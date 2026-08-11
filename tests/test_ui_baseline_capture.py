@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from starlette.testclient import TestClient
 
 from lnt.errors import InputError
+from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 from lnt.types import SeriesPosition
 from lnt.ui import operations
 from lnt.ui.app import create_app
@@ -68,11 +69,11 @@ def test_capture_one_passes_sibling_baseline_to_capture_session(
 
     with_baseline = parse_job_request(_capture_payload(baseline_session="base-noise"))
     assert isinstance(with_baseline, CaptureRequest)
-    backend.capture_one(with_baseline, tmp_path / "out", None)
+    backend.capture_one(with_baseline, tmp_path / "out", None, CancellationToken())
 
     without_baseline = parse_job_request(_capture_payload())
     assert isinstance(without_baseline, CaptureRequest)
-    backend.capture_one(without_baseline, tmp_path / "out2", None)
+    backend.capture_one(without_baseline, tmp_path / "out2", None, CancellationToken())
 
     assert recorded[0]["baseline_session"] == "../base-noise"
     assert recorded[1]["baseline_session"] is None
@@ -88,8 +89,9 @@ class _RecordingBackend(LntBackend):
         request: CaptureRequest,
         out_dir: Path,
         series: SeriesPosition | None,
+        cancellation_token: CancellationToken = NEVER_CANCELLED,
     ) -> Path:
-        del out_dir, series
+        del out_dir, series, cancellation_token
         self.requests.append(request)
         raise InputError("останов записи в тесте")
 

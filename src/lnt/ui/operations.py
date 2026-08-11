@@ -13,6 +13,7 @@ from lnt.analysis import (
     write_line_quality_analysis,
 )
 from lnt.compare import ComparisonResult, compare_analyses, ensure_comparable
+from lnt.scope_io import NEVER_CANCELLED, CancellationToken, CancelledResult
 from lnt.selftest import SelftestResult, run_selftest
 from lnt.simulate import simulate_session
 from lnt.types import ChannelMode, SeriesPosition, SessionType
@@ -37,7 +38,8 @@ class JobBackend(Protocol):
         request: CaptureRequest,
         out_dir: Path,
         series: SeriesPosition | None,
-    ) -> Path:
+        cancellation_token: CancellationToken,
+    ) -> Path | CancelledResult:
         """Захватывает одну сессию с устройства."""
         ...
 
@@ -98,7 +100,8 @@ class LntBackend:
         request: CaptureRequest,
         out_dir: Path,
         series: SeriesPosition | None,
-    ) -> Path:
+        cancellation_token: CancellationToken = NEVER_CANCELLED,
+    ) -> Path | CancelledResult:
         """Захватывает сессию с параметрами запроса панели."""
         session_type = _session_type(request)
         baseline = (
@@ -114,6 +117,7 @@ class LntBackend:
             series=series,
             baseline_session=baseline,
             channel_mode=_channel_mode(request.channels),
+            cancellation_token=cancellation_token,
         )
 
     def analyze_and_write(self, session_dir: Path) -> AnalysisResult | LineQualityAnalysis:

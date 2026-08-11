@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from lnt import acquire
+from lnt.scope_io import CancelledResult
 from lnt.types import (
     AcquisitionTelemetry,
     ChannelMode,
@@ -65,6 +66,7 @@ def test_measurement_capture_writes_explicit_floating_rc_setup(tmp_path: Path) -
         baseline_session="../baseline",
         ch1_setup=setup,
     )
+    assert not isinstance(session, CancelledResult)
 
     # Then: schema v2 carries only the explicit machine-readable transfer setup.
     manifest = json.loads((session / "manifest.json").read_text(encoding="utf-8"))
@@ -90,6 +92,7 @@ def test_self_noise_capture_writes_explicit_terminated_setup(tmp_path: Path) -> 
         sample_rate_hz=1_000_000.0,
         session_type=SessionType.SELF_NOISE,
     )
+    assert not isinstance(session, CancelledResult)
 
     # Then: the model is explicit and carries the scope termination resistance.
     manifest = json.loads((session / "manifest.json").read_text(encoding="utf-8"))
@@ -108,6 +111,7 @@ def test_single_channel_capture_omits_ch2(tmp_path: Path) -> None:
         sample_rate_hz=1_000_000.0,
         channel_mode=ChannelMode.CH1_ONLY,
     )
+    assert not isinstance(session, CancelledResult)
 
     # Then: no ch2.npy on disk and manifest marks the session as CH1-only.
     manifest = json.loads((session / "manifest.json").read_text(encoding="utf-8"))
@@ -124,6 +128,7 @@ def test_dual_channel_capture_keeps_ch2(tmp_path: Path) -> None:
         sample_rate_hz=1_000_000.0,
         channel_mode=ChannelMode.DUAL,
     )
+    assert not isinstance(session, CancelledResult)
 
     manifest = json.loads((session / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["ch2"] is not None

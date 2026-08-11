@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, assert_never
 
 from lnt.compare import comparison_to_payload
 from lnt.errors import AnalysisError, DeviceNotFoundError, InputError
+from lnt.scope_io import CancellationToken, CancelledResult
 from lnt.series import run_series, series_dirs
 from lnt.ui.models import (
     AnalyzeRequest,
@@ -193,7 +194,10 @@ def _execute_series(
                     request,
                     dirs[position.index - 1],
                     series,
+                    CancellationToken(context.is_cancelled),
                 )
+                if isinstance(path, CancelledResult):
+                    raise _Cancelled
                 context.report(
                     WorkerUpdate(
                         stage=stage,

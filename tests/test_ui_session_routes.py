@@ -10,6 +10,7 @@ from starlette.testclient import TestClient
 
 from lnt.analysis import AnalysisResult, analyze_measurement_session, write_analysis
 from lnt.compare import ComparisonResult
+from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 from lnt.selftest import SelftestResult
 from lnt.simulate import simulate_session
 from lnt.types import SeriesPosition
@@ -39,8 +40,9 @@ class _UnusedBackend:
         request: CaptureRequest,
         out_dir: Path,
         series: SeriesPosition | None,
+        cancellation_token: CancellationToken = NEVER_CANCELLED,
     ) -> Path:
-        del request, out_dir, series
+        del request, out_dir, series, cancellation_token
         raise AssertionError("задачи не должны запускаться")
 
     def analyze_and_write(self, session_dir: Path) -> AnalysisResult:

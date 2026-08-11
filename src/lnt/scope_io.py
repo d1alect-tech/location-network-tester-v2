@@ -9,7 +9,7 @@
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol, cast
+from typing import Final, Protocol, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -27,6 +27,22 @@ CHANNEL_COUNT = 2
 BLOCK_SAMPLES_PER_CHANNEL = BLOCK_SAMPLES // CHANNEL_COUNT
 OUTSTANDING_TRANSFERS = 10
 STALL_TIMEOUT_EXTRA_S = 2.0
+MAX_POLL_TIMEOUT_MS: Final = 250
+
+
+@dataclass(frozen=True, slots=True)
+class CancellationToken:
+    """Cooperative cancellation query, safe to call at poll boundaries."""
+
+    is_cancelled: Callable[[], bool] = lambda: False
+
+
+@dataclass(frozen=True, slots=True)
+class CancelledResult:
+    """Typed acknowledgement that acquisition stopped without a session."""
+
+
+NEVER_CANCELLED: Final = CancellationToken()
 
 
 class ScopeProtocol(Protocol):
@@ -58,7 +74,9 @@ class ScopeProtocol(Protocol):
     ) -> object: ...
     def start_capture(self) -> object: ...
     def stop_capture(self) -> object: ...
-    def poll(self) -> object: ...
+    def poll(self, timeout_ms: int, /) -> object:
+        """Handle events for at most ``timeout_ms`` (1..250 ms)."""
+        ...
 
 
 class _ShutdownEvent(Protocol):
@@ -89,7 +107,36 @@ def open_real_scope() -> ScopeProtocol:
         raise DeviceNotFoundError(
             "драйвер hantek6022api не установлен: pip install 'lnt[hantek]' (см. README)",
         ) from exc
-    return cast("ScopeProtocol", Oscilloscope())
+    driver = cast("_HantekDriver", cast("object", Oscilloscope()))
+    return cast("ScopeProtocol", cast("object", _HantekScope(driver)))
+
+
+class _UsbContext(Protocol):
+    def handleEventsTimeout(self, timeout_s: float, /) -> None: ...  # noqa: N802
+
+
+class _HantekDriver(Protocol):
+    context: _UsbContext
+
+
+class _HantekScope:
+    """Pinned Hantek adapter replacing its implicit libusb timeout with an explicit bound."""
+
+    def __init__(self, driver: _HantekDriver) -> None:
+        self._driver: _HantekDriver = driver
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._driver, name)
+
+    def poll(self, timeout_ms: int, /) -> None:
+        _poll_hantek(self._driver, timeout_ms)
+
+
+def _poll_hantek(driver: _HantekDriver, timeout_ms: int) -> None:
+    """Use libusb's explicit timeout; the pinned driver's ``poll`` hides its bound."""
+    if not 1 <= timeout_ms <= MAX_POLL_TIMEOUT_MS:
+        raise ValueError("poll timeout must be in 1..250 ms")
+    driver.context.handleEventsTimeout(timeout_ms / 1_000)
 
 
 def _configure_scope(scope: ScopeProtocol, rate_code: int, ch1_range_code: int) -> None:
@@ -107,14 +154,15 @@ def _configure_scope(scope: ScopeProtocol, rate_code: int, ch1_range_code: int) 
     scope.set_ch2_voltage_range(RANGE_CODE_5V)
 
 
-def run_capture(
+def run_capture(  # noqa: PLR0913 - backend contract keeps acquisition settings explicit
     scope: ScopeProtocol,
     *,
     rate_code: int,
     ch1_range_code: int,
     sample_rate_hz: float,
     requested_samples: int,
-) -> tuple[NDArray[np.uint8], NDArray[np.uint8], AcquisitionTelemetry]:
+    cancellation_token: CancellationToken = NEVER_CANCELLED,
+) -> tuple[NDArray[np.uint8], NDArray[np.uint8], AcquisitionTelemetry] | CancelledResult:
     """Гонит поток до ``requested_samples``; возвращает raw-каналы и телеметрию.
 
     Ошибки драйвера (``usb1.*``) отображаются в ``DeviceNotFoundError``:
@@ -127,6 +175,7 @@ def run_capture(
             ch1_range_code=ch1_range_code,
             sample_rate_hz=sample_rate_hz,
             requested_samples=requested_samples,
+            cancellation_token=cancellation_token,
         )
     except Exception as exc:
         if type(exc).__module__.partition(".")[0] == "usb1":
@@ -134,26 +183,31 @@ def run_capture(
         raise
 
 
-def _stream_capture(
+def _stream_capture(  # noqa: PLR0913 - mirrors the public backend contract
     scope: ScopeProtocol,
     *,
     rate_code: int,
     ch1_range_code: int,
     sample_rate_hz: float,
     requested_samples: int,
-) -> tuple[NDArray[np.uint8], NDArray[np.uint8], AcquisitionTelemetry]:
+    cancellation_token: CancellationToken,
+) -> tuple[NDArray[np.uint8], NDArray[np.uint8], AcquisitionTelemetry] | CancelledResult:
     collector = _BlockCollector()
-    _configure_scope(scope, rate_code, ch1_range_code)
+    if cancellation_token.is_cancelled():
+        return CancelledResult()
     try:
+        _configure_scope(scope, rate_code, ch1_range_code)
         shutdown = cast(
             "_ShutdownEvent",
             scope.read_async(collector.on_block, BLOCK_SAMPLES, OUTSTANDING_TRANSFERS, raw=True),
         )
-        scope.start_capture()
         try:
+            scope.start_capture()
             deadline = time.monotonic() + requested_samples / sample_rate_hz + STALL_TIMEOUT_EXTRA_S
             while collector.total_samples < requested_samples:
-                scope.poll()
+                if cancellation_token.is_cancelled():
+                    return CancelledResult()
+                scope.poll(MAX_POLL_TIMEOUT_MS)
                 if time.monotonic() > deadline:
                     raise DeviceNotFoundError(
                         f"поток прервался: {collector.total_samples}/{requested_samples} отсчётов",

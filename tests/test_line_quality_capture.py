@@ -10,6 +10,7 @@ import pytest
 
 from lnt import acquire
 from lnt.errors import InputError
+from lnt.scope_io import CancelledResult
 from lnt.types import (
     AcquisitionTelemetry,
     ChannelMode,
@@ -57,6 +58,7 @@ def test_line_quality_capture_writes_transformer_manifest(tmp_path: Path) -> Non
         session_type=SessionType.LINE_QUALITY,
         channel_mode=ChannelMode.CH1_ONLY,
     )
+    assert not isinstance(session, CancelledResult)
 
     # Then: the manifest declares the transformer front-end on CH1 and no CH2.
     manifest = json.loads((session / "manifest.json").read_text(encoding="utf-8"))
@@ -84,6 +86,7 @@ def test_line_quality_capture_applies_probe_multiplier_to_volts(tmp_path: Path) 
         session_type=SessionType.LINE_QUALITY,
         channel_mode=ChannelMode.CH1_ONLY,
     )
+    assert not isinstance(session, CancelledResult)
 
     # When: the persisted CH1 waveform is loaded.
     ch1 = np.load(session / "ch1.npy")
@@ -137,6 +140,7 @@ def test_line_quality_capture_accepts_explicit_transformer_setup(tmp_path: Path)
         channel_mode=ChannelMode.CH1_ONLY,
         ch1_setup=setup,
     )
+    assert not isinstance(session, CancelledResult)
 
     # Then: the manifest carries the explicit multiplier and scaling follows it.
     manifest = json.loads((session / "manifest.json").read_text(encoding="utf-8"))

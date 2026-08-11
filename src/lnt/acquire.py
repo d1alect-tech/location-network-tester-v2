@@ -10,6 +10,7 @@ import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -18,7 +19,15 @@ from lnt.errors import InputError
 from lnt.manifest import validated_label
 from lnt.metadata_collector import AcquisitionSettings, MetadataCollector
 from lnt.profiles import FrontEndProfile
-from lnt.scope_io import RANGE_CODE_5V, ScopeProtocol, open_real_scope, run_capture
+from lnt.scope_io import (
+    NEVER_CANCELLED,
+    RANGE_CODE_5V,
+    CancellationToken,
+    CancelledResult,
+    ScopeProtocol,
+    open_real_scope,
+    run_capture,
+)
 from lnt.session_projection import index_session, write_initial_context
 from lnt.session_store import write_session
 from lnt.types import (
@@ -58,7 +67,8 @@ DEFAULT_TRANSFORMER_SECONDARY_V = 6.0
 DEFAULT_TRANSFORMER_PROBE_MULTIPLIER = 10.0
 
 
-def capture_session(  # noqa: PLR0913 -- сборочная точка сессии: все параметры kw-only с дефолтами
+@overload
+def capture_session(
     *,
     out_dir: Path,
     duration_s: float,
@@ -71,7 +81,42 @@ def capture_session(  # noqa: PLR0913 -- сборочная точка сесс�
     ch1_setup: Ch1Setup | None = None,
     baseline_session: str | None = None,
     channel_mode: ChannelMode = ChannelMode.DUAL,
-) -> Path:
+) -> Path: ...
+
+
+@overload
+def capture_session(
+    *,
+    out_dir: Path,
+    duration_s: float,
+    cancellation_token: CancellationToken,
+    sample_rate_hz: float = DEFAULT_SAMPLE_RATE_HZ,
+    session_type: SessionType = SessionType.MEASUREMENT,
+    ch1_range_v: float = DEFAULT_RANGE_V,
+    label: str | None = None,
+    series: SeriesPosition | None = None,
+    scope_factory: Callable[[], ScopeProtocol] | None = None,
+    ch1_setup: Ch1Setup | None = None,
+    baseline_session: str | None = None,
+    channel_mode: ChannelMode = ChannelMode.DUAL,
+) -> Path | CancelledResult: ...
+
+
+def capture_session(  # noqa: C901, PLR0913 -- capture assembly boundary
+    *,
+    out_dir: Path,
+    duration_s: float,
+    sample_rate_hz: float = DEFAULT_SAMPLE_RATE_HZ,
+    session_type: SessionType = SessionType.MEASUREMENT,
+    ch1_range_v: float = DEFAULT_RANGE_V,
+    label: str | None = None,
+    series: SeriesPosition | None = None,
+    scope_factory: Callable[[], ScopeProtocol] | None = None,
+    ch1_setup: Ch1Setup | None = None,
+    baseline_session: str | None = None,
+    channel_mode: ChannelMode = ChannelMode.DUAL,
+    cancellation_token: CancellationToken = NEVER_CANCELLED,
+) -> Path | CancelledResult:
     """Захватывает сессию и атомарно пишет её в ``out_dir``.
 
     ``ch1_range_v`` — номинал диапазона ВЧ-канала (5/1/0.5 В); CH2 всегда
@@ -102,14 +147,20 @@ def capture_session(  # noqa: PLR0913 -- сборочная точка сесс�
         parameters.update(series.as_parameters())
     factory = scope_factory if scope_factory is not None else open_real_scope
     created_utc = datetime.now(UTC).isoformat()
+    if cancellation_token.is_cancelled():
+        return CancelledResult()
     scope = factory()
-    ch1_raw, ch2_raw, telemetry = run_capture(
+    capture = run_capture(
         scope,
         rate_code=rate_code,
         ch1_range_code=ch1_range_code,
         sample_rate_hz=sample_rate_hz,
         requested_samples=requested_samples,
+        cancellation_token=cancellation_token,
     )
+    if isinstance(capture, CancelledResult):
+        return capture
+    ch1_raw, ch2_raw, telemetry = capture
     id_suffix = series.id_suffix() if series is not None else ""
     manifest = SessionManifest(
         schema_version=CH1_MANIFEST_SCHEMA_VERSION,
@@ -153,27 +204,36 @@ def capture_session(  # noqa: PLR0913 -- сборочная точка сесс�
         ),
         telemetry=telemetry,
     )
-    return write_session(
-        session_dir=out_dir,
-        manifest=manifest,
-        ch1=_scale_raw(
-            ch1_raw,
-            range_code=ch1_range_code,
-            probe_multiplier=_ch1_probe_multiplier(setup),
-        ),
-        ch2=(
-            _scale_raw(ch2_raw, range_code=RANGE_CODE_5V)
-            if channel_mode is ChannelMode.DUAL
-            else None
-        ),
-        before_publish=lambda partial: write_initial_context(
-            partial,
-            manifest.session_id,
-            metadata,
-            label=normalized_label,
-        ),
-        after_publish=index_session,
-    )
+
+    def prepare_publish(partial: Path) -> None:
+        write_initial_context(partial, manifest.session_id, metadata, label=normalized_label)
+        # Last cancellation boundary: never interrupt the following atomic rename.
+        if cancellation_token.is_cancelled():
+            raise _CaptureCancelledError
+
+    try:
+        return write_session(
+            session_dir=out_dir,
+            manifest=manifest,
+            ch1=_scale_raw(
+                ch1_raw,
+                range_code=ch1_range_code,
+                probe_multiplier=_ch1_probe_multiplier(setup),
+            ),
+            ch2=(
+                _scale_raw(ch2_raw, range_code=RANGE_CODE_5V)
+                if channel_mode is ChannelMode.DUAL
+                else None
+            ),
+            before_publish=prepare_publish,
+            after_publish=index_session,
+        )
+    except _CaptureCancelledError:
+        return CancelledResult()
+
+
+class _CaptureCancelledError(Exception):
+    """Internal signal used so ``write_session`` removes its partial tree."""
 
 
 def _metadata_front_end(setup: Ch1Setup) -> FrontEndProfile:
