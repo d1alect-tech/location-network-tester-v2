@@ -83,3 +83,12 @@ def test_showcase_route_served_by_app(tmp_path: Path) -> None:
         assert response.status_code == 200
         assert "Витрина дизайн-системы LNT" in response.text
         assert response.headers["Content-Security-Policy"]
+
+def test_showcase_html_has_no_inline_styles_or_style_blocks() -> None:
+    html = SHOWCASE_PATH.read_text(encoding="utf-8")
+    assert "style=" not in html
+    assert "<style" not in html
+
+def test_showcase_html_script_tag_has_defer() -> None:
+    html = SHOWCASE_PATH.read_text(encoding="utf-8")
+    assert 'src="/static/showcase.js" defer' in html

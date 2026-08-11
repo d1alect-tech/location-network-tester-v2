@@ -26,10 +26,14 @@
   if (forcedColorsIndicator) {
     const mediaQuery = window.matchMedia('(forced-colors: active)');
     if (mediaQuery.matches) {
-      forcedColorsIndicator.style.display = 'inline-flex';
+      forcedColorsIndicator.classList.remove('is-hidden');
     }
     mediaQuery.addEventListener('change', function (e) {
-      forcedColorsIndicator.style.display = e.matches ? 'inline-flex' : 'none';
+      if (e.matches) {
+        forcedColorsIndicator.classList.remove('is-hidden');
+      } else {
+        forcedColorsIndicator.classList.add('is-hidden');
+      }
     });
   }
 

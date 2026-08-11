@@ -13,13 +13,14 @@
   </head>
   <body>
     <main class="showcase-shell">
+    <main class="showcase-shell">
       <header class="showcase-header">
         <h1>Витрина дизайн-системы LNT</h1>
         <p>Интерактивный живой стиль-гайд для проверки семантических примитивов и состояний.</p>
         <div class="showcase-controls">
           <button id="toggle-theme" class="button button-secondary" type="button">Переключить тему (Светлая/Тёмная)</button>
           <button id="toggle-motion" class="button button-secondary" type="button">Режим уменьшения движения (Выкл)</button>
-          <span id="forced-colors-indicator" class="badge badge-warn" style="display: none;">Режим Forced Colors активен</span>
+          <span id="forced-colors-indicator" class="badge badge-warn" class="is-hidden">Режим Forced Colors активен</span>
         </div>
       </header>
       <section class="theme-preview" data-theme="light" aria-labelledby="light-title">
@@ -163,5 +164,6 @@
         </div>
       </section>
     </main>
+    <script src="/static/showcase.js" defer></script>
   </body>
 </html>

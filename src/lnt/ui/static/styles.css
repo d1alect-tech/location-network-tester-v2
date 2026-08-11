@@ -320,3 +320,7 @@ thead th { color: var(--text-secondary); font: var(--type-label); } tbody th { c
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }
+
+.is-hidden {
+  display: none !important;
+}
