@@ -74,6 +74,58 @@ def test_integrated_psd_matches_time_domain_variance() -> None:
     assert integrated_power == pytest.approx(expected_variance, rel=0.015)
 
 
+def test_amplitude_scaling_is_quadratic() -> None:
+    rng = np.random.default_rng(9103)
+    samples = rng.normal(0.0, 0.2, 32_768).astype(np.float32)
+    original = compute_welch(samples, settings=_settings())
+    scaled = compute_welch(samples * 3.0, settings=_settings())
+    assert scaled.psd_v2_per_hz == pytest.approx(original.psd_v2_per_hz * 9.0, rel=2e-6)
+
+
+def test_integer_segment_time_shift_preserves_psd() -> None:
+    samples = np.sin(2 * np.pi * 512 * np.arange(32_768) / 16_384).astype(np.float32)
+    shifted = np.roll(samples, 2_048)
+    first = compute_welch(samples, settings=_settings())
+    second = compute_welch(shifted, settings=_settings())
+    assert second.psd_v2_per_hz == pytest.approx(first.psd_v2_per_hz, rel=2e-6, abs=1e-15)
+
+
+def test_chunk_geometry_does_not_change_psd() -> None:
+    rng = np.random.default_rng(9104)
+    samples = rng.normal(0.0, 0.2, 32_768).astype(np.float32)
+    small = compute_welch(samples, settings=_settings())
+    whole_settings = PsdSettings(
+        sample_rate_hz=16_384.0,
+        nperseg=2_048,
+        max_chunk_samples=samples.size,
+        bands=(FrequencyBand(name="all", low_hz=0.0, high_hz=8_192.0),),
+    )
+    whole = compute_welch(samples, settings=whole_settings)
+    assert small.segment_count == whole.segment_count
+    assert small.psd_v2_per_hz == pytest.approx(whole.psd_v2_per_hz, rel=2e-14, abs=1e-18)
+
+
+def test_sample_rate_change_preserves_physical_tone_frequency_and_power() -> None:
+    results = []
+    for rate_hz in (16_384.0, 32_768.0):
+        time = np.arange(round(rate_hz * 2), dtype=np.float64) / rate_hz
+        samples = (0.5 * np.sin(2 * np.pi * 1_024 * time)).astype(np.float32)
+        results.append(
+            compute_welch(
+                samples, settings=_settings(sample_rate_hz=rate_hz, nperseg=round(rate_hz / 8))
+            )
+        )
+    peaks = [float(result.frequency_hz[np.argmax(result.psd_v2_per_hz)]) for result in results]
+    assert peaks == pytest.approx([1_024.0, 1_024.0], abs=8.0)
+    assert results[0].band_rms[0].rms_v == pytest.approx(results[1].band_rms[0].rms_v, rel=1e-5)
+
+
+def test_zero_data_produces_exact_zero_linear_results() -> None:
+    result = compute_welch(np.zeros(4_096, dtype=np.float32), settings=_settings())
+    assert np.array_equal(result.psd_v2_per_hz, np.zeros_like(result.psd_v2_per_hz))
+    assert result.band_rms[0].rms_v == 0.0
+
+
 def test_cancellation_is_checked_between_bounded_chunks() -> None:
     # Given
     samples = np.zeros(65_536, dtype=np.float32)
