@@ -4,6 +4,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final
 
+from lnt.device_diagnostics import (
+    DeviceDiagnostic,
+    DeviceProbeSnapshot,
+    DeviceState,
+    diagnose_device_state,
+)
 from lnt.errors import DeviceNotFoundError
 from lnt.scope_io import ScopeProtocol, open_real_scope
 
@@ -32,6 +38,36 @@ class DeviceStatus:
     firmware_present: bool
     error_message: str | None
     hints: tuple[str, ...]
+    state: DeviceState
+    description_ru: str
+    recovery_action_ru: str
+
+
+@dataclass(frozen=True, slots=True)
+class _SnapshotProbe:
+    snapshot: DeviceProbeSnapshot
+
+    def probe(self) -> DeviceProbeSnapshot:
+        return self.snapshot
+
+
+def _legacy_status(diagnostic: DeviceDiagnostic) -> DeviceStatus:
+    driver_installed = diagnostic.state not in {
+        DeviceState.BACKEND_UNAVAILABLE,
+        DeviceState.DRIVER_MISSING,
+    }
+    device_opened = diagnostic.state in {DeviceState.FIRMWARE_MISSING, DeviceState.READY}
+    firmware_present = diagnostic.state is DeviceState.READY
+    return DeviceStatus(
+        driver_installed=driver_installed,
+        device_opened=device_opened,
+        firmware_present=firmware_present,
+        error_message=None if firmware_present else diagnostic.detail or diagnostic.description_ru,
+        hints=() if firmware_present else (diagnostic.recovery_action_ru,),
+        state=diagnostic.state,
+        description_ru=diagnostic.description_ru,
+        recovery_action_ru=diagnostic.recovery_action_ru,
+    )
 
 
 def diagnose_device(
@@ -41,61 +77,47 @@ def diagnose_device(
     try:
         scope = scope_factory()
     except DeviceNotFoundError as exc:
-        return DeviceStatus(
-            driver_installed=False,
-            device_opened=False,
-            firmware_present=False,
-            error_message=str(exc),
-            hints=_INSTALL_HINTS,
+        snapshot = DeviceProbeSnapshot(
+            backend_available=False,
+            detail=str(exc),
         )
     except Exception as exc:  # noqa: BLE001 - граница UI не выпускает ошибки драйвера
-        return DeviceStatus(
-            driver_installed=True,
-            device_opened=False,
-            firmware_present=False,
-            error_message=str(exc),
-            hints=_GENERIC_HINTS,
+        snapshot = DeviceProbeSnapshot(
+            backend_available=True,
+            driver_available=False,
+            detail=str(exc),
         )
-
-    handle_opened = False
-    try:
-        scope.setup()
-        handle_opened = scope.open_handle()
-        if handle_opened:
-            firmware_present = scope.is_device_firmware_present
-            status = DeviceStatus(
-                driver_installed=True,
-                device_opened=True,
-                firmware_present=firmware_present,
-                error_message=None,
-                hints=() if firmware_present else _FIRMWARE_HINTS,
+    else:
+        handle_opened = False
+        try:
+            scope.setup()
+            handle_opened = bool(scope.open_handle())
+            snapshot = DeviceProbeSnapshot(
+                backend_available=True,
+                driver_available=True,
+                detected_vid="04B5" if handle_opened else None,
+                handle_opened=handle_opened,
+                firmware_present=handle_opened and scope.is_device_firmware_present,
             )
-        else:
-            status = DeviceStatus(
-                driver_installed=True,
-                device_opened=False,
-                firmware_present=False,
-                error_message="Hantek 6022BE не найден",
-                hints=_OPEN_HINTS,
+        except Exception as exc:  # noqa: BLE001 - граница UI не выпускает ошибки драйвера
+            detail = str(exc)
+            snapshot = DeviceProbeSnapshot(
+                backend_available=True,
+                driver_available=True,
+                detected_vid="04B5",
+                handle_busy="busy" in detail.casefold() or "access" in detail.casefold(),
+                detail=detail,
             )
-    except Exception as exc:  # noqa: BLE001 - граница UI не выпускает ошибки драйвера
-        status = DeviceStatus(
-            driver_installed=True,
-            device_opened=False,
-            firmware_present=False,
-            error_message=str(exc),
-            hints=_GENERIC_HINTS,
-        )
-    finally:
-        if handle_opened:
-            try:
-                scope.close_handle()
-            except Exception as exc:  # noqa: BLE001 - ошибка закрытия также диагностируется
-                status = DeviceStatus(
-                    driver_installed=True,
-                    device_opened=False,
-                    firmware_present=False,
-                    error_message=str(exc),
-                    hints=_GENERIC_HINTS,
-                )
-    return status
+        finally:
+            if handle_opened:
+                try:
+                    scope.close_handle()
+                except Exception as exc:  # noqa: BLE001 - ошибка закрытия также диагностируется
+                    snapshot = DeviceProbeSnapshot(
+                        backend_available=True,
+                        driver_available=True,
+                        detected_vid="04B5",
+                        handle_busy=True,
+                        detail=str(exc),
+                    )
+    return _legacy_status(diagnose_device_state(_SnapshotProbe(snapshot)))
