@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Final, assert_never
 
+from lnt.runtime.store import JobStore
 from lnt.ui.job_state import JobSnapshot, advance, new_job
 from lnt.ui.job_worker import (
     WorkerCancelled,
@@ -50,10 +51,11 @@ class JobNotCancellableError(Exception):
 class JobManager:
     """Управляет единственной активной задачей и рассылкой её снимков."""
 
-    def __init__(self, *, backend: JobBackend, root: Path) -> None:
+    def __init__(self, *, backend: JobBackend, root: Path, store: JobStore) -> None:
         """Создаёт менеджер с одним рабочим потоком для каталога сессий."""
         self._backend: JobBackend = backend
         self._root: Path = root
+        self._store: JobStore = store
         self._executor: ThreadPoolExecutor = ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="lnt-job",
@@ -71,6 +73,7 @@ class JobManager:
                 raise JobBusyError
             snapshot = new_job(JobKind(request.kind))
             job_id = snapshot.job_id
+            self._store.create(snapshot, input_reference=request.model_dump(mode="json"))
             self._registry[job_id] = snapshot
             self._changes[job_id] = asyncio.Event()
             cancellation = threading.Event()
@@ -102,7 +105,12 @@ class JobManager:
         """Возвращает текущий снимок или сообщает о неизвестной задаче."""
         snapshot = self._registry.get(job_id)
         if snapshot is None:
-            raise UnknownJobError
+            try:
+                snapshot = self._store.get(job_id)
+            except KeyError as error:
+                raise UnknownJobError from error
+            self._registry[job_id] = snapshot
+            self._changes[job_id] = asyncio.Event()
         return snapshot
 
     def cancel(self, job_id: str) -> JobSnapshot:
@@ -124,7 +132,8 @@ class JobManager:
         """
         change = self._changes.get(job_id)
         if change is None:
-            raise UnknownJobError
+            self.get(job_id)
+            change = self._changes[job_id]
         last_version = 0
         while True:
             change.clear()
@@ -146,6 +155,7 @@ class JobManager:
         await asyncio.to_thread(self._executor.shutdown, wait=True, cancel_futures=False)
 
     def _publish(self, job_id: str, snapshot: JobSnapshot) -> None:
+        self._store.record(snapshot)
         self._registry[job_id] = snapshot
         self._changes[job_id].set()
 
@@ -161,7 +171,12 @@ class JobManager:
                 return
             case JobStatus.RUNNING | JobStatus.CANCELLING:
                 return
-            case JobStatus.SUCCEEDED | JobStatus.CANCELLED | JobStatus.FAILED:
+            case (
+                JobStatus.SUCCEEDED
+                | JobStatus.CANCELLED
+                | JobStatus.FAILED
+                | JobStatus.INTERRUPTED
+            ):
                 _LOGGER.debug(
                     "Запуск завершённой задачи отброшен",
                     extra={"job_id": job_id},

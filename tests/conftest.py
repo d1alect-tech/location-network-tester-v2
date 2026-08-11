@@ -70,6 +70,12 @@ def session_root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def runtime_db(tmp_path: Path) -> Path:
+    """Изолированный путь runtime-хранилища для интеграционных тестов."""
+    return tmp_path / "runtime.sqlite3"
+
+
+@pytest.fixture
 def small_mains_wave(rng: np.random.Generator) -> np.ndarray:
     """Короткий 50 Гц сигнал (0.5 с @ 100 кС/с) с лёгким шумом — для юнитов."""
     sample_rate = 100_000

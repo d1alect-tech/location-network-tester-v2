@@ -13,15 +13,17 @@ from lnt.ui.models import JobKind, JobStage, JobStatus
 SCHEMA_VERSION: Final = 1
 
 _TERMINAL_STATUSES: Final = frozenset(
-    {JobStatus.SUCCEEDED, JobStatus.CANCELLED, JobStatus.FAILED},
+    {JobStatus.SUCCEEDED, JobStatus.CANCELLED, JobStatus.FAILED, JobStatus.INTERRUPTED},
 )
 _ALLOWED_TRANSITIONS: Final[Mapping[JobStatus, frozenset[JobStatus]]] = {
-    JobStatus.QUEUED: frozenset({JobStatus.RUNNING, JobStatus.CANCELLING}),
+    JobStatus.QUEUED: frozenset(
+        {JobStatus.RUNNING, JobStatus.CANCELLING, JobStatus.INTERRUPTED},
+    ),
     JobStatus.RUNNING: frozenset(
-        {JobStatus.CANCELLING, JobStatus.SUCCEEDED, JobStatus.FAILED},
+        {JobStatus.CANCELLING, JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.INTERRUPTED},
     ),
     JobStatus.CANCELLING: frozenset(
-        {JobStatus.CANCELLED, JobStatus.SUCCEEDED, JobStatus.FAILED},
+        {JobStatus.CANCELLED, JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.INTERRUPTED},
     ),
 }
 

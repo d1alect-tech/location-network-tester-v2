@@ -1,4 +1,4 @@
-const TERMINAL_STATUSES = new Set(["succeeded", "cancelled", "failed"]);
+const TERMINAL_STATUSES = new Set(["succeeded", "cancelled", "failed", "interrupted"]);
 const SESSION_JOB_KINDS = new Set(["simulate", "capture", "analyze"]);
 
 export function createJobController({

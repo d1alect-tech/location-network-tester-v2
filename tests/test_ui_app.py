@@ -203,13 +203,21 @@ def test_lifespan_shutdown_closes_worker_thread(tmp_path: Path) -> None:
 
 def test_sequential_apps_have_independent_job_state(tmp_path: Path) -> None:
     with TestClient(
-        create_app(root=tmp_path / "first", backend=_InstantBackend()),
+        create_app(
+            root=tmp_path / "first",
+            backend=_InstantBackend(),
+            runtime_db=tmp_path / "first-runtime.sqlite3",
+        ),
     ) as first_client:
         first_job_id = _start_selftest(first_client)
         assert _poll_terminal(first_client, first_job_id)["status"] == "succeeded"
 
     with TestClient(
-        create_app(root=tmp_path / "second", backend=_InstantBackend()),
+        create_app(
+            root=tmp_path / "second",
+            backend=_InstantBackend(),
+            runtime_db=tmp_path / "second-runtime.sqlite3",
+        ),
     ) as second_client:
         missing = second_client.get(f"/api/jobs/{first_job_id}")
         second_job_id = _start_selftest(second_client)

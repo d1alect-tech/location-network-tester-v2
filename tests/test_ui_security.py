@@ -11,6 +11,7 @@ from starlette.testclient import TestClient
 from lnt.analysis import AnalysisResult
 from lnt.compare import ComparisonResult
 from lnt.errors import InputError
+from lnt.runtime.store import JobStore
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 from lnt.selftest import SelftestResult
 from lnt.types import SeriesPosition
@@ -101,10 +102,12 @@ def _build_app(services: AppServices | None) -> FastAPI:
 @pytest.fixture
 def services(tmp_path: Path) -> Iterator[AppServices]:
     backend: JobBackend = _UnusedBackend()
-    manager = JobManager(backend=backend, root=tmp_path)
+    runtime_db = tmp_path / "runtime.sqlite3"
+    manager = JobManager(backend=backend, root=tmp_path, store=JobStore(runtime_db))
     yield AppServices(
         root=tmp_path,
         catalog_db=tmp_path / ".lnt" / "catalog.sqlite3",
+        runtime_db=runtime_db,
         jobs=manager,
     )
     anyio.run(manager.aclose)

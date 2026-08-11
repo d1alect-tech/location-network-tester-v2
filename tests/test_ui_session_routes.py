@@ -10,6 +10,7 @@ from starlette.testclient import TestClient
 
 from lnt.analysis import AnalysisResult, analyze_measurement_session, write_analysis
 from lnt.compare import ComparisonResult
+from lnt.runtime.store import JobStore
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 from lnt.selftest import SelftestResult
 from lnt.simulate import simulate_session
@@ -71,7 +72,12 @@ def _build_app(root: Path, manager: JobManager) -> FastAPI:
     app = FastAPI()
     install_services(
         app,
-        AppServices(root=root, catalog_db=root / ".lnt" / "catalog.sqlite3", jobs=manager),
+        AppServices(
+            root=root,
+            catalog_db=root / ".lnt" / "catalog.sqlite3",
+            runtime_db=root / ".lnt" / "runtime.sqlite3",
+            jobs=manager,
+        ),
     )
     app.include_router(router)
     return app
@@ -101,8 +107,16 @@ def session_routes(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Session
         seed=6023,
     )
     backend: JobBackend = _UnusedBackend()
-    manager = JobManager(backend=backend, root=root)
-    unanalyzed_manager = JobManager(backend=backend, root=unanalyzed_root)
+    manager = JobManager(
+        backend=backend,
+        root=root,
+        store=JobStore(root / ".lnt" / "runtime.sqlite3"),
+    )
+    unanalyzed_manager = JobManager(
+        backend=backend,
+        root=unanalyzed_root,
+        store=JobStore(unanalyzed_root / ".lnt" / "runtime.sqlite3"),
+    )
     with (
         TestClient(_build_app(root, manager)) as client,
         TestClient(_build_app(unanalyzed_root, unanalyzed_manager)) as unanalyzed_client,

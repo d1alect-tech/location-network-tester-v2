@@ -40,6 +40,7 @@ class JobStatus(StrEnum):
     SUCCEEDED = "succeeded"
     CANCELLED = "cancelled"
     FAILED = "failed"
+    INTERRUPTED = "interrupted"
 
 
 class JobStage(StrEnum):

@@ -13,6 +13,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
+from lnt.app_paths import resolve_app_paths
+from lnt.runtime.store import JobStore
 from lnt.ui import routes_catalog, routes_context, routes_jobs, routes_profiles, routes_sessions
 from lnt.ui.dependencies import AppServices, install_services
 from lnt.ui.jobs import JobManager
@@ -40,6 +42,7 @@ def create_app(
     root: Path,
     backend: JobBackend | None = None,
     catalog_db: Path | None = None,
+    runtime_db: Path | None = None,
 ) -> FastAPI:
     """Создаёт изолированный экземпляр панели для указанного каталога сессий."""
 
@@ -47,9 +50,13 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         """Устанавливает сервисы приложения и освобождает рабочий поток."""
         await anyio.Path(root).mkdir(parents=True, exist_ok=True)
+        runtime_path = runtime_db if runtime_db is not None else resolve_app_paths().runtime_db
+        store = JobStore(runtime_path)
+        store.interrupt_nonterminal()
         manager = JobManager(
             backend=backend if backend is not None else LntBackend(),
             root=root,
+            store=store,
         )
         install_services(
             app,
@@ -58,6 +65,7 @@ def create_app(
                 catalog_db=(
                     catalog_db if catalog_db is not None else root / ".lnt" / "catalog.sqlite3"
                 ),
+                runtime_db=runtime_path,
                 jobs=manager,
             ),
         )

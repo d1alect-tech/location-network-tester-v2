@@ -28,6 +28,7 @@ class AppServices:
 
     root: Path
     catalog_db: Path
+    runtime_db: Path
     jobs: JobManager
 
 
