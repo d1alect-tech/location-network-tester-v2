@@ -90,6 +90,50 @@ MIGRATIONS: Final = (
             "CREATE INDEX idx_experiment_members_session ON experiment_members(session_id)",
         ),
     ),
+    Migration(
+        2,
+        "reconcile_projections",
+        (
+            """CREATE TABLE catalog_sessions (
+            storage_path TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            path_fingerprint TEXT NOT NULL,
+            health TEXT NOT NULL,
+            base_health TEXT NOT NULL,
+            manifest_schema INTEGER,
+            created_utc TEXT,
+            source TEXT,
+            session_type TEXT,
+            profile TEXT,
+            sample_rate_hz REAL,
+            duration_s REAL,
+            sample_count INTEGER,
+            label TEXT,
+            channels TEXT
+        )""",
+            "CREATE INDEX idx_catalog_sessions_id ON catalog_sessions(session_id)",
+            "CREATE INDEX idx_catalog_sessions_health ON catalog_sessions(health)",
+            """CREATE TABLE catalog_context_fields (
+            storage_path TEXT NOT NULL REFERENCES catalog_sessions(storage_path) ON DELETE CASCADE,
+            field_key TEXT NOT NULL,
+            field_value TEXT NOT NULL,
+            PRIMARY KEY (storage_path, field_key)
+        )""",
+            """CREATE TABLE catalog_context_tags (
+            storage_path TEXT NOT NULL REFERENCES catalog_sessions(storage_path) ON DELETE CASCADE,
+            tag TEXT NOT NULL,
+            PRIMARY KEY (storage_path, tag)
+        )""",
+            """CREATE TABLE reconcile_runs (
+            id INTEGER PRIMARY KEY CHECK(id = 1),
+            root_path TEXT NOT NULL,
+            completed_utc TEXT NOT NULL,
+            scanned INTEGER NOT NULL,
+            changed INTEGER NOT NULL,
+            deleted INTEGER NOT NULL
+        )""",
+        ),
+    ),
 )
 
 

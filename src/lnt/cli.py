@@ -23,6 +23,7 @@ from lnt.analysis import (
     write_analysis,
     write_line_quality_analysis,
 )
+from lnt.catalog.cli import configure_catalog_parser
 from lnt.compare import compare_analyses, ensure_comparable, render_comparison
 from lnt.errors import AnalysisError, DeviceNotFoundError, InputError
 from lnt.selftest import run_selftest
@@ -146,6 +147,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
     selftest = subparsers.add_parser("selftest", help="синтетическая самопроверка пайплайна")
     selftest.set_defaults(handler=_cmd_selftest)
+    catalog = subparsers.add_parser("catalog", help="обслуживание каталога сессий")
+    configure_catalog_parser(catalog)
     return parser
 
 
