@@ -15,7 +15,14 @@ from starlette.responses import Response
 
 from lnt.app_paths import resolve_app_paths
 from lnt.runtime.store import JobStore
-from lnt.ui import routes_catalog, routes_context, routes_jobs, routes_profiles, routes_sessions
+from lnt.ui import (
+    routes_analysis_v2,
+    routes_catalog,
+    routes_context,
+    routes_jobs,
+    routes_profiles,
+    routes_sessions,
+)
 from lnt.ui.dependencies import AppServices, install_services
 from lnt.ui.jobs import JobManager
 from lnt.ui.operations import JobBackend, LntBackend
@@ -107,6 +114,7 @@ def create_app(
     app.include_router(routes_catalog.router)
     app.include_router(routes_context.router)
     app.include_router(routes_profiles.router)
+    app.include_router(routes_analysis_v2.router)
     app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
     def index() -> FileResponse:
