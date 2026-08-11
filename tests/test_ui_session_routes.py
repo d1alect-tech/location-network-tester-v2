@@ -69,7 +69,10 @@ class SessionRoutesFixture:
 
 def _build_app(root: Path, manager: JobManager) -> FastAPI:
     app = FastAPI()
-    install_services(app, AppServices(root=root, jobs=manager))
+    install_services(
+        app,
+        AppServices(root=root, catalog_db=root / ".lnt" / "catalog.sqlite3", jobs=manager),
+    )
     app.include_router(router)
     return app
 

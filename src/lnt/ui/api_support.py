@@ -5,14 +5,14 @@ from pathlib import Path
 
 from fastapi import HTTPException, status
 
-from lnt.catalog.connection import catalog_path, open_catalog_reader
+from lnt.catalog.connection import open_catalog_reader
 from lnt.catalog.query_repository import CatalogQueryRepository
 
 
-def session_directory(session_id: str) -> Path:
+def session_directory(session_id: str, catalog_db: Path) -> Path:
     """Разрешает ID только через каталог, не объединяя пользовательский ввод с путём."""
     try:
-        with open_catalog_reader(catalog_path()) as connection:
+        with open_catalog_reader(catalog_db) as connection:
             row = CatalogQueryRepository(connection).find(session_id)
     except (sqlite3.Error, OSError) as error:
         raise HTTPException(

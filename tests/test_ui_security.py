@@ -102,7 +102,11 @@ def _build_app(services: AppServices | None) -> FastAPI:
 def services(tmp_path: Path) -> Iterator[AppServices]:
     backend: JobBackend = _UnusedBackend()
     manager = JobManager(backend=backend, root=tmp_path)
-    yield AppServices(root=tmp_path, jobs=manager)
+    yield AppServices(
+        root=tmp_path,
+        catalog_db=tmp_path / ".lnt" / "catalog.sqlite3",
+        jobs=manager,
+    )
     anyio.run(manager.aclose)
 
 

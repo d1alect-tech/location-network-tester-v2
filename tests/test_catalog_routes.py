@@ -60,7 +60,7 @@ def test_catalog_cursor_is_stable_and_hides_paths(
     _insert(database, "b", "2026-01-02T00:00:00Z")
     _insert(database, "c", "2026-01-01T00:00:00Z")
 
-    with TestClient(create_app(root=tmp_path / "sessions")) as client:
+    with TestClient(create_app(root=tmp_path / "sessions", catalog_db=database)) as client:
         first = client.get("/api/catalog/sessions", params={"page_size": 1}).json()
         _insert(database, "a", "2026-01-03T00:00:00Z")
         second = client.get(
@@ -106,7 +106,7 @@ def test_catalog_supports_each_typed_filter(
         created = "2026-02-02T00:00:00Z" if session_id == "recent" else "2025-01-01T00:00:00Z"
         _insert(database, session_id, created, **values)
 
-    with TestClient(create_app(root=tmp_path / "sessions")) as client:
+    with TestClient(create_app(root=tmp_path / "sessions", catalog_db=database)) as client:
         response = client.get("/api/catalog/sessions", params=query)
 
     assert response.status_code == 200
@@ -119,12 +119,12 @@ def test_catalog_facets_validation_unavailable_and_docs(
 ) -> None:
     database = _database(tmp_path, monkeypatch)
     _insert(database, "broken", "2026-01-01T00:00:00Z", health="corrupt_manifest")
-    with TestClient(create_app(root=tmp_path / "sessions")) as client:
+    with TestClient(create_app(root=tmp_path / "sessions", catalog_db=database)) as client:
         facets = client.get("/api/catalog/health-facets")
         oversized = client.get("/api/catalog/sessions", params={"page_size": 201})
         docs = [client.get(path).status_code for path in ("/docs", "/redoc", "/openapi.json")]
     database.unlink()
-    with TestClient(create_app(root=tmp_path / "other")) as client:
+    with TestClient(create_app(root=tmp_path / "other", catalog_db=database)) as client:
         unavailable = client.get("/api/catalog/sessions")
 
     assert facets.json() == {"counts": {"corrupt_manifest": 1}}
@@ -159,7 +159,7 @@ def test_catalog_10k_query_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             rows,
         )
-    with TestClient(create_app(root=tmp_path / "sessions")) as client:
+    with TestClient(create_app(root=tmp_path / "sessions", catalog_db=database)) as client:
         started = time.perf_counter()
         response = client.get("/api/catalog/sessions", params={"page_size": 50})
         measured_ms = (time.perf_counter() - started) * 1000
@@ -167,3 +167,21 @@ def test_catalog_10k_query_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert response.status_code == 200
     assert len(response.json()["items"]) == 50
     assert measured_ms < 1000, f"10k catalog query: {measured_ms:.1f} ms"
+
+
+def test_create_app_root_does_not_read_default_global_catalog(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    global_database = _database(tmp_path / "global", monkeypatch)
+    _insert(global_database, "global-only", "2026-01-01T00:00:00Z")
+    root = tmp_path / "isolated-sessions"
+    scoped_database = root / ".lnt" / "catalog.sqlite3"
+    apply_migrations(scoped_database)
+    _insert(scoped_database, "scoped-only", "2026-01-02T00:00:00Z")
+
+    with TestClient(create_app(root=root)) as client:
+        response = client.get("/api/catalog/sessions")
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == ["scoped-only"]

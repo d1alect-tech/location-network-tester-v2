@@ -6,13 +6,14 @@ import json
 import sqlite3
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from lnt.catalog.connection import catalog_path, open_catalog_reader
+from lnt.catalog.connection import open_catalog_reader
 from lnt.catalog.query_models import CatalogCursor, CatalogFilters
 from lnt.catalog.query_repository import CatalogQueryRepository
 from lnt.catalog.reconcile import catalog_status
 from lnt.ui.api_support import catalog_unavailable
+from lnt.ui.dependencies import AppServices, get_services
 from lnt.ui.models_catalog import (
     CatalogPageResponse,
     CatalogQuery,
@@ -56,7 +57,10 @@ def _invalid_cursor() -> CatalogCursor:
     "/sessions",
     response_model_exclude_none=True,
 )
-def sessions(query: CatalogQueryParams) -> CatalogPageResponse:
+def sessions(
+    query: CatalogQueryParams,
+    services: Annotated[AppServices, Depends(get_services)],
+) -> CatalogPageResponse:
     """Возвращает фильтруемую страницу без путей по умолчанию."""
     filters = CatalogFilters(
         health=query.health,
@@ -69,7 +73,7 @@ def sessions(query: CatalogQueryParams) -> CatalogPageResponse:
         created_to=query.created_to,
     )
     try:
-        with open_catalog_reader(catalog_path()) as connection:
+        with open_catalog_reader(services.catalog_db) as connection:
             page = CatalogQueryRepository(connection).page(
                 filters,
                 _decode(query.cursor),
@@ -96,10 +100,12 @@ def sessions(query: CatalogQueryParams) -> CatalogPageResponse:
 
 
 @router.get("/health-facets")
-def health_facets() -> HealthFacetsResponse:
+def health_facets(
+    services: Annotated[AppServices, Depends(get_services)],
+) -> HealthFacetsResponse:
     """Возвращает health facets всего каталога."""
     try:
-        with open_catalog_reader(catalog_path()) as connection:
+        with open_catalog_reader(services.catalog_db) as connection:
             counts = CatalogQueryRepository(connection).health_facets()
     except (sqlite3.Error, OSError) as error:
         raise catalog_unavailable(error) from error
@@ -107,10 +113,12 @@ def health_facets() -> HealthFacetsResponse:
 
 
 @router.get("/reindex-status")
-def reindex_status() -> ReindexStatusResponse:
+def reindex_status(
+    services: Annotated[AppServices, Depends(get_services)],
+) -> ReindexStatusResponse:
     """Возвращает статус последней переиндексации без raw root path."""
     try:
-        payload = catalog_status(catalog_path())
+        payload = catalog_status(services.catalog_db)
     except (sqlite3.Error, OSError) as error:
         raise catalog_unavailable(error) from error
     last = payload["last_reconcile"]

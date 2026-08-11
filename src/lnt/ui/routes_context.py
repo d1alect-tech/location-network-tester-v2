@@ -3,14 +3,16 @@
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from lnt.context.events import read_event_history
 from lnt.context.model import ContextField, ContextSnapshot
 from lnt.context.store import ContextConflictError, ContextStore, ContextUpdate
 from lnt.errors import InputError
 from lnt.ui.api_support import session_directory
+from lnt.ui.dependencies import AppServices, get_services
 from lnt.ui.models_context import (
     ContextFieldModel,
     ContextHistoryItem,
@@ -40,16 +42,23 @@ def _response(session_id: str, store: ContextStore) -> ContextResponse:
 
 
 @router.get("/{session_id}")
-def show_context(session_id: str) -> ContextResponse:
+def show_context(
+    session_id: str,
+    services: Annotated[AppServices, Depends(get_services)],
+) -> ContextResponse:
     """Читает материализованный context view сессии."""
-    directory = session_directory(session_id)
+    directory = session_directory(session_id, services.catalog_db)
     return _response(session_id, ContextStore(directory, session_id))
 
 
 @router.put("/{session_id}")
-def update_context(session_id: str, request: ContextUpdateRequest) -> ContextResponse:
+def update_context(
+    session_id: str,
+    request: ContextUpdateRequest,
+    services: Annotated[AppServices, Depends(get_services)],
+) -> ContextResponse:
     """Записывает следующую revision при совпавшей ожидаемой revision."""
-    directory = session_directory(session_id)
+    directory = session_directory(session_id, services.catalog_db)
     store = ContextStore(directory, session_id)
     current = store.load().snapshot or ContextSnapshot.empty(session_id)
     now = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
@@ -96,9 +105,12 @@ def update_context(session_id: str, request: ContextUpdateRequest) -> ContextRes
 
 
 @router.get("/{session_id}/history")
-def context_history(session_id: str) -> ContextHistoryResponse:
+def context_history(
+    session_id: str,
+    services: Annotated[AppServices, Depends(get_services)],
+) -> ContextHistoryResponse:
     """Возвращает аудит revisions из проверенной event chain."""
-    directory = session_directory(session_id)
+    directory = session_directory(session_id, services.catalog_db)
     events = read_event_history(directory / "context.events.jsonl", session_id)
     return ContextHistoryResponse(
         items=tuple(

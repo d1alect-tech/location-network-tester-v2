@@ -35,7 +35,12 @@ class _NoCacheMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def create_app(*, root: Path, backend: JobBackend | None = None) -> FastAPI:
+def create_app(
+    *,
+    root: Path,
+    backend: JobBackend | None = None,
+    catalog_db: Path | None = None,
+) -> FastAPI:
     """Создаёт изолированный экземпляр панели для указанного каталога сессий."""
 
     @asynccontextmanager
@@ -46,7 +51,16 @@ def create_app(*, root: Path, backend: JobBackend | None = None) -> FastAPI:
             backend=backend if backend is not None else LntBackend(),
             root=root,
         )
-        install_services(app, AppServices(root=root, jobs=manager))
+        install_services(
+            app,
+            AppServices(
+                root=root,
+                catalog_db=(
+                    catalog_db if catalog_db is not None else root / ".lnt" / "catalog.sqlite3"
+                ),
+                jobs=manager,
+            ),
+        )
         try:
             yield
         finally:

@@ -28,7 +28,7 @@ def _client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
             health, base_health) VALUES (?, 'known', 'fp', 'ok', 'ok')""",
             (str(session),),
         )
-    return TestClient(create_app(root=tmp_path / "sessions"))
+    return TestClient(create_app(root=tmp_path / "sessions", catalog_db=database))
 
 
 def test_context_update_conflict_and_history(

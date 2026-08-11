@@ -64,6 +64,7 @@ def run_ui(*, root: Path, port: int, open_browser: bool) -> int:
     try:
         import uvicorn  # noqa: PLC0415
 
+        from lnt.catalog.connection import catalog_path  # noqa: PLC0415
         from lnt.ui.app import create_app  # noqa: PLC0415
     except ModuleNotFoundError as exc:
         dependency = exc.name.partition(".")[0] if exc.name is not None else None
@@ -71,7 +72,7 @@ def run_ui(*, root: Path, port: int, open_browser: bool) -> int:
             raise InputError(_INSTALL_HINT) from exc
         raise
 
-    application = create_app(root=root)
+    application = create_app(root=root, catalog_db=catalog_path())
     url = UI_URL_TEMPLATE.format(port=port)
     print(f"LNT UI: {url}", flush=True)  # noqa: T201
     if open_browser:

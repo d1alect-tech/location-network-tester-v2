@@ -27,6 +27,7 @@ class AppServices:
     """Сервисы, принадлежащие одному экземпляру приложения панели."""
 
     root: Path
+    catalog_db: Path
     jobs: JobManager
 
 
