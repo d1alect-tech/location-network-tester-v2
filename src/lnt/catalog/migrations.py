@@ -148,6 +148,38 @@ MIGRATIONS: Final = (
             "CREATE INDEX idx_catalog_context_tags_tag ON catalog_context_tags(tag, storage_path)",
         ),
     ),
+    Migration(
+        4,
+        "experiment_projections",
+        (
+            """CREATE TABLE catalog_experiments (
+            id TEXT PRIMARY KEY,
+            storage_ref TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            question TEXT NOT NULL,
+            status TEXT NOT NULL,
+            protocol TEXT NOT NULL,
+            revision INTEGER NOT NULL CHECK(revision >= 1),
+            health TEXT NOT NULL
+        )""",
+            """CREATE TABLE catalog_experiment_members (
+            experiment_id TEXT NOT NULL REFERENCES catalog_experiments(id) ON DELETE CASCADE,
+            ordinal INTEGER NOT NULL CHECK(ordinal >= 1),
+            session_id TEXT NOT NULL,
+            storage_ref TEXT NOT NULL,
+            role TEXT NOT NULL,
+            condition_id TEXT NOT NULL,
+            block_key TEXT,
+            pairing_key TEXT,
+            reference_health TEXT NOT NULL,
+            PRIMARY KEY (experiment_id, ordinal)
+        )""",
+            (
+                "CREATE INDEX idx_catalog_experiment_members_session "
+                "ON catalog_experiment_members(session_id)"
+            ),
+        ),
+    ),
 )
 
 

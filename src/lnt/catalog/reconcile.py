@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from lnt.catalog.connection import open_catalog_reader, writer_transaction
+from lnt.catalog.experiment_projection import replace_experiment_projection
 from lnt.catalog.migrations import apply_migrations
 from lnt.catalog.reconcile_models import CatalogStatus, ReconcileResult, VerifyResult
 from lnt.catalog.reconcile_parse import parse_directory
@@ -49,6 +50,7 @@ def reconcile_catalog(root: Path, database: Path, *, rebuild: bool = False) -> R
                 inserted += 1
         repository.upsert_many(tuple(projections), tuple(changed_existing_paths))
         repository.mark_duplicates()
+        replace_experiment_projection(connection, root)
         changed = inserted + updated
         connection.execute(
             """INSERT INTO reconcile_runs(id, root_path, completed_utc, scanned, changed, deleted)

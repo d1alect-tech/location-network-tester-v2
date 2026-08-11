@@ -39,6 +39,24 @@ def test_downgrade_is_rejected_with_typed_error(tmp_path: Path) -> None:
     assert "не поддерживается" in str(raised.value)
 
 
+def test_latest_migration_adds_experiment_projection_tables(tmp_path: Path) -> None:
+    # Given
+    catalog_path = tmp_path / "catalog.sqlite3"
+
+    # When
+    apply_migrations(catalog_path)
+
+    # Then
+    with sqlite3.connect(catalog_path) as connection:
+        tables = {
+            str(row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'",
+            )
+        }
+    assert {"catalog_experiments", "catalog_experiment_members"} <= tables
+
+
 def test_rebuild_does_not_touch_runtime_database(tmp_path: Path) -> None:
     # Given
     catalog_path = tmp_path / "catalog.sqlite3"
