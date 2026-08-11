@@ -23,6 +23,8 @@ from lnt.analysis import (
     write_analysis,
     write_line_quality_analysis,
 )
+from lnt.archive import ArchiveError
+from lnt.archive.cli import configure_archive_parser
 from lnt.catalog.automation_cli import configure_automation_parsers
 from lnt.catalog.cli import configure_catalog_parser
 from lnt.cli_experiments import configure_research_parsers
@@ -90,7 +92,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args = parser.parse_args(argv)
         handler = cast("Handler", args.handler)
         return handler(args)
-    except (InputError, AnalysisError) as error:
+    except (InputError, AnalysisError, ArchiveError) as error:
         print(f"Ошибка: {error.message}", file=sys.stderr)
         return EXIT_INPUT
     except (KeyError, FileNotFoundError) as error:
@@ -107,6 +109,8 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Location Network Tester: захват и анализ сетевых помех (Hantek 6022BE)",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+    archive = subparsers.add_parser("archive", help="проверенные экспорт, backup и restore")
+    configure_archive_parser(archive)
     configure_automation_parsers(subparsers.add_parser)
     configure_research_parsers(subparsers.add_parser)
 
