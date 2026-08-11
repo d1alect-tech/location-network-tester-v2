@@ -7,10 +7,10 @@ import asyncio
 import logging
 import threading
 from collections.abc import AsyncIterator
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Final, assert_never
 
+from lnt.runtime.scheduler import OperationClass, OperationScheduler
 from lnt.runtime.store import JobStore
 from lnt.ui.job_state import JobSnapshot, advance, new_job
 from lnt.ui.job_worker import (
@@ -34,6 +34,7 @@ _FIRST_STAGES: Final[dict[JobKind, JobStage]] = {
     JobKind.SELFTEST: JobStage.SELFTEST,
     JobKind.DEVICE_CHECK: JobStage.CHECKING_DEVICE,
 }
+_HARDWARE_KINDS: Final = frozenset({JobKind.CAPTURE, JobKind.DEVICE_CHECK})
 
 
 class JobBusyError(Exception):
@@ -51,34 +52,36 @@ class JobNotCancellableError(Exception):
 class JobManager:
     """Управляет единственной активной задачей и рассылкой её снимков."""
 
-    def __init__(self, *, backend: JobBackend, root: Path, store: JobStore) -> None:
-        """Создаёт менеджер с одним рабочим потоком для каталога сессий."""
+    def __init__(
+        self,
+        *,
+        backend: JobBackend,
+        root: Path,
+        store: JobStore,
+        scheduler: OperationScheduler | None = None,
+    ) -> None:
+        """Создаёт менеджер с сериализацией железа и ограниченным CPU-пулом."""
         self._backend: JobBackend = backend
         self._root: Path = root
         self._store: JobStore = store
-        self._executor: ThreadPoolExecutor = ThreadPoolExecutor(
-            max_workers=1,
-            thread_name_prefix="lnt-job",
-        )
+        self._scheduler: OperationScheduler = scheduler or OperationScheduler()
         self._registry: dict[str, JobSnapshot] = {}
         self._changes: dict[str, asyncio.Event] = {}
         self._cancellations: dict[str, threading.Event] = {}
-        self._active_id: str | None = None
         self._lock: asyncio.Lock = asyncio.Lock()
 
     async def start(self, request: JobRequest) -> JobSnapshot:
         """Регистрирует задачу и запускает её в рабочем потоке."""
         async with self._lock:
-            if self._active_id is not None and not self._registry[self._active_id].is_terminal():
-                raise JobBusyError
             snapshot = new_job(JobKind(request.kind))
+            operation_class = _operation_class(snapshot.kind)
+            self._scheduler.ensure_capacity(operation_class)
             job_id = snapshot.job_id
             self._store.create(snapshot, input_reference=request.model_dump(mode="json"))
             self._registry[job_id] = snapshot
             self._changes[job_id] = asyncio.Event()
             cancellation = threading.Event()
             self._cancellations[job_id] = cancellation
-            self._active_id = job_id
             loop = asyncio.get_running_loop()
             first_stage = _FIRST_STAGES[snapshot.kind]
 
@@ -98,7 +101,7 @@ class JobManager:
                 )
                 loop.call_soon_threadsafe(self._apply_outcome, job_id, outcome)
 
-            self._executor.submit(run)
+            self._scheduler.submit(operation_class, run)
             return snapshot
 
     def get(self, job_id: str) -> JobSnapshot:
@@ -148,11 +151,10 @@ class JobManager:
 
     async def aclose(self) -> None:
         """Запрашивает отмену активной задачи и без блокировки осушает executor."""
-        if self._active_id is not None:
-            active = self._registry[self._active_id]
-            if not active.is_terminal():
-                self.cancel(active.job_id)
-        await asyncio.to_thread(self._executor.shutdown, wait=True, cancel_futures=False)
+        for snapshot in tuple(self._registry.values()):
+            if not snapshot.is_terminal():
+                self.cancel(snapshot.job_id)
+        await asyncio.to_thread(self._scheduler.close)
 
     def _publish(self, job_id: str, snapshot: JobSnapshot) -> None:
         self._store.record(snapshot)
@@ -172,10 +174,7 @@ class JobManager:
             case JobStatus.RUNNING | JobStatus.CANCELLING:
                 return
             case (
-                JobStatus.SUCCEEDED
-                | JobStatus.CANCELLED
-                | JobStatus.FAILED
-                | JobStatus.INTERRUPTED
+                JobStatus.SUCCEEDED | JobStatus.CANCELLED | JobStatus.FAILED | JobStatus.INTERRUPTED
             ):
                 _LOGGER.debug(
                     "Запуск завершённой задачи отброшен",
@@ -251,5 +250,7 @@ class JobManager:
 
     def _finish(self, job_id: str, terminal: JobSnapshot) -> None:
         self._publish(job_id, terminal)
-        if self._active_id == job_id:
-            self._active_id = None
+
+
+def _operation_class(kind: JobKind) -> OperationClass:
+    return OperationClass.HARDWARE if kind in _HARDWARE_KINDS else OperationClass.CPU

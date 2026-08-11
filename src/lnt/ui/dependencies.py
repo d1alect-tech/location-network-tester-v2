@@ -8,6 +8,7 @@ from typing import Final
 from fastapi import FastAPI, HTTPException, Request, status
 
 from lnt.errors import InputError
+from lnt.runtime.scheduler import AnalysisQueueFullError
 from lnt.ui.jobs import (
     JobBusyError,
     JobManager,
@@ -80,6 +81,8 @@ def map_domain_error(exc: Exception) -> HTTPException:
             return http_unprocessable(str(exc))
         case JobBusyError():
             return http_conflict("уже выполняется задача")
+        case AnalysisQueueFullError():
+            return http_conflict(str(exc))
         case UnknownJobError():
             return http_not_found("задача не найдена")
         case JobNotCancellableError():

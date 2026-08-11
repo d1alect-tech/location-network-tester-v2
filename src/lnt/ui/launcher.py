@@ -1,5 +1,6 @@
 """Запуск локального веб-интерфейса LNT."""
 
+import hashlib
 import logging
 import threading
 import time
@@ -10,7 +11,9 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Final
 
+from lnt.analysis_store.identity import CodeIdentity
 from lnt.errors import InputError
+from lnt.runtime.lease import HardwareLease, HardwareLeaseHeldError, bind_exclusive_loopback
 
 UI_URL_TEMPLATE: Final = "http://127.0.0.1:{port}/"
 _HEALTH_PATH: Final = "api/health"
@@ -73,23 +76,37 @@ def run_ui(*, root: Path, port: int, open_browser: bool) -> int:
         raise
 
     paths = resolve_app_paths()
-    application = create_app(root=root, catalog_db=paths.catalog_db, runtime_db=paths.runtime_db)
-    url = UI_URL_TEMPLATE.format(port=port)
-    print(f"LNT UI: {url}", flush=True)  # noqa: T201
-    if open_browser:
-        threading.Thread(
-            target=partial(_open_browser_when_ready, url),
-            daemon=True,
-            name=_BROWSER_THREAD_NAME,
-        ).start()
-
     try:
-        uvicorn.run(
-            application,
-            host="127.0.0.1",
-            port=port,
-            log_level="info",
+        lease = HardwareLease.acquire(
+            paths.runtime_db.parent / "hardware.lease",
+            build_id=_build_id(),
         )
+    except HardwareLeaseHeldError as error:
+        raise InputError(str(error)) from error
+    try:
+        with lease, bind_exclusive_loopback(port) as server_socket:
+            application = create_app(
+                root=root,
+                catalog_db=paths.catalog_db,
+                runtime_db=paths.runtime_db,
+            )
+            url = UI_URL_TEMPLATE.format(port=port)
+            print(f"LNT UI: {url}", flush=True)  # noqa: T201
+            if open_browser:
+                threading.Thread(
+                    target=partial(_open_browser_when_ready, url),
+                    daemon=True,
+                    name=_BROWSER_THREAD_NAME,
+                ).start()
+            config = uvicorn.Config(application, log_level="info")
+            uvicorn.Server(config).run(sockets=[server_socket])
     except KeyboardInterrupt:
         return 0
+    except OSError as error:
+        raise InputError(f"порт 127.0.0.1:{port} уже занят другим сервером") from error
     return 0
+
+
+def _build_id() -> str:
+    identity = CodeIdentity.current().identity_string.encode()
+    return hashlib.sha256(identity).hexdigest()[:16]
