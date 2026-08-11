@@ -123,6 +123,27 @@ def verify_event_log(path: Path, session_id: str) -> EventVerification:
     )
 
 
+def read_event_history(path: Path, session_id: str) -> tuple[ContextEvent, ...]:
+    """Проверяет цепочку и возвращает полные события в порядке revision."""
+    if not path.is_file():
+        return ()
+    try:
+        data = path.read_bytes()
+    except OSError as error:
+        raise ContextChainError("context_events_unreadable", str(error)) from error
+    complete, _tail = _split_complete_lines(data)
+    events: list[ContextEvent] = []
+    previous = genesis_hash(session_id)
+    snapshot: ContextSnapshot | None = None
+    for index, line in enumerate(complete, start=1):
+        event = _parse_line(line, index)
+        _verify_event(event, session_id, previous, snapshot)
+        events.append(event)
+        previous = event.content_hash
+        snapshot = event.snapshot
+    return tuple(events)
+
+
 def event_to_mapping(event: ContextEvent) -> dict[str, JsonValue]:
     """Переводит событие в persistable JSON-mapping."""
     mapping = _unsigned_mapping(event)

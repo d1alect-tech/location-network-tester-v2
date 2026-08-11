@@ -134,6 +134,20 @@ MIGRATIONS: Final = (
         )""",
         ),
     ),
+    Migration(
+        3,
+        "catalog_query_indexes",
+        (
+            (
+                "CREATE INDEX idx_catalog_sessions_page ON catalog_sessions("
+                "created_utc DESC, session_id, storage_path)"
+            ),
+            "CREATE INDEX idx_catalog_sessions_type ON catalog_sessions(session_type)",
+            "CREATE INDEX idx_catalog_sessions_source ON catalog_sessions(source)",
+            "CREATE INDEX idx_catalog_sessions_profile ON catalog_sessions(profile)",
+            "CREATE INDEX idx_catalog_context_tags_tag ON catalog_context_tags(tag, storage_path)",
+        ),
+    ),
 )
 
 

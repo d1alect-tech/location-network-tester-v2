@@ -6,14 +6,14 @@ from pathlib import Path
 from typing import Final, override
 
 import anyio
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
-from lnt.ui import routes_jobs, routes_sessions
+from lnt.ui import routes_catalog, routes_context, routes_jobs, routes_profiles, routes_sessions
 from lnt.ui.dependencies import AppServices, install_services
 from lnt.ui.jobs import JobManager
 from lnt.ui.operations import JobBackend, LntBackend
@@ -73,10 +73,18 @@ def create_app(*, root: Path, backend: JobBackend | None = None) -> FastAPI:
             content={"detail": f"некорректные параметры запроса: {locations}"},
         )
 
+    async def http_error(_request: Request, error: HTTPException) -> JSONResponse:
+        content = error.detail if isinstance(error.detail, dict) else {"detail": error.detail}
+        return JSONResponse(status_code=error.status_code, content=content)
+
     app.exception_handler(RequestValidationError)(request_validation_error)
+    app.exception_handler(HTTPException)(http_error)
     app.add_middleware(_NoCacheMiddleware)
     app.include_router(routes_sessions.router)
     app.include_router(routes_jobs.router)
+    app.include_router(routes_catalog.router)
+    app.include_router(routes_context.router)
+    app.include_router(routes_profiles.router)
     app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
     def index() -> FileResponse:

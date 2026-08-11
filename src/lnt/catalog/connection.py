@@ -14,6 +14,10 @@ DEFAULT_BUSY_TIMEOUT_MS: Final = 5_000
 DEFAULT_LOCK_TIMEOUT_S: Final = 5.0
 
 
+def _casefold(value: str) -> str:
+    return value.casefold()
+
+
 def catalog_path(path: Path | None = None) -> Path:
     """Возвращает внедрённый путь либо LocalAppData-путь приложения."""
     return resolve_app_paths().catalog_db if path is None else path
@@ -21,6 +25,7 @@ def catalog_path(path: Path | None = None) -> Path:
 
 def _configure(connection: sqlite3.Connection) -> None:
     connection.row_factory = sqlite3.Row
+    connection.create_function("casefold", 1, _casefold, deterministic=True)
     connection.execute("PRAGMA foreign_keys = ON")
     connection.execute(f"PRAGMA busy_timeout = {DEFAULT_BUSY_TIMEOUT_MS}")
 

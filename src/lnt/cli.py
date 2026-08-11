@@ -23,6 +23,7 @@ from lnt.analysis import (
     write_analysis,
     write_line_quality_analysis,
 )
+from lnt.catalog.automation_cli import configure_automation_parsers
 from lnt.catalog.cli import configure_catalog_parser
 from lnt.compare import compare_analyses, ensure_comparable, render_comparison
 from lnt.errors import AnalysisError, DeviceNotFoundError, InputError
@@ -102,6 +103,7 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Location Network Tester: захват и анализ сетевых помех (Hantek 6022BE)",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+    configure_automation_parsers(subparsers.add_parser)
 
     simulate = subparsers.add_parser("simulate", help="синтетическая сессия по профилю")
     simulate.add_argument("--profile", required=True, choices=sorted(PROFILES))
