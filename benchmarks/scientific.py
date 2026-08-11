@@ -25,12 +25,13 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from lnt.events import detect_events, event_preset
-from lnt.events.settings import DetectionSettings
 from lnt.psd import PsdSettings, compute_welch
 from lnt.spectrogram import StftSettings, build_overview
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from lnt.events.settings import DetectionSettings
 
 SAMPLE_RATE_HZ: Final = 8_000_000.0
 DURATION_S: Final = 30.0
