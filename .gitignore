@@ -1,3 +1,4 @@
 packaging/spike/build/
 packaging/spike/dist/
 packaging/spike/__pycache__/
+__pycache__/
