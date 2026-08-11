@@ -6,6 +6,7 @@
 
 import shutil
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -32,12 +33,14 @@ class LoadedSession:
     ch2: Float32Array | None
 
 
-def write_session(
+def write_session(  # noqa: PLR0913 - atomic lifecycle requires both publish boundary seams
     *,
     session_dir: Path,
     manifest: SessionManifest,
     ch1: Float32Array,
     ch2: Float32Array | None,
+    before_publish: Callable[[Path], None] | None = None,
+    after_publish: Callable[[Path], None] | None = None,
 ) -> Path:
     """Атомарно записывает сессию в новый каталог ``session_dir``.
 
@@ -60,10 +63,14 @@ def write_session(
             np.save(partial / manifest.ch2.filename, ch2)
         manifest_path = partial / MANIFEST_FILENAME
         manifest_path.write_text(manifest_to_json(manifest), encoding="utf-8")
+        if before_publish is not None:
+            before_publish(partial)
         partial.rename(session_dir)
     except BaseException:
         shutil.rmtree(partial, ignore_errors=True)
         raise
+    if after_publish is not None:
+        after_publish(session_dir)
     return session_dir
 
 

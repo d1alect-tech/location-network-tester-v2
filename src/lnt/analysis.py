@@ -20,6 +20,7 @@ from lnt.line_quality import (
     line_quality_to_payload,
 )
 from lnt.needles import NeedleMetrics, compute_needle_metrics, compute_needle_metrics_single
+from lnt.session_projection import project_analysis_safely
 from lnt.session_store import load_session
 from lnt.spectrum import BandSpectrum, compute_band_spectrum
 from lnt.types import SessionSource, SessionType
@@ -144,6 +145,7 @@ def write_analysis(session_dir: Path, result: AnalysisResult) -> tuple[Path, Pat
         fmt="%.9g",
     )
     _write_input_referred_spectrum(session_dir, result)
+    project_analysis_safely(session_dir, result.session_id)
     return metrics_path, spectrum_path
 
 
@@ -164,6 +166,7 @@ def write_line_quality_analysis(session_dir: Path, result: LineQualityAnalysis) 
         json.dumps(line_quality_analysis_to_payload(result), indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+    project_analysis_safely(session_dir, result.session_id)
     return metrics_path
 
 

@@ -16,7 +16,10 @@ from numpy.typing import NDArray
 
 from lnt.errors import InputError
 from lnt.manifest import validated_label
+from lnt.metadata_collector import AcquisitionSettings, MetadataCollector
+from lnt.profiles import FrontEndProfile
 from lnt.scope_io import RANGE_CODE_5V, ScopeProtocol, open_real_scope, run_capture
+from lnt.session_projection import index_session, write_initial_context
 from lnt.session_store import write_session
 from lnt.types import (
     CH1_MANIFEST_SCHEMA_VERSION,
@@ -139,6 +142,17 @@ def capture_session(  # noqa: PLR0913 -- сборочная точка сесс�
         synthetic_truth=None,
         ch1_setup=setup,
     )
+    metadata = MetadataCollector().collect(
+        settings=AcquisitionSettings(
+            sample_rate_hz=sample_rate_hz,
+            sample_count=requested_samples,
+            probe_multiplier=_ch1_probe_multiplier(setup),
+            range_v=ch1_range_v,
+            channel_mode=channel_mode,
+            front_end=_metadata_front_end(setup),
+        ),
+        telemetry=telemetry,
+    )
     return write_session(
         session_dir=out_dir,
         manifest=manifest,
@@ -152,7 +166,28 @@ def capture_session(  # noqa: PLR0913 -- сборочная точка сесс�
             if channel_mode is ChannelMode.DUAL
             else None
         ),
+        before_publish=lambda partial: write_initial_context(
+            partial,
+            manifest.session_id,
+            metadata,
+            label=normalized_label,
+        ),
+        after_publish=index_session,
     )
+
+
+def _metadata_front_end(setup: Ch1Setup) -> FrontEndProfile:
+    match setup:
+        case FloatingDifferentialRcShunt(
+            resistance_ohm=resistance,
+            c1_f=c1,
+            c2_f=c2,
+        ):
+            return FrontEndProfile.from_si(resistance_ohm=resistance, c1_f=c1, c2_f=c2)
+        case ScopeInputTerminated(termination_resistance_ohm=resistance):
+            return FrontEndProfile.from_si(resistance_ohm=resistance, c1_f=1e-30, c2_f=1e-30)
+        case TransformerLineProbe():
+            return FrontEndProfile.from_si(resistance_ohm=1.0, c1_f=1e-30, c2_f=1e-30)
 
 
 def _capture_setup(*, session_type: SessionType, setup: Ch1Setup | None) -> Ch1Setup:

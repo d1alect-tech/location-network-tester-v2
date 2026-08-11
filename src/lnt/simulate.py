@@ -8,6 +8,9 @@ import numpy as np
 
 from lnt.errors import InputError
 from lnt.manifest import validated_label
+from lnt.metadata_collector import AcquisitionSettings, MetadataCollector
+from lnt.profiles import FrontEndProfile
+from lnt.session_projection import index_session, write_initial_context
 from lnt.session_store import write_session
 from lnt.signals import generate
 from lnt.types import (
@@ -97,9 +100,27 @@ def simulate_session(  # noqa: PLR0913 -- сборочная точка сесс
         acquisition_telemetry=None,
         synthetic_truth=session.truth,
     )
+    metadata = MetadataCollector().collect(
+        settings=AcquisitionSettings(
+            sample_rate_hz=sample_rate_hz,
+            sample_count=session.ch1.size,
+            probe_multiplier=1.0,
+            range_v=1.0,
+            channel_mode=channel_mode,
+            front_end=FrontEndProfile.from_si(resistance_ohm=1.0, c1_f=1e-30, c2_f=1e-30),
+        ),
+        telemetry=None,
+    )
     return write_session(
         session_dir=out_dir,
         manifest=manifest,
         ch1=session.ch1,
         ch2=(session.ch2 if channel_mode is ChannelMode.DUAL else None),
+        before_publish=lambda partial: write_initial_context(
+            partial,
+            manifest.session_id,
+            metadata,
+            label=normalized_label,
+        ),
+        after_publish=index_session,
     )
