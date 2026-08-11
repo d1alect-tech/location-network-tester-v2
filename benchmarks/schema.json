@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LNT recovered baseline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "environment", "measurements"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "cpu", "ram_bytes", "python", "packages"],
+      "properties": {
+        "os": {"type": "string", "minLength": 1},
+        "cpu": {"type": "string", "minLength": 1},
+        "ram_bytes": {"type": "integer", "minimum": 1},
+        "python": {"type": "string", "minLength": 1},
+        "packages": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "measurements": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "seconds", "status", "exit_code", "detail"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "seconds": {"type": "number", "minimum": 0},
+          "status": {"enum": ["passed", "failed"]},
+          "exit_code": {"type": ["integer", "null"]},
+          "detail": {"type": "string"}
+        }
+      }
+    }
+  }
+}

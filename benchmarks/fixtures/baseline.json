@@ -1,0 +1,8 @@
+{
+  "profile_a": "quiet",
+  "profile_b": "bad",
+  "duration_seconds": 2.4,
+  "sample_rate_hz": 100000,
+  "seed_a": 6022,
+  "seed_b": 6023
+}
