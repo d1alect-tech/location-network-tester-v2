@@ -15,6 +15,7 @@ import platform
 import sys
 import tempfile
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Final, TypedDict, final
@@ -24,6 +25,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from lnt.events import detect_events, event_preset
+from lnt.events.settings import DetectionSettings
 from lnt.psd import PsdSettings, compute_welch
 from lnt.spectrogram import StftSettings, build_overview
 
@@ -145,6 +147,15 @@ def _payload(measurement: Measurement) -> MeasurementPayload:
     }
 
 
+def _run_psd(samples: np.memmap, settings: PsdSettings) -> str:
+    return f"segments={compute_welch(samples, settings=settings).segment_count}"
+
+
+def _run_events(samples: np.memmap, settings: DetectionSettings) -> str:
+    inventory = detect_events(samples, sample_rate_hz=SAMPLE_RATE_HZ, settings=settings)
+    return f"events={len(inventory.events)}"
+
+
 def run() -> ScientificResult:
     """Generate a temporary memmap and run PSD, overview, and event inventory."""
     measurements: list[Measurement] = []
@@ -156,7 +167,7 @@ def run() -> ScientificResult:
             _measure(
                 "streaming_psd",
                 PSD_BUDGET_S,
-                lambda: f"segments={compute_welch(samples, settings=psd_settings).segment_count}",
+                partial(_run_psd, samples, psd_settings),
             )
         )
         stft = StftSettings(
@@ -192,15 +203,7 @@ def run() -> ScientificResult:
             _measure(
                 "events",
                 EVENTS_BUDGET_S,
-                lambda: (
-                    f"events={
-                        len(
-                            detect_events(
-                                samples, sample_rate_hz=SAMPLE_RATE_HZ, settings=settings
-                            ).events
-                        )
-                    }"
-                ),
+                partial(_run_events, samples, settings),
             )
         )
         samples.flush()
