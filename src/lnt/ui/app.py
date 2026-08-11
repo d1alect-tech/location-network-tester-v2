@@ -1,4 +1,5 @@
 """Фабрика локального веб-приложения LNT."""
+# ruff: noqa: PLR0915
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -19,13 +20,18 @@ from lnt.ui import (
     routes_catalog,
     routes_context,
     routes_device,
+    routes_experiments,
     routes_jobs,
     routes_profiles,
+    routes_quality,
+    routes_research,
     routes_sessions,
+    routes_statistics,
 )
 from lnt.ui.dependencies import AppServices, install_services
 from lnt.ui.jobs import JobManager
 from lnt.ui.operations import JobBackend, LntBackend
+from lnt.ui.research_jobs import ResearchJobService
 from lnt.ui.security import LocalSecurityMiddleware, create_security_context
 
 _STATIC: Final = Path(__file__).with_name("static")
@@ -54,6 +60,7 @@ def create_app(
             root=root,
             store=store,
         )
+        research_jobs = ResearchJobService(store)
         install_services(
             app,
             AppServices(
@@ -63,12 +70,14 @@ def create_app(
                 ),
                 runtime_db=runtime_path,
                 jobs=manager,
+                research_jobs=research_jobs,
             ),
         )
         app.state.lnt_security = security
         try:
             yield
         finally:
+            research_jobs.close()
             await manager.aclose()
 
     app = FastAPI(
@@ -107,6 +116,10 @@ def create_app(
     app.include_router(routes_profiles.router)
     app.include_router(routes_analysis_v2.router)
     app.include_router(routes_device.router)
+    app.include_router(routes_experiments.router)
+    app.include_router(routes_statistics.router)
+    app.include_router(routes_research.router)
+    app.include_router(routes_quality.router)
 
     def hashed_app() -> FileResponse:
         response = FileResponse(_STATIC / "app.js", media_type="text/javascript")

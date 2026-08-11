@@ -15,6 +15,7 @@ from lnt.ui.jobs import (
     JobNotCancellableError,
     UnknownJobError,
 )
+from lnt.ui.research_jobs import ResearchJobService
 from lnt.ui.security import MUTATION_NONCE_HEADER, require_mutation_nonce
 from lnt.ui.sessions import resolve_session_dir
 
@@ -32,6 +33,7 @@ class AppServices:
     catalog_db: Path
     runtime_db: Path
     jobs: JobManager
+    research_jobs: ResearchJobService | None = None
 
 
 def install_services(app: FastAPI, services: AppServices) -> None:

@@ -25,6 +25,7 @@ from lnt.analysis import (
 )
 from lnt.catalog.automation_cli import configure_automation_parsers
 from lnt.catalog.cli import configure_catalog_parser
+from lnt.cli_experiments import configure_research_parsers
 from lnt.compare import compare_analyses, ensure_comparable, render_comparison
 from lnt.errors import AnalysisError, DeviceNotFoundError, InputError
 from lnt.selftest import run_selftest
@@ -92,6 +93,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (InputError, AnalysisError) as error:
         print(f"Ошибка: {error.message}", file=sys.stderr)
         return EXIT_INPUT
+    except (KeyError, FileNotFoundError) as error:
+        print(f"Ошибка: объект не найден: {error}", file=sys.stderr)
+        return EXIT_INPUT
     except DeviceNotFoundError as error:
         print(f"Устройство: {error.message}", file=sys.stderr)
         return EXIT_DEVICE
@@ -104,6 +108,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     configure_automation_parsers(subparsers.add_parser)
+    configure_research_parsers(subparsers.add_parser)
 
     simulate = subparsers.add_parser("simulate", help="синтетическая сессия по профилю")
     simulate.add_argument("--profile", required=True, choices=sorted(PROFILES))
