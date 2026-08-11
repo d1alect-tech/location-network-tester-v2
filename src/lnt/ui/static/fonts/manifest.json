@@ -1,0 +1,26 @@
+{
+  "packages": [
+    {
+      "name": "@ibm/plex-sans",
+      "version": "1.1.0",
+      "source": "https://registry.npmjs.org/@ibm/plex-sans/-/plex-sans-1.1.0.tgz",
+      "integrity": "sha512-WPgvO6Yfj2w5YbhyAr1tv95RUz4LRJlqN+CmYvBglabXteufP1D1E9BABMde+ZIKdRbFJDoKF5eQzfhpnbgZcQ=="
+    },
+    {
+      "name": "@ibm/plex-mono",
+      "version": "2.5.0",
+      "source": "https://registry.npmjs.org/@ibm/plex-mono/-/plex-mono-2.5.0.tgz",
+      "integrity": "sha512-STBJIPxPomOYPmBMO7z5TKPJUotAF9u3gAUumTqVgwgrAO+K4FRNh0MlhsoJjKhJKsMbBJR10/bk4inkj/wc1w=="
+    }
+  ],
+  "license": [
+    "OFL-1.1"
+  ],
+  "files": {
+    "IBMPlexSans-Regular.woff2": "ba711a3085ff9f27440b6b9c4550cfc47c97bf36591d5da958b975bb3add8c1a",
+    "IBMPlexSans-Medium.woff2": "5660f8a658f8bb50dbc005232f885eadffd2bc1c235c4f6fbb63469d1f9cde6d",
+    "IBMPlexSans-SemiBold.woff2": "f78048030eab62e860efa39a0df79e2e5581bf122eb95b9bc42c0b8a4988d205",
+    "IBMPlexMono-Regular.woff2": "ba204497f16b6d334cee9d1e963a831b73e3a56e1d6300a8489d18df7214b350",
+    "IBMPlexMono-Medium.woff2": "33faf307fa6031fb4062276d7320a6d632de890cbb347576fd80cfa01077bc25"
+  }
+}

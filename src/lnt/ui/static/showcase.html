@@ -1,0 +1,161 @@
+<!doctype html>
+<!-- ВОССТАНОВЛЕНО: первые 12 КБ утрачены при сбое диска; шапка и светлая секция
+     реконструированы зеркалированием уцелевшей тёмной секции. -->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>LNT — витрина дизайн-системы</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <main class="showcase-shell">
+      <h1>Витрина дизайн-системы LNT</h1>
+      <p class="helper-text">
+        Каждый примитив показан во всех состояниях в светлой и тёмной темах.
+      </p>
+      <section class="theme-preview" data-theme="light" aria-labelledby="light-title">
+        <h2 id="light-title">Светлая тема</h2>
+        <div class="showcase-grid">
+          <div class="primitive-group" role="group" aria-labelledby="light-buttons-title">
+            <h3 id="light-buttons-title">Кнопки</h3>
+            <div class="button-state-grid">
+              <figure class="state-fixture"><figcaption class="state-caption">Default</figcaption><button class="button button-primary" data-state="default" type="button">Primary</button><button class="button button-secondary" data-state="default" type="button">Secondary</button><button class="button button-danger-secondary" data-state="default" type="button">Danger</button></figure>
+              <figure class="state-fixture"><figcaption class="state-caption">Hover</figcaption><button class="button button-primary is-hover" type="button">Primary</button><button class="button button-secondary is-hover" type="button">Secondary</button><button class="button button-danger-secondary is-hover" type="button">Danger</button></figure>
+              <figure class="state-fixture"><figcaption class="state-caption">Focus</figcaption><button class="button button-primary is-focus" type="button">Primary</button><button class="button button-secondary is-focus" type="button">Secondary</button><button class="button button-danger-secondary is-focus" type="button">Danger</button></figure>
+              <figure class="state-fixture"><figcaption class="state-caption">Active</figcaption><button class="button button-primary is-active" type="button">Primary</button><button class="button button-secondary is-active" type="button">Secondary</button><button class="button button-danger-secondary is-active" type="button">Danger</button></figure>
+              <figure class="state-fixture"><figcaption class="state-caption">Disabled</figcaption><button class="button button-primary" type="button" disabled>Primary</button><button class="button button-secondary" type="button" disabled>Secondary</button><button class="button button-danger-secondary" type="button" disabled>Danger</button></figure>
+            </div>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="light-text-title">
+            <h3 id="light-text-title">Текстовое поле</h3>
+            <figure class="state-fixture"><figcaption class="state-caption">Default</figcaption><div class="field"><label for="light-text-default">Метка сессии</label><input id="light-text-default" type="text" data-primitive="text-field" data-state="default" value="стенд-А"></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Hover</figcaption><div class="field"><label for="light-text-hover">Метка сессии</label><input id="light-text-hover" class="is-hover" type="text" data-primitive="text-field" data-state="hover" value="стенд-А"></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Focus</figcaption><div class="field"><label for="light-text-focus">Метка сессии</label><input id="light-text-focus" class="is-focus" type="text" data-primitive="text-field" data-state="focus" value="стенд-А"></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Error</figcaption><div class="field"><label for="light-text-error">Каталог</label><input id="light-text-error" type="text" data-primitive="text-field" data-state="error" value="недопустимый/путь" aria-invalid="true" aria-describedby="light-text-error-message"><span id="light-text-error-message" class="inline-error">Используйте имя без разделителей.</span></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Disabled</figcaption><div class="field"><label for="light-text-disabled">Метка сессии</label><input id="light-text-disabled" type="text" data-primitive="text-field" data-state="disabled" value="стенд-А" disabled></div></figure>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="light-select-title">
+            <h3 id="light-select-title">Select</h3>
+            <figure class="state-fixture"><figcaption class="state-caption">Default</figcaption><div class="field"><label for="light-select-default">Диапазон CH1, В</label><select id="light-select-default" data-primitive="select" data-state="default"><option>5</option><option>1</option></select></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Hover</figcaption><div class="field"><label for="light-select-hover">Диапазон CH1, В</label><select id="light-select-hover" class="is-hover" data-primitive="select" data-state="hover"><option>5</option><option>1</option></select></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Focus</figcaption><div class="field"><label for="light-select-focus">Диапазон CH1, В</label><select id="light-select-focus" class="is-focus" data-primitive="select" data-state="focus"><option>5</option><option>1</option></select></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Error</figcaption><div class="field"><label for="light-select-error">Диапазон CH1, В</label><select id="light-select-error" data-primitive="select" data-state="error" aria-invalid="true" aria-describedby="light-select-error-message"><option>Недоступный</option></select><span id="light-select-error-message" class="inline-error">Выберите поддерживаемый диапазон.</span></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Disabled</figcaption><div class="field"><label for="light-select-disabled">Диапазон CH1, В</label><select id="light-select-disabled" data-primitive="select" data-state="disabled" disabled><option>5</option><option>1</option></select></div></figure>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="light-checkbox-title">
+            <h3 id="light-checkbox-title">Checkbox</h3>
+            <figure class="state-fixture"><figcaption class="state-caption">Default</figcaption><div class="field checkbox-field"><label for="light-check-default"><input id="light-check-default" type="checkbox" data-primitive="checkbox" data-state="default"><span>Самошум</span></label></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Checked</figcaption><div class="field checkbox-field"><label for="light-check-checked"><input id="light-check-checked" type="checkbox" data-primitive="checkbox" data-state="checked" checked><span>Самошум</span></label></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Hover</figcaption><div class="field checkbox-field"><label for="light-check-hover"><input id="light-check-hover" class="is-hover" type="checkbox" data-primitive="checkbox" data-state="hover"><span>Самошум</span></label></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Focus</figcaption><div class="field checkbox-field"><label for="light-check-focus"><input id="light-check-focus" class="is-focus" type="checkbox" data-primitive="checkbox" data-state="focus"><span>Самошум</span></label></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Disabled</figcaption><div class="field checkbox-field"><label for="light-check-disabled"><input id="light-check-disabled" type="checkbox" data-primitive="checkbox" data-state="disabled" disabled><span>Самошум</span></label></div></figure>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="light-theme-title">
+            <h3 id="light-theme-title">Выбор темы</h3>
+            <figure class="state-fixture"><figcaption class="state-caption">Default</figcaption><div class="theme-control"><label for="light-theme-default">Тема</label><select id="light-theme-default" data-primitive="theme-selector" data-state="default"><option>Системная</option><option selected>Светлая</option><option>Тёмная</option></select></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Disabled</figcaption><div class="theme-control"><label for="light-theme-disabled">Тема</label><select id="light-theme-disabled" data-primitive="theme-selector" data-state="disabled" disabled><option selected>Светлая</option></select></div></figure>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="light-status-title">
+            <h3 id="light-status-title">Статусы</h3>
+            <span class="status-label status-ok" data-primitive="status-label" data-state="ok">Готово</span>
+            <span class="status-label status-warn" data-primitive="status-label" data-state="warn">Требует проверки</span>
+            <span class="status-label status-error" data-primitive="status-label" data-state="error">Ошибка</span>
+            <span class="status-label status-running" data-primitive="status-label" data-state="running">Выполняется</span>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="light-session-title">
+            <h3 id="light-session-title">Сессии</h3>
+            <button class="session-row" data-primitive="session-row" data-state="default" type="button"><span class="analysis-state">capture-001</span><span class="helper-text">По умолчанию</span></button>
+            <button class="session-row is-hover" data-primitive="session-row" data-state="hover" type="button"><span class="analysis-state">capture-002</span><span class="helper-text">Hover</span></button>
+            <button class="session-row is-focus" data-primitive="session-row" data-state="focus" type="button"><span class="analysis-state">capture-003</span><span class="helper-text">Focus</span></button>
+            <button class="session-row is-selected" data-primitive="session-row" data-state="selected" type="button"><span class="analysis-state">capture-004</span><span class="helper-text">Выбрана</span></button>
+            <button class="session-row is-error" data-primitive="session-row" data-state="error" type="button"><span class="analysis-state">capture-005</span><span class="status-error">Повреждена</span></button>
+            <button class="session-row is-running" data-primitive="session-row" data-state="running" type="button"><span class="analysis-state">capture-006</span><span class="status-running">Анализируется</span></button>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="light-disclosure-title">
+            <h3 id="light-disclosure-title">Disclosure</h3>
+            <figure class="state-fixture"><figcaption class="state-caption">Closed</figcaption><details data-primitive="disclosure" data-state="closed"><summary>Серия и режим</summary></details></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Open</figcaption><details data-primitive="disclosure" data-state="open" open><summary>Серия и режим</summary><p class="helper-text">Повторы: 3, интервал: 5 с.</p></details></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Hover</figcaption><details data-primitive="disclosure" data-state="hover"><summary class="is-hover">Серия и режим</summary></details></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Focus</figcaption><details data-primitive="disclosure" data-state="focus"><summary class="is-focus">Серия и режим</summary></details></figure>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="light-error-banner-title">
+            <div class="error-banner" data-primitive="error-banner" data-state="error" role="alert" aria-labelledby="light-error-banner-title"><h3 id="light-error-banner-title">Операция не завершена</h3><p>Проверьте подключение USB и повторите действие.</p><button class="button button-secondary" type="button">Повторить</button></div>
+          </div>
+        </div>
+      </section>
+      <section class="theme-preview" data-theme="dark" aria-labelledby="dark-title">
+        <h2 id="dark-title">Тёмная тема</h2>
+        <div class="showcase-grid">
+          <div class="primitive-group" role="group" aria-labelledby="dark-buttons-title">
+            <h3 id="dark-buttons-title">Кнопки</h3>
+            <div class="button-state-grid">
+              <figure class="state-fixture"><figcaption class="state-caption">Default</figcaption><button class="button button-primary" data-state="default" type="button">Primary</button><button class="button button-secondary" data-state="default" type="button">Secondary</button><button class="button button-danger-secondary" data-state="default" type="button">Danger</button></figure>
+              <figure class="state-fixture"><figcaption class="state-caption">Hover</figcaption><button class="button button-primary is-hover" type="button">Primary</button><button class="button button-secondary is-hover" type="button">Secondary</button><button class="button button-danger-secondary is-hover" type="button">Danger</button></figure>
+              <figure class="state-fixture"><figcaption class="state-caption">Focus</figcaption><button class="button button-primary is-focus" type="button">Primary</button><button class="button button-secondary is-focus" type="button">Secondary</button><button class="button button-danger-secondary is-focus" type="button">Danger</button></figure>
+              <figure class="state-fixture"><figcaption class="state-caption">Active</figcaption><button class="button button-primary is-active" type="button">Primary</button><button class="button button-secondary is-active" type="button">Secondary</button><button class="button button-danger-secondary is-active" type="button">Danger</button></figure>
+              <figure class="state-fixture"><figcaption class="state-caption">Disabled</figcaption><button class="button button-primary" type="button" disabled>Primary</button><button class="button button-secondary" type="button" disabled>Secondary</button><button class="button button-danger-secondary" type="button" disabled>Danger</button></figure>
+            </div>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="dark-text-title">
+            <h3 id="dark-text-title">Текстовое поле</h3>
+            <figure class="state-fixture"><figcaption class="state-caption">Default</figcaption><div class="field"><label for="dark-text-default">Метка сессии</label><input id="dark-text-default" type="text" data-primitive="text-field" data-state="default" value="стенд-А"></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Hover</figcaption><div class="field"><label for="dark-text-hover">Метка сессии</label><input id="dark-text-hover" class="is-hover" type="text" data-primitive="text-field" data-state="hover" value="стенд-А"></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Focus</figcaption><div class="field"><label for="dark-text-focus">Метка сессии</label><input id="dark-text-focus" class="is-focus" type="text" data-primitive="text-field" data-state="focus" value="стенд-А"></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Error</figcaption><div class="field"><label for="dark-text-error">Каталог</label><input id="dark-text-error" type="text" data-primitive="text-field" data-state="error" value="недопустимый/путь" aria-invalid="true" aria-describedby="dark-text-error-message"><span id="dark-text-error-message" class="inline-error">Используйте имя без разделителей.</span></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Disabled</figcaption><div class="field"><label for="dark-text-disabled">Метка сессии</label><input id="dark-text-disabled" type="text" data-primitive="text-field" data-state="disabled" value="стенд-А" disabled></div></figure>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="dark-select-title">
+            <h3 id="dark-select-title">Select</h3>
+            <figure class="state-fixture"><figcaption class="state-caption">Default</figcaption><div class="field"><label for="dark-select-default">Диапазон CH1, В</label><select id="dark-select-default" data-primitive="select" data-state="default"><option>5</option><option>1</option></select></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Hover</figcaption><div class="field"><label for="dark-select-hover">Диапазон CH1, В</label><select id="dark-select-hover" class="is-hover" data-primitive="select" data-state="hover"><option>5</option><option>1</option></select></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Focus</figcaption><div class="field"><label for="dark-select-focus">Диапазон CH1, В</label><select id="dark-select-focus" class="is-focus" data-primitive="select" data-state="focus"><option>5</option><option>1</option></select></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Error</figcaption><div class="field"><label for="dark-select-error">Диапазон CH1, В</label><select id="dark-select-error" data-primitive="select" data-state="error" aria-invalid="true" aria-describedby="dark-select-error-message"><option>Недоступный</option></select><span id="dark-select-error-message" class="inline-error">Выберите поддерживаемый диапазон.</span></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Disabled</figcaption><div class="field"><label for="dark-select-disabled">Диапазон CH1, В</label><select id="dark-select-disabled" data-primitive="select" data-state="disabled" disabled><option>5</option><option>1</option></select></div></figure>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="dark-checkbox-title">
+            <h3 id="dark-checkbox-title">Checkbox</h3>
+            <figure class="state-fixture"><figcaption class="state-caption">Default</figcaption><div class="field checkbox-field"><label for="dark-check-default"><input id="dark-check-default" type="checkbox" data-primitive="checkbox" data-state="default"><span>Самошум</span></label></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Checked</figcaption><div class="field checkbox-field"><label for="dark-check-checked"><input id="dark-check-checked" type="checkbox" data-primitive="checkbox" data-state="checked" checked><span>Самошум</span></label></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Hover</figcaption><div class="field checkbox-field"><label for="dark-check-hover"><input id="dark-check-hover" class="is-hover" type="checkbox" data-primitive="checkbox" data-state="hover"><span>Самошум</span></label></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Focus</figcaption><div class="field checkbox-field"><label for="dark-check-focus"><input id="dark-check-focus" class="is-focus" type="checkbox" data-primitive="checkbox" data-state="focus"><span>Самошум</span></label></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Disabled</figcaption><div class="field checkbox-field"><label for="dark-check-disabled"><input id="dark-check-disabled" type="checkbox" data-primitive="checkbox" data-state="disabled" disabled><span>Самошум</span></label></div></figure>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="dark-theme-title">
+            <h3 id="dark-theme-title">Выбор темы</h3>
+            <figure class="state-fixture"><figcaption class="state-caption">Default</figcaption><div class="theme-control"><label for="dark-theme-default">Тема</label><select id="dark-theme-default" data-primitive="theme-selector" data-state="default"><option>Системная</option><option>Светлая</option><option selected>Тёмная</option></select></div></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Disabled</figcaption><div class="theme-control"><label for="dark-theme-disabled">Тема</label><select id="dark-theme-disabled" data-primitive="theme-selector" data-state="disabled" disabled><option selected>Тёмная</option></select></div></figure>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="dark-status-title">
+            <h3 id="dark-status-title">Статусы</h3>
+            <span class="status-label status-ok" data-primitive="status-label" data-state="ok">Готово</span>
+            <span class="status-label status-warn" data-primitive="status-label" data-state="warn">Требует проверки</span>
+            <span class="status-label status-error" data-primitive="status-label" data-state="error">Ошибка</span>
+            <span class="status-label status-running" data-primitive="status-label" data-state="running">Выполняется</span>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="dark-session-title">
+            <h3 id="dark-session-title">Сессии</h3>
+            <button class="session-row" data-primitive="session-row" data-state="default" type="button"><span class="analysis-state">capture-001</span><span class="helper-text">По умолчанию</span></button>
+            <button class="session-row is-hover" data-primitive="session-row" data-state="hover" type="button"><span class="analysis-state">capture-002</span><span class="helper-text">Hover</span></button>
+            <button class="session-row is-focus" data-primitive="session-row" data-state="focus" type="button"><span class="analysis-state">capture-003</span><span class="helper-text">Focus</span></button>
+            <button class="session-row is-selected" data-primitive="session-row" data-state="selected" type="button"><span class="analysis-state">capture-004</span><span class="helper-text">Выбрана</span></button>
+            <button class="session-row is-error" data-primitive="session-row" data-state="error" type="button"><span class="analysis-state">capture-005</span><span class="status-error">Повреждена</span></button>
+            <button class="session-row is-running" data-primitive="session-row" data-state="running" type="button"><span class="analysis-state">capture-006</span><span class="status-running">Анализируется</span></button>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="dark-disclosure-title">
+            <h3 id="dark-disclosure-title">Disclosure</h3>
+            <figure class="state-fixture"><figcaption class="state-caption">Closed</figcaption><details data-primitive="disclosure" data-state="closed"><summary>Серия и режим</summary></details></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Open</figcaption><details data-primitive="disclosure" data-state="open" open><summary>Серия и режим</summary><p class="helper-text">Повторы: 3, интервал: 5 с.</p></details></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Hover</figcaption><details data-primitive="disclosure" data-state="hover"><summary class="is-hover">Серия и режим</summary></details></figure>
+            <figure class="state-fixture"><figcaption class="state-caption">Focus</figcaption><details data-primitive="disclosure" data-state="focus"><summary class="is-focus">Серия и режим</summary></details></figure>
+          </div>
+          <div class="primitive-group" role="group" aria-labelledby="dark-error-banner-title">
+            <div class="error-banner" data-primitive="error-banner" data-state="error" role="alert" aria-labelledby="dark-error-banner-title"><h3 id="dark-error-banner-title">Операция не завершена</h3><p>Проверьте подключение USB и повторите действие.</p><button class="button button-secondary" type="button">Повторить</button></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

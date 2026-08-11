@@ -1,0 +1,113 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lnt"
+version = "0.1.0"
+description = "LNT (Location Network Tester): mains-noise capture (Hantek 6022BE) and analysis for the fable5-inputlag research wiki"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=2.1,<3",
+    "scipy>=1.14,<2",
+]
+
+[project.optional-dependencies]
+# Железо опционально: тесты и synthetic-QA не требуют устройства.
+# Пин на коммит e65d52b (2026-04-22) — версия, чью API-поверхность мы верифицировали.
+hantek = [
+    "hantek6022api @ git+https://github.com/Ho-Ro/Hantek6022API@e65d52b0f2536e56eaadbb555e5d7b756409c36e",
+]
+ui = [
+    "fastapi==0.140.0",
+    "python-multipart==0.0.32",
+    "uvicorn==0.51.0",
+]
+
+[project.scripts]
+lnt = "lnt.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "basedpyright>=1.21",
+    "ruff>=0.8",
+    "fastapi==0.140.0",
+    "httpx2==2.9.1",
+    "python-multipart==0.0.32",
+    "uvicorn==0.51.0",
+]
+
+[tool.hatch.metadata]
+# Требуется для git-зависимости в optional-dependencies (PEP 508 direct reference).
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lnt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    # Конфликтуют с `ruff format` (официальная рекомендация Ruff).
+    "COM812",
+    "ISC001",
+    # Взаимоисключающие пары докстринг-конвенций: выбраны D211/D212.
+    "D203",
+    "D213",
+    # Русскоязычные докстринги/комментарии — язык проекта (вики fable5-inputlag).
+    # Кириллица и типографские тире в тексте — не опечатки латиницы.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    # Исследовательский проект личной вики: copyright-шапки не используются.
+    "CPY001",
+    # Boundary-парсер (manifest.py) поднимает типизированный InputError с сообщением
+    # в месте проверки: класс-на-каждое-сообщение (TRY003) и переменная-перед-raise
+    # (EM101/EM102) — шум без прибавки типобезопасности.
+    "EM101",
+    "EM102",
+    "TRY003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",    # assert — механика pytest
+    "PLR2004", # магические числа — тестовые данные
+    "SLF001",  # доступ к _private — тестирование внутренностей
+    "D",       # имена тестов — сами себе документация
+    "ARG",     # неиспользуемые аргументы фикстур
+    "S603",    # subprocess без shell — контрактные CLI-тесты
+    "FBT",     # bool-позиционные в параметризации
+]
+# print — продуктовая поверхность CLI (консольный отчёт), не отладка.
+"src/lnt/cli.py" = ["T201"]
+# Стабы ScopeProtocol зеркалят API драйвера Hantek6022API: докстринги на
+# каждый `...`-метод дублировали бы чужую документацию без пользы.
+"src/lnt/scope_io.py" = ["D102"]
+
+[tool.basedpyright]
+pythonVersion = "3.12"
+typeCheckingMode = "all"
+include = ["src", "tests"]
+# scipy (и частично numpy) не имеют полных стабов: семейство unknown-type
+# отключено осознанно. Полноту НАШИХ сигнатур обеспечивают ruff ANN-правила
+# и остальные проверки basedpyright (никаких Any в наших аннотациях).
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportMissingTypeStubs = false
+reportAny = false
+# Builder-стиль API (argparse add_argument и т.п.) возвращают значения,
+# которые по конвенции не используются.
+reportUnusedCallResult = false

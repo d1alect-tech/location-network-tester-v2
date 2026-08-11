@@ -1,0 +1,550 @@
+<!doctype html>
+<!-- ВОССТАНОВЛЕНО: первые 8 КБ утрачены при сбое диска; голова реконструирована
+     по тестам, JS-модулям и уцелевшему хвосту документа. -->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>LNT — панель мониторинга</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link
+      rel="preload"
+      href="/static/fonts/IBMPlexSans-Regular.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    >
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">К основному содержимому</a>
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="header-title-row">
+          <h1 aria-label="Location Network Tester" title="Location Network Tester">LNT</h1>
+          <div class="theme-control">
+            <label class="visually-hidden" for="theme-select">Тема</label>
+            <select id="theme-select">
+              <option value="system">Системная</option>
+              <option value="light">Светлая</option>
+              <option value="dark">Тёмная</option>
+            </select>
+          </div>
+        </div>
+        <nav class="anchor-nav" aria-label="Разделы панели">
+          <a href="#sessions-section">Сессии</a>
+          <a href="#compare-section">Сравнение A/B</a>
+          <a href="#tools-section">Инструменты</a>
+        </nav>
+        <p id="config-root" class="config-root" title="">Каталог: загружается…</p>
+      </div>
+    </header>
+
+    <main id="main-content" class="app-shell" tabindex="-1">
+      <div
+        id="error-banner"
+        class="error-banner"
+        role="alert"
+        aria-labelledby="error-title"
+        tabindex="-1"
+        hidden
+      ></div>
+
+      <section class="command-area" aria-label="Управление измерением">
+        <section id="device-panel" class="panel measurement-rail" aria-labelledby="device-heading">
+          <div class="panel-heading">
+            <h2 id="device-heading">Устройство</h2>
+            <span class="status-label">Не проверено</span>
+          </div>
+          <div id="device-status" role="status" aria-live="polite" aria-atomic="true">
+            Проверка ещё не запускалась
+          </div>
+          <ul class="diagnostic-chain" aria-label="Цепочка диагностики">
+            <li>Драйвер: неизвестно</li>
+            <li>Устройство: неизвестно</li>
+            <li>Прошивка: неизвестно</li>
+          </ul>
+          <p class="helper-text">Проверьте USB и WinUSB, затем повторите проверку.</p>
+          <button id="device-check-btn" class="button button-secondary" type="button">
+            Проверить устройство
+          </button>
+        </section>
+
+        <section
+          class="panel measurement-rail capture-panel"
+          aria-labelledby="capture-heading"
+        >
+          <div class="panel-heading">
+            <h2 id="capture-heading">Захват</h2>
+            <span class="status-label">Ручной запуск</span>
+          </div>
+          <p class="helper-text">Для анализа CH2 должен видеть сеть 50 Гц: подключите трансформатор 230:6 к CH2.</p>
+          <form id="capture-form" class="form-grid">
+            <div class="field">
+              <label for="capture-duration">Длительность, с</label>
+              <input
+                id="capture-duration"
+                name="duration_s"
+                type="number"
+                value="2.4"
+                min="0.1"
+                step="0.1"
+              >
+            </div>
+            <div class="field">
+              <label for="capture-rate">Частота дискретизации, Гц</label>
+              <input
+                id="capture-rate"
+                name="sample_rate_hz"
+                type="number"
+                value="8000000"
+                min="1000"
+                step="1000"
+              >
+            </div>
+            <div class="field">
+              <label for="capture-range">Диапазон CH1, В</label>
+              <select id="capture-range" name="range_v">
+                <option value="5">5</option>
+                <option value="1">1</option>
+                <option value="0.5">0.5</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="capture-input">Вход CH1</label>
+              <select id="capture-input" name="input">
+                <option value="rc">RC-развязка — иголки и ВЧ-помехи</option>
+                <option value="transformer">Трансформатор 230:6 — качество сети 50 Гц</option>
+              </select>
+              <span class="helper-text">Трансформатор: частота, RMS, THD и гармоники сети. Пробник на вторичке, переключатель в 10x, один канал.</span>
+            </div>
+            <div class="field">
+              <label for="capture-channels">Каналы</label>
+              <select id="capture-channels" name="channels">
+                <option value="2">2 — CH1 + CH2 (синхронизация от сети)</option>
+                <option value="1">1 — только CH1 (один пробник)</option>
+              </select>
+              <span class="helper-text">Без CH2 метрики фазовой привязки (P_async/P_sync, частота сети) будут «н/д»; спектр и пики считаются полностью.</span>
+            </div>
+            <div class="field checkbox-field">
+              <label for="capture-self-noise">
+                <input id="capture-self-noise" name="self_noise" type="checkbox">
+                <span>Самошум (терминированный вход)</span>
+              </label>
+            </div>
+            <div class="field capture-label">
+              <label for="capture-label-input">Метка</label>
+              <input id="capture-label-input" name="label" type="text" autocomplete="off">
+              <span class="helper-text">Тег для поиска по каталогу; в имя папки не входит.</span>
+            </div>
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">Запустить захват</button>
+            </div>
+            <details id="capture-advanced" class="form-disclosure">
+              <summary>Серия и базовая сессия</summary>
+              <div class="advanced-grid">
+                <div class="field field-wide">
+                  <label for="capture-output-name">Каталог</label>
+                  <input
+                    id="capture-output-name"
+                    name="output_name"
+                    type="text"
+                    autocomplete="off"
+                  >
+                  <span class="helper-text">Имя папки на диске в корне сессий. Пусто — имя будет создано автоматически.</span>
+                </div>
+                <div class="field field-wide">
+                  <label for="capture-baseline">Базовая сессия (самошум)</label>
+                  <select id="capture-baseline" name="baseline_session">
+                    <option value="">Без базовой сессии</option>
+                  </select>
+                  <span class="helper-text">Самошум этой локации: спектр CH1 будет приведён ко входу (та же длительность и частота дискретизации). Недоступно, пока включён флажок «Самошум».</span>
+                </div>
+                <div class="field">
+                  <label for="capture-repeat">Повторов, шт.</label>
+                  <input
+                    id="capture-repeat"
+                    name="repeat"
+                    type="number"
+                    value="1"
+                    min="1"
+                    step="1"
+                  >
+                </div>
+                <div class="field">
+                  <label for="capture-interval">Интервал стартов, с</label>
+                  <input
+                    id="capture-interval"
+                    name="interval_s"
+                    type="number"
+                    value="0"
+                    min="0"
+                    step="0.1"
+                  >
+                </div>
+              </div>
+            </details>
+          </form>
+        </section>
+
+        <section class="panel measurement-rail job-panel" aria-labelledby="job-heading">
+          <div class="panel-heading">
+            <h2 id="job-heading">Активная задача</h2>
+            <span class="status-label">Ожидание</span>
+          </div>
+          <div id="job-status" role="status" aria-live="polite" aria-atomic="true">
+            Нет активной задачи
+          </div>
+          <ol class="job-steps" aria-label="Стадии задачи">
+            <li>В очереди</li>
+            <li>Симуляция</li>
+            <li>Захват</li>
+            <li>Анализ</li>
+            <li>Готово</li>
+          </ol>
+          <progress id="job-progress" max="5" value="0" aria-label="Прогресс активной задачи">0 из 5 стадий</progress>
+          <div class="job-meta">
+            <span id="job-stage">Стадия: ожидание</span>
+            <span id="job-series">Серия —/—</span>
+          </div>
+          <button
+            id="job-cancel-btn"
+            class="button button-danger-secondary"
+            type="button"
+            disabled
+          >
+            Отменить после текущей сессии
+          </button>
+        </section>
+      </section>
+
+      <section class="data-workspace" aria-label="Данные сессий">
+        <section
+          id="sessions-section"
+          class="panel sessions-panel"
+          aria-labelledby="sessions-heading"
+        >
+          <div class="panel-heading">
+            <h2 id="sessions-heading">Сессии</h2>
+            <button id="sessions-refresh-btn" class="button button-secondary" type="button">
+              Обновить
+            </button>
+          </div>
+          <p class="session-path">Каталог загружается из /api/config</p>
+          <div class="session-search-control">
+            <label for="session-search">Поиск по имени или метке</label>
+            <div class="session-search-actions">
+              <input id="session-search" type="text" autocomplete="off">
+              <button
+                id="session-search-clear"
+                class="button button-secondary"
+                type="button"
+              >
+                Очистить
+              </button>
+            </div>
+          </div>
+          <div
+            id="sessions-list"
+            class="sessions-list"
+            role="region"
+            aria-label="Сессии в каталоге"
+            tabindex="0"
+          >
+            <div class="empty-state">
+              <h3>В каталоге нет сессий</h3>
+              <p>Сессий пока нет. Создайте симуляцию или выполните захват.</p>
+              <div class="empty-actions">
+                <a class="button button-primary" href="#simulate-heading">Создать симуляцию</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="session-detail"
+          class="panel session-detail"
+          aria-labelledby="detail-heading"
+        >
+          <div class="panel-heading">
+            <h2 id="detail-heading">Детальный анализ</h2>
+            <span class="status-label">Сессия не выбрана</span>
+          </div>
+          <div class="empty-state">
+            <h3>Сессия не выбрана</h3>
+            <p>Выберите запись в каталоге, чтобы открыть манифест и результаты.</p>
+          </div>
+
+          <div class="analysis-content" hidden>
+            <div class="empty-state analysis-empty">
+              <h3>Не проанализирована</h3>
+              <p>Запустите анализ, чтобы построить спектр и рассчитать метрики.</p>
+              <button class="button button-primary" type="button">Анализировать</button>
+            </div>
+            <table class="metrics-table">
+              <caption>Метрики иголок</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Метрика</th>
+                  <th scope="col">Значение</th>
+                  <th scope="col">Единица / смысл</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">μ_pk</th><td>—</td><td>В</td></tr>
+              </tbody>
+            </table>
+            <div
+              id="spectrum-chart"
+              class="chart-block"
+              role="region"
+              aria-labelledby="spectrum-caption"
+            >
+              <figure
+                id="spectrum-figure"
+                class="chart-figure"
+                aria-labelledby="spectrum-caption"
+              >
+                <figcaption id="spectrum-caption" class="visually-hidden">Логарифмический спектр мощности выбранной сессии</figcaption>
+                <div
+                  id="spectrum-plot"
+                  class="plot plot-spectrum"
+                  aria-busy="false"
+                  data-chart-state="idle"
+                  aria-describedby="spectrum-status"
+                ></div>
+              </figure>
+              <p
+                id="spectrum-status"
+                class="chart-status"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              ></p>
+            </div>
+            <table class="peaks-table">
+              <caption>Обнаруженные пики спектра</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Частота, Гц</th>
+                  <th scope="col">Уровень, дБ</th>
+                      <th scope="col">Выраженность, дБ</th>
+                  <th scope="col">Q</th>
+                </tr>
+              </thead>
+              <tbody><tr><td colspan="4">Пики ещё не рассчитаны</td></tr></tbody>
+            </table>
+            <button id="waveform-load-btn" class="button button-secondary" type="button">
+              Показать осциллограмму
+            </button>
+            <div
+              id="waveform-chart"
+              class="chart-block"
+              role="region"
+              aria-labelledby="waveform-caption"
+              hidden
+            >
+              <figure
+                id="waveform-figure"
+                class="chart-figure"
+                aria-labelledby="waveform-caption"
+                hidden
+              >
+                <figcaption id="waveform-caption" class="visually-hidden">Превью осциллограммы выбранной сессии</figcaption>
+                <div
+                  id="waveform-plot"
+                  class="plot plot-waveform"
+                  aria-busy="false"
+                  data-chart-state="idle"
+                  aria-describedby="waveform-status"
+                  hidden
+                ></div>
+              </figure>
+              <p
+                id="waveform-status"
+                class="chart-status"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              ></p>
+            </div>
+            <details class="manifest-disclosure">
+              <summary>Манифест</summary>
+              <dl class="manifest-grid">
+                <div><dt>ID</dt><dd>—</dd></div>
+                <div><dt>Источник</dt><dd>—</dd></div>
+              </dl>
+            </details>
+          </div>
+        </section>
+      </section>
+
+      <section
+        id="compare-section"
+        class="panel compare-panel"
+        aria-labelledby="compare-heading"
+      >
+        <div class="panel-heading">
+          <div>
+            <h2 id="compare-heading">Сравнение A/B</h2>
+            <p class="helper-text">Правило расчёта: Δ = B − A</p>
+          </div>
+        </div>
+        <form id="compare-form" class="compare-form">
+          <div class="field">
+            <label for="compare-a">Сессия A</label>
+            <select id="compare-a" name="session_a">
+              <option value="">Выберите сессию A</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="compare-b">Сессия B</label>
+            <select id="compare-b" name="session_b">
+              <option value="">Выберите сессию B</option>
+            </select>
+          </div>
+          <button class="button button-primary" type="submit" disabled>Сравнить</button>
+        </form>
+        <div id="compare-result" class="compare-result">
+          <p class="empty-inline">Выберите две проанализированные сессии.</p>
+          <table class="compare-table" hidden>
+            <caption>Сравнение A/B</caption>
+            <thead>
+              <tr>
+                <th scope="col">Метрика</th>
+                <th scope="col">A</th>
+                <th scope="col">B</th>
+                <th scope="col">Δ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Уровень пика</th>
+                <td data-label="A">—</td>
+                <td data-label="B">—</td>
+                <td data-label="Δ" class="delta-neutral">0,0 дБ = без изменения</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="tools-section" class="tools-section">
+        <section class="panel form-panel" aria-labelledby="simulate-heading">
+          <h2 id="simulate-heading">Симуляция</h2>
+          <details>
+            <summary>Параметры синтетической сессии</summary>
+            <form id="simulate-form" class="form-grid">
+              <div class="field">
+                <label for="simulate-profile">Профиль</label>
+                <select id="simulate-profile" name="profile">
+                  <option value="bad">bad</option>
+                  <option value="bad-damped">bad-damped</option>
+                  <option value="quiet">quiet</option>
+                  <option value="sync-only">sync-only</option>
+                  <option value="async-heavy">async-heavy</option>
+                </select>
+                <span class="helper-text">bad — сильные помехи; bad-damped — пик 22.4 кГц ниже на ~12 дБ; quiet — тихий фон; sync-only — только синхронные иголки; async-heavy — преобладают асинхронные.</span>
+              </div>
+              <div class="field field-wide">
+                <label for="simulate-output-name">Каталог</label>
+                <input
+                  id="simulate-output-name"
+                  name="output_name"
+                  type="text"
+                  autocomplete="off"
+                >
+                <span class="helper-text">Имя папки на диске в корне сессий. Пусто — имя будет создано автоматически.</span>
+              </div>
+              <div class="field">
+                <label for="simulate-duration">Длительность, с</label>
+                <input
+                  id="simulate-duration"
+                  name="duration_s"
+                  type="number"
+                  value="2.4"
+                  min="0.1"
+                  step="0.1"
+                >
+              </div>
+              <div class="field">
+                <label for="simulate-rate">Частота дискретизации, Гц</label>
+                <input
+                  id="simulate-rate"
+                  name="sample_rate_hz"
+                  type="number"
+                  value="500000"
+                  min="1000"
+                  step="1000"
+                >
+              </div>
+              <div class="field">
+                <label for="simulate-seed">Зерно генератора</label>
+                <input
+                  id="simulate-seed"
+                  name="seed"
+                  type="number"
+                  value="6022"
+                  min="0"
+                  step="1"
+                >
+              </div>
+              <div class="field">
+                <label for="simulate-channels">Каналы</label>
+                <select id="simulate-channels" name="channels">
+                  <option value="2">2 — CH1 + CH2</option>
+                  <option value="1">1 — только CH1</option>
+                </select>
+                <span class="helper-text">Репетиция одноканального захвата: ch2.npy не записывается, синхронные метрики — «н/д».</span>
+              </div>
+              <div class="field field-wide">
+                <label for="simulate-label">Метка</label>
+                <input id="simulate-label" name="label" type="text" autocomplete="off">
+                <span class="helper-text">Тег для поиска по каталогу; в имя папки не входит.</span>
+              </div>
+              <div class="field">
+                <label for="simulate-repeat">Повторов, шт.</label>
+                <input
+                  id="simulate-repeat"
+                  name="repeat"
+                  type="number"
+                  value="1"
+                  min="1"
+                  step="1"
+                >
+              </div>
+              <div class="field">
+                <label for="simulate-interval">Интервал стартов, с</label>
+                <input
+                  id="simulate-interval"
+                  name="interval_s"
+                  type="number"
+                  value="0"
+                  min="0"
+                  step="0.1"
+                >
+              </div>
+              <div class="form-actions field-wide">
+                <button class="button button-primary" type="submit">Создать сессию</button>
+              </div>
+            </form>
+          </details>
+        </section>
+
+        <section class="panel selftest-panel" aria-labelledby="selftest-heading">
+          <div class="panel-heading">
+            <h2 id="selftest-heading">Selftest</h2>
+            <button id="selftest-btn" class="button button-secondary" type="button">
+              Запустить selftest
+            </button>
+          </div>
+          <p class="helper-text">Проверяет синтетический тракт без устройства.</p>
+          <div id="selftest-result" class="empty-inline">Проверка ещё не запускалась</div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,564 @@
+{
+    "version":  1,
+    "root":  "C:\\Users\\Kirill\\lnt-sessions",
+    "created":  "2026-08-11T13:39:55.0733436Z",
+    "algorithm":  "sha256",
+    "count":  92,
+    "files":  [
+                  {
+                      "path":  "cap-20260805-163913/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T16:39:15.7017456Z",
+                      "sha256":  "a115cc35916ef206fd828fb09a5959035fd11671c489f4d7744b6053a59c6ff7"
+                  },
+                  {
+                      "path":  "cap-20260805-163913/ch2.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T16:39:15.7617594Z",
+                      "sha256":  "aef3727fca4a6c5320f1bf5f809c02e416b219bf5f1eb7a01694512e05cc6a35"
+                  },
+                  {
+                      "path":  "cap-20260805-163913/manifest.json",
+                      "size":  19377,
+                      "mtime":  "2026-08-05T16:39:15.7627600Z",
+                      "sha256":  "27e7fef32d3bd3a2abe37f0af9e8fcdee6da426776c37bfe0f58505a0980af1e"
+                  },
+                  {
+                      "path":  "cap-20260805-163923/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T16:39:26.0821876Z",
+                      "sha256":  "96460092589b02eba3e5f292647372af5a739a31396b11c2c26eea2216e02923"
+                  },
+                  {
+                      "path":  "cap-20260805-163923/ch2.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T16:39:26.1572048Z",
+                      "sha256":  "94e86769ac4540de5c20e9011f3fa094e8a3ab5de3922ed2f988ebf720a18acb"
+                  },
+                  {
+                      "path":  "cap-20260805-163923/manifest.json",
+                      "size":  19377,
+                      "mtime":  "2026-08-05T16:39:26.1592058Z",
+                      "sha256":  "359eb06aeba371546745b42b4e716e833f69fdf41fcf5160bde5c8e9a7eee4e0"
+                  },
+                  {
+                      "path":  "cap-20260805-180623/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T18:06:26.5372550Z",
+                      "sha256":  "f457c5e8b664d8d64a1b06d74322d76af660e670fbb2a339aa548eb62d2f5cc3"
+                  },
+                  {
+                      "path":  "cap-20260805-180623/ch2.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T18:06:26.5982689Z",
+                      "sha256":  "6c946299d1daade09505ca40c25486579ebfa2be43000f1efdd716de96591128"
+                  },
+                  {
+                      "path":  "cap-20260805-180623/manifest.json",
+                      "size":  19392,
+                      "mtime":  "2026-08-05T18:06:26.6002699Z",
+                      "sha256":  "0796a9143e853f9d39265ccfe89d5ae1e12450f3c14e8c8e41b0ecb568a1c668"
+                  },
+                  {
+                      "path":  "cap-20260805-192920/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T19:29:22.9944543Z",
+                      "sha256":  "b6250502dc3349e97b649e2a3e956330f72982fa91e3a67b16f76a0b6e2d59d1"
+                  },
+                  {
+                      "path":  "cap-20260805-192920/manifest.json",
+                      "size":  19208,
+                      "mtime":  "2026-08-05T19:29:22.9954550Z",
+                      "sha256":  "715ba674ccd876fb5d857a72723593d78ae8c5654371d3a8b3a42847093b8ccd"
+                  },
+                  {
+                      "path":  "cap-20260805-192920/metrics.json",
+                      "size":  1600,
+                      "mtime":  "2026-08-05T19:29:25.3099994Z",
+                      "sha256":  "0cd5ce4fe6315c5f75ae1ddc063dca4c11087ec6d7691fc47406e50b8bd77b6b"
+                  },
+                  {
+                      "path":  "cap-20260805-192920/spectrum.csv",
+                      "size":  1314207,
+                      "mtime":  "2026-08-05T19:29:25.3900180Z",
+                      "sha256":  "6810749bb180336a37c098306d9d3c4c1f1b5ab2a04b1cc370b48e97decef4fc"
+                  },
+                  {
+                      "path":  "cap-20260805-192920/spectrum_input_referred.csv",
+                      "size":  50,
+                      "mtime":  "2026-08-05T19:29:25.3910183Z",
+                      "sha256":  "da487d675694e70c68063803244b47f55fd487900702d973a101bd0b642ab98c"
+                  },
+                  {
+                      "path":  "cap-20260805-200353/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T20:03:55.8860895Z",
+                      "sha256":  "dde5aac3a1ce91e681d5715da153e1a1798563c809beb280fe3ed101c6296144"
+                  },
+                  {
+                      "path":  "cap-20260805-200353/manifest.json",
+                      "size":  19207,
+                      "mtime":  "2026-08-05T20:03:55.8870900Z",
+                      "sha256":  "b4684da2c11065b265a8667af47eefc9782a9fc62bcb28008a6b8bfc97f6636f"
+                  },
+                  {
+                      "path":  "cap-20260805-200353/metrics.json",
+                      "size":  2537,
+                      "mtime":  "2026-08-05T20:03:58.1056116Z",
+                      "sha256":  "26b1d9b6818a8efd34568f882b23ec0e3bce5ce715f6bf5e4816dab0d9bd0816"
+                  },
+                  {
+                      "path":  "cap-20260805-200353/spectrum.csv",
+                      "size":  1314246,
+                      "mtime":  "2026-08-05T20:03:58.1856303Z",
+                      "sha256":  "e9e0ad24a1671ffee796b9f0f09eed9c053c04914a7a3618743d41492bf5b321"
+                  },
+                  {
+                      "path":  "cap-20260805-200353/spectrum_input_referred.csv",
+                      "size":  50,
+                      "mtime":  "2026-08-05T20:03:58.1856303Z",
+                      "sha256":  "da487d675694e70c68063803244b47f55fd487900702d973a101bd0b642ab98c"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-001/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T20:05:34.2837565Z",
+                      "sha256":  "4e1a2cdf9dea5101de55e5c675f4d2604930836ebd2cd756c4640adb497d801c"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-001/manifest.json",
+                      "size":  19533,
+                      "mtime":  "2026-08-05T20:05:34.2847566Z",
+                      "sha256":  "f7aefbd5e59436fb4c4bf834dc8f2e9ff7454df69e7af44d57fc5a873d5d780b"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-001/metrics.json",
+                      "size":  2850,
+                      "mtime":  "2026-08-05T20:05:38.5177527Z",
+                      "sha256":  "00a444a5864ab3afdd79dfe8b461b9ce3da4a504643b0dc80d04d4d176ba0e14"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-001/spectrum.csv",
+                      "size":  1314074,
+                      "mtime":  "2026-08-05T20:05:38.5967706Z",
+                      "sha256":  "b7a1ba4482b736cca0c0583fba531dc0fc3e10c5e7e1b713987ab823812a539c"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-001/spectrum_input_referred.csv",
+                      "size":  800,
+                      "mtime":  "2026-08-05T20:05:38.5977712Z",
+                      "sha256":  "eec8fd312c20f21940bd9a19420eb065c2569025ec2cb19425eb902cb9590c0d"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-002/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T20:05:41.1693759Z",
+                      "sha256":  "b68d85b6025e5b8ebbb2c4fb3be7443498841aa8cb6dfafe91914b5d508aad35"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-002/manifest.json",
+                      "size":  19534,
+                      "mtime":  "2026-08-05T20:05:41.1703764Z",
+                      "sha256":  "62f8c102b5cd05fff1482f128b34a011af4dce6d8e419e745cf0f582fc656ccf"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-002/metrics.json",
+                      "size":  2849,
+                      "mtime":  "2026-08-05T20:05:45.2743416Z",
+                      "sha256":  "f17decb77514d809dbecd9d969fd9da29fdca36c7ece3420a6cb4eb700d2c5b6"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-002/spectrum.csv",
+                      "size":  1314275,
+                      "mtime":  "2026-08-05T20:05:45.3523603Z",
+                      "sha256":  "80d2d04537586b076d02a5ce10837a4b993ab59674144902b4546e21e8ef1a3b"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-002/spectrum_input_referred.csv",
+                      "size":  370,
+                      "mtime":  "2026-08-05T20:05:45.3523603Z",
+                      "sha256":  "e4e077ddb0bf4effbf76dd345f77794393c3e697a30783667ff34360b69759a9"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-003/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T20:05:47.9169640Z",
+                      "sha256":  "5227f4d8f8adfa2bc2971c9b10e0acd3f5c0249986b50960350f716e44c55114"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-003/manifest.json",
+                      "size":  19550,
+                      "mtime":  "2026-08-05T20:05:47.9179637Z",
+                      "sha256":  "e207803a97167b877c555c1afecf38ecd8d02b67944991f32be1eaa1d5739cdd"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-003/metrics.json",
+                      "size":  2849,
+                      "mtime":  "2026-08-05T20:05:52.0089262Z",
+                      "sha256":  "a887fb136965d5f5549b226e8b40d0b936c0a300e9f0c6a267e6e3e360dc32d8"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-003/spectrum.csv",
+                      "size":  1314154,
+                      "mtime":  "2026-08-05T20:05:52.0879448Z",
+                      "sha256":  "0207837d8c1730bb41b09afba51a0fa6d55b51abd885b296898ededf90563177"
+                  },
+                  {
+                      "path":  "cap-20260805-200531-003/spectrum_input_referred.csv",
+                      "size":  425,
+                      "mtime":  "2026-08-05T20:05:52.0879448Z",
+                      "sha256":  "a9990a3ab4690ff4cb8ba80f62cebd2b6a80ff7744b30d4971872f7e8fce21a8"
+                  },
+                  {
+                      "path":  "cap-20260805-212516/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T21:25:18.7441025Z",
+                      "sha256":  "401c8a446fa549c1b2cb775cebef0fba838d4e229cf5dfb8e7cec172e593a9e6"
+                  },
+                  {
+                      "path":  "cap-20260805-212516/manifest.json",
+                      "size":  19367,
+                      "mtime":  "2026-08-05T21:25:18.7461027Z",
+                      "sha256":  "bc8f48ec9d48a85c114dc4294878e033236b4badb1cdf66ee60c0b0f3a338207"
+                  },
+                  {
+                      "path":  "cap-20260805-212516/metrics.json",
+                      "size":  7598,
+                      "mtime":  "2026-08-05T21:30:02.9315612Z",
+                      "sha256":  "9737de72990d318dbc82ad53bbba42ec53094390e4960fbf8b6ec5dc63625a1d"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-001/ch1.npy",
+                      "size":  320000128,
+                      "mtime":  "2026-08-05T21:34:06.1175624Z",
+                      "sha256":  "1146ef9a1d9ca363c02d02c37a37732cc76b0f46c4a735c0128f4b2ef446270e"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-001/manifest.json",
+                      "size":  75788,
+                      "mtime":  "2026-08-05T21:34:06.1205631Z",
+                      "sha256":  "0e68e4795489d6d78207dbb5e17658498839a4224d966cc34c7e6cf25a2736f8"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-001/metrics.json",
+                      "size":  2878,
+                      "mtime":  "2026-08-05T21:34:17.6993096Z",
+                      "sha256":  "21b5106345ceaaaa14989bc8cd1e49ef790c572e462a9271a2b37e04c966658f"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-001/spectrum.csv",
+                      "size":  1314193,
+                      "mtime":  "2026-08-05T21:34:17.7783277Z",
+                      "sha256":  "6cd67072074c48308c506bf716c9477eef38c3c2fb436064b2ad21bd180cc874"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-001/spectrum_input_referred.csv",
+                      "size":  94529,
+                      "mtime":  "2026-08-05T21:34:17.7843295Z",
+                      "sha256":  "75a4bb11a181bc949f4f3c0055e2ea10c2da430a3c639a41a1d8026ecd87a54c"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-002/ch1.npy",
+                      "size":  320000128,
+                      "mtime":  "2026-08-05T21:34:28.4808457Z",
+                      "sha256":  "9533261a24bfed59f7bb0bcb623b40b061b805d945cecbf0fece18aa5b791156"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-002/manifest.json",
+                      "size":  75788,
+                      "mtime":  "2026-08-05T21:34:28.4838467Z",
+                      "sha256":  "d53ca011cf99011ffadede661d31275e9ebace96491c786aaf88dad84b70fc81"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-002/metrics.json",
+                      "size":  3822,
+                      "mtime":  "2026-08-05T21:34:40.2726201Z",
+                      "sha256":  "3e26aa178ca519ad62d3709510fcfb477176ec34a079704b98bb64095de636d7"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-002/spectrum.csv",
+                      "size":  1314131,
+                      "mtime":  "2026-08-05T21:34:40.3516386Z",
+                      "sha256":  "7933c31d7ccb9e330e82e3e59a0f1c90c8a6871b78fdd8cab1de3d8976485e7a"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-002/spectrum_input_referred.csv",
+                      "size":  95017,
+                      "mtime":  "2026-08-05T21:34:40.3576399Z",
+                      "sha256":  "cb27e8d1f04c99ea2a51806a3ec43eee2db70372d73bfdf8b94347db14db350f"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-003/ch1.npy",
+                      "size":  320000128,
+                      "mtime":  "2026-08-05T21:34:51.0621582Z",
+                      "sha256":  "aeea8f32c8a23b9d5a24135d032f0876a979d27ef9c1a410c159d6b6b65cce59"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-003/manifest.json",
+                      "size":  75771,
+                      "mtime":  "2026-08-05T21:34:51.0651598Z",
+                      "sha256":  "d4cf05b4c2890148babcc3c5f756fb7f63a8a55761f67b4a1535c967487002ce"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-003/metrics.json",
+                      "size":  3634,
+                      "mtime":  "2026-08-05T21:35:02.1382663Z",
+                      "sha256":  "e5e83178837d7e88965e62f82ff7798ded39e87557c75bf8207a680f04e26175"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-003/spectrum.csv",
+                      "size":  1314189,
+                      "mtime":  "2026-08-05T21:35:02.2162854Z",
+                      "sha256":  "77e26497f2f28f034d8c318729c50f72381736fd32ac8da0590379ec7bdab3b4"
+                  },
+                  {
+                      "path":  "cap-20260805-213355-003/spectrum_input_referred.csv",
+                      "size":  87645,
+                      "mtime":  "2026-08-05T21:35:02.2222869Z",
+                      "sha256":  "a116c146ea5fef1e44c04266f9beea90008c08e38ef2e14b7b746579bc82c8df"
+                  },
+                  {
+                      "path":  "cap-20260806-083601/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-06T08:36:03.8126805Z",
+                      "sha256":  "8573df1d37ad27ab020da578274561228e8b2e14d219b412e0ecc6ce3c478da4"
+                  },
+                  {
+                      "path":  "cap-20260806-083601/manifest.json",
+                      "size":  19227,
+                      "mtime":  "2026-08-06T08:36:03.8136806Z",
+                      "sha256":  "509b2b151c77f628f0455fc4375243be42bf2af043f9cc55dfb80e1665f141fd"
+                  },
+                  {
+                      "path":  "cap-20260806-083601/metrics.json",
+                      "size":  1622,
+                      "mtime":  "2026-08-06T08:36:05.6141456Z",
+                      "sha256":  "76f655ec17df428a6b13cda2c57c5213c0e9410523e0677af0f18ed2888aa010"
+                  },
+                  {
+                      "path":  "cap-20260806-083601/spectrum.csv",
+                      "size":  1314075,
+                      "mtime":  "2026-08-06T08:36:05.6931642Z",
+                      "sha256":  "c55735c1c7e12f8074caada1ca310f99f984101b26feefdcc689c828f563ade7"
+                  },
+                  {
+                      "path":  "cap-20260806-083601/spectrum_input_referred.csv",
+                      "size":  50,
+                      "mtime":  "2026-08-06T08:36:05.6941644Z",
+                      "sha256":  "da487d675694e70c68063803244b47f55fd487900702d973a101bd0b642ab98c"
+                  },
+                  {
+                      "path":  "cap-20260806-083920/ch1.npy",
+                      "size":  960000128,
+                      "mtime":  "2026-08-06T08:39:52.0045019Z",
+                      "sha256":  "b23d2e5fd4b4c1edd457e36301759e63e819256621cb15a3ec6ecba1f582cc64"
+                  },
+                  {
+                      "path":  "cap-20260806-083920/manifest.json",
+                      "size":  223842,
+                      "mtime":  "2026-08-06T08:39:52.0105031Z",
+                      "sha256":  "9098785311c36d5e23221212b5c5058aa85028faf35252ec0447ab4bc321a039"
+                  },
+                  {
+                      "path":  "cap-20260806-083920/metrics.json",
+                      "size":  2691,
+                      "mtime":  "2026-08-06T08:40:16.4038606Z",
+                      "sha256":  "583971b5bb868b9922349eb1b57b77411afeea039f0f2acb33e3c460f6076f2f"
+                  },
+                  {
+                      "path":  "cap-20260806-083920/spectrum.csv",
+                      "size":  1314244,
+                      "mtime":  "2026-08-06T08:40:16.5139044Z",
+                      "sha256":  "c6ca7f7d3fba9f9a5fa7ea5f0f236a0a845eb69939bd330125a94d53d38ecb23"
+                  },
+                  {
+                      "path":  "cap-20260806-083920/spectrum_input_referred.csv",
+                      "size":  82687,
+                      "mtime":  "2026-08-06T08:40:16.5189056Z",
+                      "sha256":  "1f8205748bef54fe939d921ebc1fe3ba5787b521fc810e0c379817ff8bb3c9b6"
+                  },
+                  {
+                      "path":  "cap-20260806-084129/ch1.npy",
+                      "size":  960000128,
+                      "mtime":  "2026-08-06T08:42:00.7548576Z",
+                      "sha256":  "34107966be90582c91c48b32218a8f1a6f39292d70e4ddd4b50b6a501574d078"
+                  },
+                  {
+                      "path":  "cap-20260806-084129/manifest.json",
+                      "size":  223747,
+                      "mtime":  "2026-08-06T08:42:00.7618594Z",
+                      "sha256":  "c37cfa171cb45fc5a4e209e7bb9a317cea4628fea87df289f52f92db92b77f70"
+                  },
+                  {
+                      "path":  "cap-20260806-084129/metrics.json",
+                      "size":  7581,
+                      "mtime":  "2026-08-06T08:42:04.9559147Z",
+                      "sha256":  "1ca004522ae2aae719a48e412e64f3faccb4d27625659c0a3771c5ad8605439d"
+                  },
+                  {
+                      "path":  "cap-20260806-093821/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-06T09:38:26.2541863Z",
+                      "sha256":  "bc40959cbcdc98714dd8c90338adc3e74f316f23933ffde328ba59070cfb64b6"
+                  },
+                  {
+                      "path":  "cap-20260806-093821/ch2.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-06T09:38:26.3166852Z",
+                      "sha256":  "02cd32e8fc278adaa75d046fd6a3e5b126f3bb5694468ee9a6020a24783f5e80"
+                  },
+                  {
+                      "path":  "cap-20260806-093821/manifest.json",
+                      "size":  19483,
+                      "mtime":  "2026-08-06T09:38:26.3166852Z",
+                      "sha256":  "d28252929613ebf0735f0fcdfb488f5e9bd06848df924c3086eeeaefdb5ed332"
+                  },
+                  {
+                      "path":  "cap-20260806-093843/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-06T09:38:46.4867963Z",
+                      "sha256":  "fd6961da70e42c7e5eaafcfc16df1d7010b7e8f8aa3856ed677fa396faaa4ed6"
+                  },
+                  {
+                      "path":  "cap-20260806-093843/manifest.json",
+                      "size":  19242,
+                      "mtime":  "2026-08-06T09:38:46.4867963Z",
+                      "sha256":  "6817cd6a5b1d3dca372c1fe3ac96d9026487538141085283ffcc9d9483fcb0f3"
+                  },
+                  {
+                      "path":  "cap-20260806-093843/metrics.json",
+                      "size":  1436,
+                      "mtime":  "2026-08-06T09:38:48.1795246Z",
+                      "sha256":  "c4af740e1463012e64bb28107854d606d9077b00ffc0a3d1a35f2acbcef3427d"
+                  },
+                  {
+                      "path":  "cap-20260806-093843/spectrum.csv",
+                      "size":  1314228,
+                      "mtime":  "2026-08-06T09:38:48.2576483Z",
+                      "sha256":  "09046380ef19dd20a0186294daf23977c538046c0f2ea6f2f4948208d7f2e29e"
+                  },
+                  {
+                      "path":  "cap-20260806-093843/spectrum_input_referred.csv",
+                      "size":  50,
+                      "mtime":  "2026-08-06T09:38:48.2576483Z",
+                      "sha256":  "da487d675694e70c68063803244b47f55fd487900702d973a101bd0b642ab98c"
+                  },
+                  {
+                      "path":  "cap-20260806-094122/ch1.npy",
+                      "size":  960000128,
+                      "mtime":  "2026-08-06T09:41:54.5831932Z",
+                      "sha256":  "276a232e0e95f1e2c0c048765191fa89697b98731ec3004d97f6cd7ad75370d3"
+                  },
+                  {
+                      "path":  "cap-20260806-094122/manifest.json",
+                      "size":  223893,
+                      "mtime":  "2026-08-06T09:41:54.5901950Z",
+                      "sha256":  "2ab4eafcea5fcb7837dc3bfa187849e7c525b017736f7f40feb39d5ef174e0c1"
+                  },
+                  {
+                      "path":  "cap-20260806-094122/metrics.json",
+                      "size":  2879,
+                      "mtime":  "2026-08-06T09:42:18.0892257Z",
+                      "sha256":  "defc5bf05b396d6ac6e8fee64d7b5b41bb5ca87b885e6daa5759c8b9c402334c"
+                  },
+                  {
+                      "path":  "cap-20260806-094122/spectrum.csv",
+                      "size":  1314175,
+                      "mtime":  "2026-08-06T09:42:18.1672441Z",
+                      "sha256":  "652f7e31f2ffc219eddd1e88c87f8e3707eba2a35db229ce970a4f9bd457496c"
+                  },
+                  {
+                      "path":  "cap-20260806-094122/spectrum_input_referred.csv",
+                      "size":  22390,
+                      "mtime":  "2026-08-06T09:42:18.1692444Z",
+                      "sha256":  "fd984675270e5df2b27cb57f199ce590af539138b429d190f8abfc846fbf2642"
+                  },
+                  {
+                      "path":  "cap-20260806-094321/ch1.npy",
+                      "size":  960000128,
+                      "mtime":  "2026-08-06T09:43:52.9020351Z",
+                      "sha256":  "c6010af33842a4ec409bb18a40d55e336c648e6f8429f2a68300b02aa4c59def"
+                  },
+                  {
+                      "path":  "cap-20260806-094321/manifest.json",
+                      "size":  223798,
+                      "mtime":  "2026-08-06T09:43:52.9090368Z",
+                      "sha256":  "3d7a2ac499d99d127c2610cd59afd2ce18ba8af0eae43cbefeb20aae806dc5a2"
+                  },
+                  {
+                      "path":  "cap-20260806-094321/metrics.json",
+                      "size":  7583,
+                      "mtime":  "2026-08-06T09:43:57.1500346Z",
+                      "sha256":  "872771c7460d5c28aec343751cf39fcb4e76e156598b63dd8acba527a9e5c846"
+                  },
+                  {
+                      "path":  "first-capture/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T16:33:12.2353220Z",
+                      "sha256":  "a5f647b3fd70fb27907c61fda32cbccab4fdecf48ba19e0c7d21acd4d4157a6f"
+                  },
+                  {
+                      "path":  "first-capture/ch2.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T16:33:12.3053386Z",
+                      "sha256":  "606fe589fb8a18f8072dfe0d736473080049b9ce9874df20ff1746043dec0632"
+                  },
+                  {
+                      "path":  "first-capture/manifest.json",
+                      "size":  19535,
+                      "mtime":  "2026-08-05T16:33:12.3063386Z",
+                      "sha256":  "73cf457d5714728f1760846ce0acd3bd340a158865af1e7fff4eae83b6cfd4a1"
+                  },
+                  {
+                      "path":  "qa-line-quality/ch1.npy",
+                      "size":  3200128,
+                      "mtime":  "2026-08-05T21:02:55.1720046Z",
+                      "sha256":  "e3072644de21a9ded7feb729b646f33bff383d292af15ebdcab833b8f9bbe936"
+                  },
+                  {
+                      "path":  "qa-line-quality/manifest.json",
+                      "size":  911,
+                      "mtime":  "2026-08-05T21:02:55.1720046Z",
+                      "sha256":  "c25db73454dc793538bbbc8e401bccd481b6fc73f76676e8ef9e2239cdc394ed"
+                  },
+                  {
+                      "path":  "qa-line-quality/metrics.json",
+                      "size":  7594,
+                      "mtime":  "2026-08-05T21:03:23.2731331Z",
+                      "sha256":  "f440ceb47ec287fdc15927c5b45dffa183639da566bcd6d7a18b9639bd54f6e7"
+                  },
+                  {
+                      "path":  "single-ch-test/ch1.npy",
+                      "size":  76800128,
+                      "mtime":  "2026-08-05T18:57:39.6432024Z",
+                      "sha256":  "380aa679174fdaa91d2126cb149d0861f02fc9994ec9de77aef1e35a1a326d20"
+                  },
+                  {
+                      "path":  "single-ch-test/manifest.json",
+                      "size":  19384,
+                      "mtime":  "2026-08-05T18:57:39.6452028Z",
+                      "sha256":  "d61e734befb79093244e316781930364319b9e64babcbeeb7f73a7957edddd56"
+                  },
+                  {
+                      "path":  "single-ch-test/metrics.json",
+                      "size":  1603,
+                      "mtime":  "2026-08-05T18:57:51.9891077Z",
+                      "sha256":  "4c473647411f754a61296375df5e7592be5d3f744bd48d6c813f780ee95e3ae0"
+                  },
+                  {
+                      "path":  "single-ch-test/spectrum.csv",
+                      "size":  1314216,
+                      "mtime":  "2026-08-05T18:57:52.0701260Z",
+                      "sha256":  "ef879a08a6f4bf7fd7c296885fd5751a2b2aca43f4d3fdd2e88911ac566ff322"
+                  },
+                  {
+                      "path":  "single-ch-test/spectrum_input_referred.csv",
+                      "size":  50,
+                      "mtime":  "2026-08-05T18:57:52.0701260Z",
+                      "sha256":  "da487d675694e70c68063803244b47f55fd487900702d973a101bd0b642ab98c"
+                  }
+              ],
+    "errors":  [
+
+               ]
+}
