@@ -1,0 +1,47 @@
+{
+  "schema_version": 2,
+  "session_id": "frozen-v2-transformer",
+  "created_utc": "2026-08-11T12:02:00Z",
+  "completed_utc": "2026-08-11T12:02:01Z",
+  "source": "device",
+  "session_type": "line_quality",
+  "sample_rate_hz": 1000000.0,
+  "duration_s": 4e-06,
+  "sample_count": 4,
+  "line_frequency_hz": 50.0,
+  "profile": null,
+  "baseline_session": null,
+  "parameters": {},
+  "ch1": {
+    "filename": "ch1.npy",
+    "role": "lf_transformer",
+    "unit": "V",
+    "front_end": "transformer 230:6",
+    "range_code": 1,
+    "probe_multiplier": 10.0
+  },
+  "ch2": null,
+  "acquisition_telemetry": {
+    "requested_samples": 4,
+    "captured_samples": 4,
+    "callback_count": 1,
+    "block_lengths": [
+      4
+    ],
+    "callback_gaps_s": [],
+    "expected_block_interval_s": 4e-06,
+    "short_block_count": 1,
+    "ch1_clip_low_count": 0,
+    "ch1_clip_high_count": 0,
+    "ch2_clip_low_count": 0,
+    "ch2_clip_high_count": 0,
+    "calibration_used": false
+  },
+  "synthetic_truth": null,
+  "ch1_setup": {
+    "kind": "transformer_line_probe_v1",
+    "nominal_primary_v": 230.0,
+    "nominal_secondary_v": 6.0,
+    "probe_multiplier": 10.0
+  }
+}

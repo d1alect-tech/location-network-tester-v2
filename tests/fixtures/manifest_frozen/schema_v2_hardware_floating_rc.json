@@ -1,0 +1,49 @@
+{
+  "schema_version": 2,
+  "session_id": "frozen-v2-floating-rc",
+  "created_utc": "2026-08-11T12:01:00Z",
+  "completed_utc": "2026-08-11T12:01:01Z",
+  "source": "device",
+  "session_type": "measurement",
+  "sample_rate_hz": 1000000.0,
+  "duration_s": 4e-06,
+  "sample_count": 4,
+  "line_frequency_hz": 50.0,
+  "profile": null,
+  "baseline_session": "../frozen-v2-self-noise",
+  "parameters": {},
+  "ch1": {
+    "filename": "ch1.npy",
+    "role": "hf_probe",
+    "unit": "V",
+    "front_end": "floating differential RC shunt",
+    "range_code": 1,
+    "probe_multiplier": 1.0
+  },
+  "ch2": null,
+  "acquisition_telemetry": {
+    "requested_samples": 4,
+    "captured_samples": 4,
+    "callback_count": 1,
+    "block_lengths": [
+      4
+    ],
+    "callback_gaps_s": [],
+    "expected_block_interval_s": 4e-06,
+    "short_block_count": 1,
+    "ch1_clip_low_count": 0,
+    "ch1_clip_high_count": 0,
+    "ch2_clip_low_count": 0,
+    "ch2_clip_high_count": 0,
+    "calibration_used": false
+  },
+  "synthetic_truth": null,
+  "ch1_setup": {
+    "kind": "floating_differential_rc_shunt_v1",
+    "resistance_ohm": 100.0,
+    "c1_f": 1e-08,
+    "c2_f": 1e-08,
+    "component_values_basis": "nominal",
+    "reference_assumption": "floating_host_unverified"
+  }
+}
