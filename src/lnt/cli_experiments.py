@@ -11,6 +11,7 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
+from lnt.cli_research import run_check, run_confirm, run_trends, validation_fields
 from lnt.errors import InputError
 from lnt.experiments import Experiment, ExperimentStore
 from lnt.research import Hypothesis, HypothesisStore, hypothesis_status_label
@@ -46,11 +47,29 @@ def configure_research_parsers(add_parser: ParserFactory) -> None:
     stats.add_argument("--pair", action="append", default=[])
     _root(stats)
     stats.set_defaults(handler=_experiment)
+    trends = commands.add_parser("trends")
+    trends.add_argument("value", help="путь к JSON-файлу параметров тренда")
+    _root(trends)
+    trends.set_defaults(handler=_experiment)
+    check = commands.add_parser("check")
+    check.add_argument("value", help="идентификатор эксперимента")
+    _root(check)
+    check.set_defaults(handler=_experiment)
+    confirm = commands.add_parser("confirm")
+    confirm.add_argument("value", help="идентификатор запуска протокола")
+    confirm.add_argument("--actor", required=True, help="имя подтверждающего оператора")
+    _root(confirm)
+    confirm.set_defaults(handler=_experiment)
     hypothesis = add_parser("hypothesis", help="аудитируемые гипотезы")
     hypotheses = hypothesis.add_subparsers(dest="hypothesis_command", required=True)
     for name in ("add", "edit", "status"):
         command = hypotheses.add_parser(name)
-        command.add_argument("value")
+        value_help = (
+            "путь к JSON-файлу гипотезы"
+            if name in {"add", "edit"}
+            else "идентификатор гипотезы"
+        )
+        command.add_argument("value", help=value_help)
         _root(command)
         command.set_defaults(handler=_hypothesis)
 
@@ -94,6 +113,12 @@ def _experiment(args: argparse.Namespace) -> int:
                 },
             }
             print(json.dumps(payload, ensure_ascii=False, indent=2))
+        case "trends":
+            return run_trends(Path(args.value))
+        case "check":
+            return run_check(args.value, args.root)
+        case "confirm":
+            return run_confirm(args.value, args.actor, args.root)
         case _:
             raise InputError("неизвестная команда experiment")
     return 0
@@ -125,8 +150,12 @@ def _experiment_file(path: Path) -> Experiment:
 def _hypothesis_file(path: Path) -> Hypothesis:
     try:
         return Hypothesis.model_validate_json(path.read_text(encoding="utf-8"))
-    except (OSError, ValidationError) as error:
-        raise InputError(f"гипотеза: некорректный файл {path}") from error
+    except OSError as error:
+        raise InputError(f"гипотеза: не удалось прочитать файл {path}: {error}") from error
+    except ValidationError as error:
+        raise InputError(
+            f"гипотеза: некорректные поля {path}: {validation_fields(error)}"
+        ) from error
 
 
 def _pair(raw: str) -> PairedUnit:
