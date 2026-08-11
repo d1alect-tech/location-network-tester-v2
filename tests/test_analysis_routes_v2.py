@@ -41,8 +41,8 @@ def _recipe_payload() -> dict[str, JsonValue]:
 
 def test_recipe_create_list_clone_and_referenced_delete_conflict(tmp_path: Path) -> None:
     app = create_app(root=tmp_path, runtime_db=tmp_path / "runtime.sqlite3")
-    headers = {"X-LNT-Request": "ui"}
     with TestClient(app) as client:
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
         created = client.post(
             "/api/analysis/recipes",
             json={"name": "base", "recipe": _recipe_payload()},

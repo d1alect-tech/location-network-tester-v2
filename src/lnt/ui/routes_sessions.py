@@ -6,7 +6,7 @@
 
 from typing import Annotated, TypedDict
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 
 from lnt.acquire import DEFAULT_RANGE_V, DEFAULT_SAMPLE_RATE_HZ, RANGE_CODES
@@ -19,12 +19,14 @@ from lnt.ui.dependencies import (
     map_domain_error,
     resolve_session_or_404,
 )
+from lnt.ui.security import get_security_context
 
 
 class HealthPayload(TypedDict):
     """Ответ проверки доступности API."""
 
     status: str
+    build_id: str
 
 
 class SimulateDefaults(TypedDict):
@@ -61,6 +63,10 @@ class ConfigPayload(TypedDict):
     root: str
     profiles: list[str]
     defaults: OperationDefaults
+    build_id: str
+    mutation_nonce: str
+    static_asset_hash: str
+    static_assets: dict[str, str]
 
 
 router = APIRouter(prefix="/api")
@@ -72,14 +78,15 @@ Channel = Annotated[str, Query(pattern=r"^ch[12]$")]
 
 
 @router.get("/health")
-def health(_services: Services) -> HealthPayload:
+def health(_services: Services, request: Request) -> HealthPayload:
     """Подтверждает готовность API и установленных сервисов."""
-    return {"status": "ok"}
+    return {"status": "ok", "build_id": get_security_context(request).build_id}
 
 
 @router.get("/config")
-def config(services: Services) -> ConfigPayload:
+def config(services: Services, request: Request) -> ConfigPayload:
     """Возвращает корень хранилища и доступные настройки операций."""
+    security = get_security_context(request)
     return {
         "root": str(services.root),
         "profiles": list(PROFILES),
@@ -100,6 +107,10 @@ def config(services: Services) -> ConfigPayload:
             },
             "ranges": list(RANGE_CODES),
         },
+        "build_id": security.build_id,
+        "mutation_nonce": security.mutation_nonce,
+        "static_asset_hash": security.static_asset_hash,
+        "static_assets": {"app": f"/static/app.{security.static_asset_hash}.js"},
     }
 
 

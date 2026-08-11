@@ -36,14 +36,17 @@ def test_context_update_conflict_and_history(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     with _client(tmp_path, monkeypatch) as client:
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
         initial = client.get("/api/context/known")
         updated = client.put(
             "/api/context/known",
             json={"expected_revision": 0, "tags": ["night"], "notes": "проверено"},
+            headers=headers,
         )
         stale = client.put(
             "/api/context/known",
             json={"expected_revision": 0, "notes": "устарело"},
+            headers=headers,
         )
         history = client.get("/api/context/known/history")
 
@@ -61,9 +64,14 @@ def test_context_maps_unknown_traversal_and_invalid_body(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     with _client(tmp_path, monkeypatch) as client:
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
         missing = client.get("/api/context/missing")
         traversal = client.get("/api/context/..%5C..")
-        invalid = client.put("/api/context/known", json={"expected_revision": -1})
+        invalid = client.put(
+            "/api/context/known",
+            json={"expected_revision": -1},
+            headers=headers,
+        )
 
     assert missing.status_code == 404
     assert traversal.status_code in {404, 422}

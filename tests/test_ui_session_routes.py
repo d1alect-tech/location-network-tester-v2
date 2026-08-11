@@ -134,7 +134,8 @@ def test_health_reports_ok(session_routes: SessionRoutesFixture) -> None:
     response = session_routes.client.get("/api/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json()["status"] == "ok"
+    assert response.json()["build_id"]
 
 
 def test_config_reports_profiles_and_capture_defaults(session_routes: SessionRoutesFixture) -> None:

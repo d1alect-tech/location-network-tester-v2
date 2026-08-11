@@ -41,6 +41,7 @@ import {
   renderSessionDetail,
   renderSessions,
 } from "./views.js";
+import { buildIdentityMatches } from "./build-identity.js";
 
 export function bootstrapApp(root = document) {
   const elements = collectElements(root);
@@ -125,7 +126,12 @@ export function bootstrapApp(root = document) {
 
   async function loadConfig() {
     try {
-      applyConfig(root, elements, await getConfig());
+      const config = await getConfig();
+      const frontendBuildId = document.documentElement.dataset.buildId;
+      if (!buildIdentityMatches(frontendBuildId, config)) {
+        throw new ApiError(409, "Версии интерфейса и backend не совпадают. Обновите страницу.");
+      }
+      applyConfig(root, elements, config);
     } catch (error) {
       showError(error);
     }

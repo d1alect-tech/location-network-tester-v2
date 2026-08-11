@@ -15,10 +15,11 @@ from lnt.ui.jobs import (
     JobNotCancellableError,
     UnknownJobError,
 )
+from lnt.ui.security import MUTATION_NONCE_HEADER, require_mutation_nonce
 from lnt.ui.sessions import resolve_session_dir
 
-CSRF_HEADER: Final = "X-LNT-Request"
-CSRF_VALUE: Final = "ui"
+CSRF_HEADER: Final = MUTATION_NONCE_HEADER
+CSRF_VALUE: Final = "deprecated-static-value-not-authorized"
 
 _SESSION_NAME_PATTERN: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 
@@ -36,6 +37,10 @@ class AppServices:
 def install_services(app: FastAPI, services: AppServices) -> None:
     """Сохраняет типизированные сервисы в состоянии приложения."""
     app.state.lnt_services = services
+    if not hasattr(app.state, "lnt_security"):
+        from lnt.ui.security import create_security_context  # noqa: PLC0415
+
+        app.state.lnt_security = create_security_context(Path(__file__).with_name("static"))
 
 
 def get_services(request: Request) -> AppServices:
@@ -51,12 +56,8 @@ def get_services(request: Request) -> AppServices:
 
 
 def require_csrf(request: Request) -> None:
-    """Требует служебный заголовок для изменяющих запросов панели."""
-    if request.headers.get(CSRF_HEADER) != CSRF_VALUE:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="запрос отклонён: нет заголовка X-LNT-Request",
-        )
+    """Совместимое имя dependency: требует nonce текущего запуска."""
+    require_mutation_nonce(request)
 
 
 def http_not_found(message: str) -> HTTPException:

@@ -35,8 +35,12 @@
  * @property {(error: Event) => void} onError
  */
 
-export const CSRF_HEADER = "X-LNT-Request";
-export const CSRF_VALUE = "ui";
+export const CSRF_HEADER = "X-LNT-Mutation-Nonce";
+let mutationNonce = "";
+
+export function installMutationNonce(nonce) {
+  mutationNonce = nonce;
+}
 
 export class ApiError extends Error {
   /**
@@ -84,7 +88,9 @@ export async function getHealth() {
 
 /** @returns {Promise<ConfigPayload>} */
 export async function getConfig() {
-  return request("/api/config");
+  const config = await request("/api/config");
+  installMutationNonce(config.mutation_nonce);
+  return config;
 }
 
 /** @returns {Promise<SessionListPayload>} */
@@ -132,7 +138,7 @@ export async function startJob(jobRequest) {
   return request("/api/jobs", {
     method: "POST",
     headers: {
-      [CSRF_HEADER]: CSRF_VALUE,
+      [CSRF_HEADER]: mutationNonce,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(jobRequest),
@@ -154,7 +160,7 @@ export async function getJob(jobId) {
 export async function cancelJob(jobId) {
   return request(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
     method: "POST",
-    headers: { [CSRF_HEADER]: CSRF_VALUE },
+    headers: { [CSRF_HEADER]: mutationNonce },
   });
 }
 

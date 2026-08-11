@@ -14,13 +14,17 @@ def test_profile_crud_preserves_history(tmp_path: Path, monkeypatch: pytest.Monk
         "data": {"alias": "стенд", "outlet": "A-3", "circuit": "lab"},
     }
     with TestClient(create_app(root=tmp_path / "sessions")) as client:
-        created = client.post("/api/profiles/lab-main", json=payload)
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        created = client.post("/api/profiles/lab-main", json=payload, headers=headers)
         listed = client.get("/api/profiles")
         shown = client.get("/api/profiles/lab-main")
-        payload["data"]["alias"] = "стенд 2"
-        updated = client.put("/api/profiles/lab-main", json=payload)
+        updated_payload = {
+            "kind": "location",
+            "data": {"alias": "стенд 2", "outlet": "A-3", "circuit": "lab"},
+        }
+        updated = client.put("/api/profiles/lab-main", json=updated_payload, headers=headers)
         history = client.get("/api/profiles/lab-main/history")
-        deleted = client.delete("/api/profiles/lab-main")
+        deleted = client.delete("/api/profiles/lab-main", headers=headers)
         missing = client.get("/api/profiles/lab-main")
 
     assert created.status_code == 201
@@ -38,8 +42,17 @@ def test_profile_rejects_traversal_and_invalid_kind(
 ) -> None:
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
     with TestClient(create_app(root=tmp_path / "sessions")) as client:
-        traversal = client.post("/api/profiles/..%5C..", json={"kind": "location", "data": {}})
-        invalid = client.post("/api/profiles/lab", json={"kind": "sql", "data": {}})
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        traversal = client.post(
+            "/api/profiles/..%5C..",
+            json={"kind": "location", "data": {}},
+            headers=headers,
+        )
+        invalid = client.post(
+            "/api/profiles/lab",
+            json={"kind": "sql", "data": {}},
+            headers=headers,
+        )
 
     assert traversal.status_code in {404, 422}
     assert invalid.status_code == 422

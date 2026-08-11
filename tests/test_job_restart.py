@@ -13,8 +13,6 @@ from lnt.ui.models import JobKind, JobStatus
 if TYPE_CHECKING:
     from pathlib import Path
 
-_CSRF = {"X-LNT-Request": "ui"}
-
 
 def test_restart_interrupts_nonterminal_job_and_accepts_new_job(tmp_path: Path) -> None:
     runtime_db = tmp_path / "runtime.sqlite3"
@@ -24,8 +22,9 @@ def test_restart_interrupts_nonterminal_job_and_accepts_new_job(tmp_path: Path) 
     store_a.record(advance(abandoned, status=JobStatus.RUNNING))
 
     with TestClient(create_app(root=tmp_path / "sessions", runtime_db=runtime_db)) as client_b:
+        headers = {"X-LNT-Mutation-Nonce": client_b.get("/api/config").json()["mutation_nonce"]}
         recovered = client_b.get(f"/api/jobs/{abandoned.job_id}")
-        created = client_b.post("/api/jobs", headers=_CSRF, json={"kind": "selftest"})
+        created = client_b.post("/api/jobs", headers=headers, json={"kind": "selftest"})
 
     assert recovered.status_code == 200
     assert recovered.json()["status"] == "interrupted"
@@ -40,7 +39,8 @@ def test_runtime_database_is_app_scoped_and_injectable(
 ) -> None:
 
     with TestClient(create_app(root=tmp_path / "sessions", runtime_db=runtime_db)) as client:
-        response = client.post("/api/jobs", headers=_CSRF, json={"kind": "selftest"})
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        response = client.post("/api/jobs", headers=headers, json={"kind": "selftest"})
 
     assert response.status_code == 202
     assert runtime_db.exists()

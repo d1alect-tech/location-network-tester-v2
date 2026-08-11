@@ -16,8 +16,6 @@ from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 from lnt.selftest import SelftestResult
 from lnt.types import SeriesPosition
 from lnt.ui.dependencies import (
-    CSRF_HEADER,
-    CSRF_VALUE,
     AppServices,
     get_services,
     install_services,
@@ -33,6 +31,7 @@ from lnt.ui.jobs import (
     UnknownJobError,
 )
 from lnt.ui.models import CaptureRequest, SimulateRequest
+from lnt.ui.security import SecurityContext
 from tests.test_ui_sessions import write_manifest
 
 if TYPE_CHECKING:
@@ -119,22 +118,29 @@ def client(services: AppServices) -> Iterator[TestClient]:
         yield test_client
 
 
-def test_post_without_csrf_header_is_rejected(client: TestClient) -> None:
+def test_post_without_nonce_header_is_rejected(client: TestClient) -> None:
     response = client.post("/submit")
 
     assert response.status_code == 403
-    assert response.json() == {"detail": "запрос отклонён: нет заголовка X-LNT-Request"}
+    assert response.json()["detail"]["code"] == "mutation_nonce_invalid"
 
 
-def test_post_with_wrong_csrf_value_is_rejected(client: TestClient) -> None:
-    response = client.post("/submit", headers={CSRF_HEADER: "wrong"})
+def test_post_with_wrong_nonce_value_is_rejected(client: TestClient) -> None:
+    response = client.post("/submit", headers={"X-LNT-Mutation-Nonce": "wrong"})
 
     assert response.status_code == 403
-    assert response.json() == {"detail": "запрос отклонён: нет заголовка X-LNT-Request"}
+    assert response.json()["detail"]["code"] == "mutation_nonce_invalid"
 
 
-def test_post_with_expected_csrf_header_is_accepted(client: TestClient) -> None:
-    response = client.post("/submit", headers={CSRF_HEADER: CSRF_VALUE})
+def test_post_with_launch_nonce_is_accepted(client: TestClient) -> None:
+    app = client.app
+    assert isinstance(app, FastAPI)
+    security = app.state.lnt_security
+    assert isinstance(security, SecurityContext)
+    response = client.post(
+        "/submit",
+        headers={"X-LNT-Mutation-Nonce": security.mutation_nonce},
+    )
 
     assert response.status_code == 200
     assert response.json() == {"ok": True}

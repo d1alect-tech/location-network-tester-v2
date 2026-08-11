@@ -12,11 +12,8 @@ from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 from lnt.types import SeriesPosition
 from lnt.ui import operations
 from lnt.ui.app import create_app
-from lnt.ui.dependencies import CSRF_HEADER, CSRF_VALUE
 from lnt.ui.models import CaptureRequest, parse_job_request
 from lnt.ui.operations import LntBackend
-
-_CSRF = {CSRF_HEADER: CSRF_VALUE}
 
 
 def _capture_payload(**overrides: object) -> dict[str, object]:
@@ -109,9 +106,10 @@ def _poll_terminal(client: TestClient, job_id: str) -> dict[str, object]:
 def test_capture_job_route_carries_baseline_session(tmp_path: Path) -> None:
     backend = _RecordingBackend()
     with TestClient(create_app(root=tmp_path, backend=backend)) as client:
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
         accepted = client.post(
             "/api/jobs",
-            headers=_CSRF,
+            headers=headers,
             json=_capture_payload(baseline_session="base-noise"),
         )
         assert accepted.status_code == 202
@@ -120,7 +118,7 @@ def test_capture_job_route_carries_baseline_session(tmp_path: Path) -> None:
 
         rejected = client.post(
             "/api/jobs",
-            headers=_CSRF,
+            headers=headers,
             json=_capture_payload(baseline_session="../evil"),
         )
 

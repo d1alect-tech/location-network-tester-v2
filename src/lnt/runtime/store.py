@@ -126,6 +126,33 @@ class JobStore:
             ).fetchall()
         return tuple(JobEvent(version=int(row[0]), status=JobStatus(str(row[1]))) for row in rows)
 
+    def list_snapshots(self, *, page_size: int, offset: int = 0) -> tuple[JobSnapshot, ...]:
+        """Возвращает bounded страницу последних снимков от новых к старым."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT e.snapshot FROM jobs j
+                JOIN job_events e ON e.job_id=j.job_id AND e.version=j.version
+                ORDER BY j.queue_order DESC LIMIT ? OFFSET ?""",
+                (page_size, offset),
+            ).fetchall()
+        return tuple(_load_snapshot(str(row[0])) for row in rows)
+
+    def event_snapshots(
+        self,
+        job_id: str,
+        *,
+        page_size: int,
+        after_version: int = 0,
+    ) -> tuple[JobSnapshot, ...]:
+        """Переигрывает bounded часть durable журнала после указанной версии."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT snapshot FROM job_events WHERE job_id=? AND version>?
+                ORDER BY version LIMIT ?""",
+                (job_id, after_version, page_size),
+            ).fetchall()
+        return tuple(_load_snapshot(str(row[0])) for row in rows)
+
     def record(self, snapshot: JobSnapshot) -> None:
         """Атомарно записывает следующий легальный снимок и событие."""
         current = self.get(snapshot.job_id)
@@ -203,9 +230,7 @@ class JobStore:
                 tuple(status.value for status in _TERMINAL),
             ).fetchall()
             candidates = [
-                str(row[0])
-                for row in rows
-                if not json.loads(str(row[1]))["written_sessions"]
+                str(row[0]) for row in rows if not json.loads(str(row[1]))["written_sessions"]
             ]
             removed = tuple(reversed(candidates[keep:]))
             connection.executemany(

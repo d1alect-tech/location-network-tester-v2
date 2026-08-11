@@ -10,10 +10,8 @@ from starlette.testclient import TestClient
 
 from lnt.selftest import SelftestResult
 from lnt.ui.app import create_app
-from lnt.ui.dependencies import CSRF_HEADER, CSRF_VALUE
 from lnt.ui.operations import LntBackend
 
-_CSRF: Final = {CSRF_HEADER: CSRF_VALUE}
 _TERMINAL_STATUSES: Final = frozenset({"succeeded", "cancelled", "failed"})
 STATIC_DIR: Final = Path(__file__).resolve().parent.parent / "src/lnt/ui/static"
 SESSION_VIEWS_PATH: Final = STATIC_DIR / "session-views.js"
@@ -37,7 +35,8 @@ class _InstantBackend(LntBackend):
 
 
 def _start_selftest(client: TestClient) -> str:
-    response = client.post("/api/jobs", headers=_CSRF, json={"kind": "selftest"})
+    headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+    response = client.post("/api/jobs", headers=headers, json={"kind": "selftest"})
     assert response.status_code == 202
     payload: _JobPayload = response.json()
     return payload["job_id"]
@@ -83,7 +82,7 @@ def test_index_serves_panel_html(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     assert 'id="simulate-form"' in response.text
-    assert "/static/app.js" in response.text
+    assert re.search(r"/static/app\.[0-9a-f]{16}\.js", response.text)
 
 
 def test_index_preloads_ibm_plex_sans_regular(tmp_path: Path) -> None:
@@ -161,7 +160,8 @@ def test_sessions_router_is_included(tmp_path: Path) -> None:
         response = client.get("/api/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json()["status"] == "ok"
+    assert response.json()["build_id"]
 
 
 def test_jobs_router_requires_csrf(tmp_path: Path) -> None:
@@ -173,7 +173,8 @@ def test_jobs_router_requires_csrf(tmp_path: Path) -> None:
 
 def test_validation_error_is_compact_russian_text(tmp_path: Path) -> None:
     with TestClient(create_app(root=tmp_path, backend=_InstantBackend())) as client:
-        response = client.post("/api/jobs", headers=_CSRF, json={"kind": "nope"})
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        response = client.post("/api/jobs", headers=headers, json={"kind": "nope"})
 
     assert response.status_code == 422
     detail: str = response.json()["detail"]
@@ -227,11 +228,12 @@ def test_sequential_apps_have_independent_job_state(tmp_path: Path) -> None:
     assert terminal["status"] == "succeeded"
 
 
-def test_index_and_static_no_cache(tmp_path: Path) -> None:
-    """Панель и статика всегда ревалидируются: обновление UI не залипает в кэше."""
+def test_index_and_static_cache_contract(tmp_path: Path) -> None:
+    """Index и unhashed static никогда не кэшируются."""
     app = create_app(root=tmp_path)
     with TestClient(app) as client:
-        for path in ("/", "/static/app.js"):
-            response = client.get(path)
-            assert response.status_code == 200, path
-            assert response.headers["cache-control"] == "no-cache", path
+        index = client.get("/")
+        unhashed = client.get("/static/app.js")
+
+    assert index.headers["cache-control"] == "no-store"
+    assert unhashed.headers["cache-control"] == "no-store"

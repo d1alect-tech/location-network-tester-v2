@@ -126,6 +126,27 @@ class JobManager:
         self._publish(job_id, cancelling)
         return cancelling
 
+    def list(self, *, page_size: int, offset: int = 0) -> tuple[JobSnapshot, ...]:
+        """Возвращает страницу durable задач, включая прошлые запуски."""
+        return self._store.list_snapshots(page_size=page_size, offset=offset)
+
+    def history(
+        self,
+        job_id: str,
+        *,
+        page_size: int,
+        after_version: int = 0,
+    ) -> tuple[JobSnapshot, ...]:
+        """Возвращает durable прогресс после указанной версии."""
+        snapshots = self._store.event_snapshots(
+            job_id,
+            page_size=page_size,
+            after_version=after_version,
+        )
+        if not snapshots and after_version == 0:
+            self.get(job_id)
+        return snapshots
+
     async def snapshots(self, job_id: str) -> AsyncIterator[JobSnapshot]:
         """Публикует только новые версии снимков вплоть до терминальной.
 
