@@ -142,4 +142,13 @@ def create_app(
         return response
 
     app.get("/", include_in_schema=False)(index)
+
+    def showcase() -> Response:
+        """Возвращает страницу витрины дизайн-системы."""
+        html = (_STATIC / "showcase.html").read_text(encoding="utf-8")
+        response = Response(html, media_type="text/html")
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    app.get("/showcase", include_in_schema=False)(showcase)
     return app

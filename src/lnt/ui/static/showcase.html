@@ -8,14 +8,20 @@
     <meta name="color-scheme" content="light dark">
     <title>LNT — витрина дизайн-системы</title>
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/v2-tokens.css">
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
     <main class="showcase-shell">
-      <h1>Витрина дизайн-системы LNT</h1>
-      <p class="helper-text">
-        Каждый примитив показан во всех состояниях в светлой и тёмной темах.
-      </p>
+      <header class="showcase-header">
+        <h1>Витрина дизайн-системы LNT</h1>
+        <p>Интерактивный живой стиль-гайд для проверки семантических примитивов и состояний.</p>
+        <div class="showcase-controls">
+          <button id="toggle-theme" class="button button-secondary" type="button">Переключить тему (Светлая/Тёмная)</button>
+          <button id="toggle-motion" class="button button-secondary" type="button">Режим уменьшения движения (Выкл)</button>
+          <span id="forced-colors-indicator" class="badge badge-warn" style="display: none;">Режим Forced Colors активен</span>
+        </div>
+      </header>
       <section class="theme-preview" data-theme="light" aria-labelledby="light-title">
         <h2 id="light-title">Светлая тема</h2>
         <div class="showcase-grid">
