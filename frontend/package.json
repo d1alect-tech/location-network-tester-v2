@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/build-manifest.js",
     "build:check": "node scripts/build-check.js",
     "typecheck": "tsc --noEmit",
     "licenses:check": "node scripts/licenses-check.js",

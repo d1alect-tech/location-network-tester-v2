@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -5,12 +6,6 @@ import { test } from "@playwright/test";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-interface PerformanceWithMemory extends Performance {
-  memory?: {
-    usedJSHeapSize: number;
-  };
-}
 
 interface WindowWithBenchmark extends Window {
   runBenchmark?: (cellCount: number) => Promise<{
@@ -33,48 +28,44 @@ test("Run ECharts Heatmap Benchmark", async ({ page }) => {
   const cellCounts = [64000, 128000, 262000, 524000, 2000000];
   const results = [];
 
+  const context = page.context();
+  const client = await context.newCDPSession(page);
+  await client.send("Performance.enable");
+
   for (const count of cellCounts) {
     console.log(`Running benchmark for ${count} cells...`);
-
-    // Measure memory before
-    const metricsBefore = await page.evaluate(() => {
-      const perf = performance as PerformanceWithMemory;
-      return perf.memory ? perf.memory.usedJSHeapSize : 0;
-    });
 
     const result = await page.evaluate(async (c) => {
       return await (window as unknown as WindowWithBenchmark).runBenchmark!(c);
     }, count);
 
-    // Measure memory after
-    const metricsAfter = await page.evaluate(() => {
-      const perf = performance as PerformanceWithMemory;
-      return perf.memory ? perf.memory.usedJSHeapSize : 0;
-    });
-
-    const heapDiffBytes = metricsAfter - metricsBefore;
-    const heapDiffMiB = heapDiffBytes / (1024 * 1024);
-
-    // Get RSS and other performance metrics from Playwright
-    // Note: page.metrics() is only available on Chromium via CDP session
-    const client = await (
-      page.context() as unknown as {
-        newCDPSession: (page: unknown) => Promise<{
-          send: (method: string) => Promise<{ metrics: Array<{ name: string; value: number }> }>;
-        }>;
-      }
-    ).newCDPSession(page);
+    // Get JS Heap metrics from CDP session
     const performanceMetrics = await client.send("Performance.getMetrics");
     const metricsMap: Record<string, number> = {};
     for (const m of performanceMetrics.metrics) {
       metricsMap[m.name] = m.value;
     }
-    const rssMiB = (metricsMap.JSHeapUsedSize || 0) / (1024 * 1024);
+    const heapUsedMiB = (metricsMap.JSHeapUsedSize || 0) / (1024 * 1024);
+    const heapTotalMiB = (metricsMap.JSHeapTotalSize || 0) / (1024 * 1024);
+
+    // Measure real process RSS via PowerShell
+    let browserRssMiB = 0;
+    try {
+      // Run PowerShell to find chrome.exe or chrome-headless-shell.exe processes under ms-playwright and sum WorkingSetSize
+      const psCommand =
+        "powershell -NoProfile -Command \"(Get-CimInstance Win32_Process -Filter '(Name = ''chrome.exe'' or Name = ''chrome-headless-shell.exe'') and ExecutablePath like ''%ms-playwright%''').WorkingSetSize | Measure-Object -Sum | Select-Object -ExpandProperty Sum\"";
+      const output = execSync(psCommand, { encoding: "utf-8" }).trim();
+      const totalWorkingSetBytes = Number.parseInt(output, 10) || 0;
+      browserRssMiB = totalWorkingSetBytes / (1024 * 1024);
+    } catch (err) {
+      console.error("Failed to measure process RSS via PowerShell:", err);
+    }
 
     results.push({
       ...result,
-      heapDiffMiB: Math.max(0, heapDiffMiB),
-      rssMiB: rssMiB || heapDiffMiB, // Fallback if JSHeapUsedSize is not populated
+      heapUsedMiB,
+      heapTotalMiB,
+      browserRssMiB,
     });
   }
 
@@ -88,6 +79,8 @@ test("Run ECharts Heatmap Benchmark", async ({ page }) => {
       cpu: "Ryzen 7 7800X3D",
       ram: "31.6 GiB",
     },
+    rss_method:
+      "Sum of WorkingSetSize of chrome.exe processes containing 'ms-playwright' in ExecutablePath via PowerShell Get-CimInstance Win32_Process",
     results,
   };
   fs.writeFileSync(resultsPath, JSON.stringify(resultsWithHost, null, 2));
@@ -99,7 +92,7 @@ test("Run ECharts Heatmap Benchmark", async ({ page }) => {
   for (const res of results) {
     const renderOk = res.renderMs <= 1500;
     const zoomOk = res.zoomMs <= 250;
-    const rssOk = res.rssMiB <= 512;
+    const rssOk = res.browserRssMiB <= 512;
     if (renderOk && zoomOk && rssOk) {
       cap = res.cellCount;
     } else {
@@ -110,9 +103,9 @@ test("Run ECharts Heatmap Benchmark", async ({ page }) => {
   const decisionContent = `# ECharts Heatmap Benchmark Decision
 
 ## Benchmark Results
-| Cells | Render (ms) | Zoom (ms) | Teardown (ms) | Wire Bytes | RSS (MiB) |
-|---|---|---|---|---|---|
-${results.map((r) => `| ${r.cellCount} | ${r.renderMs.toFixed(1)} | ${r.zoomMs.toFixed(1)} | ${r.teardownMs.toFixed(1)} | ${r.wireSizeBytes} | ${r.rssMiB.toFixed(1)} |`).join("\n")}
+| Cells | Render (ms) | Zoom (ms) | Teardown (ms) | Wire Bytes | Heap Used (MiB) | Heap Total (MiB) | Browser RSS (MiB) |
+|---|---|---|---|---|---|---|---|
+${results.map((r) => `| ${r.cellCount} | ${r.renderMs.toFixed(1)} | ${r.zoomMs.toFixed(1)} | ${r.teardownMs.toFixed(1)} | ${r.wireSizeBytes} | ${r.heapUsedMiB.toFixed(1)} | ${r.heapTotalMiB.toFixed(1)} | ${r.browserRssMiB.toFixed(1)} |`).join("\n")}
 
 ## Decision
 - **Hard Viewport-Cell Cap**: ${cap} cells

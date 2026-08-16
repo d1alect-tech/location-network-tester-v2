@@ -4,56 +4,62 @@
     "cpu": "Ryzen 7 7800X3D",
     "ram": "31.6 GiB"
   },
+  "rss_method": "Sum of WorkingSetSize of chrome.exe processes containing 'ms-playwright' in ExecutablePath via PowerShell Get-CimInstance Win32_Process",
   "results": [
     {
       "cellCount": 64000,
       "wireSizeBytes": 768000,
-      "dataGenMs": 3.0999999940395355,
-      "renderMs": 97.5,
-      "zoomMs": 18,
-      "teardownMs": 1.0999999940395355,
-      "heapDiffMiB": 0,
-      "rssMiB": 0
+      "dataGenMs": 4.0999999940395355,
+      "renderMs": 123.40000000596046,
+      "zoomMs": 23.400000005960464,
+      "teardownMs": 2.0999999940395355,
+      "heapUsedMiB": 37.3758430480957,
+      "heapTotalMiB": 60.8671875,
+      "browserRssMiB": 284.1796875
     },
     {
       "cellCount": 128000,
       "wireSizeBytes": 1536000,
-      "dataGenMs": 3.300000011920929,
-      "renderMs": 104.59999999403954,
-      "zoomMs": 27.200000017881393,
-      "teardownMs": 0.8999999761581421,
-      "heapDiffMiB": 0,
-      "rssMiB": 0
+      "dataGenMs": 4.299999982118607,
+      "renderMs": 132.5,
+      "zoomMs": 39.30000001192093,
+      "teardownMs": 1.0999999940395355,
+      "heapUsedMiB": 48.387752532958984,
+      "heapTotalMiB": 122.21484375,
+      "browserRssMiB": 361.64453125
     },
     {
       "cellCount": 262000,
       "wireSizeBytes": 3144000,
-      "dataGenMs": 16.69999998807907,
-      "renderMs": 159.90000000596046,
-      "zoomMs": 23.599999994039536,
-      "teardownMs": 0.800000011920929,
-      "heapDiffMiB": 0,
-      "rssMiB": 0
+      "dataGenMs": 17.600000023841858,
+      "renderMs": 184,
+      "zoomMs": 27,
+      "teardownMs": 1,
+      "heapUsedMiB": 139.71337509155273,
+      "heapTotalMiB": 193.48828125,
+      "browserRssMiB": 441.21875
     },
     {
       "cellCount": 524000,
       "wireSizeBytes": 6288000,
-      "dataGenMs": 14,
-      "renderMs": 276.40000000596046,
-      "zoomMs": 21.19999998807907,
-      "teardownMs": 0.7000000178813934,
-      "heapDiffMiB": 0,
-      "rssMiB": 0
+      "dataGenMs": 14.599999994039536,
+      "renderMs": 342.80000001192093,
+      "zoomMs": 31.69999998807907,
+      "teardownMs": 0.9000000059604645,
+      "heapUsedMiB": 162.84251022338867,
+      "heapTotalMiB": 229.5234375,
+      "browserRssMiB": 550.22265625
     },
     {
       "cellCount": 2000000,
       "wireSizeBytes": 24000000,
-      "dataGenMs": 50.5,
-      "renderMs": 1068.6000000238419,
-      "zoomMs": 67.19999998807907,
-      "teardownMs": 0.7000000178813934,
-      "heapDiffMiB": 0,
-      "rssMiB": 0
+      "dataGenMs": 54.19999998807907,
+      "renderMs": 1147.4000000059605,
+      "zoomMs": 66.09999999403954,
+      "teardownMs": 0.9000000059604645,
+      "heapUsedMiB": 670.055362701416,
+      "heapTotalMiB": 723.48046875,
+      "browserRssMiB": 1012.80078125
     }
   ]
 }

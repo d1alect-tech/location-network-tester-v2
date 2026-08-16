@@ -1,47 +1,116 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const frontendDir = path.resolve(__dirname, '..');
 const staticV2Dir = path.resolve(__dirname, '../../src/lnt/ui/static/v2');
-const manifestPath = path.join(staticV2Dir, '.vite/manifest.json');
+const manifestPath = path.join(staticV2Dir, '.vite/build-manifest.json');
+
+function getFilesRecursive(dir) {
+  const results = [];
+  if (!fs.existsSync(dir)) return results;
+  const list = fs.readdirSync(dir);
+  for (const file of list) {
+    const filePath = path.join(dir, file);
+    const stat = fs.statSync(filePath);
+    if (stat && stat.isDirectory()) {
+      results.push(...getFilesRecursive(filePath));
+    } else {
+      results.push(filePath);
+    }
+  }
+  return results;
+}
+
+function computeFileHash(filePath) {
+  const content = fs.readFileSync(filePath);
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
 
 function checkBuild() {
   console.log('Running build:check...');
 
-  // 1. Verify manifest exists
+  // 1. Verify build-manifest.json exists
   if (!fs.existsSync(manifestPath)) {
-    console.error(`Error: Manifest not found at ${manifestPath}`);
+    console.error(`Error: Build manifest not found at ${manifestPath}`);
     process.exit(1);
   }
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-  
-  // 2. Verify files in manifest exist on disk
-  for (const key of Object.keys(manifest)) {
-    const entry = manifest[key];
-    const file = entry.file;
-    const filePath = path.join(staticV2Dir, file);
-    if (!fs.existsSync(filePath)) {
-      console.error(`Error: File ${file} from manifest does not exist on disk at ${filePath}`);
-      process.exit(1);
-    }
+  const sources = manifest.sources || {};
+  const outputs = manifest.outputs || {};
 
-    // Check CSS files if any
-    if (entry.css) {
-      for (const cssFile of entry.css) {
-        const cssPath = path.join(staticV2Dir, cssFile);
-        if (!fs.existsSync(cssPath)) {
-          console.error(`Error: CSS file ${cssFile} from manifest does not exist on disk at ${cssPath}`);
-          process.exit(1);
-        }
-      }
+  // 2. Verify sources on disk match manifest
+  const currentSourceFiles = [
+    path.join(frontendDir, 'index.html'),
+    path.join(frontendDir, 'vite.config.ts'),
+    path.join(frontendDir, 'package-lock.json'),
+    ...getFilesRecursive(path.join(frontendDir, 'src'))
+  ];
+
+  const currentSourcesMap = {};
+  for (const file of currentSourceFiles) {
+    if (fs.existsSync(file)) {
+      const relativePath = path.relative(frontendDir, file).replace(/\\/g, '/');
+      currentSourcesMap[relativePath] = computeFileHash(file);
     }
   }
 
-  // 3. Assert no echarts or plotly in product bundle
+  // Check for missing or modified sources
+  for (const relPath of Object.keys(sources)) {
+    if (!currentSourcesMap[relPath]) {
+      console.error(`Error: Source file ${relPath} from manifest is missing on disk`);
+      process.exit(1);
+    }
+    if (currentSourcesMap[relPath] !== sources[relPath]) {
+      console.error(`Error: Source file ${relPath} has drifted (stale source, rebuild required)`);
+      process.exit(1);
+    }
+  }
+
+  // Check for untracked new sources
+  for (const relPath of Object.keys(currentSourcesMap)) {
+    if (!sources[relPath]) {
+      console.error(`Error: New source file ${relPath} is not tracked in manifest (rebuild required)`);
+      process.exit(1);
+    }
+  }
+
+  // 3. Verify outputs on disk match manifest
+  const currentOutputFiles = getFilesRecursive(staticV2Dir);
+  const currentOutputsMap = {};
+  for (const file of currentOutputFiles) {
+    const relativePath = path.relative(staticV2Dir, file).replace(/\\/g, '/');
+    if (relativePath !== '.vite/build-manifest.json') {
+      currentOutputsMap[relativePath] = computeFileHash(file);
+    }
+  }
+
+  // Check for missing or modified outputs
+  for (const relPath of Object.keys(outputs)) {
+    if (!currentOutputsMap[relPath]) {
+      console.error(`Error: Output file ${relPath} from manifest is missing on disk`);
+      process.exit(1);
+    }
+    if (currentOutputsMap[relPath] !== outputs[relPath]) {
+      console.error(`Error: Output file ${relPath} has drifted (tampered or stale output, rebuild required)`);
+      process.exit(1);
+    }
+  }
+
+  // Check for untracked new outputs
+  for (const relPath of Object.keys(currentOutputsMap)) {
+    if (!outputs[relPath]) {
+      console.error(`Error: New output file ${relPath} is not tracked in manifest (rebuild required)`);
+      process.exit(1);
+    }
+  }
+
+  // 4. Assert no echarts or plotly in product bundle
   const assetsDir = path.join(staticV2Dir, 'assets');
   if (fs.existsSync(assetsDir)) {
     const files = fs.readdirSync(assetsDir);
