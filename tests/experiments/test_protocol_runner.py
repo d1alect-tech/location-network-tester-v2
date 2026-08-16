@@ -104,11 +104,13 @@ def test_repeated_blocks_complete_in_declared_order(tmp_path: Path) -> None:
         )
     )
     members = tuple(
-        source.members[(index - 1) % 2].model_copy(update={
-            "session_id": f"planned-{index}",
-            "order": index,
-            "block_key": f"block-{(index + 1) // 2}",
-        })
+        source.members[(index - 1) % 2].model_copy(
+            update={
+                "session_id": f"planned-{index}",
+                "order": index,
+                "block_key": f"block-{(index + 1) // 2}",
+            }
+        )
         for index in range(1, 5)
     )
     experiment = source.model_copy(update={"steps": steps, "members": members})
@@ -129,9 +131,7 @@ def test_repeated_blocks_complete_in_declared_order(tmp_path: Path) -> None:
 def test_restart_resumes_exact_awaiting_confirmation_boundary(tmp_path: Path) -> None:
     capture = FakeCapture(tmp_path / "sessions")
     first = _runner(tmp_path, capture=capture)
-    pending = first.start(
-        run_id="restart", experiment=_aba_experiment(), mode=ProtocolRunMode.REAL
-    )
+    pending = first.start(run_id="restart", experiment=_aba_experiment(), mode=ProtocolRunMode.REAL)
     first.close()
 
     resumed_runner = _runner(tmp_path, capture=capture)
@@ -159,7 +159,9 @@ def test_cancellation_between_members_keeps_completed_members(tmp_path: Path) ->
     )
 
     result = runner.start(
-        run_id="cancel", experiment=_aba_experiment(), mode=ProtocolRunMode.SIMULATOR,
+        run_id="cancel",
+        experiment=_aba_experiment(),
+        mode=ProtocolRunMode.SIMULATOR,
         is_cancelled=cancelled.is_set,
     )
 
@@ -217,8 +219,6 @@ def test_randomization_is_reproducible_only_from_persisted_seed(tmp_path: Path) 
 def test_qc_recommendations_are_persisted(tmp_path: Path) -> None:
     runner = _runner(tmp_path)
 
-    result = runner.start(
-        run_id="qc", experiment=make_experiment(), mode=ProtocolRunMode.SIMULATOR
-    )
+    result = runner.start(run_id="qc", experiment=make_experiment(), mode=ProtocolRunMode.SIMULATOR)
 
     assert all(member.qc_recommendations == () for member in result.completed_members)

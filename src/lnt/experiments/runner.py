@@ -106,18 +106,20 @@ class ProtocolRunner:
             )
             for order in generated
         )
-        record = self.store.create(ProtocolRunRecord(
-            run_id=run_id,
-            experiment_id=experiment.experiment_id,
-            mode=mode,
-            status=ProtocolRunStatus.RUNNING,
-            revision=1,
-            seed=seed if randomized else None,
-            generated_order=tuple(generated),
-            plan=plan,
-            next_member_index=0,
-            completed_members=(),
-        ))
+        record = self.store.create(
+            ProtocolRunRecord(
+                run_id=run_id,
+                experiment_id=experiment.experiment_id,
+                mode=mode,
+                status=ProtocolRunStatus.RUNNING,
+                revision=1,
+                seed=seed if randomized else None,
+                generated_order=tuple(generated),
+                plan=plan,
+                next_member_index=0,
+                completed_members=(),
+            )
+        )
         return self._advance(record, is_cancelled)
 
     def resume(
@@ -145,10 +147,12 @@ class ProtocolRunner:
             return record
         confirmation = ConfirmationRecord(actor=actor, auto_confirmed=auto_confirm)
         confirmed = self._record(
-            record.model_copy(update={
-                "status": ProtocolRunStatus.RUNNING,
-                "current_confirmation": confirmation,
-            }),
+            record.model_copy(
+                update={
+                    "status": ProtocolRunStatus.RUNNING,
+                    "current_confirmation": confirmation,
+                }
+            ),
             "intervention_confirmed",
             actor,
         )
@@ -171,17 +175,19 @@ class ProtocolRunner:
             )
         findings = self._scheduler.submit(OperationClass.HARDWARE, self._preflight).result()
         preflight_done = self._record(
-            record.model_copy(update={
-                "current_preflight": tuple(_finding(item) for item in findings)
-            }),
+            record.model_copy(
+                update={"current_preflight": tuple(_finding(item) for item in findings)}
+            ),
             "preflight_completed",
         )
         member = preflight_done.plan[preflight_done.next_member_index]
         requested = self._record(
-            preflight_done.model_copy(update={
-                "status": ProtocolRunStatus.AWAITING_CONFIRMATION,
-                "requested_physical_change": member.instruction,
-            }),
+            preflight_done.model_copy(
+                update={
+                    "status": ProtocolRunStatus.AWAITING_CONFIRMATION,
+                    "requested_physical_change": member.instruction,
+                }
+            ),
             "intervention_requested",
         )
         if requested.mode is ProtocolRunMode.SIMULATOR:
@@ -224,13 +230,15 @@ class ProtocolRunner:
             qc_recommendations=tuple(item.reason_code for item in recommendations),
         )
         boundary = self._record(
-            qc_done.model_copy(update={
-                "next_member_index": qc_done.next_member_index + 1,
-                "completed_members": (*qc_done.completed_members, completed),
-                "requested_physical_change": None,
-                "current_confirmation": None,
-                "current_preflight": (),
-            }),
+            qc_done.model_copy(
+                update={
+                    "next_member_index": qc_done.next_member_index + 1,
+                    "completed_members": (*qc_done.completed_members, completed),
+                    "requested_physical_change": None,
+                    "current_confirmation": None,
+                    "current_preflight": (),
+                }
+            ),
             "member_completed",
         )
         return self._advance(boundary, is_cancelled)

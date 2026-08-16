@@ -37,9 +37,12 @@ class ProtocolRunStore:
         if (directory / "run.json").exists():
             raise FileExistsError(record.run_id)
         directory.mkdir(parents=True, exist_ok=False)
-        self._append(directory, ProtocolRunEvent(
-            revision=record.revision, transition="run_created", actor="system", snapshot=record
-        ))
+        self._append(
+            directory,
+            ProtocolRunEvent(
+                revision=record.revision, transition="run_created", actor="system", snapshot=record
+            ),
+        )
         self._replace(directory / "run.json", record)
         return record
 
@@ -57,9 +60,12 @@ class ProtocolRunStore:
         if record.revision != current.revision + 1:
             raise ProtocolRunPersistenceError("revision не является следующей")
         directory = self.root / record.run_id
-        self._append(directory, ProtocolRunEvent(
-            revision=record.revision, transition=transition, actor=actor, snapshot=record
-        ))
+        self._append(
+            directory,
+            ProtocolRunEvent(
+                revision=record.revision, transition=transition, actor=actor, snapshot=record
+            ),
+        )
         self._replace(directory / "run.json", record)
         return record
 

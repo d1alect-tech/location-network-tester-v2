@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import os
 import subprocess
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -19,14 +17,15 @@ INTEGRITY_DIR = V2_ROOT / ".integrity"
 def _run_ps(
     script_name: str,
     *args: str,
-) -> subprocess.CompletedProcess:
+) -> subprocess.CompletedProcess[str]:
     """Shell out to a PowerShell script under scripts/."""
     script = SCRIPTS_DIR / script_name
     assert script.is_file(), f"Script not found: {script}"
     cmd = [
         "powershell",
         "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
+        "-ExecutionPolicy",
+        "Bypass",
         "-File",
         str(script),
         *args,
@@ -36,6 +35,7 @@ def _run_ps(
         capture_output=True,
         text=True,
         timeout=60,
+        check=False,
     )
 
 
@@ -65,14 +65,16 @@ class TestAssertPristine:
         """Assert-Pristine should exit 0 when the original tree is pristine."""
         cp = _run_ps(
             "Assert-Pristine.ps1",
-            "-Original", original_path,
-            "-SessionRoot", session_root,
-            "-ReceiptDir", str(INTEGRITY_DIR),
+            "-Original",
+            original_path,
+            "-SessionRoot",
+            session_root,
+            "-ReceiptDir",
+            str(INTEGRITY_DIR),
             "-Verbose",
         )
-        print(cp.stdout)
         if cp.stderr:
-            print(cp.stderr)
+            pass
         assert cp.returncode == 0, (
             f"Assert-Pristine failed (exit {cp.returncode}):\n"
             f"stdout: {cp.stdout}\n"
@@ -88,14 +90,15 @@ class TestAssertPristine:
         """Assert-Pristine should exit 1 when receipt dir does not exist."""
         cp = _run_ps(
             "Assert-Pristine.ps1",
-            "-Original", original_path,
-            "-SessionRoot", session_root,
-            "-ReceiptDir", r"C:\does_not_exist_xyz",
+            "-Original",
+            original_path,
+            "-SessionRoot",
+            session_root,
+            "-ReceiptDir",
+            r"C:\does_not_exist_xyz",
             "-Verbose",
         )
-        assert cp.returncode != 0, (
-            "Expected non-zero exit for missing receipt dir"
-        )
+        assert cp.returncode != 0, "Expected non-zero exit for missing receipt dir"
 
 
 # --- Assert-EvidencePaths ---------------------------------------------------
@@ -111,15 +114,15 @@ class TestAssertEvidencePaths:
         """A path completely outside both protected trees should pass."""
         cp = _run_ps(
             "Assert-EvidencePaths.ps1",
-            "-Paths", r"C:\temp\evidence\report.pdf",
-            "-Original", original_path,
-            "-SessionRoot", session_root,
+            "-Paths",
+            r"C:\temp\evidence\report.pdf",
+            "-Original",
+            original_path,
+            "-SessionRoot",
+            session_root,
             "-Detailed",
         )
-        print(cp.stdout)
-        assert cp.returncode == 0, (
-            f"Safe path rejected (exit {cp.returncode}):\n{cp.stdout}"
-        )
+        assert cp.returncode == 0, f"Safe path rejected (exit {cp.returncode}):\n{cp.stdout}"
 
     @PRistine
     def test_path_inside_original_fails(
@@ -128,21 +131,19 @@ class TestAssertEvidencePaths:
         session_root: str,
     ) -> None:
         """A path inside the original tree should be rejected."""
-        inside = os.path.join(original_path, "src", "lnt", "main.py")
+        inside = str(Path(original_path) / "src" / "lnt" / "main.py")
         cp = _run_ps(
             "Assert-EvidencePaths.ps1",
-            "-Paths", inside,
-            "-Original", original_path,
-            "-SessionRoot", session_root,
+            "-Paths",
+            inside,
+            "-Original",
+            original_path,
+            "-SessionRoot",
+            session_root,
             "-Detailed",
         )
-        print(cp.stdout)
-        assert cp.returncode != 0, (
-            f"Path inside original was not rejected:\n{cp.stdout}"
-        )
-        assert "FAIL" in cp.stdout, (
-            "Expected FAIL message in output"
-        )
+        assert cp.returncode != 0, f"Path inside original was not rejected:\n{cp.stdout}"
+        assert "FAIL" in cp.stdout, "Expected FAIL message in output"
 
     @PRistine
     def test_path_traversal_escape_fails(
@@ -152,18 +153,21 @@ class TestAssertEvidencePaths:
     ) -> None:
         """A path with ..\\ traversal into the original tree should be rejected."""
         # Simulate an evidence path that uses ..\\ to climb back into original
-        escape_path = r"C:\Users\Kirill\Documents\other_stuff\..\InputLag\location-network-tester\secrets.txt"
+        escape_path = (
+            r"C:\Users\Kirill\Documents\other_stuff\..\InputLag"
+            r"\location-network-tester\secrets.txt"
+        )
         cp = _run_ps(
             "Assert-EvidencePaths.ps1",
-            "-Paths", escape_path,
-            "-Original", original_path,
-            "-SessionRoot", session_root,
+            "-Paths",
+            escape_path,
+            "-Original",
+            original_path,
+            "-SessionRoot",
+            session_root,
             "-Detailed",
         )
-        print(cp.stdout)
-        assert cp.returncode != 0, (
-            f"Traversal escape was not rejected:\n{cp.stdout}"
-        )
+        assert cp.returncode != 0, f"Traversal escape was not rejected:\n{cp.stdout}"
 
     @PRistine
     def test_path_inside_sessions_root_fails(
@@ -172,18 +176,18 @@ class TestAssertEvidencePaths:
         session_root: str,
     ) -> None:
         """A path inside the sessions root should be rejected."""
-        inside = os.path.join(session_root, "some-session", "manifest.json")
+        inside = str(Path(session_root) / "some-session" / "manifest.json")
         cp = _run_ps(
             "Assert-EvidencePaths.ps1",
-            "-Paths", inside,
-            "-Original", original_path,
-            "-SessionRoot", session_root,
+            "-Paths",
+            inside,
+            "-Original",
+            original_path,
+            "-SessionRoot",
+            session_root,
             "-Detailed",
         )
-        print(cp.stdout)
-        assert cp.returncode != 0, (
-            f"Path inside sessions root was not rejected:\n{cp.stdout}"
-        )
+        assert cp.returncode != 0, f"Path inside sessions root was not rejected:\n{cp.stdout}"
 
     @PRistine
     def test_slash_mixing_escape_fails(
@@ -195,15 +199,15 @@ class TestAssertEvidencePaths:
         mixed = original_path.replace("\\", "/") + "/src/../.integrity/evil.dll"
         cp = _run_ps(
             "Assert-EvidencePaths.ps1",
-            "-Paths", mixed,
-            "-Original", original_path,
-            "-SessionRoot", session_root,
+            "-Paths",
+            mixed,
+            "-Original",
+            original_path,
+            "-SessionRoot",
+            session_root,
             "-Detailed",
         )
-        print(cp.stdout)
-        assert cp.returncode != 0, (
-            f"Slash-mixing escape was not rejected:\n{cp.stdout}"
-        )
+        assert cp.returncode != 0, f"Slash-mixing escape was not rejected:\n{cp.stdout}"
 
 
 # --- Verify-ApprovedPlan ----------------------------------------------------
@@ -215,9 +219,9 @@ class TestVerifyApprovedPlan:
         """Verify-ApprovedPlan should exit 0 when the committed copy is intact."""
         cp = _run_ps(
             "Verify-ApprovedPlan.ps1",
-            "-IntegrityDir", str(INTEGRITY_DIR),
+            "-IntegrityDir",
+            str(INTEGRITY_DIR),
         )
-        print(cp.stdout)
         assert cp.returncode == 0, (
             f"Verify-ApprovedPlan failed (exit {cp.returncode}):\n{cp.stdout}"
         )

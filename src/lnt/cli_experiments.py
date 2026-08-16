@@ -21,9 +21,7 @@ from lnt.statistics import AnalysisContext, PairedUnit, estimate_paired
 class ParserFactory(Protocol):
     """Capability used by argparse subparser registration."""
 
-    def __call__(
-        self, name: str, *, help: str
-    ) -> argparse.ArgumentParser:
+    def __call__(self, name: str, *, help: str) -> argparse.ArgumentParser:
         """Create a named parser with localized help."""
         ...
 
@@ -65,9 +63,7 @@ def configure_research_parsers(add_parser: ParserFactory) -> None:
     for name in ("add", "edit", "status"):
         command = hypotheses.add_parser(name)
         value_help = (
-            "путь к JSON-файлу гипотезы"
-            if name in {"add", "edit"}
-            else "идентификатор гипотезы"
+            "путь к JSON-файлу гипотезы" if name in {"add", "edit"} else "идентификатор гипотезы"
         )
         command.add_argument("value", help=value_help)
         _root(command)

@@ -67,7 +67,9 @@ class OperationScheduler:
         if cpu_workers < 1 or cpu_queue_limit < 0:
             raise ValueError("лимиты планировщика должны быть неотрицательными")
         self._hardware = ThreadPoolExecutor(max_workers=1, thread_name_prefix="lnt-job-hardware")
-        self._cpu = ThreadPoolExecutor(max_workers=cpu_workers, thread_name_prefix="lnt-job-analysis")
+        self._cpu = ThreadPoolExecutor(
+            max_workers=cpu_workers, thread_name_prefix="lnt-job-analysis"
+        )
         self._cpu_workers = cpu_workers
         self._cpu_queue_limit = cpu_queue_limit
         self._cpu_running = 0

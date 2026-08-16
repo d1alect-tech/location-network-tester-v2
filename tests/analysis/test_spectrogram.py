@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 import tracemalloc
-from typing import TYPE_CHECKING, assert_never, override
+from typing import TYPE_CHECKING, override
 
 import numpy as np
 import pytest
@@ -98,8 +98,8 @@ def test_overview_localizes_fixture(
             values = signal.chirp(time_s, f0=40.0, f1=220.0, t1=1.0)
         case "burst":
             values = np.sin(2 * np.pi * expected_hz * time_s) * (np.abs(time_s - 0.5) < 0.1)
-        case unreachable:
-            assert_never(unreachable)
+        case _:
+            raise ValueError(f"Unknown kind: {kind}")
     overview = build_overview(
         _save(tmp_path / kind, values.astype(np.float32)),
         sample_rate_hz=fs,

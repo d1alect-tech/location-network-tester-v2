@@ -47,8 +47,11 @@ def test_index_session_without_explicit_path_stays_out_of_real_appdata(tmp_path:
     isolated_catalog = catalog_path()
     assert isolated_catalog.is_relative_to(tmp_path)
     with open_catalog_reader(isolated_catalog) as connection:
-        assert connection.execute(
-            "SELECT session_id FROM catalog_sessions WHERE session_id='isolated-session'"
-        ).fetchone() is not None
+        assert (
+            connection.execute(
+                "SELECT session_id FROM catalog_sessions WHERE session_id='isolated-session'"
+            ).fetchone()
+            is not None
+        )
     after = REAL_CATALOG.read_bytes() if REAL_CATALOG.exists() else None
     assert after == before

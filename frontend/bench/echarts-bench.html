@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ECharts Heatmap Benchmark</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: sans-serif;
+        background: #12161a;
+        color: #f4f4f4;
+      }
+      #chart-container {
+        width: 800px;
+        height: 600px;
+        border: 1px solid #2d3748;
+        background: #1a1f24;
+      }
+      .controls {
+        margin-bottom: 20px;
+      }
+      button {
+        background: #00a3ff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 14px;
+        border-radius: 4px;
+      }
+      button:hover {
+        opacity: 0.9;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ECharts Heatmap Benchmark</h1>
+    <div class="controls">
+      <button id="btn-run">Run Benchmark</button>
+      <span id="status" style="margin-left: 20px;">Ready</span>
+    </div>
+    <div id="chart-container"></div>
+
+    <script type="module">
+      import * as echarts from 'echarts';
+      window.echarts = echarts;
+
+      // Expose benchmark function to window for Playwright to call
+      window.runBenchmark = async (cellCount) => {
+        const container = document.getElementById('chart-container');
+        const statusText = document.getElementById('status');
+        statusText.textContent = `Generating ${cellCount} cells...`;
+        
+        // Clear previous chart if any
+        if (window.chart) {
+          window.chart.dispose();
+          window.chart = null;
+        }
+
+        // Generate data
+        const cols = 1000;
+        const rows = Math.ceil(cellCount / cols);
+        
+        const t0_data = performance.now();
+        const data = new Float32Array(cols * rows * 3);
+        let idx = 0;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            data[idx] = c;
+            data[idx + 1] = r;
+            data[idx + 2] = Math.sin(c / 10) * Math.cos(r / 10);
+            idx += 3;
+          }
+        }
+        const t1_data = performance.now();
+        const dataGenMs = t1_data - t0_data;
+        const wireSizeBytes = data.byteLength;
+
+        statusText.textContent = `Rendering ${cellCount} cells...`;
+        
+        const t0_render = performance.now();
+        window.chart = echarts.init(container);
+        
+        const echartsData = [];
+        for (let i = 0; i < cols * rows; i++) {
+          echartsData.push([data[i * 3], data[i * 3 + 1], data[i * 3 + 2]]);
+        }
+
+        const option = {
+          tooltip: {},
+          xAxis: { type: 'category' },
+          yAxis: { type: 'category' },
+          visualMap: {
+            min: -1,
+            max: 1,
+            calculable: true,
+            realtime: false,
+            inRange: {
+              color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
+            }
+          },
+          series: [{
+            name: 'Heatmap',
+            type: 'heatmap',
+            data: echartsData,
+            progressive: 5000,
+            progressiveThreshold: 3000,
+            animation: false
+          }]
+        };
+
+        window.chart.setOption(option);
+        const t1_render = performance.now();
+        const renderMs = t1_render - t0_render;
+
+        statusText.textContent = `Simulating zoom...`;
+        const t0_zoom = performance.now();
+        window.chart.dispatchAction({
+          type: 'dataZoom',
+          start: 20,
+          end: 80
+        });
+        const t1_zoom = performance.now();
+        const zoomMs = t1_zoom - t0_zoom;
+
+        statusText.textContent = `Tearing down...`;
+        const t0_teardown = performance.now();
+        window.chart.dispose();
+        window.chart = null;
+        const t1_teardown = performance.now();
+        const teardownMs = t1_teardown - t0_teardown;
+
+        statusText.textContent = `Done`;
+
+        return {
+          cellCount,
+          wireSizeBytes,
+          dataGenMs,
+          renderMs,
+          zoomMs,
+          teardownMs
+        };
+      };
+
+      const btnRun = document.getElementById('btn-run');
+      if (btnRun) {
+        btnRun.addEventListener('click', () => {
+          window.runBenchmark(64000).then(res => {
+            console.log('Benchmark result:', res);
+          });
+        });
+      }
+
+      // Signal that we are ready
+      window.isBenchmarkReady = true;
+    </script>
+  </body>
+</html>

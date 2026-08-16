@@ -114,23 +114,31 @@ def test_experiment_trends_cli_is_bounded_and_labeled(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     request = tmp_path / "trends.json"
-    request.write_text(json.dumps({
-        "observations": [{
-            "observation_id": f"o-{index}",
-            "timestamp": f"2026-08-{index + 1:02d}T10:00:00+00:00",
-            "source_offset": str(index),
-            "location": "lab",
-            "condition": "a",
-            "predictor": float(index),
-            "outcome": float(index + 1),
-            "metadata": [],
-        } for index in range(5)],
-        "minimum_n": 5,
-        "max_lag": 2,
-        "bootstrap_samples": 100,
-        "seed": 3,
-        "units": "s",
-    }), encoding="utf-8")
+    request.write_text(
+        json.dumps(
+            {
+                "observations": [
+                    {
+                        "observation_id": f"o-{index}",
+                        "timestamp": f"2026-08-{index + 1:02d}T10:00:00+00:00",
+                        "source_offset": str(index),
+                        "location": "lab",
+                        "condition": "a",
+                        "predictor": float(index),
+                        "outcome": float(index + 1),
+                        "metadata": [],
+                    }
+                    for index in range(5)
+                ],
+                "minimum_n": 5,
+                "max_lag": 2,
+                "bootstrap_samples": 100,
+                "seed": 3,
+                "units": "s",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     code = main(["experiment", "trends", str(request), "--root", str(tmp_path / "sessions")])
 
@@ -144,10 +152,19 @@ def test_experiment_trends_cli_rejects_oversized_query(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     request = tmp_path / "trends.json"
-    request.write_text(json.dumps({
-        "observations": [], "minimum_n": 5, "max_lag": 101,
-        "bootstrap_samples": 100, "seed": 0, "units": "s",
-    }), encoding="utf-8")
+    request.write_text(
+        json.dumps(
+            {
+                "observations": [],
+                "minimum_n": 5,
+                "max_lag": 101,
+                "bootstrap_samples": 100,
+                "seed": 0,
+                "units": "s",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     code = main(["experiment", "trends", str(request), "--root", str(tmp_path / "sessions")])
 
@@ -170,8 +187,11 @@ def _descriptor(session_id: str, *, sample_rate_hz: float = 20_000_000.0) -> Ses
         baseline_identity="baseline-a",
         calibration=CalibrationIdentity(identity="adc-a", applied=False),
         quality=AcquisitionQuality(
-            quality_thresholds_version=1, channels=(), findings=(),
-            maximum_callback_gap_s=0.0, short_block_count=0,
+            quality_thresholds_version=1,
+            channels=(),
+            findings=(),
+            maximum_callback_gap_s=0.0,
+            short_block_count=0,
         ),
         context_fields=(ContextValue(field="site_id", value="lab-a", comparable=True),),
     )
@@ -209,21 +229,41 @@ def test_experiment_confirm_cli_records_actor(
 ) -> None:
     root = tmp_path / "sessions"
     store = ProtocolRunStore(root.parent / "protocol-runs")
-    store.create(ProtocolRunRecord(
-        run_id="real-1", experiment_id="latency-study", mode=ProtocolRunMode.REAL,
-        status=ProtocolRunStatus.AWAITING_CONFIRMATION, revision=1, seed=None,
-        generated_order=(1,),
-        plan=(PlannedMember(
-            protocol_order=1, condition_id="condition-a", instruction="Измерить A",
-            block_key="block-1", pairing_key="pair-1",
-        ),),
-        next_member_index=0, completed_members=(), requested_physical_change="Измерить A",
-    ))
+    store.create(
+        ProtocolRunRecord(
+            run_id="real-1",
+            experiment_id="latency-study",
+            mode=ProtocolRunMode.REAL,
+            status=ProtocolRunStatus.AWAITING_CONFIRMATION,
+            revision=1,
+            seed=None,
+            generated_order=(1,),
+            plan=(
+                PlannedMember(
+                    protocol_order=1,
+                    condition_id="condition-a",
+                    instruction="Измерить A",
+                    block_key="block-1",
+                    pairing_key="pair-1",
+                ),
+            ),
+            next_member_index=0,
+            completed_members=(),
+            requested_physical_change="Измерить A",
+        )
+    )
 
-    code = main([
-        "experiment", "confirm", "real-1", "--actor", "user:operator",
-        "--root", str(root),
-    ])
+    code = main(
+        [
+            "experiment",
+            "confirm",
+            "real-1",
+            "--actor",
+            "user:operator",
+            "--root",
+            str(root),
+        ]
+    )
 
     assert code == 0
     assert store.events("real-1")[1].actor == "user:operator"

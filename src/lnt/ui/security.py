@@ -112,7 +112,11 @@ class LocalSecurityMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         if request.url.path.startswith("/static/") and "Cache-Control" not in response.headers:
-            response.headers["Cache-Control"] = "no-store"
+            # Hashed assets in static/v2/assets should have long-cache headers
+            if "/static/v2/assets/" in request.url.path:
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            else:
+                response.headers["Cache-Control"] = "no-store"
         return response
 
 

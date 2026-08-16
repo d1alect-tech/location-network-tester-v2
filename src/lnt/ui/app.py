@@ -127,7 +127,21 @@ def create_app(
         return response
 
     app.get(f"/static/{hashed_app_name}", include_in_schema=False)(hashed_app)
+    app.mount("/static/v2", StaticFiles(directory=_STATIC / "v2"), name="static_v2")
     app.mount("/static", StaticFiles(directory=_STATIC), name="static")
+
+    def index_v2() -> Response:
+        """Возвращает главную страницу локальной панели v2."""
+        index_path = _STATIC / "v2" / "index.html"
+        if not index_path.exists():
+            raise HTTPException(status_code=404, detail="v2 index.html not found")
+        html = index_path.read_text(encoding="utf-8")
+        response = Response(html, media_type="text/html")
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    app.get("/v2/", include_in_schema=False)(index_v2)
+    app.get("/v2", include_in_schema=False)(index_v2)
 
     def index() -> Response:
         """Возвращает главную страницу локальной панели."""
