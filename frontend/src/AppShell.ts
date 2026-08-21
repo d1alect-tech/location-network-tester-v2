@@ -1,4 +1,6 @@
 import "./style.css";
+import { announcePolite } from "./components/primitives/status";
+import { RouteStore } from "./state/routeState";
 
 // Simple Hash Router
 export type Route = "prepare" | "capture" | "inspect" | "experiments" | "reports" | "settings";
@@ -33,9 +35,11 @@ export const ROUTES: Record<Route, { title: string; desc: string }> = {
 export class AppShell {
   private container: HTMLElement;
   private currentRoute: Route = "prepare";
+  private readonly routes: RouteStore;
 
   constructor(container: HTMLElement) {
     this.container = container;
+    this.routes = new RouteStore(window);
     window.addEventListener("hashchange", () => this.handleRoute());
   }
 
@@ -71,18 +75,18 @@ export class AppShell {
   private handleRoute(): void {
     try {
       const hash = window.location.hash;
-      let route: Route = "prepare";
-      if (hash.startsWith("#/")) {
-        const r = hash.slice(2) as Route;
-        if (ROUTES[r]) {
-          route = r;
-        }
-      } else {
+      if (!hash.startsWith("#/")) {
         // Redirect to default
         window.location.hash = "#/prepare";
         return;
       }
-
+      // Маршрут и фильтры читаются из модели состояния (safe-restore при перезагрузке).
+      this.routes.syncFromUrl();
+      const parsed = this.routes.get();
+      const route: Route = parsed.route in ROUTES ? (parsed.route as Route) : "prepare";
+      if (route !== this.currentRoute) {
+        announcePolite(`Раздел: ${ROUTES[route].title}`);
+      }
       this.currentRoute = route;
       this.updateActiveNav();
       this.renderView();

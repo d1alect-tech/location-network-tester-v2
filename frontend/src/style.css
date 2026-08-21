@@ -1,5 +1,6 @@
 /* Import design tokens from T36 */
 @import "../../src/lnt/ui/static/v2-tokens.css";
+@import "./components/primitives/primitives.css";
 
 /* Base styles */
 body {

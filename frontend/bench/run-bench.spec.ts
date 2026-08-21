@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "@playwright/test";
@@ -71,8 +72,9 @@ test("Run ECharts Heatmap Benchmark", async ({ page }) => {
 
   console.log("Benchmark Results:", results);
 
-  // Write results to frontend/bench/results.json
-  const resultsPath = path.resolve(__dirname, "results.json");
+  // Write fresh measurements to a TEMP file: routine runs must not clobber the
+  // committed snapshot (noisy RSS would rewrite it on every e2e run).
+  const resultsPath = path.join(os.tmpdir(), "lnt-bench-results.json");
   const resultsWithHost = {
     host: {
       os: "Windows 10 Home 22H2 x64",
@@ -83,7 +85,7 @@ test("Run ECharts Heatmap Benchmark", async ({ page }) => {
       "Sum of WorkingSetSize of chrome.exe processes containing 'ms-playwright' in ExecutablePath via PowerShell Get-CimInstance Win32_Process",
     results,
   };
-  fs.writeFileSync(resultsPath, JSON.stringify(resultsWithHost, null, 2));
+  fs.writeFileSync(resultsPath, `${JSON.stringify(resultsWithHost, null, 2)}\n`);
   console.log(`Results written to ${resultsPath}`);
 
   // Determine the hard viewport-cell cap and data format
@@ -100,19 +102,16 @@ test("Run ECharts Heatmap Benchmark", async ({ page }) => {
     }
   }
 
-  const decisionContent = `# ECharts Heatmap Benchmark Decision
-
-## Benchmark Results
-| Cells | Render (ms) | Zoom (ms) | Teardown (ms) | Wire Bytes | Heap Used (MiB) | Heap Total (MiB) | Browser RSS (MiB) |
-|---|---|---|---|---|---|---|---|
-${results.map((r) => `| ${r.cellCount} | ${r.renderMs.toFixed(1)} | ${r.zoomMs.toFixed(1)} | ${r.teardownMs.toFixed(1)} | ${r.wireSizeBytes} | ${r.heapUsedMiB.toFixed(1)} | ${r.heapTotalMiB.toFixed(1)} | ${r.browserRssMiB.toFixed(1)} |`).join("\n")}
-
-## Decision
-- **Hard Viewport-Cell Cap**: ${cap} cells
-- **Data Format**: Float32Array typed-array layout (X, Y, Value interleaved) for maximum efficiency and minimal wire size.
-`;
-
-  const decisionPath = path.resolve(__dirname, "DECISION.md");
-  fs.writeFileSync(decisionPath, decisionContent);
-  console.log(`Decision written to ${decisionPath}`);
+  // The finalized decision is frozen (todo 37): never rewrite it. Recompute the
+  // cap and report loudly when it drifts from the committed DECISION.md.
+  const committedDecision = fs.readFileSync(path.resolve(__dirname, "DECISION.md"), "utf-8");
+  const match = /Hard Viewport-Cell Cap\*\*: (\d+) cells/.exec(committedDecision);
+  const committedCap = match === null ? null : Number(match[1]);
+  if (committedCap !== cap) {
+    console.warn(
+      `[bench] recomputed cap ${cap} differs from finalized cap ${committedCap} — DECISION.md left untouched`,
+    );
+  } else {
+    console.log(`[bench] recomputed cap matches finalized cap (${cap} cells)`);
+  }
 });

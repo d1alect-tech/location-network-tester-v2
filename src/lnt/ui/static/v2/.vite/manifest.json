@@ -1,11 +1,31 @@
 {
+  "_routeState.BvfMyqa0.css": {
+    "file": "assets/routeState.BvfMyqa0.css",
+    "src": "_routeState.BvfMyqa0.css"
+  },
+  "_routeState.CqTERXm9.js": {
+    "file": "assets/routeState.CqTERXm9.js",
+    "name": "routeState",
+    "css": [
+      "assets/routeState.BvfMyqa0.css"
+    ]
+  },
   "index.html": {
-    "file": "assets/main.6wfBCiZw.js",
+    "file": "assets/main.BSybKybL.js",
     "name": "main",
     "src": "index.html",
     "isEntry": true,
-    "css": [
-      "assets/main.DtcolDVk.css"
+    "imports": [
+      "_routeState.CqTERXm9.js"
+    ]
+  },
+  "showcase.html": {
+    "file": "assets/showcase.CXKPnrJf.js",
+    "name": "showcase",
+    "src": "showcase.html",
+    "isEntry": true,
+    "imports": [
+      "_routeState.CqTERXm9.js"
     ]
   }
 }
