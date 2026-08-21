@@ -12,7 +12,7 @@ const EVIDENCE_DIR = resolve(
 );
 
 test("primitives showcase renders and stays accessible", async ({ page }) => {
-  await page.goto("http://127.0.0.1:9999/static/v2/showcase.html");
+  await page.goto("http://127.0.0.1:4102/static/v2/showcase.html");
 
   await expect(page.locator(".demo-section")).toHaveCount(6);
 

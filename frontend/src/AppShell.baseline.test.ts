@@ -31,10 +31,10 @@ describe("AppShell (baseline characterization)", () => {
     window.location.hash = "#/capture";
     const shell = new AppShell(container);
     shell.init();
-    expect(container.querySelector(".placeholder-title")?.textContent).toBe("Захват");
-    expect(container.querySelector(".placeholder-desc")?.textContent).toContain(
-      "серийных измерений",
-    );
+    // Todo 40: маршрут «Захват» намеренно монтирует полный рабочий процесс
+    // вместо заглушки (базлайн зафиксирован зелёным до изменений).
+    expect(container.querySelector(".capture-view")).not.toBeNull();
+    expect(container.querySelector(".view-title")?.textContent).toBe("Захват");
     const active = container.querySelector(".nav-link.active");
     expect(active?.getAttribute("data-route")).toBe("capture");
   });
