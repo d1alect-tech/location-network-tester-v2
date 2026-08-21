@@ -9,57 +9,57 @@
     {
       "cellCount": 64000,
       "wireSizeBytes": 768000,
-      "dataGenMs": 4.0999999940395355,
-      "renderMs": 123.40000000596046,
-      "zoomMs": 23.400000005960464,
-      "teardownMs": 2.0999999940395355,
-      "heapUsedMiB": 37.3758430480957,
-      "heapTotalMiB": 60.8671875,
-      "browserRssMiB": 284.1796875
+      "dataGenMs": 6.399999991059303,
+      "renderMs": 125.29999999701977,
+      "zoomMs": 19.600000008940697,
+      "teardownMs": 1.3999999910593033,
+      "heapUsedMiB": 36.55120849609375,
+      "heapTotalMiB": 61.8671875,
+      "browserRssMiB": 283.44921875
     },
     {
       "cellCount": 128000,
       "wireSizeBytes": 1536000,
-      "dataGenMs": 4.299999982118607,
-      "renderMs": 132.5,
-      "zoomMs": 39.30000001192093,
-      "teardownMs": 1.0999999940395355,
-      "heapUsedMiB": 48.387752532958984,
-      "heapTotalMiB": 122.21484375,
-      "browserRssMiB": 361.64453125
+      "dataGenMs": 3.3999999910593033,
+      "renderMs": 125.90000000596046,
+      "zoomMs": 16.200000002980232,
+      "teardownMs": 0.7000000029802322,
+      "heapUsedMiB": 65.43439865112305,
+      "heapTotalMiB": 113.67578125,
+      "browserRssMiB": 356.78125
     },
     {
       "cellCount": 262000,
       "wireSizeBytes": 3144000,
-      "dataGenMs": 17.600000023841858,
-      "renderMs": 184,
-      "zoomMs": 27,
-      "teardownMs": 1,
-      "heapUsedMiB": 139.71337509155273,
-      "heapTotalMiB": 193.48828125,
-      "browserRssMiB": 441.21875
+      "dataGenMs": 22.600000008940697,
+      "renderMs": 170.79999999701977,
+      "zoomMs": 16.5,
+      "teardownMs": 0.800000011920929,
+      "heapUsedMiB": 142.2891616821289,
+      "heapTotalMiB": 193.8671875,
+      "browserRssMiB": 445.93359375
     },
     {
       "cellCount": 524000,
       "wireSizeBytes": 6288000,
-      "dataGenMs": 14.599999994039536,
-      "renderMs": 342.80000001192093,
-      "zoomMs": 31.69999998807907,
-      "teardownMs": 0.9000000059604645,
-      "heapUsedMiB": 162.84251022338867,
-      "heapTotalMiB": 229.5234375,
-      "browserRssMiB": 550.22265625
+      "dataGenMs": 14,
+      "renderMs": 315.1000000089407,
+      "zoomMs": 23,
+      "teardownMs": 0.7000000029802322,
+      "heapUsedMiB": 175.82323455810547,
+      "heapTotalMiB": 220.4921875,
+      "browserRssMiB": 509.421875
     },
     {
       "cellCount": 2000000,
       "wireSizeBytes": 24000000,
-      "dataGenMs": 54.19999998807907,
-      "renderMs": 1147.4000000059605,
-      "zoomMs": 66.09999999403954,
-      "teardownMs": 0.9000000059604645,
-      "heapUsedMiB": 670.055362701416,
-      "heapTotalMiB": 723.48046875,
-      "browserRssMiB": 1012.80078125
+      "dataGenMs": 51.1000000089407,
+      "renderMs": 1184.5999999940395,
+      "zoomMs": 52.8999999910593,
+      "teardownMs": 0.7000000029802322,
+      "heapUsedMiB": 614.2516098022461,
+      "heapTotalMiB": 653.98828125,
+      "browserRssMiB": 945.35546875
     }
   ]
 }

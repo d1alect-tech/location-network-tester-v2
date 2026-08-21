@@ -5,7 +5,7 @@
     "package-lock.json": "ee169fcfffb29769f812976c7b0ff22546e0e6344e86a2384748ad95b87c1dfc",
     "src/AppShell.test.ts": "a29528210611030d409393f947feb4cb9f5d7e68a30a9efac72af8ffec40e405",
     "src/AppShell.ts": "6c08e06f537daa413cfa1daec57809e8346efb93cc6e22839c673d730a1fe4e1",
-    "src/main.ts": "175fa7eaa8bffa9893c948249a203b75592778adae6fc385602cc11aea9c12c5",
+    "src/main.ts": "76b62bf02dc2390cad489edf06c75b4a92d5785225576d0ac9df471150db7b19",
     "src/shell.spec.ts": "a5b17f17e983f50439ad4c361eaebcee11333897687fbf997d3f90383eb98f8f",
     "src/style.css": "ac9cd2eac9bfabe88def72df19612835f250f4afed0954f72a7f85007b3a4714"
   },
