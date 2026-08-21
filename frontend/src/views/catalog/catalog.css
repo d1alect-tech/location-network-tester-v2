@@ -1,0 +1,271 @@
+/* Рабочая область каталога (Todo 39): двухпанельная раскладка DESIGN.md
+ * (каталог слева, инспектор/профили справа), виртуализованный список,
+ * бейджи health, конфликт-revision панель. Только токены v2-tokens.css. */
+
+.lnt-cat-workspace {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(360px, 420px);
+  gap: var(--lnt-space-4);
+  height: 100%;
+  min-height: 0;
+}
+
+.lnt-cat-left,
+.lnt-cat-right {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background-color: var(--lnt-bg-panel);
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-panel);
+  padding: var(--lnt-space-4);
+}
+
+.lnt-cat-filters {
+  margin-bottom: var(--lnt-space-4);
+}
+
+.lnt-cat-saved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--lnt-space-2);
+}
+
+.lnt-cat-saved .lnt-select {
+  min-width: 180px;
+}
+
+/* Виртуализованный список */
+.lnt-cat-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 240px;
+}
+
+.lnt-cat-viewport {
+  position: relative;
+  overflow-y: auto;
+  flex: 1;
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-control);
+  background-color: var(--lnt-bg-canvas);
+}
+
+.lnt-cat-sizer {
+  width: 1px;
+}
+
+.lnt-cat-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  will-change: transform;
+}
+
+.lnt-cat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 3fr) auto minmax(0, auto);
+  align-items: center;
+  gap: var(--lnt-space-2);
+  height: 44px;
+  padding: 0 var(--lnt-space-3);
+  border-bottom: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  cursor: pointer;
+}
+
+.lnt-cat-row:hover {
+  background-color: var(--lnt-bg-raised);
+}
+
+.lnt-cat-row:focus-visible {
+  outline: var(--lnt-focus-width) solid var(--lnt-accent-a);
+  outline-offset: calc(var(--lnt-focus-offset) * -1);
+}
+
+.lnt-cat-row-selected,
+.lnt-cat-row-selected:hover {
+  background-color: var(--lnt-bg-selected);
+}
+
+.lnt-cat-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.lnt-mono {
+  font-family: var(--lnt-font-mono);
+}
+
+.lnt-cat-health {
+  max-width: 200px;
+}
+
+.lnt-cat-more {
+  margin-top: var(--lnt-space-2);
+  align-self: flex-start;
+}
+
+.lnt-cat-empty,
+.lnt-cat-error {
+  padding: var(--lnt-space-6);
+}
+
+/* Инспектор */
+.lnt-cat-inspector,
+.lnt-cat-profiles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-3);
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.lnt-cat-tabs {
+  display: flex;
+  gap: var(--lnt-space-2);
+}
+
+.lnt-cat-tab-active {
+  background-color: var(--lnt-bg-selected);
+  color: var(--lnt-accent-a);
+}
+
+.lnt-cat-session-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-1);
+}
+
+.lnt-cat-notes {
+  resize: vertical;
+}
+
+.lnt-cat-fields td,
+.lnt-cat-fields th {
+  font-size: 13px;
+  padding: var(--lnt-space-2) var(--lnt-space-3);
+}
+
+.lnt-cat-unavailable {
+  color: var(--lnt-status-warn);
+}
+
+.lnt-cat-recovery {
+  background-color: var(--lnt-status-warn-bg);
+  border: var(--lnt-border-width) solid var(--lnt-status-warn);
+  border-radius: var(--lnt-radius-control);
+  padding: var(--lnt-space-3);
+  font-size: 13px;
+}
+
+.lnt-cat-recovery-title {
+  margin: 0 0 var(--lnt-space-2);
+}
+
+.lnt-cat-recovery-list {
+  margin: 0;
+  padding-left: var(--lnt-space-5);
+}
+
+.lnt-cat-conflict {
+  background-color: var(--lnt-status-error-bg);
+  border: var(--lnt-border-width) solid var(--lnt-status-error);
+  border-radius: var(--lnt-radius-control);
+  padding: var(--lnt-space-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lnt-space-2);
+  font-size: 13px;
+}
+
+/* Атрибут hidden обязан побеждать display:flex (конфликт-панель скрывается). */
+.lnt-cat-conflict[hidden],
+.lnt-cat-inspector [hidden],
+.lnt-cat-profiles-panel[hidden] {
+  display: none !important;
+}
+
+.lnt-cat-conflict-title {
+  flex-basis: 100%;
+  margin: 0;
+  font-weight: var(--lnt-weight-medium);
+}
+
+/* Профили */
+.lnt-cat-profile-group {
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-control);
+  margin: 0 0 var(--lnt-space-3);
+  padding: var(--lnt-space-3);
+}
+
+.lnt-cat-profile-group legend {
+  font-size: 13px;
+  color: var(--lnt-fg-secondary);
+  padding: 0 var(--lnt-space-2);
+}
+
+.lnt-cat-profile-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lnt-space-2);
+  min-height: var(--lnt-control-height);
+}
+
+.lnt-cat-profile-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lnt-cat-quantity {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--lnt-space-2);
+}
+
+.lnt-cat-preview-panel {
+  border-top: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  margin-top: var(--lnt-space-3);
+  padding-top: var(--lnt-space-3);
+}
+
+.lnt-cat-preview-title {
+  margin: 0 0 var(--lnt-space-2);
+  font-size: 13px;
+  font-weight: var(--lnt-weight-semibold);
+}
+
+.lnt-cat-preview-item {
+  margin-bottom: var(--lnt-space-3);
+}
+
+.lnt-cat-preview-line {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lnt-fg-secondary);
+}
+
+.lnt-cat-preview-json {
+  margin: var(--lnt-space-1) 0 0;
+  padding: var(--lnt-space-2);
+  background-color: var(--lnt-bg-raised);
+  border-radius: var(--lnt-radius-control);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 1000px) {
+  .lnt-cat-workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(300px, 1fr) auto;
+  }
+}

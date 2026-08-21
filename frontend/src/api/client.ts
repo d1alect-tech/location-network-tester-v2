@@ -3,6 +3,8 @@
 
 import { createJobsApi, createPlotsApi } from "./client-jobs";
 import type { JobsApi, PlotsApi } from "./client-jobs";
+import { createProfilesApi } from "./client-profiles";
+import type { ProfilesApi } from "./client-profiles";
 import { createResearchApi } from "./client-research";
 import type { ResearchApi } from "./client-research";
 import { ApiError, isAbortError, normalizeThrown, parseApiError } from "./errors";
@@ -40,11 +42,14 @@ export class LntApiClient {
   readonly plots: PlotsApi;
   /** Эксперименты, гипотезы, тренды, сравнимость (Todo 34). */
   readonly research: ResearchApi;
+  /** CRUD профилей (Todo 39). */
+  readonly profilesApi: ProfilesApi;
 
   constructor(private readonly fetchImpl: typeof fetch = (...args) => fetch(...args)) {
     this.jobs = createJobsApi(this);
     this.plots = createPlotsApi(this);
     this.research = createResearchApi(this);
+    this.profilesApi = createProfilesApi(this);
   }
 
   get currentBuildId(): string | null {
@@ -61,6 +66,11 @@ export class LntApiClient {
     this.buildId = config.build_id;
     this.nonce = config.mutation_nonce;
     return config;
+  }
+
+  /** Гарантирует наличие nonce перед мутацией (идемпотентно). */
+  async ensureReady(options: RequestOptions = {}): Promise<void> {
+    if (this.nonce === null) await this.bootstrap(options);
   }
 
   /** Детерминированное восстановление после перезапуска сервера/обновления. */
@@ -183,6 +193,7 @@ export class LntApiClient {
     if (!response.ok) {
       throw parseApiError(response.status, await safeJsonBody(response));
     }
+    if (response.status === 204) return undefined; // No Content — пустое тело валидно
     try {
       return await response.json();
     } catch (error) {

@@ -20,7 +20,7 @@ interface WindowWithBenchmark extends Window {
 }
 
 test("Run ECharts Heatmap Benchmark", async ({ page }) => {
-  await page.goto("http://127.0.0.1:9999/static/v2/bench/echarts-bench.html");
+  await page.goto("http://127.0.0.1:4101/static/v2/bench/echarts-bench.html");
   // Wait for the script to load and expose runBenchmark
   await page.waitForFunction(
     () => (window as unknown as WindowWithBenchmark).runBenchmark !== undefined,
