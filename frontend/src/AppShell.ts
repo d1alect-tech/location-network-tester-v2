@@ -1,6 +1,9 @@
 import "./style.css";
 import { announcePolite } from "./components/primitives/status";
 import { RouteStore } from "./state/routeState";
+// --- todo 41 (uPlot workbench): единственная точка регистрации графиков ---
+import "./components/charts/charts.css";
+import { mountInspectWorkbench } from "./components/charts/register";
 
 // Simple Hash Router
 export type Route = "prepare" | "capture" | "inspect" | "experiments" | "reports" | "settings";
@@ -125,6 +128,14 @@ export class AppShell {
         <p class="placeholder-desc">${routeInfo.desc}</p>
       </div>
     `;
+    // --- todo 41 (uPlot workbench): аддитивный монтаж на маршруте Инспекция ---
+    if (this.currentRoute === "inspect") {
+      const host = document.createElement("section");
+      host.className = "charts-workbench-host";
+      host.setAttribute("aria-label", "Графики сессии");
+      viewContainer.querySelector(".placeholder-view")?.after(host);
+      mountInspectWorkbench(host);
+    }
   }
 
   public renderErrorBoundary(error: Error): void {

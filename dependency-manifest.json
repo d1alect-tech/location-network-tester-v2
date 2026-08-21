@@ -367,14 +367,14 @@
     "hash": "sha256:f6f4b69b657c312f516dd2d268ab9ae6f254b11e4bac504f37b2ab58b24dd0b0",
     "scope": "runtime"
   },
-  {
-    "name": "plotly-gl2d",
-    "version": "3.7.0",
-    "license": "MIT",
-    "source_url": "https://registry.npmjs.org/plotly.js/-/plotly.js-3.7.0.tgz",
-    "hash": "sha256:d396c0d59e2844a167dc4aca8469fe1653060cb105f4d7cbd47b3c7788b1e750",
-    "scope": "vendored"
-  },
+    {
+      "name": "uplot",
+      "version": "1.6.32",
+      "license": "MIT",
+      "source_url": "https://registry.npmjs.org/uplot/-/uplot-1.6.32.tgz",
+      "hash": "sha256:5dd9b3281aa64b461b42d9945f6adb2649d346502b12281a9ae0d46599a80eba",
+      "scope": "vendored"
+    },
   {
     "name": "ibm-plex-mono-medium",
     "version": "2.5.0",

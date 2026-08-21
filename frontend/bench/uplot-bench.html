@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>uPlot 1-D Benchmark</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: sans-serif;
+        background: #12161a;
+        color: #f4f4f4;
+      }
+      #chart-container {
+        width: 1200px;
+        height: 400px;
+        border: 1px solid #2d3748;
+        background: #1a1f24;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>uPlot 1-D Benchmark (todo 41)</h1>
+    <div id="chart-container"></div>
+
+    <!-- БЕНЧ-СТРАНИЦА: uPlot только здесь и в продукте; ECharts не используется. -->
+    <script type="module">
+      import uPlot from "uplot";
+
+      // Для проб и спецификации: инстанс доступен из evaluate().
+      window.uPlotLib = uPlot;
+
+      function percentile(sorted, p) {
+        if (sorted.length === 0) return 0;
+        const idx = Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1);
+        return sorted[Math.max(0, idx)];
+      }
+
+      // Синтетический сигнал: синусоида с одиночной иглой (проверка рендера).
+      function generate(pointCount) {
+        const x = new Float64Array(pointCount);
+        const y = new Float64Array(pointCount);
+        for (let i = 0; i < pointCount; i++) {
+          x[i] = i * 1e-6;
+          y[i] = Math.sin(i / 500) * 0.8 + Math.sin(i / 37) * 0.05;
+        }
+        const spike = Math.floor(pointCount * 0.7);
+        y[spike] = 42;
+        return { x, y };
+      }
+
+      window.runUplotBenchmark = async (pointCount) => {
+        const container = document.getElementById("chart-container");
+        container.replaceChildren();
+
+        // Синтетический сигнал с иглой (проверка отрисовки экстремумов).
+        const x = new Float64Array(pointCount);
+        const y = new Float64Array(pointCount);
+        for (let i = 0; i < pointCount; i++) {
+          x[i] = i * 1e-6;
+          y[i] = Math.sin(i / 500) * 0.8 + Math.sin(i / 37) * 0.05;
+        }
+        y[Math.floor(pointCount * 0.7)] = 42;
+
+        function countPainted(plot) {
+          const img = plot.ctx.getImageData(0, 0, plot.ctx.canvas.width, plot.ctx.canvas.height).data;
+          let n = 0;
+          for (let i = 3; i < img.length; i += 4 * 97) if (img[i] > 0) n++;
+          return n;
+        }
+
+        // uPlot откладывает первую покраску до микротаска; plot.batch()
+        // принудительно выполняет отложенный рендер синхронно. Измеряем
+        // конструктор + сброс очереди и подтверждаем пикселями канвы.
+        const opts = {
+          width: 1200,
+          height: 400,
+          series: [{}, { stroke: "#00a3ff", width: 1.5, points: { show: false } }],
+          axes: [{ label: "Время, с" }, { label: "Напряжение, В" }],
+          cursor: { drag: { setScale: true, x: true, y: false } },
+        };
+        const t0 = performance.now();
+        const plot = new uPlot(opts, [x, y], container);
+        plot.batch(() => {});
+        const renderMs = performance.now() - t0;
+        const paintedPixelSamples = countPainted(plot);
+        const renderedPoints = plot.data[0].length;
+
+        // Пан/зум: каждый прогон в immediate-mode (batch) — реальная
+        // синхронная перерисовка на окно; собираем все выборки для p95.
+        const span = x[pointCount - 1];
+        const win = span / 10;
+        const panTimes = [];
+        const zoomTimes = [];
+        const REPEATS = 150;
+        for (let i = 0; i < REPEATS; i++) {
+          const min = ((i % 6) / 6) * (span - win);
+          const a = performance.now();
+          plot.batch(() => plot.setScale("x", { min, max: min + win }));
+          panTimes.push(performance.now() - a);
+
+          const center = span / 2;
+          const half = win / (2 + (i % 8));
+          const b = performance.now();
+          plot.batch(() => plot.setScale("x", { min: center - half, max: center + half }));
+          zoomTimes.push(performance.now() - b);
+        }
+        panTimes.sort((a, b) => a - b);
+        zoomTimes.sort((a, b) => a - b);
+
+        const t1 = performance.now();
+        plot.destroy();
+        const teardownMs = performance.now() - t1;
+
+        return {
+          pointCount,
+          wireSizeBytes: x.byteLength + y.byteLength,
+          dataGenMs: 0,
+          renderMs: Number(renderMs.toFixed(3)),
+          panP95Ms: Number(percentile(panTimes, 95).toFixed(4)),
+          panMeanMs: Number((panTimes.reduce((s2, v) => s2 + v, 0) / REPEATS).toFixed(4)),
+          zoomP95Ms: Number(percentile(zoomTimes, 95).toFixed(4)),
+          zoomMeanMs: Number((zoomTimes.reduce((s2, v) => s2 + v, 0) / REPEATS).toFixed(4)),
+          teardownMs: Number(teardownMs.toFixed(3)),
+          renderedPoints,
+          paintedPixelSamples,
+        };
+      };
+      </script>
+  </body>
+</html>

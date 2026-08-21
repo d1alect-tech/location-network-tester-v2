@@ -1,5 +1,8 @@
 # Редизайн UI LNT: Scientific Workbench
 
+> Актуализировано todo 41 (2026-08): одномерные графики панели переведены на uPlot;
+> формулировки о прежней графической библиотеке обновлены без изменения решений.
+
 Дата: 2026-07-26  
 Статус: утверждённый дизайн, готов к планированию реализации
 
@@ -19,7 +22,7 @@
   semantic status ramps, cyan/ochre chart pair.
 - Приоритет: measurement-first.
 - Полный UX-scope: новая компоновка, progressive disclosure, поиск сессий,
-  сворачиваемый манифест, lazy Plotly, favicon и metadata.
+  сворачиваемый манифест, ленивая загрузка графической библиотеки, favicon и metadata.
 
 Точный token-контракт, контрасты и состояния находятся в корневом `DESIGN.md`.
 
@@ -76,7 +79,7 @@ API-запрос, не меняет сортировку и не уничтож�
 
 ### Графики
 
-Глобальный Plotly-script удаляется из initial HTML. Loader вставляет локальный
+Глобальный скрипт графики не попадает в initial HTML; ES-модуль подключает локальный
 vendor-script при первом запросе графика, возвращает общий Promise для
 параллельных вызовов и отображает текстовый статус загрузки. Ошибка загрузки
 показывает восстановительное действие, а не пустые оси.
@@ -97,16 +100,16 @@ Backend и маршруты не меняются. Существующие вы
 
 - `themePreference: system | light | dark`;
 - `sessionQuery: string`;
-- `plotlyLoadPromise: Promise | null`.
+- `chartLibPromise: Promise | null` (с todо 41 — прямой ESM-импорт).
 
 Theme state изолирован в небольшом модуле. Session query применяется только
-при рендере каталога. Plotly loader не меняет payload графиков.
+при рендере каталога. подключение графической библиотеки не меняет payload графиков.
 
 ## Ошибки и восстановление
 
 - API/domain errors продолжают проходить через общий inline error-banner.
 - Ошибка поля остаётся рядом с полем и получает `aria-invalid`.
-- Ошибка Plotly не делает сессию повреждённой; пользователь может повторить
+- Ошибка загрузки графики не делает сессию повреждённой; пользователь может повторить
   загрузку графика.
 - Пустой результат поиска не является ошибкой.
 - Theme initialization при недоступном localStorage безопасно возвращается к
@@ -114,7 +117,7 @@ Theme state изолирован в небольшом модуле. Session que
 
 ## Производительность
 
-- Plotly 1.6MB исключается из initial load и загружается один раз по требованию.
+- Библиотека графики исключена из initial load и подключается локальным вендорным модулем.
 - Локальный IBM Plex Sans 400 preload; другие WOFF2 загружаются по CSS demand.
 - Никаких CDN, внешних изображений, telemetry или новой runtime-библиотеки.
 - Фильтрация 200 сессий выполняется синхронно; virtualize не добавляется без
@@ -144,7 +147,7 @@ Theme state изолирован в небольшом модуле. Session que
 
 - `DESIGN.md`, HTML/CSS/JS темы и компоновки;
 - локальные IBM Plex WOFF2 и `@font-face`;
-- theme module, session filter, Plotly loader;
+- theme module, session filter, модуль графики;
 - SVG favicon и meta description;
 - обновление тестов и полная browser QA.
 
@@ -163,7 +166,7 @@ Theme state изолирован в небольшом модуле. Session que
 1. Primitive showcase: обе темы и все состояния button/input/select/checkbox/
    session-row/disclosure/error-banner.
 2. Функциональные тесты: theme persistence/system change, session filter,
-   Plotly single-load/retry, сохранение существующих job/session flows.
+   single-load/retry графического модуля, сохранение существующих job/session flows.
 3. Browser matrix: 375/768/1280, light/dark/system, длинные ID/путь, 200 сессий.
 4. Keyboard, live regions, 200% zoom, reduced motion и контрасты.
 5. Existing Python/JS gates, wheel/offline inspection.
@@ -178,7 +181,7 @@ Theme state изолирован в небольшом модуле. Session que
   параметров.
 - Спектр получает основную ширину desktop.
 - Light/dark не имеют вспышки неверной темы и сохраняют выбор.
-- Первый экран не загружает Plotly до запроса графика.
+- Первый экран не загружает графический модуль до запроса графика.
 - Все прежние операции и API-контракты проходят без изменений.
 - Обе темы проходят WCAG AA и visual QA на трёх breakpoints.
 

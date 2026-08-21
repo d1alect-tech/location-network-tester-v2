@@ -57,14 +57,14 @@ This inventory is generated from `uv.lock` and the vendored static assets commit
 
 | Asset | Version | License | Source | SHA-256 |
 |---|---:|---|---|---|
-| plotly-gl2d | 3.7.0 | `MIT` | https://registry.npmjs.org/plotly.js/-/plotly.js-3.7.0.tgz | `sha256:d396c0d59e2844a167dc4aca8469fe1653060cb105f4d7cbd47b3c7788b1e750` |
+| uplot | 1.6.32 | `MIT` | https://registry.npmjs.org/uplot/-/uplot-1.6.32.tgz | `sha512-KIMVnG68zvu5XXUbC4LQEPnhwOxBuLyW1AHtpm6IKTXImkbLgkMy+jabjLgSLMasNuGGzQm/ep3tOkyTxpiQIw==` |
 | ibm-plex-mono-medium | 2.5.0 | `OFL-1.1` | https://registry.npmjs.org/@ibm/plex-mono/-/plex-mono-2.5.0.tgz | `sha256:33faf307fa6031fb4062276d7320a6d632de890cbb347576fd80cfa01077bc25` |
 | ibm-plex-mono-regular | 2.5.0 | `OFL-1.1` | https://registry.npmjs.org/@ibm/plex-mono/-/plex-mono-2.5.0.tgz | `sha256:ba204497f16b6d334cee9d1e963a831b73e3a56e1d6300a8489d18df7214b350` |
 | ibm-plex-sans-medium | 1.1.0 | `OFL-1.1` | https://registry.npmjs.org/@ibm/plex-sans/-/plex-sans-1.1.0.tgz | `sha256:5660f8a658f8bb50dbc005232f885eadffd2bc1c235c4f6fbb63469d1f9cde6d` |
 | ibm-plex-sans-regular | 1.1.0 | `OFL-1.1` | https://registry.npmjs.org/@ibm/plex-sans/-/plex-sans-1.1.0.tgz | `sha256:ba711a3085ff9f27440b6b9c4550cfc47c97bf36591d5da958b975bb3add8c1a` |
 | ibm-plex-sans-semibold | 1.1.0 | `OFL-1.1` | https://registry.npmjs.org/@ibm/plex-sans/-/plex-sans-1.1.0.tgz | `sha256:f78048030eab62e860efa39a0df79e2e5581bf122eb95b9bc42c0b8a4988d205` |
 
-The IBM Plex package provenance and npm integrity values are also retained in `src/lnt/ui/static/fonts/manifest.json`; the OFL text is retained beside the fonts and in `LICENSES/OFL-1.1.txt`. Plotly GL2D identifies its version and MIT license in its committed header.
+The IBM Plex package provenance and npm integrity values are also retained in `src/lnt/ui/static/fonts/manifest.json`; the OFL text is retained beside the fonts and in `LICENSES/OFL-1.1.txt`. uPlot identifies its version and MIT license in its committed vendor header.
 
 ## Frontend build toolchain
 

@@ -1,0 +1,116 @@
+/* Стили uPlot-workbench (todo 41): токены DESIGN.md, высоты графиков,
+ * сводка под курсором и таблицы аннотаций. Без декоративных градиентов. */
+
+.lnt-workbench {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-4);
+  margin-top: var(--lnt-space-4);
+}
+
+.lnt-workbench-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lnt-space-4);
+  align-items: end;
+}
+
+.lnt-field-inline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-1);
+  min-height: var(--lnt-touch-target-min);
+  justify-content: center;
+}
+
+.lnt-label-text {
+  font-size: 13px;
+  font-weight: var(--lnt-weight-medium);
+  color: var(--lnt-fg-secondary);
+}
+
+.lnt-chart .lnt-uplot-root,
+.lnt-chart .lnt-uplot-host {
+  inline-size: 100%;
+  block-size: var(--lnt-chart-height-mobile);
+}
+
+@media (min-width: 768px) {
+  .lnt-chart .lnt-uplot-root,
+  .lnt-chart .lnt-uplot-host {
+    block-size: var(--lnt-chart-height-tablet);
+  }
+}
+
+@media (min-width: 1280px) {
+  .lnt-chart .lnt-uplot-root,
+  .lnt-chart .lnt-uplot-host {
+    block-size: var(--lnt-chart-height-desktop);
+  }
+}
+
+.lnt-readout {
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-panel);
+  background-color: var(--lnt-bg-panel);
+  padding: var(--lnt-space-2) var(--lnt-space-4);
+}
+
+.lnt-readout-caption {
+  display: block;
+  font-size: 13px;
+  font-weight: var(--lnt-weight-medium);
+  color: var(--lnt-fg-secondary);
+  margin-bottom: var(--lnt-space-1);
+}
+
+.lnt-readout-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-family: var(--lnt-font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.lnt-readout-table th,
+.lnt-peaks-summary th {
+  text-align: left;
+  color: var(--lnt-fg-secondary);
+  border-bottom: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  padding: var(--lnt-space-1) var(--lnt-space-2);
+}
+
+.lnt-readout-table td,
+.lnt-peaks-summary td {
+  padding: var(--lnt-space-1) var(--lnt-space-2);
+  border-bottom: var(--lnt-border-width) solid var(--lnt-border-subtle);
+}
+
+.lnt-peaks-summary {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-family: var(--lnt-font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.lnt-peaks-summary-caption {
+  font-size: 12px;
+  color: var(--lnt-fg-secondary);
+  margin-bottom: var(--lnt-space-1);
+}
+
+.lnt-input-ref-status {
+  font-size: 15px;
+  margin: 0 0 var(--lnt-space-1);
+}
+
+.lnt-helper-text {
+  font-size: 12px;
+  color: var(--lnt-fg-secondary);
+  margin: 0;
+}
+
+.lnt-btn-small {
+  min-height: var(--lnt-control-height);
+}

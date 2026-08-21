@@ -1,5 +1,5 @@
-import { loadPlotly } from "./plotly-loader.js";
 import { element } from "./view-dom.js";
+import { createUplotChart } from "./uplot-chart.js";
 
 const LOADING_MESSAGE = "Загрузка графика…";
 const ERROR_MESSAGE = "Не удалось загрузить график. Повторите открытие сессии.";
@@ -47,7 +47,7 @@ function readBrowserPlotTokens() {
     plot: styles.getPropertyValue("--plot-bg").trim(),
     paper: styles.getPropertyValue("--surface-panel").trim(),
     text: styles.getPropertyValue("--text-secondary").trim(),
-    lineWidth: Number.parseFloat(styles.getPropertyValue("--plot-line-width")),
+    lineWidth: Number.parseFloat(styles.getPropertyValue("--plot-line-width")) || 1,
   };
 }
 
@@ -55,17 +55,14 @@ function spectrumDefinition(spectrum, colors) {
   const levelDb = spectrum.psd_v2_per_hz.map((value) => 10 * Math.log10(value));
   return {
     traces: [{
-      type: "scattergl",
-      mode: "lines",
+      type: "line",
       name: "A",
       x: spectrum.frequency_hz,
       y: spectrum.psd_v2_per_hz,
       customdata: levelDb,
-      hovertemplate: "%{x:.0f} Гц<br>%{y:.3e} В²/Гц<br>%{customdata:.1f} дБ<extra>A</extra>",
       line: { color: colors.lineA, width: colors.lineWidth },
     }],
     layout: {
-      autosize: true,
       paper_bgcolor: colors.paper,
       plot_bgcolor: colors.plot,
       font: { color: colors.text },
@@ -79,8 +76,7 @@ function waveformDefinition(waveform, colors) {
   const isSecondChannel = waveform.channel === "ch2";
   return {
     traces: [{
-      type: "scattergl",
-      mode: "lines",
+      type: "line",
       name: waveform.channel.toUpperCase(),
       x: waveform.time_s,
       y: waveform.voltage_v,
@@ -91,7 +87,6 @@ function waveformDefinition(waveform, colors) {
       },
     }],
     layout: {
-      autosize: true,
       paper_bgcolor: colors.paper,
       plot_bgcolor: colors.plot,
       font: { color: colors.text },
@@ -126,11 +121,11 @@ function setChartError(target, status) {
   status.textContent = ERROR_MESSAGE;
 }
 
-export function createChartRenderer({ loadPlotly: load, getElementById, readPlotTokens }) {
+export function createChartRenderer({ loadChart, getElementById, readPlotTokens }) {
   const chains = new Map();
   const owners = new Map();
   const plots = new Map();
-  let plotlyRef = null;
+  let loadedChart = null;
 
   async function renderChart({ targetId, payload, definition, reveal, isCurrent, token }) {
     if (!isCurrent()) return undefined;
@@ -139,16 +134,16 @@ export function createChartRenderer({ loadPlotly: load, getElementById, readPlot
     const isOwner = () => owners.get(targetId) === token;
     if (reveal) revealChart(target);
     setChartLoading(target, status);
-    const config = { responsive: true, displaylogo: false };
+    const config = { responsive: true, tokens: readPlotTokens() };
     try {
-      const plotly = await load();
-      plotlyRef = plotly;
+      const chartLib = await loadChart();
+      loadedChart = chartLib;
       if (!isCurrent()) return undefined;
-      const chart = definition(payload, readPlotTokens());
-      const result = await plotly.newPlot(target, chart.traces, chart.layout, config);
+      const chart = definition(payload, config.tokens);
+      const result = await chartLib.newPlot(target, chart.traces, chart.layout, config);
       if (isCurrent() && isOwner()) {
         setChartReady(target, status);
-        plots.set(targetId, { payload, definition, config });
+        plots.set(targetId, { target, payload, definition, config });
       }
       return result;
     } catch (error) {
@@ -180,12 +175,14 @@ export function createChartRenderer({ loadPlotly: load, getElementById, readPlot
   }
 
   function applyTheme() {
-    if (plotlyRef === null) return;
-    for (const [targetId, entry] of plots) {
-      const target = getElementById(targetId);
-      if (!target || target.dataset.chartState !== "ready") continue;
-      const chart = entry.definition(entry.payload, readPlotTokens());
-      plotlyRef.react(target, chart.traces, chart.layout, entry.config);
+    // Перекраска синхронна, если библиотека уже загружена первым рендером;
+    // до этого — безопасное отсутствие операций.
+    if (loadedChart === null) return;
+    for (const entry of plots.values()) {
+      if (entry.target.dataset.chartState !== "ready") continue;
+      entry.config.tokens = readPlotTokens();
+      const chart = entry.definition(entry.payload, entry.config.tokens);
+      loadedChart.react(entry.target, chart.traces, chart.layout, entry.config);
     }
   }
 
@@ -212,7 +209,7 @@ export function createChartRenderer({ loadPlotly: load, getElementById, readPlot
 const browserRenderer = typeof document === "undefined"
   ? null
   : createChartRenderer({
-    loadPlotly,
+    loadChart: async () => createUplotChart({ documentRef: document }),
     getElementById: (id) => document.getElementById(id),
     readPlotTokens: readBrowserPlotTokens,
   });

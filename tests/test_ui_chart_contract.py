@@ -9,7 +9,8 @@ VIEW_MODULES: Final = {
     "view-dom.js": frozenset(),
     "ch1-input-reference.js": frozenset(),
     "line-quality-views.js": frozenset({"./view-dom.js"}),
-    "chart-views.js": frozenset({"./plotly-loader.js", "./view-dom.js"}),
+    "uplot-chart.js": frozenset({"./vendor/uPlot.esm.js"}),
+    "chart-views.js": frozenset({"./uplot-chart.js", "./view-dom.js"}),
     "session-views.js": frozenset(
         {
             "./chart-views.js",
