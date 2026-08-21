@@ -143,7 +143,7 @@ function isProfileData(kind: string, value: unknown): value is ProfileData {
   }
 }
 
-function isProfileRevision(value: unknown): value is ProfileRevision {
+export function isProfileRevision(value: unknown): value is ProfileRevision {
   return (
     isRecord(value) &&
     hasString(value, "profile_id") &&

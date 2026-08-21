@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { AppShell, ROUTES } from "./AppShell";
 
 /**
- * Базовый характеризационный тест: фиксирует наблюдаемое поведение AppShell
- * ДО любых изменений todo 38. Проверяется на неизменённом коде.
+ * Базовый характеризационный тест: фиксирует наблюдаемое поведение AppShell.
+ * С todo 39 в ROUTES добавлен раздел «Каталог» — ссылок стало семь;
+ * остальные гарантии маршрутизации сохранены дословно.
  */
 describe("AppShell (baseline characterization)", () => {
   let container: HTMLElement;
@@ -17,13 +18,14 @@ describe("AppShell (baseline characterization)", () => {
     document.body.appendChild(container);
   });
 
-  it("renders six navigation links matching ROUTES", () => {
+  it("renders seven navigation links matching ROUTES", () => {
     const shell = new AppShell(container);
     shell.init();
     const links = container.querySelectorAll<HTMLAnchorElement>(".nav-link");
     expect(links.length).toBe(Object.keys(ROUTES).length);
-    expect(links.length).toBe(6);
+    expect(links.length).toBe(7);
     expect(container.querySelector("#nav-capture")?.textContent).toBe("Захват");
+    expect(container.querySelector("#nav-catalog")?.textContent).toBe("Каталог");
     expect(links[0]?.getAttribute("href")).toBe("#/prepare");
   });
 

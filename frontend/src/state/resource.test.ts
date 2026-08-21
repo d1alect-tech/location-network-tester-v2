@@ -55,6 +55,42 @@ describe("createResourceLoader", () => {
     expect(loader.get()).toEqual({ kind: "ready", key: "fast-session", value: "fast-data" });
   });
 
+  // Todo 39: расширенный сценарий гонки — три загрузки, обратный порядок
+  // завершения (C → A → B), финальное состояние соответствует последнему
+  // ЗАПУЩЕННОМУ ключу, а не последнему завершившемуся ответу.
+  it("reversed completion order across three loads keeps the current selection", async () => {
+    const gates: Array<ReturnType<typeof deferred<string>>> = [
+      deferred<string>(),
+      deferred<string>(),
+      deferred<string>(),
+    ];
+    const keys: string[] = [];
+    const signals: AbortSignal[] = [];
+    const loader = createResourceLoader<string>((key, signal) => {
+      keys.push(key);
+      signals.push(signal);
+      const gate = gates[keys.length - 1];
+      if (!gate) throw new Error("unexpected load");
+      return gate.promise;
+    });
+
+    const runA = loader.load("a");
+    const runB = loader.load("b");
+    const runC = loader.load("c");
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(true);
+    expect(signals[2]?.aborted).toBe(false);
+
+    gates[2]?.resolve("c-data");
+    await runC;
+    gates[0]?.resolve("a-data");
+    await runA;
+    gates[1]?.resolve("b-data");
+    await runB;
+
+    expect(loader.get()).toEqual({ kind: "ready", key: "c", value: "c-data" });
+  });
+
   it("late failure of a superseded request does not clobber ready state", async () => {
     const slow = deferred<string>();
     const fast = deferred<string>();

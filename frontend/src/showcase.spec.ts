@@ -8,11 +8,11 @@ const __dirname = dirname(__filename);
 /** Витрина примитивов: реальная браузерная поверхность для доказательства a11y. */
 const EVIDENCE_DIR = resolve(
   __dirname,
-  "../../.omo/start-work/evidence/task-38-lnt-complete-redesign",
+  "../../../.omo/start-work/evidence/task-39-lnt-complete-redesign",
 );
 
 test("primitives showcase renders and stays accessible", async ({ page }) => {
-  await page.goto("http://127.0.0.1:9999/static/v2/showcase.html");
+  await page.goto("http://127.0.0.1:4101/static/v2/showcase.html");
 
   await expect(page.locator(".demo-section")).toHaveCount(6);
 

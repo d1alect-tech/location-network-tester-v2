@@ -3,7 +3,14 @@ import { announcePolite } from "./components/primitives/status";
 import { RouteStore } from "./state/routeState";
 
 // Simple Hash Router
-export type Route = "prepare" | "capture" | "inspect" | "experiments" | "reports" | "settings";
+export type Route =
+  | "prepare"
+  | "catalog"
+  | "capture"
+  | "inspect"
+  | "experiments"
+  | "reports"
+  | "settings";
 
 export const ROUTES: Record<Route, { title: string; desc: string }> = {
   prepare: {
@@ -30,12 +37,31 @@ export const ROUTES: Record<Route, { title: string; desc: string }> = {
     title: "Настройки",
     desc: "Управление путями сессий, базами данных, резервным копированием.",
   },
+  // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
+  catalog: {
+    title: "Каталог",
+    desc: "Поиск и фильтрация сессий, инспектор контекста, управление профилями.",
+  },
+  // ===== END T39 CATALOG REGISTRATION =====
 };
+
+import { LntApiClient } from "./api/client";
+// ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
+import { mountCatalogWorkspace } from "./views/catalog/catalogWorkspace";
+// ===== END T39 CATALOG REGISTRATION =====
 
 export class AppShell {
   private container: HTMLElement;
   private currentRoute: Route = "prepare";
   private readonly routes: RouteStore;
+
+  // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
+  /** Смонтированное представление и его очистка; смена фильтров внутри
+   * одного маршрута не должна пересоздавать рабочую область. */
+  private mountedRoute: Route | null = null;
+  private activeViewCleanup: (() => void) | null = null;
+  private readonly apiClient = new LntApiClient();
+  // ===== END T39 CATALOG REGISTRATION =====
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -89,7 +115,13 @@ export class AppShell {
       }
       this.currentRoute = route;
       this.updateActiveNav();
-      this.renderView();
+      // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
+      // Пересоздаём представление только при смене маршрута: смена фильтров
+      // или выбор сессии меняют query того же hash-маршрута.
+      if (route !== this.mountedRoute) {
+        this.renderView();
+      }
+      // ===== END T39 CATALOG REGISTRATION =====
     } catch (error) {
       this.renderErrorBoundary(error as Error);
     }
@@ -111,6 +143,9 @@ export class AppShell {
     const viewContainer = this.container.querySelector("#view-container");
     if (!viewContainer) return;
 
+    this.activeViewCleanup?.();
+    this.activeViewCleanup = null;
+
     // Check for a special test trigger to test error boundary
     if (this.currentRoute === "experiments" && window.location.search.includes("trigger-error")) {
       throw new Error("Тестовая критическая ошибка в представлении Эксперименты");
@@ -119,15 +154,33 @@ export class AppShell {
     const routeInfo = ROUTES[this.currentRoute];
     if (!routeInfo) return;
 
+    // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
+    if (this.currentRoute === "catalog") {
+      viewContainer.innerHTML = "";
+      viewContainer.className = "view-container lnt-cat-view-container";
+      this.activeViewCleanup = mountCatalogWorkspace(viewContainer as HTMLElement, {
+        client: this.apiClient,
+        routes: this.routes,
+      });
+      this.mountedRoute = this.currentRoute;
+      return;
+    }
+    // ===== END T39 CATALOG REGISTRATION =====
+
     viewContainer.innerHTML = `
       <div class="placeholder-view">
         <h2 class="placeholder-title">${routeInfo.title}</h2>
         <p class="placeholder-desc">${routeInfo.desc}</p>
       </div>
     `;
+    this.mountedRoute = this.currentRoute;
   }
 
   public renderErrorBoundary(error: Error): void {
+    // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
+    // Граница ошибки сбрасывает смонтированное представление.
+    this.mountedRoute = null;
+    // ===== END T39 CATALOG REGISTRATION =====
     const main = this.container.querySelector("#app-main") || this.container;
     main.innerHTML = `
       <div class="error-panel" role="alert">
