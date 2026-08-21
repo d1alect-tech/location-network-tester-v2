@@ -23,7 +23,7 @@ _MIN_POINTS: Final = 4
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DecimatedSeries:
-    """Прореженный ряд точек графика для передачи в Plotly."""
+    """Прореженный ряд точек графика для передачи в панель (uPlot)."""
 
     x: tuple[float, ...]
     y: tuple[float, ...]

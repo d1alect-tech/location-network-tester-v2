@@ -16,11 +16,14 @@ function harness() {
       this.attrs[name] = String(value);
     },
     replaceChildren() {},
+    contains: () => false,
+    append() {},
+    getBoundingClientRect: () => ({ width: 640, height: 260 }),
   };
   const status = { textContent: "" };
   const byId = { "spectrum-plot": target, "spectrum-status": status };
   const reactCalls = [];
-  const plotly = {
+  const chartLib = {
     newPlot: async () => ({}),
     react: (node, _traces, layout) => {
       reactCalls.push({ node, layout });
@@ -28,7 +31,7 @@ function harness() {
   };
   let tokens = { lineA: "#1", grid: "#3", plot: "#4", paper: "#light", text: "#6", lineWidth: 1 };
   const renderer = createChartRenderer({
-    loadPlotly: async () => plotly,
+    loadChart: async () => chartLib,
     getElementById: (id) => byId[id] ?? null,
     readPlotTokens: () => tokens,
   });

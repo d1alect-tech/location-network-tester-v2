@@ -30,7 +30,7 @@ function setup(plotPromise, nextPlot) {
   const plotCalls = [];
   const renderer = createChartRenderer({
     getElementById: (id) => id === "chart-status" ? status : target,
-    loadPlotly: async () => ({
+    loadChart: async () => ({
       newPlot(...args) {
         plotCalls.push(args);
         return nextPlot === undefined ? plotPromise : nextPlot();

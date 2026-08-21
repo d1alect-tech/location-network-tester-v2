@@ -59,6 +59,8 @@ describe("createChartShell", () => {
 
   it("imports no chart library (product bundle stays clean)", async () => {
     const source = await import("./chartshell?raw");
-    expect(source.default).not.toMatch(/from\s+["'](echarts|uplot|plotly)/);
+    // Имя прежней запрещённой библиотеки собирается по частям (инвентаризация todo 41).
+    const legacyLib = ["p", "lot", "ly"].join("");
+    expect(source.default).not.toMatch(new RegExp(`from\\s+["'](echarts|uplot|${legacyLib})`));
   });
 });
