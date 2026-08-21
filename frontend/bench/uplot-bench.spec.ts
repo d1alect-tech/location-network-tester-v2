@@ -30,7 +30,7 @@ const BUDGET_INTERACT_P95_MS = 100;
 const BUDGET_POINTS = 200_000;
 
 test("uPlot 1-D budgets at 200k points", async ({ page }) => {
-  await page.goto("http://127.0.0.1:4103/static/v2/bench/uplot-bench.html");
+  await page.goto("http://127.0.0.1:4101/static/v2/bench/uplot-bench.html");
   await page.waitForFunction(
     () => (window as unknown as WindowWithBench).runUplotBenchmark !== undefined,
   );

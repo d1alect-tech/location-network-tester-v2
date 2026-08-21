@@ -15,7 +15,7 @@ const EVIDENCE_DIR = resolve(
   __dirname,
   "../../../.omo/start-work/evidence/task-40-lnt-complete-redesign",
 );
-const BASE = "http://127.0.0.1:4102/static/v2/";
+const BASE = "http://127.0.0.1:4101/static/v2/";
 
 function interruptedJobFixture(): JobSnapshot {
   return {

@@ -91,7 +91,7 @@ async function mockApi(page: import("@playwright/test").Page): Promise<void> {
 
 test("uPlot-workbench: связанные графики, паритет данных, log-оси, CSV", async ({ page }) => {
   await mockApi(page);
-  await page.goto("http://127.0.0.1:4103/static/v2/#/inspect");
+  await page.goto("http://127.0.0.1:4101/static/v2/#/inspect");
   await expect(page.locator(".lnt-workbench")).toBeVisible();
 
   // Открытие сессии А через клавиатурно-доступный селект.
