@@ -24,7 +24,8 @@ test("AppShell loads offline with zero non-loopback requests", async ({ page }) 
 
   // Verify we can navigate to different views
   await page.click("#nav-capture");
-  await expect(page.locator(".placeholder-title")).toHaveText("Захват");
+  // Todo 40: раздел «Захват» рендерит полный рабочий процесс вместо заглушки.
+  await expect(page.locator(".view-title")).toHaveText("Захват");
 
   await page.click("#nav-inspect");
   await expect(page.locator(".placeholder-title")).toHaveText("Инспекция");

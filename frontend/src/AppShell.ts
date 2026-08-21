@@ -1,6 +1,12 @@
 import "./style.css";
+import { LntApiClient } from "./api/client";
+// BEGIN Todo 40: регистрация рабочего процесса захвата (аддитивно, один блок).
+import { createCaptureView } from "./capture/captureView";
+import type { CaptureViewHandle } from "./capture/captureView";
+import { clearElement } from "./components/primitives/dom";
 import { announcePolite } from "./components/primitives/status";
 import { RouteStore } from "./state/routeState";
+// END Todo 40
 
 // Simple Hash Router
 export type Route =
@@ -45,15 +51,20 @@ export const ROUTES: Record<Route, { title: string; desc: string }> = {
   // ===== END T39 CATALOG REGISTRATION =====
 };
 
-import { LntApiClient } from "./api/client";
 // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
 import { mountCatalogWorkspace } from "./views/catalog/catalogWorkspace";
 // ===== END T39 CATALOG REGISTRATION =====
+// BEGIN Todo 40: общий клиент панели для раздела «Захват».
+const shellClient = new LntApiClient();
+// END Todo 40
 
 export class AppShell {
   private container: HTMLElement;
   private currentRoute: Route = "prepare";
   private readonly routes: RouteStore;
+  // BEGIN Todo 40
+  private captureView: CaptureViewHandle | null = null;
+  // END Todo 40
 
   // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
   /** Смонтированное представление и его очистка; смена фильтров внутри
@@ -154,6 +165,11 @@ export class AppShell {
     const routeInfo = ROUTES[this.currentRoute];
     if (!routeInfo) return;
 
+    // BEGIN Todo 40: маршрут «Захват» монтирует полный рабочий процесс.
+    this.captureView?.dispose();
+    this.captureView = null;
+    // END Todo 40
+
     // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
     if (this.currentRoute === "catalog") {
       viewContainer.innerHTML = "";
@@ -166,6 +182,16 @@ export class AppShell {
       return;
     }
     // ===== END T39 CATALOG REGISTRATION =====
+
+    // BEGIN Todo 40
+    if (this.currentRoute === "capture") {
+      const view = createCaptureView(shellClient);
+      this.captureView = view;
+      clearElement(viewContainer);
+      viewContainer.append(view.root);
+      return;
+    }
+    // END Todo 40
 
     viewContainer.innerHTML = `
       <div class="placeholder-view">

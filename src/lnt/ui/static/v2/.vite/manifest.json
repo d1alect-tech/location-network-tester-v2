@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "_forms.BvfMyqa0.css": {
     "file": "assets/forms.BvfMyqa0.css",
     "src": "_forms.BvfMyqa0.css"
@@ -12,10 +13,26 @@
   },
   "index.html": {
     "file": "assets/main.DTNGvB3J.js",
+=======
+  "_routeState.CZ-jxVAJ.css": {
+    "file": "assets/routeState.CZ-jxVAJ.css",
+    "src": "_routeState.CZ-jxVAJ.css"
+  },
+  "_routeState.MqSCN6Tc.js": {
+    "file": "assets/routeState.MqSCN6Tc.js",
+    "name": "routeState",
+    "css": [
+      "assets/routeState.CZ-jxVAJ.css"
+    ]
+  },
+  "index.html": {
+    "file": "assets/main.BGhDpNec.js",
+>>>>>>> feat/t40-capture
     "name": "main",
     "src": "index.html",
     "isEntry": true,
     "imports": [
+<<<<<<< HEAD
       "_forms.QgfkDwto.js"
     ],
     "css": [
@@ -24,11 +41,22 @@
   },
   "showcase.html": {
     "file": "assets/showcase.DFKmfJN3.js",
+=======
+      "_routeState.MqSCN6Tc.js"
+    ]
+  },
+  "showcase.html": {
+    "file": "assets/showcase.CwqZfnSL.js",
+>>>>>>> feat/t40-capture
     "name": "showcase",
     "src": "showcase.html",
     "isEntry": true,
     "imports": [
+<<<<<<< HEAD
       "_forms.QgfkDwto.js"
+=======
+      "_routeState.MqSCN6Tc.js"
+>>>>>>> feat/t40-capture
     ]
   }
 }
