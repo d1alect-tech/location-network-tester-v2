@@ -9,6 +9,8 @@ import { createProfilesApi } from "./client-profiles";
 import type { ProfilesApi } from "./client-profiles";
 import { createResearchApi } from "./client-research";
 import type { ResearchApi } from "./client-research";
+import { createStatisticsApi } from "./client-statistics";
+import type { StatisticsApi } from "./client-statistics";
 import { ApiError, isAbortError, normalizeThrown, parseApiError } from "./errors";
 import {
   isCatalogPage,
@@ -48,6 +50,8 @@ export class LntApiClient {
   readonly profilesApi: ProfilesApi;
   /** Артефакты анализа v2: spectrogram.npz и events.json (Todo 42). */
   readonly analysis: AnalysisApi;
+  /** Durable statistics-runs (todo 43, контракты routes_statistics.py). */
+  readonly statistics: StatisticsApi;
   /** Сырой fetch для бинарных ответов; подменяется в тестах конструктором. */
   readonly rawFetch: typeof fetch;
 
@@ -57,6 +61,7 @@ export class LntApiClient {
     this.research = createResearchApi(this);
     this.profilesApi = createProfilesApi(this);
     this.analysis = createAnalysisApi(this);
+    this.statistics = createStatisticsApi(this);
     // Бинарные загрузки артефактов идут мимо requestJson (тот только JSON);
     // под-клиент анализа использует этот же инжектированный fetch.
     this.rawFetch = (...args) => this.fetchImpl(...args);

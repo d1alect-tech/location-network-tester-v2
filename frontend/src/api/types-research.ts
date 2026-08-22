@@ -117,3 +117,74 @@ export type RunConfirmPayload = {
   actor: string;
   auto_confirm?: boolean;
 };
+
+/** ===== Todo 43: контракты routes_statistics.py (todo 31) ===== */
+
+export interface PairInput {
+  unit_id: string;
+  value_a: number;
+  value_b: number;
+}
+
+export interface AbaUnitInput {
+  unit_id: string;
+  value_a1: number;
+  value_b: number;
+  value_a2: number;
+}
+
+/** Тело POST /api/v2/experiments/{id}/statistics-runs (StatisticsRun). */
+export interface StatisticsRunRequest {
+  kind: "ab" | "aba" | "repeated_blocks" | "cohort" | "longitudinal";
+  estimand: string;
+  units: string;
+  pairs?: PairInput[];
+  aba_units?: AbaUnitInput[];
+  seed?: number;
+}
+
+/** Снимок задачи панели (lnt/ui/job_state.py JobSnapshot.to_payload). */
+export interface JobSnapshotPayload {
+  schema_version: number;
+  version: number;
+  job_id: string;
+  kind: string;
+  status: string;
+  stage: string;
+  series_index: number | null;
+  series_total: number | null;
+  written_sessions: string[];
+  result: OpenRecord | null;
+  error_code: string | null;
+  error_message: string | null;
+}
+
+/** Метаданные результата статистики (_metadata в routes_statistics.py). */
+export interface StatisticsMetadata {
+  units: string;
+  sampling_unit: string;
+  hierarchy: string[];
+  n: number;
+  missing_count: number;
+  exclusions: { member_id: string; reason: string }[];
+  estimator: string;
+  interval_method: string;
+  provenance: Record<string, unknown>;
+}
+
+/** Эффект (InferentialEffect/DescriptiveEffect asdict). */
+export interface EffectPayload {
+  mean_effect: number;
+  median_effect: number;
+  robust_effect: number;
+  interval: { low: number; high: number; confidence_level: number } | null;
+  stored_differences: number[];
+  metadata: OpenRecord;
+}
+
+/** Конверт GET /statistics-runs/{job_id}/result при успехе. */
+export interface StatisticsResultEnvelope {
+  result_kind: "effect" | "descriptive" | "refusal";
+  result: OpenRecord;
+  metadata: StatisticsMetadata;
+}

@@ -57,6 +57,9 @@ export const ROUTES: Record<Route, { title: string; desc: string }> = {
 // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
 import { mountCatalogWorkspace } from "./views/catalog/catalogWorkspace";
 // ===== END T39 CATALOG REGISTRATION =====
+// BEGIN Todo 43: рабочая область экспериментов (аддитивно, один блок).
+import { mountExperimentsWorkspace } from "./views/experiments/experimentsWorkspace";
+// END Todo 43
 // BEGIN Todo 40: общий клиент панели для раздела «Захват».
 const shellClient = new LntApiClient();
 // END Todo 40
@@ -185,6 +188,19 @@ export class AppShell {
       return;
     }
     // ===== END T39 CATALOG REGISTRATION =====
+
+    // BEGIN Todo 43: маршрут «Эксперименты» монтирует полный рабочий контур.
+    if (this.currentRoute === "experiments") {
+      viewContainer.innerHTML = "";
+      viewContainer.className = "view-container lnt-exp-view-container";
+      this.activeViewCleanup = mountExperimentsWorkspace(viewContainer as HTMLElement, {
+        client: this.apiClient,
+        routes: this.routes,
+      });
+      this.mountedRoute = this.currentRoute;
+      return;
+    }
+    // END Todo 43
 
     // BEGIN Todo 40
     if (this.currentRoute === "capture") {

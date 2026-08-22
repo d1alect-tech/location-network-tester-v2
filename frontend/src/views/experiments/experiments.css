@@ -1,0 +1,198 @@
+/* Рабочая область «Эксперименты» (todo 43): раскладка, таймлайн, участники,
+ * баннеры-квалификаторы. Токены — из DESIGN.md; состояния не только цветом. */
+
+.lnt-exp-workspace {
+  display: flex;
+  gap: var(--lnt-space-md, 16px);
+  align-items: flex-start;
+}
+
+.lnt-exp-left,
+.lnt-exp-right {
+  min-width: 0;
+}
+
+.lnt-exp-left {
+  flex: 0 0 320px;
+}
+
+.lnt-exp-right {
+  flex: 1 1 auto;
+}
+
+.lnt-exp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lnt-exp-list-item .lnt-exp-open {
+  width: 100%;
+  text-align: left;
+}
+
+.lnt-exp-actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+
+.lnt-exp-subtitle {
+  font-size: 1rem;
+  margin: 12px 0 6px;
+}
+
+/* Таймлайн протокола */
+.lnt-exp-timeline {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  position: relative;
+}
+
+.lnt-exp-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--lnt-border, #ccc4);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  background: var(--lnt-surface, transparent);
+}
+
+.lnt-exp-step-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--lnt-border-strong, #999);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.lnt-exp-step-condition {
+  font-family: var(--lnt-font-mono, monospace);
+  font-size: 0.85rem;
+  color: var(--lnt-text-muted, #666);
+}
+
+/* Участники и исключения */
+.lnt-exp-member-table td,
+.lnt-exp-member-table th {
+  text-align: left;
+  vertical-align: top;
+  padding: 6px 8px;
+}
+
+tr.lnt-exp-excluded .lnt-exp-member-session,
+tr.lnt-exp-excluded td:first-child {
+  text-decoration: line-through;
+}
+
+tr.lnt-exp-excluded {
+  opacity: 0.85;
+}
+
+.lnt-exp-audit {
+  border: 1px dashed var(--lnt-border, #ccc4);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 8px;
+}
+
+.lnt-exp-audit ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+/* Баннеры-квалификаторы: текст + рамка, не только цвет */
+.lnt-exp-banner {
+  border: 1px solid var(--lnt-border-strong, #999);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 10px 0;
+}
+
+.lnt-exp-banner-info::before {
+  content: "ℹ ";
+}
+
+.lnt-exp-banner-warn {
+  border-style: solid;
+  border-width: 2px;
+}
+
+.lnt-exp-banner-warn::before {
+  content: "▲ Внимание: ";
+  font-weight: 600;
+}
+
+.lnt-exp-banner-error::before {
+  content: "✕ Ошибка: ";
+  font-weight: 600;
+}
+
+.lnt-exp-result-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 8px 0;
+}
+
+.lnt-exp-result-grid dt {
+  font-weight: 600;
+}
+
+.lnt-exp-result-grid dd {
+  margin: 0;
+  font-family: var(--lnt-font-mono, monospace);
+}
+
+.lnt-exp-provenance {
+  border-top: 1px solid var(--lnt-border, #ccc4);
+  margin-top: 12px;
+  padding-top: 8px;
+}
+
+.lnt-exp-limitations {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.lnt-exp-meta-line {
+  margin: 4px 0;
+  font-size: 0.9rem;
+}
+
+/* Мастер создания */
+.lnt-exp-wizard {
+  border: 1px solid var(--lnt-border-strong, #999);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--lnt-surface, transparent);
+}
+
+.lnt-exp-wizard-form .lnt-field {
+  margin: 8px 0;
+}
+
+.lnt-field-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+/* Оверлей спектра — только просмотр: курсор uPlot не должен перекрывать
+ * кнопки управления сравнением. */
+.lnt-exp-overlay .u-over {
+  pointer-events: none;
+}
