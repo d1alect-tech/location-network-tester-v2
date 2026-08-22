@@ -1,6 +1,8 @@
 /** Fetch-клиент стабильных контрактов LNT: nonce запуска, контроль build id,
  * нормализация ошибок. Заголовок мутаций: X-LNT-Mutation-Nonce (security.py). */
 
+import { createAnalysisApi } from "./client-analysis";
+import type { AnalysisApi } from "./client-analysis";
 import { createJobsApi, createPlotsApi } from "./client-jobs";
 import type { JobsApi, PlotsApi } from "./client-jobs";
 import { createProfilesApi } from "./client-profiles";
@@ -44,12 +46,20 @@ export class LntApiClient {
   readonly research: ResearchApi;
   /** CRUD профилей (Todo 39). */
   readonly profilesApi: ProfilesApi;
+  /** Артефакты анализа v2: spectrogram.npz и events.json (Todo 42). */
+  readonly analysis: AnalysisApi;
+  /** Сырой fetch для бинарных ответов; подменяется в тестах конструктором. */
+  readonly rawFetch: typeof fetch;
 
   constructor(private readonly fetchImpl: typeof fetch = (...args) => fetch(...args)) {
     this.jobs = createJobsApi(this);
     this.plots = createPlotsApi(this);
     this.research = createResearchApi(this);
     this.profilesApi = createProfilesApi(this);
+    this.analysis = createAnalysisApi(this);
+    // Бинарные загрузки артефактов идут мимо requestJson (тот только JSON);
+    // под-клиент анализа использует этот же инжектированный fetch.
+    this.rawFetch = (...args) => this.fetchImpl(...args);
   }
 
   get currentBuildId(): string | null {

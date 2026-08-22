@@ -9,7 +9,7 @@ import { RouteStore } from "./state/routeState";
 // END Todo 40
 // --- todo 41 (uPlot workbench): единственная точка регистрации графиков ---
 import "./components/charts/charts.css";
-import { mountInspectWorkbench } from "./components/charts/register";
+import { mountInspectSpectrogram, mountInspectWorkbench } from "./components/charts/register";
 
 // Simple Hash Router
 export type Route =
@@ -210,6 +210,12 @@ export class AppShell {
       host.setAttribute("aria-label", "Графики сессии");
       viewContainer.querySelector(".placeholder-view")?.after(host);
       mountInspectWorkbench(host);
+      // --- todo 42 (спектрограмма): аддитивный монтаж под workbench ---
+      const specHost = document.createElement("section");
+      specHost.className = "charts-spectrogram-host";
+      specHost.setAttribute("aria-label", "Спектрограмма сессии");
+      host.after(specHost);
+      mountInspectSpectrogram(specHost);
     }
   }
 

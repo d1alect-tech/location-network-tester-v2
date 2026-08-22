@@ -110,15 +110,18 @@ function checkBuild() {
     }
   }
 
-  // 4. Запрет посторонних графических библиотек в продуктовом бандле
-  // (второе имя запрещённой библиотеки собирается по частям — см. todo 41).
+  // 4. Запрет посторонних графических библиотек в продуктовом бандле.
+  // Todo 42 легализовал модульный ECharts вторым графическим стеком
+  // (регистрация только бенч-отобранных модулей — charts/echarts.ts), поэтому
+  // запрещена ТОЛЬКО Plotly; имя собирается по частям, чтобы не совпасть само
+  // с собой в этом файле.
   const assetsDir = path.join(staticV2Dir, 'assets');
   if (fs.existsSync(assetsDir)) {
     const files = fs.readdirSync(assetsDir);
     for (const file of files) {
       if (file.endsWith('.js')) {
         const content = fs.readFileSync(path.join(assetsDir, file), 'utf-8');
-        const forbidden = ['echarts', ['p', 'lot', 'ly'].join('')];
+        const forbidden = [['p', 'lot', 'ly'].join('')];
         if (forbidden.some((name) => content.includes(name))) {
           console.error(`Error: Product bundle ${file} contains forbidden library string`);
           process.exit(1);

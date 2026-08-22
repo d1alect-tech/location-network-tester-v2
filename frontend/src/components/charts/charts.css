@@ -114,3 +114,98 @@
 .lnt-btn-small {
   min-height: var(--lnt-control-height);
 }
+
+/* Стили спектрограммы (todo 42): панель под uPlot-workbench, слой маркеров
+ * поверх канвы, статус/сводка/баннер ошибки. Токены DESIGN.md, без градиентов. */
+
+.lnt-spec-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-4);
+  margin-top: var(--lnt-space-4);
+}
+
+.lnt-spec-controls {
+  align-items: end;
+}
+
+.lnt-spec-status {
+  font-size: 13px;
+  color: var(--lnt-fg-secondary);
+  font-family: var(--lnt-font-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.lnt-spec-error {
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-panel);
+  background-color: var(--lnt-bg-panel);
+  padding: var(--lnt-space-2) var(--lnt-space-4);
+}
+
+.lnt-spec-summary-line,
+.lnt-event-list-caption {
+  font-size: 13px;
+  color: var(--lnt-fg-secondary);
+}
+
+.lnt-spec-root {
+  position: relative;
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-panel);
+  background-color: var(--lnt-bg-panel);
+}
+
+.lnt-spec-chart {
+  inline-size: 100%;
+  block-size: min(70vh, 560px);
+  outline: none;
+}
+
+.lnt-spec-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.lnt-spec-marker {
+  position: absolute;
+  top: 16px;
+  transform: translateX(-50%);
+  inline-size: 14px;
+  block-size: 14px;
+  min-inline-size: 14px;
+  padding: 0;
+  border-radius: 50%;
+  border: var(--lnt-border-width) solid var(--lnt-accent-a);
+  background-color: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.lnt-spec-marker.is-selected {
+  background-color: var(--lnt-accent-a);
+}
+
+.lnt-event-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-1);
+  max-block-size: 240px;
+  overflow-y: auto;
+}
+
+.lnt-event-item {
+  min-block-size: var(--lnt-touch-target-min);
+  display: flex;
+  align-items: center;
+  padding: var(--lnt-space-1) var(--lnt-space-2);
+  border-radius: var(--lnt-radius-control);
+}
+
+.lnt-event-item.is-selected {
+  background-color: color-mix(in srgb, var(--lnt-accent-a) 14%, transparent);
+}
