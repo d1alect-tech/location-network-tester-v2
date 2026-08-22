@@ -166,3 +166,51 @@ body {
     animation: none !important;
   }
 }
+
+/* ===== BEGIN Todo 44: адаптивность шапки и мобильный фокус-режим =====
+ * Планшет (768–1279): шапка переносится, навигация не переполняет документ.
+ * Мобильный (≤767, DESIGN.md §2.3): документ владеет прокруткой; панели
+ * складываются в одну колонку. Горизонтальная прокрутка документа запрещена. */
+@media (max-width: 1279px) {
+  .app-header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: var(--lnt-header-height);
+  }
+
+  .app-nav {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 767px) {
+  body {
+    overflow: hidden auto;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  #app {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .app-header {
+    padding: var(--lnt-space-2) var(--lnt-space-3);
+    row-gap: var(--lnt-space-1);
+  }
+
+  .nav-link {
+    padding: var(--lnt-space-2) var(--lnt-space-3);
+  }
+
+  .app-main {
+    overflow: visible;
+  }
+
+  .view-container {
+    overflow-y: visible;
+    padding: var(--lnt-space-3);
+  }
+}
+/* ===== END Todo 44 ===== */

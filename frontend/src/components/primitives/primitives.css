@@ -42,6 +42,14 @@
   color: #ffffff;
 }
 
+/* Todo 44: белый текст на акценте проходит 4.5:1 только на самом акценте,
+ * поэтому hover первичной кнопки не меняет пару фон/текст (иначе контраст
+ * падает до ~1:1) — состояние наведения дублируется светлой рамкой внутри. */
+.lnt-btn-primary:hover {
+  background-color: var(--lnt-accent-a);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
 .lnt-btn:focus-visible,
 .lnt-input:focus-visible,
 .lnt-select:focus-visible,

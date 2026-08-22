@@ -54,12 +54,18 @@ export const ROUTES: Record<Route, { title: string; desc: string }> = {
   // ===== END T39 CATALOG REGISTRATION =====
 };
 
+import { createThemePreference } from "./state/themePreference";
+import type { ThemeController } from "./state/themePreference";
 // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
 import { mountCatalogWorkspace } from "./views/catalog/catalogWorkspace";
 // ===== END T39 CATALOG REGISTRATION =====
 // BEGIN Todo 43: рабочая область экспериментов (аддитивно, один блок).
 import { mountExperimentsWorkspace } from "./views/experiments/experimentsWorkspace";
 // END Todo 43
+// BEGIN Todo 44: отчёты, настройки и переключатель темы (аддитивно).
+import { mountReportsWorkspace } from "./views/reports/reportsWorkspace";
+import { mountSettingsWorkspace } from "./views/settings/settingsWorkspace";
+// END Todo 44
 // BEGIN Todo 40: общий клиент панели для раздела «Захват».
 const shellClient = new LntApiClient();
 // END Todo 40
@@ -71,6 +77,9 @@ export class AppShell {
   // BEGIN Todo 40
   private captureView: CaptureViewHandle | null = null;
   // END Todo 40
+  // BEGIN Todo 44
+  private readonly theme: ThemeController;
+  // END Todo 44
 
   // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
   /** Смонтированное представление и его очистка; смена фильтров внутри
@@ -83,6 +92,9 @@ export class AppShell {
   constructor(container: HTMLElement) {
     this.container = container;
     this.routes = new RouteStore(window);
+    // BEGIN Todo 44: тема применяется до первой отрисовки (без вспышки).
+    this.theme = createThemePreference(window);
+    // END Todo 44
     window.addEventListener("hashchange", () => this.handleRoute());
   }
 
@@ -113,6 +125,9 @@ export class AppShell {
         <div class="view-container" id="view-container"></div>
       </main>
     `;
+    // BEGIN Todo 44: переключатель темы в шапке (система/светлая/тёмная).
+    this.container.querySelector(".app-header")?.append(this.theme.control());
+    // END Todo 44
   }
 
   private handleRoute(): void {
@@ -201,6 +216,22 @@ export class AppShell {
       return;
     }
     // END Todo 43
+
+    // BEGIN Todo 44: маршруты «Отчёты» и «Настройки» (аддитивно).
+    if (this.currentRoute === "reports" || this.currentRoute === "settings") {
+      viewContainer.innerHTML = "";
+      viewContainer.className = "view-container";
+      this.activeViewCleanup =
+        this.currentRoute === "reports"
+          ? mountReportsWorkspace(viewContainer as HTMLElement, {
+              client: this.apiClient,
+              routes: this.routes,
+            })
+          : mountSettingsWorkspace(viewContainer as HTMLElement, { client: this.apiClient });
+      this.mountedRoute = this.currentRoute;
+      return;
+    }
+    // END Todo 44
 
     // BEGIN Todo 40
     if (this.currentRoute === "capture") {

@@ -196,3 +196,15 @@ tr.lnt-exp-excluded {
 .lnt-exp-overlay .u-over {
   pointer-events: none;
 }
+
+/* Todo 44: мобильный фокус-режим — панели в одну колонку (DESIGN.md §2.3). */
+@media (max-width: 767px) {
+  .lnt-exp-workspace {
+    flex-direction: column;
+  }
+
+  .lnt-exp-left {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}

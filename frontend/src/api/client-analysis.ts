@@ -4,8 +4,8 @@
 
 import type { LntApiClient, RequestOptions } from "./client";
 import { ApiError, isAbortError, normalizeThrown, parseApiError } from "./errors";
-import { isEventInventoryPayload } from "./guards-analysis";
-import type { EventInventoryPayload } from "./types-analysis";
+import { isEventInventoryPayload, isRecipeListPayload } from "./guards-analysis";
+import type { AnalysisRecipePayload, EventInventoryPayload } from "./types-analysis";
 
 function artifactPath(session: string, key: string, suffix: string): string {
   return `/api/analysis/sessions/${encodeURIComponent(session)}/artifacts/${encodeURIComponent(
@@ -23,6 +23,8 @@ export interface AnalysisApi {
   ): Promise<ArrayBuffer>;
   /** GET …/artifacts/{key}/events.json → проверенная инвентаризация событий. */
   events(session: string, key: string, options?: RequestOptions): Promise<EventInventoryPayload>;
+  /** GET /api/analysis/recipes → неизменяемые рецепты (только чтение). */
+  recipes(options?: RequestOptions): Promise<AnalysisRecipePayload[]>;
 }
 
 export function createAnalysisApi(client: LntApiClient): AnalysisApi {
@@ -62,6 +64,11 @@ export function createAnalysisApi(client: LntApiClient): AnalysisApi {
       );
       if (!isEventInventoryPayload(payload)) throw new ApiError("parse");
       return payload;
+    },
+    recipes: async (options = {}) => {
+      const payload = await client.requestJson("GET", "/api/analysis/recipes", undefined, options);
+      if (!isRecipeListPayload(payload)) throw new ApiError("parse");
+      return payload.items;
     },
   };
 }

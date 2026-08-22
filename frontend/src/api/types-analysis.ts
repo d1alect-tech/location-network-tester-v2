@@ -26,6 +26,15 @@ export interface EventInventoryPayload {
   events: CandidateEventPayload[];
 }
 
+/** Элемент списка неизменяемых рецептов (GET /api/analysis/recipes,
+ * routes_analysis_v2.list_recipes → RecipeCatalog payload). */
+export interface AnalysisRecipePayload {
+  recipe_id: string;
+  name: string;
+  sha256: string;
+  recipe: Record<string, unknown>;
+}
+
 /** Уровень пирамиды спектрограммы, разобранный из spectrogram.npz. Форма
  * power_db бэкенда — (полосы, время): плоский индекс = f * timeBins + t. */
 export interface SpectrogramLevel {

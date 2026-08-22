@@ -95,6 +95,9 @@ export class MockResearchBackend {
   conflictNextHypothesis = false;
   /** Пара сессий, для которой сравнимость блокируется смешанным типом. */
   mixedTypeSessions = new Set<string>();
+  /** Todo 44: типизированное состояние устройства для панели диагностики
+   * (device_absent — штатное состояние, а не ошибка). */
+  deviceState = "ready";
   requestLog: { method: string; path: string }[] = [];
   private jobCounter = 0;
 
@@ -278,6 +281,7 @@ export class MockResearchBackend {
     if (path === "/api/health" && method === "GET") {
       return json(200, { status: "ok", build_id: "t43-build" });
     }
+    if (path === "/api/jobs" && method === "GET") return json(200, { items: [] });
     if (path === "/api/catalog/sessions" && method === "GET") {
       return json(200, { items: this.sessions, next_cursor: null });
     }
@@ -300,12 +304,73 @@ export class MockResearchBackend {
       return json(200, {
         name: session.id,
         manifest: {},
-        analysis: { metrics: { band_mid_total: session.metric } },
+        analysis: {
+          metrics: { band_mid_total: session.metric },
+          ch1_input_reference:
+            session.health === "ok"
+              ? { status: "available", model_kind: "rc_shunt_v1" }
+              : { status: "unavailable", reason_code: "analysis_unavailable" },
+        },
         spectrum_available: true,
         waveform_available: false,
         ch2_available: false,
       });
     }
+
+    // ===== BEGIN Todo 44: диагностика устройства, preflight, рецепты =====
+    if (path === "/api/device/state" && method === "GET") {
+      const descriptions: Record<string, [string, string]> = {
+        ready: ["Устройство готово к захвату.", "Можно запускать измерения."],
+        device_absent: [
+          "Устройство не обнаружено на шине USB.",
+          "Подключите осциллограф и проверьте кабель; драйвер WinUSB ставится через Zadig (VID 04B4/04B5).",
+        ],
+      };
+      const entry = descriptions[this.deviceState] ?? descriptions.device_absent!;
+      return json(200, {
+        state: this.deviceState,
+        description_ru: entry[0],
+        recovery_action_ru: entry[1],
+      });
+    }
+    if (path === "/api/capture/preflight" && method === "POST") {
+      const findings: Record<string, unknown>[] = [];
+      if (this.deviceState !== "ready") {
+        findings.push({
+          severity: "block",
+          code: "device_not_ready",
+          message_ru: "Устройство не готово к записи.",
+          recovery_action_ru: "Выполните действие из диагностики устройства.",
+        });
+      }
+      findings.push({
+        severity: "warn",
+        code: "baseline_not_requested",
+        message_ru: "Самошум-базовая сессия не выбрана: приведение ко входу будет недоступно.",
+        recovery_action_ru: "При необходимости снимите базовую сессию самошума в локации.",
+      });
+      return json(200, {
+        ready: this.deviceState === "ready",
+        device_state: this.deviceState,
+        findings,
+      });
+    }
+    if (path === "/api/analysis/recipes" && method === "GET") {
+      return json(200, {
+        items: [
+          {
+            recipe_id: "rec-default-spectrum",
+            name: "Базовый спектр",
+            sha256: "c".repeat(64),
+            recipe: { window: "welch", bands: 512 },
+          },
+        ],
+      });
+    }
+    if (path === "/api/profiles" && method === "GET") {
+      return json(200, { items: [] });
+    }
+    // ===== END Todo 44 =====
 
     if (path === "/api/v2/comparability/check" && method === "POST") {
       const body = route.request().postDataJSON() as {

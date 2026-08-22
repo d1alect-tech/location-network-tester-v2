@@ -1,7 +1,11 @@
 /** Runtime-guards артефактов анализа v2 (types-analysis). Битый JSON
  * событий или некорректные числа отклоняются до попадания в состояние UI. */
 
-import type { CandidateEventPayload, EventInventoryPayload } from "./types-analysis";
+import type {
+  AnalysisRecipePayload,
+  CandidateEventPayload,
+  EventInventoryPayload,
+} from "./types-analysis";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -43,4 +47,20 @@ export function isEventInventoryPayload(value: unknown): value is EventInventory
     Array.isArray(value.events) &&
     value.events.every((event) => isCandidateEvent(event))
   );
+}
+
+/** Элемент списка рецептов: идентичность + неизменяемое тело. */
+export function isAnalysisRecipe(value: unknown): value is AnalysisRecipePayload {
+  return (
+    isRecord(value) &&
+    typeof value.recipe_id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.sha256 === "string" &&
+    isRecord(value.recipe)
+  );
+}
+
+/** Ответ GET /api/analysis/recipes: { items: [...] }. */
+export function isRecipeListPayload(value: unknown): value is { items: AnalysisRecipePayload[] } {
+  return isRecord(value) && Array.isArray(value.items) && value.items.every(isAnalysisRecipe);
 }
