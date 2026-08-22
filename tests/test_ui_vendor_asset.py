@@ -7,9 +7,7 @@ import lnt
 ASSET_PATH: Final = Path(lnt.__file__).parent / "ui/static/vendor/uPlot.esm.js"
 CSS_ASSET_PATH: Final = Path(lnt.__file__).parent / "ui/static/vendor/uPlot.min.css"
 EXPECTED_SIZE: Final = 145_423
-EXPECTED_SHA256: Final = (
-    "5dd9b3281aa64b461b42d9945f6adb2649d346502b12281a9ae0d46599a80eba"
-)
+EXPECTED_SHA256: Final = "5dd9b3281aa64b461b42d9945f6adb2649d346502b12281a9ae0d46599a80eba"
 
 
 class TestUplotVendorAsset:

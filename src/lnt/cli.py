@@ -23,6 +23,7 @@ from lnt.analysis import (
     write_analysis,
     write_line_quality_analysis,
 )
+from lnt.app_paths import resolve_app_paths
 from lnt.archive import ArchiveError
 from lnt.archive.cli import configure_archive_parser
 from lnt.catalog.automation_cli import configure_automation_parsers
@@ -155,6 +156,23 @@ def _build_parser() -> argparse.ArgumentParser:
         help="не открывать браузер автоматически",
     )
     ui.set_defaults(handler=_cmd_ui)
+
+    support_bundle = subparsers.add_parser(
+        "support-bundle",
+        help="ZIP-диагностика для поддержки (без секретов и захватов)",
+    )
+    support_bundle.add_argument("out", help="путь к создаваемому .zip")
+    support_bundle.add_argument(
+        "--include-private-notes",
+        action="store_true",
+        help="явно пометить выгрузку приватных заметок (сейчас членов с заметками нет)",
+    )
+    support_bundle.add_argument(
+        "--no-logs",
+        action="store_true",
+        help="не включать хвост структурного журнала",
+    )
+    support_bundle.set_defaults(handler=_cmd_support_bundle)
 
     selftest = subparsers.add_parser("selftest", help="синтетическая самопроверка пайплайна")
     selftest.set_defaults(handler=_cmd_selftest)
@@ -322,6 +340,24 @@ def _cmd_ui(args: argparse.Namespace) -> int:
     from lnt.ui.launcher import run_ui  # noqa: PLC0415
 
     return run_ui(root=Path(args.root), port=args.port, open_browser=not args.no_browser)
+
+
+def _cmd_support_bundle(args: argparse.Namespace) -> int:
+    from lnt.support import BundleOptions, build_support_bundle  # noqa: PLC0415
+
+    paths = resolve_app_paths()
+    result = build_support_bundle(
+        Path(cast("str", args.out)),
+        paths=paths,
+        options=BundleOptions(
+            include_private_notes=bool(args.include_private_notes),
+            include_recent_logs=not bool(args.no_logs),
+        ),
+        probe=None,
+    )
+    print(f"Сборник поддержки: {result.path}")
+    print(f"Члены: {', '.join(result.member_names)}")
+    return EXIT_OK
 
 
 def _cmd_selftest(_args: argparse.Namespace) -> int:

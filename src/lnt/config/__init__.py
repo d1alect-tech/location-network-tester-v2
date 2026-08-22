@@ -1,6 +1,6 @@
 """Публичный API типизированной конфигурации LNT."""
 
-from lnt.config.model import CONFIG_SCHEMA_VERSION, Config
+from lnt.config.model import CONFIG_SCHEMA_VERSION, Config, LoggingSettings
 from lnt.config.store import (
     ConfigLoadResult,
     ConfigLoadStatus,
@@ -17,6 +17,7 @@ __all__ = [
     "ConfigLoadStatus",
     "ConfigRecoveryError",
     "ConfigWriteError",
+    "LoggingSettings",
     "load_config",
     "write_config",
 ]
