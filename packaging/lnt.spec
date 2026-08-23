@@ -88,37 +88,54 @@ def _version_tuple(version: str) -> tuple[int, int, int, int]:
 
 _file_version = _version_tuple(PROJECT_VERSION)
 
-version_resource = VSVersionInfo(
-    ffi=FixedFileInfo(
-        filevers=_file_version,
-        prodvers=_file_version,
-        mask=0x3F,
-        flags=0x0,
-        OS=0x40004,
-        fileType=0x1,
-        subtype=0x0,
-        date=(0, 0),
-    ),
-    kids=[
-        StringFileInfo(
-            [
-                StringTable(
-                    "040904B0",
-                    [
-                        StringStruct("CompanyName", "LNT owner-internal build"),
-                        StringStruct("FileDescription", "LNT local measurement panel"),
-                        StringStruct("FileVersion", PROJECT_VERSION),
-                        StringStruct("InternalName", "LNT"),
-                        StringStruct("OriginalFilename", "LNT.exe"),
-                        StringStruct("ProductName", "LNT"),
-                        StringStruct("ProductVersion", PROJECT_VERSION),
-                        StringStruct("PrivateBuild", "owner-internal; no conveyance"),
-                    ],
-                ),
-            ],
+
+def _version_info(original_name: str, description: str) -> VSVersionInfo:
+    """Version-ресурс для одного из двух exe одной сборки."""
+    return VSVersionInfo(
+        ffi=FixedFileInfo(
+            filevers=_file_version,
+            prodvers=_file_version,
+            mask=0x3F,
+            flags=0x0,
+            OS=0x40004,
+            fileType=0x1,
+            subtype=0x0,
+            date=(0, 0),
         ),
-        VarFileInfo([VarStruct("Translation", [1033, 1200])]),
-    ],
+        kids=[
+            StringFileInfo(
+                [
+                    StringTable(
+                        "040904B0",
+                        [
+                            StringStruct("CompanyName", "LNT owner-internal build"),
+                            StringStruct("FileDescription", description),
+                            StringStruct("FileVersion", PROJECT_VERSION),
+                            StringStruct("InternalName", original_name.removesuffix(".exe")),
+                            StringStruct("OriginalFilename", original_name),
+                            StringStruct("ProductName", "LNT"),
+                            StringStruct("ProductVersion", PROJECT_VERSION),
+                            StringStruct("PrivateBuild", "owner-internal; no conveyance"),
+                        ],
+                    ),
+                ],
+            ),
+            VarFileInfo([VarStruct("Translation", [1033, 1200])]),
+        ],
+    )
+
+
+version_resource = _version_info(
+    "LNT.exe",
+    "LNT local measurement panel",
+)
+# Todo 48 smoke: windowed LNT.exe не имеет консольных потоков, поэтому CLI-
+# самопроверка и archive-вербы неотслеживаемы (stdout/exit-диагностика). Консольный
+# сиблинг разделяет тот же _internal и тот же скрипт запуска; GUI-поведение
+# LNT.exe не меняется.
+version_resource_cli = _version_info(
+    "LNT-cli.exe",
+    "LNT command-line interface (console)"
 )
 
 analysis = Analysis(
@@ -143,6 +160,20 @@ analysis = Analysis(
         # Starlette/FastAPI импортируют multipart лениво и под двумя именами.
         "multipart",
         "python_multipart",
+        # Todo 48 smoke нашёл ленивые импорты, которые не собираются статическим
+        # анализом и ломали запуск замороженного приложения (ImportError на первом
+        # же расширении scipy): чистый stdlib heapq, Cython-модуль scipy и два
+        # ленивых submodule array_api_compat (импортируются через importlib).
+    "heapq",
+    "scipy._cyutility",
+    "scipy._external.array_api_compat.numpy.fft",
+    "scipy._external.array_api_compat.common._fft",
+    # uvicorn разрешает Config/Server через модульный __getattr__ и применяет
+    # собственный dictConfig с форматтерами uvicorn.logging - статический
+    # анализ их не видит (Todo 48: "Unable to configure formatter 'default'").
+    "uvicorn.config",
+    "uvicorn.logging",
+    "uvicorn.server",
     ],
     hookspath=[],
     hooksconfig={},
@@ -185,8 +216,30 @@ exe = EXE(
     version=version_resource,
 )
 
+# Консольный сиблинг: тот же pyz/scripts, общий _internal (см. COLLECT ниже).
+# Даёт наблюдаемые stdout/exit-коды для selftest/archive в smoke Todo 48.
+exe_cli = EXE(
+    pyz,
+    analysis.scripts,
+    [],
+    exclude_binaries=True,
+    name="LNT-cli",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    version=version_resource_cli,
+)
+
 coll = COLLECT(
     exe,
+    exe_cli,
     analysis.binaries,
     analysis.datas,
     strip=False,

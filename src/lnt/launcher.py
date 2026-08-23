@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import sys
 import threading
 import time
@@ -45,6 +46,28 @@ HEALTH_ATTEMPTS: Final = 120
 HEALTH_INTERVAL_S: Final = 0.25
 FOCUS_PROBE_TIMEOUT_S: Final = 0.5
 UI_URL_TEMPLATE: Final = "http://127.0.0.1:{port}/"
+# Верхнеуровневые подкоманды lnt.cli, доступные из замороженного exe. Тождество
+# этому множеству и реальному парсеру lnt.cli проверяет тест
+# test_gui_main_cli_subcommands_match_parser (tests/test_launcher.py).
+CLI_SUBCOMMANDS: Final = frozenset(
+    {
+        "analyze",
+        "archive",
+        "capture",
+        "catalog",
+        "compare",
+        "context",
+        "experiment",
+        "hypothesis",
+        "profiles",
+        "reindex",
+        "selftest",
+        "sessions",
+        "simulate",
+        "support-bundle",
+        "ui",
+    }
+)
 _UI_DEPENDENCIES: Final = frozenset({"fastapi", "uvicorn", "starlette"})
 _INSTALL_HINT: Final = "интерфейс не установлен: pip install 'lnt[ui]' (см. README)"
 
@@ -132,8 +155,36 @@ def launch(
     return 0
 
 
+def _guard_null_streams() -> None:
+    """Замещает отсутствующие консольные потоки devnull (windowed-сборка).
+
+    Дефект из smoke Todo 48: в PyInstaller windowed-экземпляре sys.stdout и
+    sys.stderr равны None, и первый же print()/лог-запись ронял запуск с
+    AttributeError: 'NoneType' object has no attribute 'write' (в GUI-режиме
+    это выглядело как немой отказ или модальный диалог загрузчика).
+    """
+    devnull = Path(os.devnull)
+    if sys.stdout is None:
+        sys.stdout = devnull.open("w", encoding="utf-8")
+    if sys.stderr is None:
+        sys.stderr = devnull.open("w", encoding="utf-8")
+
+
 def gui_main(argv: list[str] | None = None) -> int:
     """Точка входа упакованного приложения: без traceback в консоль GUI."""
+    _guard_null_streams()
+    tokens = list(sys.argv[1:] if argv is None else argv)
+    if tokens and tokens[0] in CLI_SUBCOMMANDS:
+        # Дефект, найденный smoke-прогоном Todo 48: замороженный exe умел только
+        # GUI-лаунчер, и `LNT.exe selftest` падал с exit 2 через argparse.
+        # Зарегистрированные CLI-подкоманды пробрасываются настоящему парсеру;
+        # запуск без позиционных аргументов сохраняет прежнее поведение GUI.
+        from lnt.cli import main as cli_main  # noqa: PLC0415
+
+        try:
+            return cli_main(tokens)
+        except KeyboardInterrupt:
+            return 0
     parser = argparse.ArgumentParser(prog="lnt-app", description="Локальная панель LNT")
     parser.add_argument("--root", type=Path, default=Path.home() / "lnt-sessions")
     parser.add_argument("--port", type=int, default=PREFERRED_PORT)
@@ -154,11 +205,17 @@ def gui_main(argv: list[str] | None = None) -> int:
 def _report_crash(error: BaseException) -> None:
     """Пишет код поддержки в структурный журнал и одной строкой в stderr."""
     code = support_code(error)
+    causes: list[str] = []
+    current: BaseException | None = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        causes.append(f"{type(current).__name__}: {current}")
+        current = current.__cause__ or current.__context__
     logging.getLogger("lnt.launcher").critical(
-        "аварийное завершение; код поддержки=%s; ошибка=%s: %s",
+        "аварийное завершение; код поддержки=%s; ошибка=%s",
         code,
-        type(error).__name__,
-        error,
+        " -> ".join(causes),
     )
     sys.stderr.write(f"Аварийное завершение LNT. Код поддержки: {code}\n")
 
@@ -247,7 +304,13 @@ def _run_uvicorn(application: FastAPI, *, server_socket: socket.socket) -> None:
         if dependency in _UI_DEPENDENCIES:
             raise InputError(_INSTALL_HINT) from exc
         raise
-    uvicorn.Server(uvicorn.Config(application, log_level="info")).run(sockets=[server_socket])
+    # Дефект из smoke Todo 48: в windowed-сборке sys.stdout равен None, и
+    # дефолтный LOGGING_CONFIG uvicorn падал на DefaultFormatter(use_colors=None)
+    # с "'NoneType' object has no attribute 'isatty'". Отключаем его dictConfig:
+    # журналы uvicorn идут в root и попадают в наш структурный файл-лог.
+    uvicorn.Server(uvicorn.Config(application, log_level="info", log_config=None)).run(
+        sockets=[server_socket]
+    )
 
 
 def _build_id() -> str:

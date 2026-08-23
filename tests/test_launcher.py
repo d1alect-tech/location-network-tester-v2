@@ -6,6 +6,7 @@ import socket
 import subprocess
 import sys
 import time
+import types
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterator
@@ -13,7 +14,9 @@ from pathlib import Path
 
 import pytest
 
+from lnt import launcher as launcher_module
 from lnt.launcher import (
+    CLI_SUBCOMMANDS,
     LOCK_FILENAME,
     SUPPORT_CODE_PREFIX,
     acquire_instance_lock,
@@ -187,3 +190,97 @@ def test_gui_main_crash_writes_support_code_without_traceback(
     assert "Traceback" not in captured.err
     assert "Traceback" not in captured.out
     assert SUPPORT_CODE_PREFIX in captured.err
+
+
+def _cli_parser_choices() -> set[str]:
+    import argparse  # noqa: PLC0415
+
+    from lnt.cli import _build_parser  # noqa: PLC0415
+
+    for action in _build_parser()._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            return set(action.choices)
+    raise AssertionError("у lnt.cli нет subparsers")
+
+
+def test_gui_main_cli_subcommands_match_parser() -> None:
+    """CLI_SUBCOMMANDS тождественен реальному парсеру lnt.cli (parity guard)."""
+    choices = _cli_parser_choices()
+    assert set(CLI_SUBCOMMANDS) == choices
+    assert "selftest" in CLI_SUBCOMMANDS
+    assert "ui" in CLI_SUBCOMMANDS
+
+
+def test_gui_main_dispatches_registered_cli_subcommands(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`LNT.exe selftest` пробрасывается в lnt.cli.main (дефект Todo 48)."""
+    seen: dict[str, list[str]] = {}
+
+    def fake_cli_main(argv: list[str]) -> int:
+        seen["argv"] = list(argv)
+        return 7
+
+    monkeypatch.setattr("lnt.cli.main", fake_cli_main)
+    assert gui_main(["selftest"]) == 7
+    assert seen["argv"] == ["selftest"]
+
+
+def test_gui_main_keeps_gui_surface_for_unknown_positional() -> None:
+    """Незнакомая позиция не попадает в CLI и отклоняется argparse (exit 2)."""
+    with pytest.raises(SystemExit) as excinfo:
+        gui_main(["definitely-not-a-command"])
+    assert excinfo.value.code == 2
+
+
+def test_run_uvicorn_disables_uvicorn_dict_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Дефект Todo 48: в windowed-сборке sys.stdout is None, и дефолтный
+    dictConfig uvicorn падает на DefaultFormatter(use_colors=None).
+    _run_uvicorn обязан передавать log_config=None, чтобы журналы uvicorn
+    шли через root-хендлеры структурного лога."""
+    captured: dict[str, object] = {}
+
+    class FakeConfig:
+        def __init__(
+            self,
+            application: object,
+            log_level: str = "info",
+            log_config: object = "sentinel",
+        ) -> None:
+            self.application = application
+            captured["log_level"] = log_level
+            captured["log_config"] = log_config
+
+    class FakeServer:
+        def __init__(self, config: FakeConfig) -> None:
+            captured["config"] = config
+
+        def run(self, sockets: list[object]) -> None:
+            captured["sockets"] = sockets
+
+    fake_uvicorn = types.SimpleNamespace(Config=FakeConfig, Server=FakeServer)
+    monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
+    monkeypatch.setattr(sys, "stdout", None)  # windowed PyInstaller reality
+
+    sentinel_socket = object()
+    launcher_module._run_uvicorn(object(), server_socket=sentinel_socket)  # type: ignore[arg-type]
+
+    assert captured["log_config"] is None
+    assert captured["sockets"] == [sentinel_socket]
+
+
+def test_gui_main_survives_missing_console_streams(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Windowed-сборка: sys.stdout/stderr равны None — запуск не должен падать.
+
+    Дефект Todo 48: 'NoneType' object has no attribute 'write' в windowed
+    PyInstaller при первой же печати или лог-записи.
+    """
+    monkeypatch.setattr(sys, "stdout", None)
+    monkeypatch.setattr(sys, "stderr", None)
+    with pytest.raises(SystemExit) as excinfo:
+        gui_main(["definitely-not-a-command"])
+    assert excinfo.value.code == 2

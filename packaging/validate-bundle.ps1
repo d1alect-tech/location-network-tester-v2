@@ -60,7 +60,7 @@ function Get-BundleClass {
     # PyInstaller onedir layout: everything except LNT.exe lives under _internal/.
     param([string]$RelPath)
     $lower = $RelPath.ToLowerInvariant().Replace("\", "/")
-    if ($lower -eq "lnt.exe") { return "app-bootloader" }
+    if ($lower -eq "lnt.exe" -or $lower -eq "lnt-cli.exe") { return "app-bootloader" }
     if ($lower -match "^_internal/python3\d+\.dll$") { return "python-runtime" }
     if ($lower -match "^_internal/(base_library\.zip|[^/]+\.pyz)$") { return "python-runtime" }
     if ($lower.EndsWith(".pyd")) { return "python-extension" }
@@ -91,6 +91,7 @@ function Test-RequiredEntries {
         }
     }
     Require "LNT.exe"
+    Require "LNT-cli.exe"
     Require "_internal/usb1/libusb-1.0.dll"
     Require "_internal/lnt/ui/static/v2/index.html"
     Require "_internal/lnt/ui/static/vendor/uPlot.esm.js"
