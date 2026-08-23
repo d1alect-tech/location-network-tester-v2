@@ -1,0 +1,59 @@
+# DEFINITION ONLY - Windows CI for the private LNT repository (Todo 49).
+#
+# Guardrails (plan Todo 49 / decision 16):
+#   * The LOCAL gate scripts/quality.ps1 remains the single authoritative
+#     quality authority; this workflow only replays it on a hosted runner for
+#     a future PRIVATE repository. It must never become authoritative.
+#   * This workflow PUBLISHES, UPLOADS and RELEASES NOTHING. There are no
+#     artifact-upload steps, no release steps and no secrets by design: the
+#     private-use distribution must never leave the machine that built it.
+#   * Reproducibility is claimed honestly: deterministic logical builds with
+#     documented PyInstaller bootloader/base_library timestamp drift, never
+#     bit-for-bit reproducibility.
+
+name: reproducible-build
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  quality-gate-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv (pinned)
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.12.3"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install locked frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Sync locked Python environment
+        run: uv sync --locked
+
+      - name: Replay local quality gate (non-authoritative on CI; locks, assets, SBOM, checksums)
+        shell: pwsh
+        run: scripts/quality.ps1 -Evidence evidence/ci-quality -Full
+
+      - name: Compare two clean builds (strict JSON verdict)
+        shell: pwsh
+        run: scripts/compare-builds.ps1 -Evidence evidence/ci-compare
+
+      # Deliberately NO actions/upload-artifact, no release, no publish step.
+      # Evidence stays inside the runner workspace and is discarded with it.

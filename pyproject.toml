@@ -48,6 +48,23 @@ allow-direct-references = true
 [tool.hatch.build.targets.wheel]
 packages = ["src/lnt"]
 
+# Воспроизводимость provenance (Todo 49): sdist не должен зависеть от грязного
+# рабочего дерева — иначе содержимое tar.gz меняется от запуска к запуску
+# (в проверке мёртвой сессии node_modules из frontend/ протёк в sdist: 5506
+# файлов, 57 МБ). Исключаем тяжёлые волатильные каталоги явно, а не надеемся
+# на вложенные .gitignore (hatchling их здесь не применяет).
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/build",
+    "/dist",
+    "/.venv",
+    "/.omo",
+    "/frontend/node_modules",
+    "/frontend/test-results",
+    "/frontend/playwright-report",
+    "/frontend/dist",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
