@@ -24,10 +24,18 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+def read_payload(path: Path) -> str:
+    """Читает JSON-файл CLI, допуская UTF-8 BOM (PowerShell 5.1 utf8 по умолчанию).
+
+    DEF-003: файлы с BOM должны приниматься так же, как без него.
+    """
+    return path.read_text(encoding="utf-8-sig")
+
+
 def run_trends(path: Path) -> int:
     """Parse the API-equivalent bounded request and print labeled JSON."""
     try:
-        request = TrendQuery.model_validate_json(path.read_text(encoding="utf-8"))
+        request = TrendQuery.model_validate_json(read_payload(path))
     except OSError as error:
         raise InputError(f"тренды: не удалось прочитать файл {path}: {error}") from error
     except ValidationError as error:
@@ -116,7 +124,7 @@ def run_confirm(run_id: str, actor: str, root: Path) -> int:
 def _descriptor(directory: Path) -> SessionDescriptor:
     path = directory / "comparability.json"
     try:
-        return TypeAdapter(SessionDescriptor).validate_json(path.read_text(encoding="utf-8"))
+        return TypeAdapter(SessionDescriptor).validate_json(read_payload(path))
     except OSError as error:
         raise InputError(f"сопоставимость: не удалось прочитать {path}: {error}") from error
     except ValidationError as error:

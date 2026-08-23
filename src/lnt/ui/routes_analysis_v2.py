@@ -19,6 +19,8 @@ from lnt.analysis_store import AnalysisRecipe, ArtifactCorruptError, ArtifactSto
 from lnt.analysis_v2 import AnalysisOrchestrator, DefaultAnalysisEngine
 from lnt.analysis_v2.jobs import AnalysisJobStore
 from lnt.analysis_v2.recipes import RecipeCatalog
+from lnt.errors import InputError
+from lnt.safe_paths import ensure_safe_filename
 from lnt.ui.decimation import min_max_envelope
 from lnt.ui.dependencies import AppServices, get_services, require_csrf
 from lnt.ui.models_analysis_v2 import (  # noqa: TC001 - FastAPI resolves request models
@@ -128,6 +130,11 @@ def artifact_file(
 ) -> Response:
     """Serve bytes only after manifest integrity verification."""
     artifact = _verified_artifact(services, session_name, artifact_key)
+    try:
+        # GAP-2: единый барьер путей вместо сравнения parent (defense-in-depth).
+        ensure_safe_filename(filename, label="имя файла артефакта")
+    except InputError as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "файл artifact не найден") from error
     path = artifact / filename
     if not path.is_file() or path.parent != artifact:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "файл artifact не найден")

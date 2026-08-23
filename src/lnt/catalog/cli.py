@@ -56,6 +56,11 @@ def configure_catalog_parser(catalog: argparse.ArgumentParser) -> None:
     verify = commands.add_parser("verify", help="проверить drift без записи")
     _root(verify)
     _database(verify)
+    verify.add_argument(
+        "--deep",
+        action="store_true",
+        help="хешировать содержимое raw-файлов (медленнее, ловит смену байтов)",
+    )
     _json_flag(verify)
     verify.set_defaults(handler=_cmd_verify)
 
@@ -108,13 +113,22 @@ def _cmd_status(args: argparse.Namespace) -> int:
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:
-    result = verify_catalog(cast("Path", args.root), cast("Path", args.database))
-    payload = {"drift_paths": list(result.drift_paths)}
+    deep = cast("bool", getattr(args, "deep", False))
+    result = verify_catalog(
+        cast("Path", args.root),
+        cast("Path", args.database),
+        deep=deep,
+    )
+    payload: dict[str, object] = {"drift_paths": list(result.drift_paths)}
+    if deep:
+        payload["baseline_created"] = result.baseline_created
     if cast("bool", args.json_output):
         sys.stdout.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
     elif result.drift_paths:
         lines = "\n".join(f"- {path}" for path in result.drift_paths)
         sys.stdout.write(f"Обнаружено расхождение каталога:\n{lines}\n")
+    elif result.baseline_created:
+        sys.stdout.write("Создан базовый снимок содержимого; расхождений нет\n")
     else:
         sys.stdout.write("Расхождений каталога нет\n")
     return 1 if result.drift_paths else 0

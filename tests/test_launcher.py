@@ -195,10 +195,10 @@ def test_gui_main_crash_writes_support_code_without_traceback(
 def _cli_parser_choices() -> set[str]:
     import argparse  # noqa: PLC0415
 
-    from lnt.cli import _build_parser  # noqa: PLC0415
+    from lnt.cli import _build_parser  # pyright: ignore[reportPrivateUsage] # noqa: PLC0415
 
     for action in _build_parser()._actions:
-        if isinstance(action, argparse._SubParsersAction):
+        if isinstance(action, argparse._SubParsersAction):  # pyright: ignore[reportPrivateUsage]
             return set(action.choices)
     raise AssertionError("у lnt.cli нет subparsers")
 
@@ -249,7 +249,7 @@ def test_run_uvicorn_disables_uvicorn_dict_config(
             log_level: str = "info",
             log_config: object = "sentinel",
         ) -> None:
-            self.application = application
+            self.application: object = application
             captured["log_level"] = log_level
             captured["log_config"] = log_config
 
@@ -265,7 +265,10 @@ def test_run_uvicorn_disables_uvicorn_dict_config(
     monkeypatch.setattr(sys, "stdout", None)  # windowed PyInstaller reality
 
     sentinel_socket = object()
-    launcher_module._run_uvicorn(object(), server_socket=sentinel_socket)  # type: ignore[arg-type]
+    launcher_module._run_uvicorn(  # pyright: ignore[reportPrivateUsage]
+        object(),  # pyright: ignore[reportArgumentType]
+        server_socket=sentinel_socket,  # pyright: ignore[reportArgumentType]
+    )
 
     assert captured["log_config"] is None
     assert captured["sockets"] == [sentinel_socket]

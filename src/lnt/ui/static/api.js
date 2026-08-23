@@ -81,11 +81,6 @@ async function request(path, options = {}) {
   return response.json();
 }
 
-/** @returns {Promise<HealthPayload>} */
-export async function getHealth() {
-  return request("/api/health");
-}
-
 /** @returns {Promise<ConfigPayload>} */
 export async function getConfig() {
   const config = await request("/api/config");

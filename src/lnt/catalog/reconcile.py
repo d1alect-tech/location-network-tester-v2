@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -74,15 +75,49 @@ def reconcile_catalog(root: Path, database: Path, *, rebuild: bool = False) -> R
     )
 
 
-def verify_catalog(root: Path, database: Path) -> VerifyResult:
-    """Сравнивает текущие fingerprints и строки без записи."""
-    scanned = scan_immediate_directories(root)
+def verify_catalog(root: Path, database: Path, *, deep: bool = False) -> VerifyResult:
+    """Сравнивает текущие fingerprints и строки без записи.
+
+    Обычный режим — быстрая stat-сверка против проекций каталога.
+
+    ``deep=True`` (GAP-1): сверяет SHA-256 содержимого всех релевантных файлов
+    (включая raw ``.npy``/``.csv``) со снимком ``<database>.deep.json``.
+    Первый запуск создаёт снимок и не сообщает drift; последующие запуски
+    обнаруживают смену любых байтов, в том числе при сохранённых размере и mtime.
+    Удалите файл снимка, чтобы снять базовую линию заново.
+    """
+    if not deep:
+        scanned = scan_immediate_directories(root)
+        actual = {str(item.path): item.fingerprint for item in scanned}
+        with open_catalog_reader(database) as connection:
+            expected = ReconcileRepository(connection).fingerprints()
+        paths = set(actual) | set(expected)
+        drift = tuple(sorted(path for path in paths if actual.get(path) != expected.get(path)))
+        return VerifyResult(drift_paths=drift)
+
+    baseline_path = database.with_suffix(database.suffix + ".deep.json")
+    scanned = scan_immediate_directories(root, deep=True)
     actual = {str(item.path): item.fingerprint for item in scanned}
-    with open_catalog_reader(database) as connection:
-        expected = ReconcileRepository(connection).fingerprints()
-    paths = set(actual) | set(expected)
-    drift = tuple(sorted(path for path in paths if actual.get(path) != expected.get(path)))
-    return VerifyResult(drift_paths=drift)
+    baseline: dict[str, str] | None = None
+    if baseline_path.is_file():
+        try:
+            loaded = json.loads(baseline_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeError, OSError):
+            loaded = None
+        if isinstance(loaded, dict) and all(
+            isinstance(key, str) and isinstance(value, str) for key, value in loaded.items()
+        ):
+            baseline = {str(key): str(value) for key, value in loaded.items()}
+    created = baseline is None
+    effective: dict[str, str] = baseline if baseline is not None else actual
+    paths = set(actual) | set(effective)
+    drift = tuple(sorted(path for path in paths if actual.get(path) != effective.get(path)))
+    if created:
+        snapshot = json.dumps(actual, ensure_ascii=False, sort_keys=True, indent=1)
+        temporary = baseline_path.with_name(baseline_path.name + ".partial")
+        temporary.write_text(snapshot + "\n", encoding="utf-8")
+        temporary.replace(baseline_path)
+    return VerifyResult(drift_paths=drift, baseline_created=created)
 
 
 def catalog_status(database: Path) -> CatalogStatus:

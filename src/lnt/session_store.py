@@ -16,6 +16,7 @@ from numpy.typing import NDArray
 
 from lnt.errors import InputError
 from lnt.manifest import manifest_from_json, manifest_to_json
+from lnt.safe_paths import ensure_safe_filename
 from lnt.types import SessionManifest
 
 MANIFEST_FILENAME = "manifest.json"
@@ -53,6 +54,10 @@ def write_session(  # noqa: PLR0913 - atomic lifecycle requires both publish bou
         raise InputError("ch2: массив и метаданные канала должны быть заданы вместе")
     if ch2 is not None:
         _validate_array(ch2, expected_count=manifest.sample_count, label="ch2")
+    # GAP-2: имя файла канала из манифеста не должно выходить за partial-каталог.
+    ensure_safe_filename(manifest.ch1.filename, label="ch1: имя файла")
+    if manifest.ch2 is not None:
+        ensure_safe_filename(manifest.ch2.filename, label="ch2: имя файла")
     if session_dir.exists():
         raise InputError(f"каталог сессии уже существует: {session_dir}")
     partial = session_dir.with_name(f"{session_dir.name}.partial-{uuid.uuid4().hex[:8]}")
@@ -84,6 +89,10 @@ def load_session(session_dir: Path) -> LoadedSession:
     except UnicodeDecodeError as error:
         raise InputError("manifest.json: файл должен быть в кодировке UTF-8") from error
     manifest = manifest_from_json(manifest_text)
+    # GAP-2: чтение канала только по безопасному имени из манифеста.
+    ensure_safe_filename(manifest.ch1.filename, label="ch1: имя файла")
+    if manifest.ch2 is not None:
+        ensure_safe_filename(manifest.ch2.filename, label="ch2: имя файла")
     ch1 = _load_channel(session_dir / manifest.ch1.filename, manifest.sample_count, "ch1")
     ch2 = (
         _load_channel(session_dir / manifest.ch2.filename, manifest.sample_count, "ch2")

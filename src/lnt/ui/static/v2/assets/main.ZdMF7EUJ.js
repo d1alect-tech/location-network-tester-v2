@@ -61,7 +61,7 @@ PERFORMANCE OF THIS SOFTWARE.
       <div class="error-panel" role="alert">
         <h2 class="error-title">Критическая ошибка интерфейса</h2>
         <p>Произошел сбой при отрисовке или маршрутизации представления. Пожалуйста, попробуйте восстановить сессию.</p>
-        <div class="error-message">${t.stack||t.message}</div>
+        <div class="error-message"></div>
         <button class="btn-recovery" id="btn-recover">Сбросить и вернуться на главную</button>
       </div>
-    `;const n=e.querySelector("#btn-recover");n&&n.addEventListener("click",()=>{window.location.href=`${window.location.origin}${window.location.pathname}#/prepare`})}}document.addEventListener("DOMContentLoaded",()=>{const r=document.getElementById("app");r&&new NV(r).init()});
+    `;const n=e.querySelector(".error-message");n&&(n.textContent=t.stack||t.message);const i=e.querySelector("#btn-recover");i&&i.addEventListener("click",()=>{window.location.href=`${window.location.origin}${window.location.pathname}#/prepare`})}}document.addEventListener("DOMContentLoaded",()=>{const r=document.getElementById("app");r&&new NV(r).init()});

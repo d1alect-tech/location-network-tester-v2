@@ -64,9 +64,14 @@ class ReconcileResult:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class VerifyResult:
-    """Расхождения файловой системы и сохранённых fingerprints."""
+    """Расхождения файловой системы и сохранённых fingerprints.
+
+    ``baseline_created`` поднимается в deep-режиме (GAP-1), когда снимок
+    содержимого raw-файлов был создан при этом запуске (drift тогда пуст).
+    """
 
     drift_paths: tuple[str, ...]
+    baseline_created: bool = False
 
 
 class CatalogStatus(TypedDict):

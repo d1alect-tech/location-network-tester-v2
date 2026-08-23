@@ -11,7 +11,7 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
-from lnt.cli_research import run_check, run_confirm, run_trends, validation_fields
+from lnt.cli_research import read_payload, run_check, run_confirm, run_trends, validation_fields
 from lnt.errors import InputError
 from lnt.experiments import Experiment, ExperimentStore
 from lnt.research import Hypothesis, HypothesisStore, hypothesis_status_label
@@ -138,14 +138,14 @@ def _hypothesis(args: argparse.Namespace) -> int:
 
 def _experiment_file(path: Path) -> Experiment:
     try:
-        return Experiment.model_validate_json(path.read_text(encoding="utf-8"))
+        return Experiment.model_validate_json(read_payload(path))
     except (OSError, ValidationError) as error:
         raise InputError(f"эксперимент: некорректный файл {path}") from error
 
 
 def _hypothesis_file(path: Path) -> Hypothesis:
     try:
-        return Hypothesis.model_validate_json(path.read_text(encoding="utf-8"))
+        return Hypothesis.model_validate_json(read_payload(path))
     except OSError as error:
         raise InputError(f"гипотеза: не удалось прочитать файл {path}: {error}") from error
     except ValidationError as error:

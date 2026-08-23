@@ -28,8 +28,8 @@
     "src/api/types-research.ts": "f38d8e72957929b4169c205fc55e1163f914095ae6728097a1c4d94cf2b78c75",
     "src/api/types.ts": "d9e2d23757aeb03e99284e9d21ae8b37ed96497a35a01695319bf5bb383ef8d0",
     "src/AppShell.baseline.test.ts": "3581263796854b4693f2e25e42d8c4610b3685efb13eeabc4fa6fd8efa6a9af0",
-    "src/AppShell.test.ts": "a29528210611030d409393f947feb4cb9f5d7e68a30a9efac72af8ffec40e405",
-    "src/AppShell.ts": "88a16fc5388bdc3411cf9bf0719d67a7eb3cecee8c8123efbbd75d138c77cf25",
+    "src/AppShell.test.ts": "3436597f3a260aebc2160a7ed23e0b6d843e7f42e5b5ba0e28eab2f5d87b7df8",
+    "src/AppShell.ts": "e443fb23e289a6f5cb6f86c63712151c91337509c8250e8ae40ec1dcddfcf976",
     "src/capture/capture.css": "bd10e2f63dd0d23eb2989a030aeb67c008b7a256e607f759be9dc07253ae9953",
     "src/capture/captureView.ts": "e0a5abc0dcaa56ae92e975c78e900b3d1a8ad4a8a9e2fcbb0c533b997857a775",
     "src/capture/devicePanel.ts": "ec6212930549664146d94b3b1bc2a47d5aea97169c9cc40ed42f0fc6fd27640b",
@@ -168,13 +168,13 @@
     "src/vite-env.d.ts": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
   },
   "outputs": {
-    ".vite/manifest.json": "49a27f392b4eeaf7f4d97c4b59f23dd90e7cfa983415c6ac31ff81ad51d5e69e",
+    ".vite/manifest.json": "9154843ed05293d4b62dac7f295837ceba7c1ad10c6d343eb04433f47e84966c",
     "assets/chartshell.CjJRDo9O.css": "402d77ae161808e8980ece8a379a8191bb7bcd0d342b6c6111161eddaab6c5a2",
     "assets/chartshell.Clw3K0Pw.js": "b9ff608156491aacbe6bd827a5862a577dc0894ef8453a356577209c909171ca",
-    "assets/main.Cbs4wh2j.js": "183d04b807681a288b344efb226a3657588114ce2be53d8a86748fa3bbe129c4",
     "assets/main.RZvbK8Ew.css": "32dbf4789d130f9c094a104f08c3dd2bbf93e680ed458e1589dbe697b4b588e2",
+    "assets/main.ZdMF7EUJ.js": "dee55ba20ebddd27f80535784b79c6a4bfabf7afedb7daddefe26afa82100df1",
     "assets/showcase.ByphNKJ1.js": "e162b1d3a1b6074ea33eae4a5371695c93a77b7ca3a98f3704009d47bd4536dd",
-    "index.html": "099e87dd78d9d01ad3cc64a00b6e287b6194070cfde630612898841778efc00f",
+    "index.html": "2e59f87a1550b8a1158416ee496733a727d110663577de0ec112a5670560a06d",
     "showcase.html": "a3b8c36a05a9fba44f53cec24bf0fe1ef3800d7f21a1c67b3bada551bb12395d"
   }
 }

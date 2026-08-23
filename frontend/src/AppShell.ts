@@ -276,10 +276,14 @@ export class AppShell {
       <div class="error-panel" role="alert">
         <h2 class="error-title">Критическая ошибка интерфейса</h2>
         <p>Произошел сбой при отрисовке или маршрутизации представления. Пожалуйста, попробуйте восстановить сессию.</p>
-        <div class="error-message">${error.stack || error.message}</div>
+        <div class="error-message"></div>
         <button class="btn-recovery" id="btn-recover">Сбросить и вернуться на главную</button>
       </div>
     `;
+    // Todo 51 / DEF-005: сообщение об ошибке может содержать данные сервера
+    // (detail API) — вставляем только через textContent, никогда в innerHTML.
+    const messageNode = main.querySelector(".error-message");
+    if (messageNode) messageNode.textContent = error.stack || error.message;
 
     const btn = main.querySelector("#btn-recover");
     if (btn) {

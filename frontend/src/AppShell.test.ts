@@ -34,4 +34,20 @@ describe("AppShell Router & Error Boundary", () => {
       "Test error message",
     );
   });
+
+  it("DEF-005: renders hostile payload as inert text, never markup", () => {
+    // Given: сообщение об ошибке несёт серверный detail с активной разметкой.
+    const payload = '<img src=x onerror="window.__xss=1"><b>injected</b>';
+
+    // When
+    appShell.renderErrorBoundary(new Error(payload));
+
+    // Then: разметка не материализуется, текст доступен как textContent.
+    expect(container.querySelectorAll("img").length).toBe(0);
+    expect(container.querySelectorAll("b").length).toBe(0);
+    const message = container.querySelector(".error-message");
+    expect(message?.textContent).toContain(payload);
+    expect(message?.innerHTML).not.toContain("<img");
+    expect(message?.innerHTML).not.toContain("<b>");
+  });
 });

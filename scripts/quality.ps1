@@ -16,12 +16,14 @@
 #
 # Usage:
 #   powershell -File scripts/quality.ps1 -Evidence <dir> [-Full]
-# -Full is accepted for forward compatibility (Todo 51 extends this gate);
-# every mode runs all reproducibility gates.
+# -Full additionally runs the Todo-51 ledger gates (defect/security/size
+# regressions + basedpyright) AFTER the reproducibility gates.
+# Every mode runs all reproducibility gates.
 # Exit codes: 0 ok; 10 preflight; 20 stale package-lock.json; 21 stale uv.lock;
 # 22 dependency-manifest invalid/stale; 23 stale frontend assets;
 # 30 frontend build not byte-stable; 31 python wheel/sdist failed;
-# 32 package build failed; 40 SBOM failed; 50 checksum coverage failed.
+# 32 package build failed; 40 SBOM failed; 50 checksum coverage failed;
+# 60 Todo-51 ledger gate failed.
 # PowerShell 5.1 compatible (pwsh is not installed on this host); every gate
 # command appends an EXIT_CODE line to the evidence transcript.
 
@@ -573,7 +575,39 @@ if ($coverageErrors.Count -gt 0) {
     Fail 50 ("checksum coverage incomplete: " + (($coverageErrors | Select-Object -First 5) -join "; "))
 }
 
-# --- Step 10: verdict -------------------------------------------------------------
+# --- Step 10: Todo-51 ledger gates (-Full only) ---------------------------------
+if ($Full) {
+    $ledgerExit = Invoke-Native "ledger-regressions" {
+        Push-Location $root
+        try {
+            uv run pytest tests/test_module_size.py tests/test_safe_paths.py `
+                tests/catalog/test_deep_verify.py tests/test_cli_bom_inputs.py `
+                tests/archive tests/test_ui_security_v2.py -q
+        } finally {
+            Pop-Location
+        }
+    }
+    Record "ledger-regressions" $ledgerExit "defect/security/size corpus"
+    if ($ledgerExit -ne 0) { Fail 60 "Todo-51 ledger regression corpus failed" }
+
+    $bpExit = Invoke-Native "basedpyright" {
+        Push-Location $root
+        try {
+            uv run basedpyright
+        } finally {
+            Pop-Location
+        }
+    }
+    Record "basedpyright" $bpExit "strict types"
+    if ($bpExit -ne 0) { Fail 60 "basedpyright failed" }
+
+    foreach ($auditScript in @("scripts\audit-plan-evidence.ps1", "scripts\audit-scope.ps1")) {
+        if (-not (Test-Path -LiteralPath (Join-Path $root $auditScript))) { Fail 60 ("audit engine missing: " + $auditScript) }
+    }
+    Record "audit-engines-present" 0 "F1/F4 engines available"
+}
+
+# --- Step 11: verdict -------------------------------------------------------------
 $verdict = [ordered]@{
     schema_version = 1
     verdict = "PASS"
@@ -588,6 +622,7 @@ $verdict = [ordered]@{
         package_build = $true
         sbom_crosschecked = $true
         checksum_coverage_complete = $true
+        todo51_ledger_gates = [bool]$Full
     }
     artifacts = [ordered]@{
         zip_name = $zipName

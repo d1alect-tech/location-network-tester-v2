@@ -3,22 +3,23 @@
 from __future__ import annotations
 
 import json
-import os
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from lnt.catalog.reconcile_models import CatalogSession, ScannedDirectory, SessionHealth
 from lnt.context.store import ContextStore
 from lnt.errors import InputError
 from lnt.manifest import manifest_from_json
+from lnt.safe_paths import is_safe_filename
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from lnt.types import SessionManifest
 
 
 def _safe_filename(filename: str) -> bool:
-    path = Path(filename)
-    return path.name == filename and not path.is_absolute() and os.sep not in filename
+    # GAP-2: единый предикат безопасного имени файла.
+    return is_safe_filename(filename)
 
 
 def _manifest_health(directory: Path, manifest: SessionManifest) -> SessionHealth:

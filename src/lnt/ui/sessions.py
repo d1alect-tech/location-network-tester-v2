@@ -9,6 +9,7 @@ from typing import Final, Literal
 
 from lnt.errors import InputError
 from lnt.manifest import manifest_from_json
+from lnt.safe_paths import ensure_within_root
 from lnt.series import series_dirs
 from lnt.types import SessionType
 
@@ -117,6 +118,11 @@ def resolve_session_dir(root: Path, name: str) -> Path:
     except OSError as error:
         detail = " ".join(str(error).splitlines())
         raise InputError(f"не удалось проверить каталог сессии {name!r}: {detail}") from error
+    try:
+        # GAP-2: единый барьер выхода за корень (defense-in-depth к имени).
+        ensure_within_root(resolved_root, resolved_candidate)
+    except InputError as error:
+        raise InputError(f"каталог сессии выходит за пределы корня: {name!r}") from error
     if resolved_candidate.parent != resolved_root:
         raise InputError(f"каталог сессии выходит за пределы корня: {name!r}")
     return candidate
