@@ -1,0 +1,22 @@
+LNT — private-use Windows build (one-folder distribution)
+=========================================================
+
+OWNER-INTERNAL / NO CONVEYANCE.
+
+This build profile is owner-internal and private. It is built and used only
+by the owner, and it is not to be conveyed to another person. This folder is
+NOT an installer and NOT a public release.
+
+- Any transfer to another person or any public release is outside the
+  private-use policy and requires a separate GPL source-and-license compliance
+  decision before the build may be conveyed (the bundled Hantek integration,
+  Hantek6022API, is GPLv3-or-later).
+- Zadig is NOT bundled. WinUSB driver installation is intentionally out of
+  scope; see the upstream project documentation for hardware preparation.
+- External OS DLLs are never shipped: at runtime only canonical System32
+  x64 Microsoft-signed files from the frozen allowlist are loaded.
+- License texts and third-party notices ship inside this folder:
+  licenses/, THIRD_PARTY_NOTICES.md, dependency-manifest.json,
+  private-use-policy.md.
+
+The full policy text is in private-use-policy.md next to this file.

@@ -1,5 +1,7 @@
 packaging/spike/build/
 packaging/spike/dist/
 packaging/spike/__pycache__/
+/build/
+/dist/
 __pycache__/
 .omo/

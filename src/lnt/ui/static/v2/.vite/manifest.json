@@ -1,34 +1,34 @@
 {
-  "_chartshell.CZ-jxVAJ.css": {
-    "file": "assets/chartshell.CZ-jxVAJ.css",
-    "src": "_chartshell.CZ-jxVAJ.css"
+  "_chartshell.CjJRDo9O.css": {
+    "file": "assets/chartshell.CjJRDo9O.css",
+    "src": "_chartshell.CjJRDo9O.css"
   },
-  "_chartshell.DBzfF8Gd.js": {
-    "file": "assets/chartshell.DBzfF8Gd.js",
+  "_chartshell.Clw3K0Pw.js": {
+    "file": "assets/chartshell.Clw3K0Pw.js",
     "name": "chartshell",
     "css": [
-      "assets/chartshell.CZ-jxVAJ.css"
+      "assets/chartshell.CjJRDo9O.css"
     ]
   },
   "index.html": {
-    "file": "assets/main.CUcIkN4r.js",
+    "file": "assets/main.Cbs4wh2j.js",
     "name": "main",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.DBzfF8Gd.js"
+      "_chartshell.Clw3K0Pw.js"
     ],
     "css": [
-      "assets/main.BaRVCyC0.css"
+      "assets/main.RZvbK8Ew.css"
     ]
   },
   "showcase.html": {
-    "file": "assets/showcase.D0hroTTr.js",
+    "file": "assets/showcase.ByphNKJ1.js",
     "name": "showcase",
     "src": "showcase.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.DBzfF8Gd.js"
+      "_chartshell.Clw3K0Pw.js"
     ]
   }
 }
