@@ -91,7 +91,7 @@ def build_capture_setup(
 ) -> FloatingDifferentialRcShunt | ScopeInputTerminated | TransformerLineProbe:
     """Преобразует явные CLI flags в совместимую с capture-сессией CH1 setup."""
     match session_type:
-        case SessionType.MEASUREMENT:
+        case SessionType.MEASUREMENT | SessionType.CM_DM | SessionType.CM_DM_CALIBRATION:
             if options.termination_ohm is not None:
                 raise InputError("--termination-ohm допустим только для --self-noise")
             if options.probe_multiplier is not None:

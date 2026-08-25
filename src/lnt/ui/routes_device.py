@@ -101,7 +101,7 @@ def _setup(
     session_type: SessionType,
 ) -> FloatingDifferentialRcShunt | ScopeInputTerminated | TransformerLineProbe:
     match session_type:
-        case SessionType.MEASUREMENT:
+        case SessionType.MEASUREMENT | SessionType.CM_DM | SessionType.CM_DM_CALIBRATION:
             return FloatingDifferentialRcShunt(
                 resistance_ohm=100.0,
                 c1_f=10e-9,

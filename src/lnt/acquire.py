@@ -265,7 +265,7 @@ def _capture_setup(*, session_type: SessionType, setup: Ch1Setup | None) -> Ch1S
 
 def _default_setup(session_type: SessionType) -> Ch1Setup:
     match session_type:
-        case SessionType.MEASUREMENT:
+        case SessionType.MEASUREMENT | SessionType.CM_DM | SessionType.CM_DM_CALIBRATION:
             return FloatingDifferentialRcShunt(
                 resistance_ohm=100.0,
                 c1_f=10e-9,

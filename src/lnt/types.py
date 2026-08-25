@@ -26,6 +26,8 @@ class SessionType(StrEnum):
     MEASUREMENT = "measurement"
     SELF_NOISE = "self_noise"
     LINE_QUALITY = "line_quality"
+    CM_DM = "cm_dm"
+    CM_DM_CALIBRATION = "cm_dm_calibration"
 
 
 class ChannelRole(StrEnum):

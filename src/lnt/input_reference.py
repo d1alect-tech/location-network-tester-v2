@@ -177,7 +177,12 @@ def _measurement_unavailable_reason(measurement: LoadedSession) -> str | None:
     match manifest.session_type:
         case SessionType.MEASUREMENT:
             pass
-        case SessionType.SELF_NOISE | SessionType.LINE_QUALITY:
+        case (
+            SessionType.SELF_NOISE
+            | SessionType.LINE_QUALITY
+            | SessionType.CM_DM
+            | SessionType.CM_DM_CALIBRATION
+        ):
             return "measurement_session_type_mismatch"
     if not isinstance(setup, FloatingDifferentialRcShunt):
         return "measurement_ch1_setup_mismatch"
