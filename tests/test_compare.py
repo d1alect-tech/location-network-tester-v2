@@ -8,9 +8,12 @@ from lnt.compare import (
     ComparisonResult,
     compare_analyses,
     comparison_to_payload,
+    ensure_comparable,
     render_comparison,
 )
+from lnt.errors import InputError
 from lnt.simulate import simulate_session
+from lnt.types import SessionType
 
 FS = 250_000.0
 DURATION = 2.1
@@ -67,6 +70,32 @@ class TestCompare:
         assert mean_delta.value_a is not None
         assert mean_delta.value_b is not None
         assert mean_delta.value_b < mean_delta.value_a
+
+
+class TestEnsureComparable:
+    def test_ensure_comparable_rejects_cm_dm_session(
+        self,
+        analyses: tuple[AnalysisResult, AnalysisResult],
+    ) -> None:
+        cm_dm_result = replace(analyses[0], session_type=SessionType.CM_DM)
+
+        with pytest.raises(InputError, match="cm/dm"):
+            ensure_comparable(cm_dm_result)
+
+    def test_ensure_comparable_rejects_cm_dm_calibration_session(
+        self,
+        analyses: tuple[AnalysisResult, AnalysisResult],
+    ) -> None:
+        calibration_result = replace(analyses[0], session_type=SessionType.CM_DM_CALIBRATION)
+
+        with pytest.raises(InputError, match="cm/dm"):
+            ensure_comparable(calibration_result)
+
+    def test_ensure_comparable_still_accepts_plain_measurement(
+        self,
+        analyses: tuple[AnalysisResult, AnalysisResult],
+    ) -> None:
+        assert ensure_comparable(analyses[0]) is analyses[0]
 
 
 class TestPayload:

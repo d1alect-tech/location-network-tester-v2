@@ -6,11 +6,15 @@ from typing import Final, TypedDict
 from lnt.analysis import AnalysisResult, LineQualityAnalysis
 from lnt.errors import InputError
 from lnt.spectrum import BandSpectrum, SpectrumPeak, level_at_db
+from lnt.types import SessionType
 
 MAX_COMPARED_PEAKS: Final = 5
 PEAK_MATCH_TOLERANCE_RATIO: Final = 0.02
 PEAK_MATCH_MIN_BINS: Final = 2.0
 ZERO_METRIC_EPS: Final = 1e-30
+NON_COMPARABLE_SESSION_TYPES: Final = frozenset(
+    {SessionType.CM_DM, SessionType.CM_DM_CALIBRATION},
+)
 
 
 def ensure_comparable(result: AnalysisResult | LineQualityAnalysis) -> AnalysisResult:
@@ -18,6 +22,10 @@ def ensure_comparable(result: AnalysisResult | LineQualityAnalysis) -> AnalysisR
     if isinstance(result, LineQualityAnalysis):
         raise InputError(
             f"сессия {result.session_id}: сравнение line-quality сессий не поддерживается",
+        )
+    if result.session_type in NON_COMPARABLE_SESSION_TYPES:
+        raise InputError(
+            f"сессия {result.session_id}: сравнение cm/dm сессий не поддерживается",
         )
     return result
 
