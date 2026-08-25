@@ -8,6 +8,12 @@ import json
 
 import numpy as np
 
+from lnt.cm_dm.analysis import (
+    CM_DM_SPECTRUM_FILENAME,
+    CSV_HEADER,
+    analyze_cm_dm_session,
+    cm_dm_analysis_to_payload,
+)
 from lnt.events import EventInventory, detect_events, event_preset
 from lnt.features import BandSet, EstimandDirection, compute_event_features
 from lnt.line_quality_v2 import compute_line_quality_v2, line_quality_v2_to_payload
@@ -25,22 +31,24 @@ class DefaultAnalysisEngine:
         context.checkpoint()
         match name:
             case "psd":
-                return self._psd(context)
+                output = self._psd(context)
             case "spectrogram":
-                return self._spectrogram(context)
+                output = self._spectrogram(context)
             case "events":
-                return self._events(context)
+                output = self._events(context)
             case "features":
-                return self._features(context)
+                output = self._features(context)
             case "line_quality":
                 result = compute_line_quality_v2(
                     context.channels[0], sample_rate_hz=context.sample_rate_hz
                 )
-                return BranchOutput(
+                output = BranchOutput(
                     files={"metrics.json": _json(line_quality_v2_to_payload(result))}
                 )
+            case "cm_dm":
+                output = self._cm_dm(context)
             case "correction":
-                return BranchOutput(
+                output = BranchOutput(
                     files={
                         "correction.json": _json(
                             {
@@ -53,6 +61,7 @@ class DefaultAnalysisEngine:
                 )
             case _:
                 raise ValueError(f"unknown analysis branch: {name}")
+        return output
 
     @staticmethod
     def _psd(context: BranchContext) -> BranchOutput:
@@ -108,6 +117,27 @@ class DefaultAnalysisEngine:
             power_db=overview.power_db,
         )
         return BranchOutput(files={"spectrogram.npz": buffer.getvalue()})
+
+    @staticmethod
+    def _cm_dm(context: BranchContext) -> BranchOutput:
+        """Считает CM/DM-декомпозицию существующим v1-движком и упаковывает артефакты."""
+        result = analyze_cm_dm_session(context.session_dir)
+        band = result.band
+        table = io.StringIO()
+        np.savetxt(
+            table,
+            np.column_stack([band.frequency_hz, band.cm_psd, band.dm_psd, band.coherence]),
+            delimiter=",",
+            header=CSV_HEADER,
+            comments="",
+            fmt="%.9g",
+        )
+        return BranchOutput(
+            files={
+                "metrics.json": _json(cm_dm_analysis_to_payload(result)),
+                CM_DM_SPECTRUM_FILENAME: table.getvalue().encode(),
+            }
+        )
 
     @staticmethod
     def _inventory(context: BranchContext) -> EventInventory:

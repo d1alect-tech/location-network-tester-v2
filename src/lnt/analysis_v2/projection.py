@@ -7,7 +7,12 @@ import uuid
 from pathlib import Path  # noqa: TC003 - runtime projection paths
 from typing import Final
 
-LEGACY_FILES: Final = ("metrics.json", "spectrum.csv", "spectrum_input_referred.csv")
+LEGACY_FILES: Final = (
+    "metrics.json",
+    "spectrum.csv",
+    "spectrum_input_referred.csv",
+    "cm_dm_spectrum.csv",
+)
 
 
 def project_default(session_dir: Path, artifact_dir: Path) -> None:

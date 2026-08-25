@@ -18,6 +18,7 @@ from lnt.analysis_store import (
     CodeIdentity,
     NamedDigest,
 )
+from lnt.errors import InputError
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 
 from .projection import project_default
@@ -36,6 +37,7 @@ _DISPATCH: Final = {
     SessionKind.MEASUREMENT: ("psd", "spectrogram", "events", "features", "correction"),
     SessionKind.SELF_NOISE: ("psd", "spectrogram", "events", "features"),
     SessionKind.LINE_QUALITY: ("line_quality",),
+    SessionKind.CM_DM: ("cm_dm",),
 }
 
 
@@ -123,7 +125,12 @@ class AnalysisOrchestrator:
 
 def _session_metadata(session_dir: Path) -> tuple[SessionKind, float]:
     payload = json.loads((session_dir / "manifest.json").read_text(encoding="utf-8"))
-    return SessionKind(payload["session_type"]), float(payload["sample_rate_hz"])
+    raw_kind = payload["session_type"]
+    try:
+        kind = SessionKind(raw_kind)
+    except ValueError as error:
+        raise InputError(f"неизвестный для анализа тип сессии: {raw_kind!r}") from error
+    return kind, float(payload["sample_rate_hz"])
 
 
 def _artifact_inputs(

@@ -22,6 +22,7 @@ class SessionKind(StrEnum):
     MEASUREMENT = "measurement"
     SELF_NOISE = "self_noise"
     LINE_QUALITY = "line_quality"
+    CM_DM = "cm_dm"
 
 
 @dataclass(frozen=True, slots=True)
