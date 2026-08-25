@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from lnt.analysis import AnalysisResult, LineQualityAnalysis
+    from lnt.cm_dm.analysis import CmDmAnalysis
     from lnt.types import SeriesPosition
 
 
@@ -240,7 +241,10 @@ class _SeriesBackend(LntBackend):
         )
 
     @override
-    def analyze_and_write(self, session_dir: Path) -> AnalysisResult | LineQualityAnalysis:
+    def analyze_and_write(
+        self,
+        session_dir: Path,
+    ) -> AnalysisResult | LineQualityAnalysis | CmDmAnalysis:
         result = LntBackend.analyze_and_write(self, session_dir)
         self.cancelled.set()
         return result

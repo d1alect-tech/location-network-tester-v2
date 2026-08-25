@@ -18,9 +18,7 @@ from lnt.acquire import capture_session
 from lnt.analysis import (
     LineQualityAnalysis,
     analyze_session,
-    render_analysis,
     render_line_quality_analysis,
-    write_analysis,
     write_line_quality_analysis,
 )
 from lnt.app_paths import resolve_app_paths
@@ -29,6 +27,10 @@ from lnt.archive.cli import configure_archive_parser
 from lnt.catalog.automation_cli import configure_automation_parsers
 from lnt.catalog.cli import configure_catalog_parser
 from lnt.cli_experiments import configure_research_parsers
+from lnt.cm_dm.dispatch import (
+    analyze_routed_session,
+    write_and_render_analysis,
+)
 from lnt.compare import compare_analyses, ensure_comparable, render_comparison
 from lnt.errors import AnalysisError, DeviceNotFoundError, InputError
 from lnt.selftest import run_selftest
@@ -317,15 +319,13 @@ def _capture_session_type(args: argparse.Namespace) -> SessionType:
 
 def _cmd_analyze(args: argparse.Namespace) -> int:
     session_dir = Path(cast("str", args.session))
-    result = analyze_session(session_dir)
+    result = analyze_routed_session(session_dir)
     if isinstance(result, LineQualityAnalysis):
         metrics_path = write_line_quality_analysis(session_dir, result)
         print(render_line_quality_analysis(result))
         print(f"Артефакты: {metrics_path.name}")
         return EXIT_OK
-    metrics_path, spectrum_path = write_analysis(session_dir, result)
-    print(render_analysis(result))
-    print(f"Артефакты: {metrics_path.name}, {spectrum_path.name}")
+    print(write_and_render_analysis(session_dir, result))
     return EXIT_OK
 
 

@@ -12,6 +12,12 @@ from lnt.analysis import (
     write_analysis,
     write_line_quality_analysis,
 )
+from lnt.cm_dm.analysis import (
+    CmDmAnalysis,
+    analyze_cm_dm_session,
+    write_cm_dm_analysis,
+)
+from lnt.cm_dm.dispatch import is_cm_dm_session
 from lnt.compare import ComparisonResult, compare_analyses, ensure_comparable
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken, CancelledResult
 from lnt.selftest import SelftestResult, run_selftest
@@ -43,7 +49,10 @@ class JobBackend(Protocol):
         """Захватывает одну сессию с устройства."""
         ...
 
-    def analyze_and_write(self, session_dir: Path) -> AnalysisResult | LineQualityAnalysis:
+    def analyze_and_write(
+        self,
+        session_dir: Path,
+    ) -> AnalysisResult | LineQualityAnalysis | CmDmAnalysis:
         """Анализирует сессию и записывает артефакты анализа."""
         ...
 
@@ -120,8 +129,15 @@ class LntBackend:
             cancellation_token=cancellation_token,
         )
 
-    def analyze_and_write(self, session_dir: Path) -> AnalysisResult | LineQualityAnalysis:
+    def analyze_and_write(
+        self,
+        session_dir: Path,
+    ) -> AnalysisResult | LineQualityAnalysis | CmDmAnalysis:
         """Анализирует сессию, записывает артефакты и возвращает результат."""
+        if is_cm_dm_session(session_dir):
+            cm_dm_result = analyze_cm_dm_session(session_dir)
+            write_cm_dm_analysis(session_dir, cm_dm_result)
+            return cm_dm_result
         result = analyze_session(session_dir)
         if isinstance(result, LineQualityAnalysis):
             write_line_quality_analysis(session_dir, result)
