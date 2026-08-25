@@ -56,6 +56,7 @@ class CapturePreflightRequest:
     range_v: float
     probe_multiplier: float
     baseline_requested: bool
+    probe_pair_calibration_available: bool | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -101,6 +102,7 @@ def run_capture_preflight(
     findings.extend(_capacity_findings(request, environment))
     findings.extend(_baseline_findings(request, environment))
     findings.extend(_range_findings(request))
+    findings.extend(_probe_pair_findings(request))
     return tuple(findings)
 
 
@@ -226,6 +228,20 @@ def _baseline_findings(
             "baseline_incompatible",
             f"Baseline не прошёл существующую проверку совместимости: {reason}.",
             "Выберите baseline с теми же source/rate/range/probe/setup и telemetry без clipping.",
+        ),
+    )
+
+
+def _probe_pair_findings(request: CapturePreflightRequest) -> tuple[PreflightFinding, ...]:
+    """WARN только при явно известной недоступности калибровки пары пробников."""
+    if request.probe_pair_calibration_available is not False:
+        return ()
+    return (
+        _finding(
+            FindingSeverity.WARN,
+            "probe_pair_calibration_missing",
+            "Калибровка пары пробников недоступна: запись идёт без коррекции CH2.",
+            "Снимите калибровку флагом --probe-pair-calibrate и повторите measurement.",
         ),
     )
 
