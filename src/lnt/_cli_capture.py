@@ -23,6 +23,17 @@ DEFAULT_TRANSFORMER_PROBE_MULTIPLIER = 10.0
 RC_COMPONENT_COUNT = 3
 
 
+_PROBE_PAIR_FORBIDDEN_ATTRS = (
+    "baseline",
+    "termination_ohm",
+    "probe_multiplier",
+    "component_values_basis",
+    "rc_r_ohm",
+    "rc_c1_nf",
+    "rc_c2_nf",
+)
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CaptureSetupOptions:
     """Явные CLI-вводы CH1 setup до их преобразования в доменную модель."""
@@ -34,6 +45,38 @@ class CaptureSetupOptions:
     component_values_basis: str | None
     termination_ohm: float | None
     probe_multiplier: float | None = None
+
+    @staticmethod
+    def validate_mode_flags(args: argparse.Namespace) -> bool:
+        """Валидирует режимные флаги capture; возвращает признак --self-noise."""
+        probe_pair = bool(getattr(args, "probe_pair", False))
+        if bool(getattr(args, "probe_pair_calibrate", False)) and not probe_pair:
+            raise InputError("--probe-pair-calibrate допустим только с --probe-pair")
+        calibration_dir: str | None = getattr(args, "probe_calibration", None)
+        if calibration_dir is not None and not probe_pair:
+            raise InputError("--probe-calibration допустим только с --probe-pair")
+        self_noise = bool(getattr(args, "self_noise", False))
+        if not probe_pair:
+            return self_noise
+        if self_noise:
+            raise InputError("--probe-pair взаимоисключающий с --self-noise")
+        if bool(getattr(args, "line_quality", False)):
+            raise InputError("--probe-pair взаимоисключающий с --line-quality")
+        if getattr(args, "channels", 2) == 1:
+            raise InputError("probe-pair требует два канала")
+        for attr in _PROBE_PAIR_FORBIDDEN_ATTRS:
+            if getattr(args, attr, None) is not None:
+                raise InputError(f"--probe-pair не принимает --{attr.replace('_', '-')}")
+        return False
+
+    @staticmethod
+    def probe_pair_session_type(args: argparse.Namespace) -> SessionType:
+        """Разрешает fallback session_type: cm_dm для --probe-pair, иначе measurement."""
+        if not bool(getattr(args, "probe_pair", False)):
+            return SessionType.MEASUREMENT
+        if bool(getattr(args, "probe_pair_calibrate", False)):
+            return SessionType.CM_DM_CALIBRATION
+        return SessionType.CM_DM
 
 
 def add_capture_arguments(
@@ -82,6 +125,25 @@ def add_capture_arguments(
         default=None,
     )
     parser.add_argument("--termination-ohm", type=finite_float, default=None)
+    parser.add_argument(
+        "--probe-pair",
+        action="store_true",
+        dest="probe_pair",
+        help="измерение CM/DM: щуп CH1 на L, щуп CH2 на N (только два канала)",
+    )
+    parser.add_argument(
+        "--probe-pair-calibrate",
+        action="store_true",
+        dest="probe_pair_calibrate",
+        help="калибровка CM/DM: оба щупа на один проводник, только с --probe-pair",
+    )
+    parser.add_argument(
+        "--probe-calibration",
+        default=None,
+        dest="probe_calibration",
+        metavar="DIR",
+        help="каталог калибровочной сессии CM/DM, только с --probe-pair",
+    )
 
 
 def build_capture_setup(

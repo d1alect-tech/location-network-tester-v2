@@ -304,7 +304,7 @@ def _cmd_capture(args: argparse.Namespace) -> int:
 
 
 def _capture_session_type(args: argparse.Namespace) -> SessionType:
-    self_noise = cast("bool", args.self_noise)
+    self_noise = CaptureSetupOptions.validate_mode_flags(args)
     line_quality = cast("bool", args.line_quality)
     if self_noise and line_quality:
         raise InputError("--self-noise и --line-quality взаимоисключающие")
@@ -312,7 +312,7 @@ def _capture_session_type(args: argparse.Namespace) -> SessionType:
         return SessionType.LINE_QUALITY
     if self_noise:
         return SessionType.SELF_NOISE
-    return SessionType.MEASUREMENT
+    return CaptureSetupOptions.probe_pair_session_type(args)
 
 
 def _cmd_analyze(args: argparse.Namespace) -> int:
