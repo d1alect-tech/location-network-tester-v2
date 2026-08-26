@@ -174,7 +174,9 @@ def analyze_cm_dm_session(session_dir: Path) -> CmDmAnalysis:
             f"fs={manifest.sample_rate_hz:.0f} Гц: полоса проводимых помех не покрывается"
         )
     nperseg = _band_nperseg(manifest.sample_rate_hz)
-    welch = compute_cross_welch(loaded.ch1, loaded.ch2, manifest.sample_rate_hz, nperseg=nperseg)
+    correction = _parameter_float(manifest.parameters, PARAM_CORRECTION_FACTOR)
+    ch2 = loaded.ch2 if correction is None else loaded.ch2 * correction
+    welch = compute_cross_welch(loaded.ch1, ch2, manifest.sample_rate_hz, nperseg=nperseg)
     decomposed = decompose(welch.s_ll, welch.s_nn, welch.s_ln_cplx, welch.segment_count)
     mask = band_mask(welch.frequency_hz, band_low_hz, band_high_hz)
     band_frequency_hz = welch.frequency_hz[mask]
