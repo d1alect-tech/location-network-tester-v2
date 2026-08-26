@@ -39,13 +39,20 @@ def build_probe_pair_session(  # noqa: PLR0913 - поверхность повт
     sample_rate_hz: float = 2_000_000.0,
     duration_s: float = 0.5,
     calibration_params: Mapping[str, ParameterValue] | None = None,
+    probe_pair_kind: str = "mixed",
+    noise_sigma_v: float = NOISE_SIGMA_V,
 ) -> Path:
     """Пишет синтетическую cm_dm-сессию: DM-тон противофазен, CM-тон синфазен.
 
     CH1 = dm_tone + cm_tone + шум; CH2 = gain * (cm_tone - dm_tone) + шум.
     Противофазный DM-тон попадает в дифференциальную PSD, синфазный CM-тон —
-    в синфазную. Без ``calibration_params`` в parameters пишется только тег
-    ``probe_pair``; с ними — три калибровочных скаляра плюс тег.
+    в синфазную. ``probe_pair_kind`` задаёт синтетическую истину: ``mixed`` —
+    обе составляющие (поведение по умолчанию); ``cm_only`` — оба канала несут
+    только общий тон (идентичное содержимое с точностью до gain), DM
+    отсутствует; ``dm_only`` — идеально дифференциальная пара CH2 =
+    -gain * dm_tone, CM отсутствует. Без ``calibration_params`` в parameters
+    пишется только тег ``probe_pair``; с ними — три калибровочных скаляра плюс
+    тег.
     """
     now = datetime.now(UTC).isoformat()
     sample_count = round(duration_s * sample_rate_hz)
@@ -56,9 +63,21 @@ def build_probe_pair_session(  # noqa: PLR0913 - поверхность повт
         if cm_tone_hz is not None
         else np.zeros(sample_count, dtype=np.float64)
     )
+    match probe_pair_kind:
+        case "mixed":
+            ch1_content = dm_tone + common_tone
+            ch2_content = gain * (common_tone - dm_tone)
+        case "cm_only":
+            ch1_content = common_tone
+            ch2_content = gain * common_tone
+        case "dm_only":
+            ch1_content = dm_tone
+            ch2_content = -gain * dm_tone
+        case _:
+            raise ValueError(f"probe_pair_kind: неизвестный вид пары {probe_pair_kind!r}")
     rng = np.random.default_rng(_NOISE_SEED)
-    ch1 = (dm_tone + common_tone + rng.normal(0.0, NOISE_SIGMA_V, sample_count)).astype(np.float32)
-    ch2 = (gain * (common_tone - dm_tone) + rng.normal(0.0, NOISE_SIGMA_V, sample_count)).astype(
+    ch1 = (ch1_content + rng.normal(0.0, noise_sigma_v, sample_count)).astype(np.float32)
+    ch2 = (ch2_content + rng.normal(0.0, noise_sigma_v, sample_count)).astype(
         np.float32,
     )
     parameters: dict[str, ParameterValue] = (
