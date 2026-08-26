@@ -44,14 +44,16 @@ class PeakDelta:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class MetricDelta:
-    """Пара значений одной метрики иголок (A и B).
+    """Пара значений одной метрики иголок (A и B) и знаковая дельта B - A.
 
-    ``None`` — метрика недоступна (однокональная сессия без фазовой привязки).
+    ``None`` — метрика недоступна (однокональная сессия без фазовой привязки):
+    тогда и ``delta`` равна ``None``.
     """
 
     name: str
     value_a: float | None
     value_b: float | None
+    delta: float | None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -81,6 +83,7 @@ class MetricDeltaPayload(TypedDict):
     name: str
     value_a: float | None
     value_b: float | None
+    delta: float | None
 
 
 class ComparisonPayload(TypedDict):
@@ -106,26 +109,32 @@ def compare_analyses(result_a: AnalysisResult, result_b: AnalysisResult) -> Comp
         for peak in result_a.spectrum.peaks[:MAX_COMPARED_PEAKS]
         for match in (_find_matching_peak(result_b.spectrum, peak.frequency_hz),)
     )
+    needle_a = result_a.needle
+    needle_b = result_b.needle
     metric_deltas = (
         MetricDelta(
             name="needle_mean_v",
-            value_a=result_a.needle.needle_mean_v,
-            value_b=result_b.needle.needle_mean_v,
+            value_a=needle_a.needle_mean_v,
+            value_b=needle_b.needle_mean_v,
+            delta=_signed_delta(needle_a.needle_mean_v, needle_b.needle_mean_v),
         ),
         MetricDelta(
             name="needle_sigma_ratio",
-            value_a=result_a.needle.needle_sigma_ratio,
-            value_b=result_b.needle.needle_sigma_ratio,
+            value_a=needle_a.needle_sigma_ratio,
+            value_b=needle_b.needle_sigma_ratio,
+            delta=_signed_delta(needle_a.needle_sigma_ratio, needle_b.needle_sigma_ratio),
         ),
         MetricDelta(
             name="async_sync_ratio",
-            value_a=result_a.needle.async_sync_ratio,
-            value_b=result_b.needle.async_sync_ratio,
+            value_a=needle_a.async_sync_ratio,
+            value_b=needle_b.async_sync_ratio,
+            delta=_signed_delta(needle_a.async_sync_ratio, needle_b.async_sync_ratio),
         ),
         MetricDelta(
             name="lf_envelope_cv",
-            value_a=result_a.needle.lf_envelope_cv,
-            value_b=result_b.needle.lf_envelope_cv,
+            value_a=needle_a.lf_envelope_cv,
+            value_b=needle_b.lf_envelope_cv,
+            delta=_signed_delta(needle_a.lf_envelope_cv, needle_b.lf_envelope_cv),
         ),
     )
     return ComparisonResult(
@@ -157,6 +166,7 @@ def comparison_to_payload(result: ComparisonResult) -> ComparisonPayload:
                 "name": delta.name,
                 "value_a": delta.value_a,
                 "value_b": delta.value_b,
+                "delta": delta.delta,
             }
             for delta in result.metric_deltas
         ],
@@ -185,12 +195,24 @@ def render_comparison(result: ComparisonResult) -> str:
             percent = "н/д"
         else:
             percent = _percent_text(metric.value_a, metric.value_b)
-        lines.append(f"  {metric.name:<20} {value_a} -> {value_b}  ({percent})")
+        values = f"  {metric.name:<20} {value_a} -> {value_b}  ({percent})"
+        lines.append(f"{values}  дельта {_delta_text(metric.delta)}")
     return "\n".join(lines)
 
 
 def _value_text(value: float | None) -> str:
     return f"{value:>10.5f}" if value is not None else f"{'н/д':>10}"
+
+
+def _signed_delta(value_a: float | None, value_b: float | None) -> float | None:
+    """B - A, если обе метрики доступны, иначе ``None``."""
+    if value_a is None or value_b is None:
+        return None
+    return value_b - value_a
+
+
+def _delta_text(delta: float | None) -> str:
+    return f"{delta:+.5f}" if delta is not None else "н/д"
 
 
 def _find_matching_peak(spectrum: BandSpectrum, frequency_hz: float) -> SpectrumPeak | None:

@@ -6,6 +6,7 @@ import pytest
 from lnt.analysis import AnalysisResult, analyze_measurement_session
 from lnt.compare import (
     ComparisonResult,
+    MetricDelta,
     compare_analyses,
     comparison_to_payload,
     ensure_comparable,
@@ -70,6 +71,41 @@ class TestCompare:
         assert mean_delta.value_a is not None
         assert mean_delta.value_b is not None
         assert mean_delta.value_b < mean_delta.value_a
+
+
+class TestMetricDelta:
+    def test_metric_delta_is_signed_difference(
+        self,
+        analyses: tuple[AnalysisResult, AnalysisResult],
+    ) -> None:
+        result_a, result_b = analyses
+        base_a = replace(result_a, needle=replace(result_a.needle, needle_mean_v=2.0))
+        higher_b = replace(result_b, needle=replace(result_b.needle, needle_mean_v=2.5))
+        lower_b = replace(result_b, needle=replace(result_b.needle, needle_mean_v=1.5))
+
+        positive = compare_analyses(base_a, higher_b)
+        negative = compare_analyses(base_a, lower_b)
+
+        positive_by_name = {delta.name: delta for delta in positive.metric_deltas}
+        negative_by_name = {delta.name: delta for delta in negative.metric_deltas}
+        assert positive_by_name["needle_mean_v"].delta == pytest.approx(0.5)
+        assert negative_by_name["needle_mean_v"].delta == pytest.approx(-0.5)
+
+    def test_metric_delta_none_when_either_side_missing(
+        self,
+        analyses: tuple[AnalysisResult, AnalysisResult],
+    ) -> None:
+        result_a, result_b = analyses
+        missing_a = replace(result_a, needle=replace(result_a.needle, needle_mean_v=None))
+        missing_b = replace(result_b, needle=replace(result_b.needle, needle_mean_v=None))
+
+        payload = comparison_to_payload(compare_analyses(missing_a, result_b))
+        payload_reversed = comparison_to_payload(compare_analyses(result_a, missing_b))
+
+        metrics = {delta["name"]: delta for delta in payload["metric_deltas"]}
+        metrics_reversed = {delta["name"]: delta for delta in payload_reversed["metric_deltas"]}
+        assert metrics["needle_mean_v"]["delta"] is None
+        assert metrics_reversed["needle_mean_v"]["delta"] is None
 
 
 class TestEnsureComparable:
@@ -137,12 +173,30 @@ class TestPayload:
         assert metric_deltas
         for metric_delta in metric_deltas:
             assert isinstance(metric_delta, dict)
-            assert tuple(metric_delta) == ("name", "value_a", "value_b")
+            assert tuple(metric_delta) == ("name", "value_a", "value_b", "delta")
             assert isinstance(metric_delta["name"], str)
             assert isinstance(metric_delta["value_a"], float)
             assert isinstance(metric_delta["value_b"], float)
 
         assert json.loads(json.dumps(payload)) == payload
+
+    def test_payload_canonical_shape_includes_delta(
+        self,
+        comparison: ComparisonResult,
+    ) -> None:
+        payload = comparison_to_payload(comparison)
+
+        metric_deltas = payload["metric_deltas"]
+        assert isinstance(metric_deltas, list)
+        assert metric_deltas
+        for metric_delta in metric_deltas:
+            assert tuple(metric_delta) == ("name", "value_a", "value_b", "delta")
+            assert isinstance(metric_delta["value_a"], float)
+            assert isinstance(metric_delta["value_b"], float)
+            assert isinstance(metric_delta["delta"], float)
+            assert metric_delta["delta"] == pytest.approx(
+                metric_delta["value_b"] - metric_delta["value_a"],
+            )
 
     def test_unmatched_peak_q_b_remains_none(
         self,
@@ -169,6 +223,25 @@ class TestRender:
         assert comparison.session_b_id in text
         assert "дБ" in text
         assert "needle_mean_v" in text
+
+    def test_render_shows_signed_metric_delta(self) -> None:
+        positive = ComparisonResult(
+            session_a_id="syn-a",
+            session_b_id="syn-b",
+            peak_deltas=(),
+            metric_deltas=(MetricDelta(name="needle_mean_v", value_a=2.0, value_b=2.5, delta=0.5),),
+        )
+        negative = ComparisonResult(
+            session_a_id="syn-a",
+            session_b_id="syn-b",
+            peak_deltas=(),
+            metric_deltas=(
+                MetricDelta(name="needle_mean_v", value_a=2.5, value_b=2.0, delta=-0.5),
+            ),
+        )
+
+        assert "+0.50000" in render_comparison(positive)
+        assert "-0.50000" in render_comparison(negative)
 
     def test_table_encodes_in_ru_windows_consoles(self, comparison: ComparisonResult) -> None:
         text = render_comparison(comparison)
