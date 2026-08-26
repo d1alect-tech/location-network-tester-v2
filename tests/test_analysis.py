@@ -80,6 +80,7 @@ class TestAnalysisPayload:
             "async_power_v2",
             "async_sync_ratio",
             "lf_envelope_cv",
+            "uncertainty",
         }
         assert needle["sync_source"] == "ch2"
         spectrum = payload["spectrum"]

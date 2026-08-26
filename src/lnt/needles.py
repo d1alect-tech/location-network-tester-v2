@@ -12,6 +12,7 @@ CH1 режется на номинальные окна 20 мс; фазозав�
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Final
 
 import numpy as np
 from numpy.typing import NDArray
@@ -33,6 +34,10 @@ MIN_LINE_HZ = 40.0
 MAX_LINE_HZ = 70.0
 PEAK_WINDOW_FRACTION = 0.03
 POWER_EPS = 1e-30
+BOOTSTRAP_SAMPLES: Final = 10_000
+MIN_UNCERTAINTY_N: Final = 3
+CONFIDENCE_LEVEL: Final = 0.95
+INTERVAL_METHOD: Final = "seeded_cycle_bootstrap_percentile_95"
 
 
 class SyncSource(StrEnum):
@@ -40,6 +45,24 @@ class SyncSource(StrEnum):
 
     CH2 = "ch2"
     NOMINAL = "nominal"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class NeedleMetricInterval:
+    """Двусторонний бутстрэп-интервал одной needle-оценки."""
+
+    low: float
+    high: float
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class NeedleMetricIntervalPair:
+    """Маркированная 95%-неопределённость μ_pk и σ_pk/μ_pk по цикловым пикам."""
+
+    method: str
+    confidence_level: float
+    needle_mean_v: NeedleMetricInterval
+    needle_sigma_ratio: NeedleMetricInterval
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -58,6 +81,7 @@ class NeedleMetrics:
     async_power_v2: float | None
     async_sync_ratio: float | None
     lf_envelope_cv: float | None
+    uncertainty: NeedleMetricIntervalPair | None = None
 
 
 def compute_needle_metrics(
@@ -65,8 +89,14 @@ def compute_needle_metrics(
     ch2: Float32Array,
     *,
     sample_rate_hz: float,
+    seed: int = 0,
 ) -> NeedleMetrics:
-    """Считает метрики иголок; CH1 — ВЧ-пробник, CH2 — форма 50 Гц."""
+    """Считает метрики иголок; CH1 — ВЧ-пробник, CH2 — форма 50 Гц.
+
+    ``seed`` управляет сеянным бутстрэпом 95%-интервалов (см.
+    ``uncertainty``); при числе пиков ниже 3 интервал недоступен и
+    ``uncertainty`` равен ``None``.
+    """
     hf = ch1.astype(np.float64)
     lf = ch2.astype(np.float64)
     rms = float(np.sqrt(np.mean(np.square(lf))))
@@ -106,6 +136,7 @@ def compute_needle_metrics(
         async_power_v2=async_power,
         async_sync_ratio=async_power / max(sync_power, POWER_EPS),
         lf_envelope_cv=float(np.std(lf_peaks, ddof=1)) / max(float(np.mean(lf_peaks)), POWER_EPS),
+        uncertainty=_bootstrap_uncertainty(peaks, seed=seed),
     )
 
 
@@ -114,11 +145,14 @@ def compute_needle_metrics_single(
     *,
     sample_rate_hz: float,
     line_frequency_hz: float = 50.0,
+    seed: int = 0,
 ) -> NeedleMetrics:
     """Считает метрики иголок без опорного CH2 по номинальным окнам сети.
 
     Пик берётся как максимум |CH1| в каждом окне длиной 1/f_сети;
     фазозависимые метрики недоступны и возвращаются как ``None``.
+    Максимумы окон служат выборкой для сеянного бутстрэпа ``uncertainty``;
+    при числе пиков ниже 3 он равен ``None``.
     """
     hf = ch1.astype(np.float64)
     samples_per_cycle = sample_rate_hz / line_frequency_hz
@@ -144,6 +178,30 @@ def compute_needle_metrics_single(
         async_power_v2=None,
         async_sync_ratio=None,
         lf_envelope_cv=None,
+        uncertainty=_bootstrap_uncertainty(peaks, seed=seed),
+    )
+
+
+def _bootstrap_uncertainty(
+    peaks: Float64Array,
+    *,
+    seed: int,
+) -> NeedleMetricIntervalPair | None:
+    """Сеянный бутстрэп 95%-CI для μ_pk и σ_pk/μ_pk; ``None`` при n < 3."""
+    count = int(peaks.size)
+    if count < MIN_UNCERTAINTY_N:
+        return None
+    rng = np.random.default_rng(seed)
+    indices = rng.integers(0, count, size=(BOOTSTRAP_SAMPLES, count))
+    means = np.mean(peaks[indices], axis=1)
+    sigmas = np.std(peaks[indices], axis=1, ddof=1)
+    mean_low, mean_high = np.quantile(means, (0.025, 0.975))
+    ratio_low, ratio_high = np.quantile(sigmas / np.maximum(means, POWER_EPS), (0.025, 0.975))
+    return NeedleMetricIntervalPair(
+        method=INTERVAL_METHOD,
+        confidence_level=CONFIDENCE_LEVEL,
+        needle_mean_v=NeedleMetricInterval(low=float(mean_low), high=float(mean_high)),
+        needle_sigma_ratio=NeedleMetricInterval(low=float(ratio_low), high=float(ratio_high)),
     )
 
 
