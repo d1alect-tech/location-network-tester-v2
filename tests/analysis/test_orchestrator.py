@@ -92,8 +92,16 @@ def _orchestrator(engine: RecordingEngine) -> AnalysisOrchestrator:
 @pytest.mark.parametrize(
     ("kind", "channels", "expected"),
     [
-        (SessionKind.MEASUREMENT, 2, {"psd", "spectrogram", "events", "features", "correction"}),
-        (SessionKind.MEASUREMENT, 1, {"psd", "spectrogram", "events", "features", "correction"}),
+        (
+            SessionKind.MEASUREMENT,
+            2,
+            {"psd", "spectrogram", "events", "features", "correction", "audio_panel"},
+        ),
+        (
+            SessionKind.MEASUREMENT,
+            1,
+            {"psd", "spectrogram", "events", "features", "correction", "audio_panel"},
+        ),
         (SessionKind.SELF_NOISE, 1, {"psd", "spectrogram", "events", "features"}),
         (SessionKind.LINE_QUALITY, 1, {"line_quality"}),
     ],

@@ -23,6 +23,12 @@ class SessionKind(StrEnum):
     SELF_NOISE = "self_noise"
     LINE_QUALITY = "line_quality"
     CM_DM = "cm_dm"
+    POWER_QUALITY = "power_quality"
+    NOTCHING = "notching"
+    HARMONICS = "harmonics"
+    APD = "apd"
+    BURST = "burst"
+    TRENDS = "trends"
 
 
 @dataclass(frozen=True, slots=True)

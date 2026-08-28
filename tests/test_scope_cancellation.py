@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING, override
 
 import numpy as np
 import pytest
-from PyHT6022.LibUsbScope import Oscilloscope
+
+try:
+    from PyHT6022.LibUsbScope import Oscilloscope
+except ModuleNotFoundError:
+    Oscilloscope = None  # type: ignore[assignment]  # hardware optional
 
 from lnt import scope_io
 from lnt.acquire import capture_session
@@ -212,6 +216,8 @@ def test_cancelled_capture_leaves_no_session_or_partial_dir(tmp_path: Path) -> N
 
 
 def test_pinned_hantek_poll_is_replaced_by_bounded_timeout_path() -> None:
+    if Oscilloscope is None:
+        pytest.skip("PyHT6022 not installed — hardware optional")
     source = inspect.getsource(Oscilloscope.poll)
     bounded_source = inspect.getsource(scope_io)
 

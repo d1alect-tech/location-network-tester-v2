@@ -8,6 +8,9 @@ import json
 
 import numpy as np
 
+from lnt.apd import apd_preset, compute_apd
+from lnt.audio_panel import compute_audio_panel
+from lnt.burst import burst_preset, detect_bursts
 from lnt.cm_dm.analysis import (
     CM_DM_SPECTRUM_FILENAME,
     CSV_HEADER,
@@ -16,9 +19,13 @@ from lnt.cm_dm.analysis import (
 )
 from lnt.events import EventInventory, detect_events, event_preset
 from lnt.features import BandSet, EstimandDirection, compute_event_features
+from lnt.harmonics import compute_harmonics
 from lnt.line_quality_v2 import compute_line_quality_v2, line_quality_v2_to_payload
+from lnt.notching import detect_notching, notching_preset
+from lnt.power_quality import detect_half_cycle_rms, detect_power_quality, power_quality_preset
 from lnt.psd import FrequencyBand, PsdSettings, compute_welch
 from lnt.spectrogram import StftSettings, build_overview
+from lnt.trends import compute_trends, trends_preset
 
 from .types import BranchContext, BranchOutput
 
@@ -26,7 +33,7 @@ from .types import BranchContext, BranchOutput
 class DefaultAnalysisEngine:
     """Dispatches branch names to pre-existing engines without reimplementing math."""
 
-    def run_branch(self, name: str, context: BranchContext) -> BranchOutput:
+    def run_branch(self, name: str, context: BranchContext) -> BranchOutput:  # noqa: C901, PLR0912
         """Run one named optional branch using its existing engine."""
         context.checkpoint()
         match name:
@@ -47,6 +54,20 @@ class DefaultAnalysisEngine:
                 )
             case "cm_dm":
                 output = self._cm_dm(context)
+            case "power_quality":
+                output = self._power_quality(context)
+            case "audio_panel":
+                output = self._audio_panel(context)
+            case "notching":
+                output = self._notching(context)
+            case "harmonics":
+                output = self._harmonics(context)
+            case "apd":
+                output = self._apd(context)
+            case "burst":
+                output = self._burst(context)
+            case "trends":
+                output = self._trends(context)
             case "correction":
                 output = BranchOutput(
                     files={
@@ -90,8 +111,7 @@ class DefaultAnalysisEngine:
         metrics = {
             "segment_count": result.segment_count,
             "band_rms": [
-                {"name": item.band.name, "rms_v": item.rms_v, "unit": item.unit}
-                for item in result.band_rms
+                {"name": i.band.name, "rms_v": i.rms_v, "unit": i.unit} for i in result.band_rms
             ],
         }
         return BranchOutput(
@@ -166,6 +186,97 @@ class DefaultAnalysisEngine:
         features = compute_event_features(self._inventory(context), bands)
         return BranchOutput(
             files={"features.json": _json({"bands": [item.to_dict() for item in features.bands]})}
+        )
+
+    @staticmethod
+    def _audio_panel(context: BranchContext) -> BranchOutput:
+        inventory = compute_audio_panel(
+            context.channels[0],
+            sample_rate_hz=context.sample_rate_hz,
+            chunk_samples=1_048_576,
+        )
+        context.checkpoint()
+        return BranchOutput(files={"audio_panel.json": _json(inventory.to_dict())})
+
+    @staticmethod
+    def _notching(context: BranchContext) -> BranchOutput:
+        settings = notching_preset("notching_default")
+        inventory = detect_notching(
+            context.channels[0],
+            sample_rate_hz=context.sample_rate_hz,
+            settings=settings,
+        )
+        context.checkpoint()
+        return BranchOutput(files={"notching.json": _json(inventory.to_dict())})
+
+    @staticmethod
+    def _apd(context: BranchContext) -> BranchOutput:
+        settings = apd_preset("apd_default")
+        inv = compute_apd(
+            context.channels[0], sample_rate_hz=context.sample_rate_hz, settings=settings
+        )
+        context.checkpoint()
+        return BranchOutput(files={"apd.json": _json(inv.to_dict())})
+
+    @staticmethod
+    def _harmonics(context: BranchContext) -> BranchOutput:
+        inv = compute_harmonics(context.channels[0], sample_rate_hz=context.sample_rate_hz)
+        context.checkpoint()
+        # harmonic spectra placeholder: per-window THD line for overview
+        spectra = {
+            "estimated_grid_hz": inv.estimated_grid_frequency_hz,
+            "windows": [
+                {"index": w.index, "thd": w.thd, "fundamental_rms": w.fundamental_rms}
+                for w in inv.windows
+            ],
+        }
+        return BranchOutput(
+            files={
+                "harmonics.json": _json(inv.to_dict()),
+                "harmonic_spectra.json": _json(spectra),
+            }
+        )
+
+    @staticmethod
+    def _burst(context: BranchContext) -> BranchOutput:
+        settings = burst_preset("burst_default")
+        inventory = detect_bursts(
+            context.channels[0],
+            sample_rate_hz=context.sample_rate_hz,
+            settings=settings,
+        )
+        context.checkpoint()
+        return BranchOutput(files={"burst.json": _json(inventory.to_dict())})
+
+    @staticmethod
+    def _trends(context: BranchContext) -> BranchOutput:
+        inv = compute_trends(
+            context.channels[0], sample_rate_hz=context.sample_rate_hz, settings=trends_preset()
+        )
+        context.checkpoint()
+        return BranchOutput(files={"trends.json": _json(inv.to_dict())})
+
+    @staticmethod
+    def _power_quality(context: BranchContext) -> BranchOutput:
+        settings = power_quality_preset("itic_default")
+        rms_series = detect_half_cycle_rms(
+            context.channels[0],
+            line_frequency_hz=50.0,
+            chunk_samples=settings.chunk_samples,
+        )
+        context.checkpoint()
+        inventory = detect_power_quality(rms_series, settings=settings)
+        rms_payload = {
+            "count": int(rms_series.rms_v.size),
+            "times_s": rms_series.times_s.tolist(),
+            "rms_v": rms_series.rms_v.tolist(),
+            "edges_s": rms_series.edges_s.tolist(),
+        }
+        return BranchOutput(
+            files={
+                "power_quality.json": _json(inventory.to_dict()),
+                "half_cycle_rms.json": _json(rms_payload),
+            }
         )
 
 
