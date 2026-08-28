@@ -8,6 +8,13 @@
 Однокональный режим (``compute_needle_metrics_single``): опорного 50 Гц нет,
 CH1 режется на номинальные окна 20 мс; фазозависимые метрики (P_sync/P_async,
 частота сети, CV огибающей) честно недоступны (``None``).
+
+Память (T17): тяжёлые ядра вынесены в ``_needle_memory`` — бутстрэп копит
+статистики последовательными тиражами (O(пиков) вместо O(тиражи×пики)),
+ресемплинг идёт батчами в два прохода (O(батча) вместо матрицы
+циклы×4096). Остаточный пик — фильтрация: ``sosfiltfilt`` требует полных
+f64-копий записи, транзиентно ~3×запись(f64) ≈ 6×запись(f32) на
+фильтруемый канал; после фильтра устойчиво живёт один массив результата.
 """
 
 from dataclasses import dataclass
@@ -18,6 +25,13 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy import signal
 
+from lnt._needle_memory import (
+    PHASE_BINS,
+    bootstrap_quantiles,
+    chunked_rms,
+    resample_mean_cycle,
+    residual_async_power,
+)
 from lnt.errors import AnalysisError, SessionTooShortError
 
 Float32Array = NDArray[np.float32]
@@ -25,7 +39,6 @@ Float64Array = NDArray[np.float64]
 
 MIN_CYCLES = 100
 MIN_CROSSINGS = 2
-PHASE_BINS = 4_096
 FILTER_ORDER = 4
 LF_LOWPASS_HZ = 200.0
 HF_HIGHPASS_HZ = 3_000.0
@@ -97,14 +110,14 @@ def compute_needle_metrics(
     ``uncertainty``); при числе пиков ниже 3 интервал недоступен и
     ``uncertainty`` равен ``None``.
     """
-    hf = ch1.astype(np.float64)
-    lf = ch2.astype(np.float64)
-    rms = float(np.sqrt(np.mean(np.square(lf))))
+    rms = chunked_rms(ch2)
     if rms < MIN_LF_RMS_V:
         raise AnalysisError(
             f"CH2 слишком слаб для синхронизации: RMS {rms:.4f} В < {MIN_LF_RMS_V} В",
         )
-    positions = _rising_crossings(_apply_filter(lf, sample_rate_hz, LF_LOWPASS_HZ, "lowpass"))
+    lf_clean = _apply_filter(ch2, sample_rate_hz, LF_LOWPASS_HZ, "lowpass")
+    positions = _rising_crossings(lf_clean)
+    del lf_clean  # отфильтрованный CH2 больше не нужен — освободить до фильтра CH1
     if positions.size < MIN_CROSSINGS:
         raise AnalysisError("CH2: не найдено ни одного полного цикла сети")
     line_frequency = sample_rate_hz / float(np.mean(np.diff(positions)))
@@ -115,17 +128,15 @@ def compute_needle_metrics(
     cycles_found = positions.size - 1
     if cycles_found < MIN_CYCLES:
         raise SessionTooShortError(cycles_found=cycles_found, cycles_required=MIN_CYCLES)
-    hf_clean = _apply_filter(hf, sample_rate_hz, HF_HIGHPASS_HZ, "highpass")
-    cycles = _resample_cycles(hf_clean, positions)
-    mean_cycle = cycles.mean(axis=0)
-    residual = cycles - mean_cycle
+    hf_clean = _apply_filter(ch1, sample_rate_hz, HF_HIGHPASS_HZ, "highpass")
+    mean_cycle = resample_mean_cycle(hf_clean, positions)
     sync_power = float(np.mean(np.square(mean_cycle)))
-    async_power = float(np.mean(np.square(residual)))
+    async_power = residual_async_power(hf_clean, positions, mean_cycle)
     dominant_fraction = float(np.argmax(np.abs(mean_cycle))) / PHASE_BINS
     peaks = _needle_peaks(hf_clean, positions, dominant_fraction)
     needle_mean = float(np.mean(peaks))
     needle_sigma = float(np.std(peaks, ddof=1))
-    lf_peaks = _cycle_maxima(lf, positions)
+    lf_peaks = _cycle_maxima(ch2, positions)
     return NeedleMetrics(
         sync_source=SyncSource.CH2,
         cycles_analyzed=cycles_found,
@@ -154,12 +165,11 @@ def compute_needle_metrics_single(
     Максимумы окон служат выборкой для сеянного бутстрэпа ``uncertainty``;
     при числе пиков ниже 3 он равен ``None``.
     """
-    hf = ch1.astype(np.float64)
     samples_per_cycle = sample_rate_hz / line_frequency_hz
-    cycle_count = int(hf.size / samples_per_cycle)
+    cycle_count = int(ch1.size / samples_per_cycle)
     if cycle_count < MIN_CYCLES:
         raise SessionTooShortError(cycles_found=cycle_count, cycles_required=MIN_CYCLES)
-    hf_clean = _apply_filter(hf, sample_rate_hz, HF_HIGHPASS_HZ, "highpass")
+    hf_clean = _apply_filter(ch1, sample_rate_hz, HF_HIGHPASS_HZ, "highpass")
     positions = np.arange(cycle_count + 1, dtype=np.float64) * samples_per_cycle
     peaks = np.empty(cycle_count, dtype=np.float64)
     for cycle_index in range(cycle_count):
@@ -188,31 +198,36 @@ def _bootstrap_uncertainty(
     seed: int,
 ) -> NeedleMetricIntervalPair | None:
     """Сеянный бутстрэп 95%-CI для μ_pk и σ_pk/μ_pk; ``None`` при n < 3."""
-    count = int(peaks.size)
-    if count < MIN_UNCERTAINTY_N:
+    if int(peaks.size) < MIN_UNCERTAINTY_N:
         return None
-    rng = np.random.default_rng(seed)
-    indices = rng.integers(0, count, size=(BOOTSTRAP_SAMPLES, count))
-    means = np.mean(peaks[indices], axis=1)
-    sigmas = np.std(peaks[indices], axis=1, ddof=1)
-    mean_low, mean_high = np.quantile(means, (0.025, 0.975))
-    ratio_low, ratio_high = np.quantile(sigmas / np.maximum(means, POWER_EPS), (0.025, 0.975))
+    mean_low, mean_high, ratio_low, ratio_high = bootstrap_quantiles(
+        peaks,
+        seed=seed,
+        samples=BOOTSTRAP_SAMPLES,
+        eps=POWER_EPS,
+    )
     return NeedleMetricIntervalPair(
         method=INTERVAL_METHOD,
         confidence_level=CONFIDENCE_LEVEL,
-        needle_mean_v=NeedleMetricInterval(low=float(mean_low), high=float(mean_high)),
-        needle_sigma_ratio=NeedleMetricInterval(low=float(ratio_low), high=float(ratio_high)),
+        needle_mean_v=NeedleMetricInterval(low=mean_low, high=mean_high),
+        needle_sigma_ratio=NeedleMetricInterval(low=ratio_low, high=ratio_high),
     )
 
 
 def _apply_filter(
-    samples: Float64Array,
+    samples: Float32Array,
     sample_rate_hz: float,
     cutoff_hz: float,
     kind: str,
 ) -> Float64Array:
+    """Фильтр Баттерворта нулевой фазы; f64-копия входа умирает на выходе.
+
+    Единственное место с полноразмерной f64-копией записи: sosfiltfilt
+    считает только в double, а расширение f32→f64 точное.
+    """
     sos = signal.butter(FILTER_ORDER, cutoff_hz, btype=kind, fs=sample_rate_hz, output="sos")
-    return np.asarray(signal.sosfiltfilt(sos, samples), dtype=np.float64)
+    wide = np.asarray(samples, dtype=np.float64)
+    return np.asarray(signal.sosfiltfilt(sos, wide), dtype=np.float64)
 
 
 def _rising_crossings(lf: Float64Array) -> Float64Array:
@@ -223,16 +238,6 @@ def _rising_crossings(lf: Float64Array) -> Float64Array:
         return np.empty(0, dtype=np.float64)
     fractions = -lf[indices] / (lf[indices + 1] - lf[indices])
     return indices.astype(np.float64) + fractions
-
-
-def _resample_cycles(hf: Float64Array, positions: Float64Array) -> Float64Array:
-    cycle_count = positions.size - 1
-    starts = positions[:-1]
-    lengths = np.diff(positions)
-    phase_grid = np.arange(PHASE_BINS, dtype=np.float64) / PHASE_BINS
-    sample_points = starts[:, np.newaxis] + lengths[:, np.newaxis] * phase_grid[np.newaxis, :]
-    flat = np.interp(sample_points.ravel(), np.arange(hf.size, dtype=np.float64), hf)
-    return flat.reshape(cycle_count, PHASE_BINS)
 
 
 def _needle_peaks(
@@ -252,10 +257,15 @@ def _needle_peaks(
     return peaks
 
 
-def _cycle_maxima(lf: Float64Array, positions: Float64Array) -> Float64Array:
+def _cycle_maxima(lf: Float32Array, positions: Float64Array) -> Float64Array:
+    """Максимумы сырого CH2 по циклам, побитово равные прежним значениям.
+
+    Расширение f32→f64 точное, поэтому пооконное приведение эквивалентно
+    прежнему цельномассивному.
+    """
     maxima = np.empty(positions.size - 1, dtype=np.float64)
     for cycle_index in range(positions.size - 1):
         low = int(np.floor(positions[cycle_index]))
         high = min(lf.size, int(np.ceil(positions[cycle_index + 1])) + 1)
-        maxima[cycle_index] = float(np.max(lf[low:high]))
+        maxima[cycle_index] = float(np.max(lf[low:high].astype(np.float64)))
     return maxima

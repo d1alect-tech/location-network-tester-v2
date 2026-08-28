@@ -2,6 +2,14 @@
 
 Q оценивается по полуширине пика на уровне половинной мощности (-3 дБ):
 Q = f0 / FWHM; f0 уточняется параболической интерполяцией по трём бинам.
+
+PSD считается через ограниченный по памяти ``lnt.psd.compute_welch``
+(посегментное накопление, запись не материализуется как float64 целиком,
+memmap-входы читаются порциями). Численное соответствие прямому
+``scipy.signal.welch`` (hann, detrend=constant, density, mean) —
+``rtol=2e-6, atol=1e-15``. Отличие от прежней scipy-реализации:
+нечисловые входы (NaN/Inf, переполнение) отклоняются ``PsdDataError``
+вместо тихого NaN/Inf-результата.
 """
 
 from dataclasses import dataclass
@@ -11,6 +19,8 @@ from numpy.typing import NDArray
 from scipy import signal
 
 from lnt.errors import InputError
+from lnt.psd import FrequencyBand, PsdSettings, compute_welch
+from lnt.psd.models import DEFAULT_MAX_CHUNK_SAMPLES
 
 Float32Array = NDArray[np.float32]
 Float64Array = NDArray[np.float64]
@@ -69,13 +79,17 @@ def compute_band_spectrum(
             f"пустая полоса анализа: {band_low_hz:.0f}..{effective_high:.0f} Гц",
         )
     nperseg = _choose_nperseg(samples.size, sample_rate_hz)
-    freqs_raw, psd_raw = signal.welch(
-        samples.astype(np.float64),
-        fs=sample_rate_hz,
-        nperseg=nperseg,
+    result = compute_welch(
+        np.asarray(samples),
+        settings=PsdSettings(
+            sample_rate_hz=sample_rate_hz,
+            nperseg=nperseg,
+            max_chunk_samples=max(DEFAULT_MAX_CHUNK_SAMPLES, nperseg),
+            bands=(FrequencyBand(name="full", low_hz=0.0, high_hz=sample_rate_hz / 2.0),),
+        ),
     )
-    freqs = np.asarray(freqs_raw, dtype=np.float64)
-    psd = np.asarray(psd_raw, dtype=np.float64)
+    freqs = result.frequency_hz
+    psd = result.psd_v2_per_hz
     mask = (freqs >= band_low_hz) & (freqs <= effective_high)
     if int(mask.sum()) < MIN_BAND_BINS:
         raise InputError(
