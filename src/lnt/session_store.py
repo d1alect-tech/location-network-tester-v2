@@ -6,7 +6,7 @@
 
 import shutil
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -34,6 +34,25 @@ class LoadedSession:
     ch2: Float32Array | None
 
 
+def _create_partial(session_dir: Path) -> Path:
+    if session_dir.exists():
+        raise InputError(f"каталог сессии уже существует: {session_dir}")
+    partial = session_dir.with_name(f"{session_dir.name}.partial-{uuid.uuid4().hex[:8]}")
+    partial.mkdir(parents=True)
+    return partial
+
+
+def _write_manifest(partial: Path, manifest: SessionManifest) -> None:
+    (partial / MANIFEST_FILENAME).write_text(manifest_to_json(manifest), encoding="utf-8")
+
+
+def _validate_filenames(manifest: SessionManifest) -> None:
+    # GAP-2: имя файла канала из манифеста не должно выходить за partial-каталог.
+    ensure_safe_filename(manifest.ch1.filename, label="ch1: имя файла")
+    if manifest.ch2 is not None:
+        ensure_safe_filename(manifest.ch2.filename, label="ch2: имя файла")
+
+
 def write_session(  # noqa: PLR0913 - atomic lifecycle requires both publish boundary seams
     *,
     session_dir: Path,
@@ -54,20 +73,52 @@ def write_session(  # noqa: PLR0913 - atomic lifecycle requires both publish bou
         raise InputError("ch2: массив и метаданные канала должны быть заданы вместе")
     if ch2 is not None:
         _validate_array(ch2, expected_count=manifest.sample_count, label="ch2")
-    # GAP-2: имя файла канала из манифеста не должно выходить за partial-каталог.
-    ensure_safe_filename(manifest.ch1.filename, label="ch1: имя файла")
-    if manifest.ch2 is not None:
-        ensure_safe_filename(manifest.ch2.filename, label="ch2: имя файла")
-    if session_dir.exists():
-        raise InputError(f"каталог сессии уже существует: {session_dir}")
-    partial = session_dir.with_name(f"{session_dir.name}.partial-{uuid.uuid4().hex[:8]}")
-    partial.mkdir(parents=True)
+    _validate_filenames(manifest)
+    partial = _create_partial(session_dir)
     try:
         np.save(partial / manifest.ch1.filename, ch1)
         if manifest.ch2 is not None and ch2 is not None:
             np.save(partial / manifest.ch2.filename, ch2)
-        manifest_path = partial / MANIFEST_FILENAME
-        manifest_path.write_text(manifest_to_json(manifest), encoding="utf-8")
+        _write_manifest(partial, manifest)
+        if before_publish is not None:
+            before_publish(partial)
+        partial.rename(session_dir)
+    except BaseException:
+        shutil.rmtree(partial, ignore_errors=True)
+        raise
+    if after_publish is not None:
+        after_publish(session_dir)
+    return session_dir
+
+
+def write_session_spooled(  # noqa: PLR0913 - atomic lifecycle requires both publish boundary seams
+    *,
+    session_dir: Path,
+    manifest: SessionManifest,
+    ch1_chunks: Iterator[Float32Array],
+    ch2_chunks: Iterator[Float32Array] | None,
+    before_publish: Callable[[Path], None] | None = None,
+    after_publish: Callable[[Path], None] | None = None,
+) -> Path:
+    """Атомарно записывает сессию из потока чанков, не держа канал целиком в RAM.
+
+    Контракт тот же, что у ``write_session``: то же именование partial-каталога,
+    манифест до rename, атомарный rename, rmtree при любом ``BaseException``
+    (включая исключение посреди генератора), ``after_publish`` после публикации.
+    Каждый чанк — float32 1-D; суммарная длина обязана равняться
+    ``manifest.sample_count``, иначе ``InputError`` и partial удалён.
+    """
+    if (manifest.ch2 is None) != (ch2_chunks is None):
+        raise InputError("ch2: массив и метаданные канала должны быть заданы вместе")
+    _validate_filenames(manifest)
+    partial = _create_partial(session_dir)
+    try:
+        _spool_channel(partial / manifest.ch1.filename, ch1_chunks, manifest.sample_count, "ch1")
+        if manifest.ch2 is not None and ch2_chunks is not None:
+            _spool_channel(
+                partial / manifest.ch2.filename, ch2_chunks, manifest.sample_count, "ch2"
+            )
+        _write_manifest(partial, manifest)
         if before_publish is not None:
             before_publish(partial)
         partial.rename(session_dir)
@@ -102,15 +153,49 @@ def load_session(session_dir: Path) -> LoadedSession:
     return LoadedSession(session_dir=session_dir, manifest=manifest, ch1=ch1, ch2=ch2)
 
 
-def _validate_array(data: Float32Array, *, expected_count: int, label: str) -> None:
+def _validate_dtype(data: Float32Array, *, label: str) -> None:
     if data.dtype != np.float32:
         raise InputError(f"{label}: ожидается dtype float32, получено {data.dtype}")
     if data.ndim != 1:
         raise InputError(f"{label}: ожидается одномерный массив, получено ndim={data.ndim}")
+
+
+def _validate_array(data: Float32Array, *, expected_count: int, label: str) -> None:
+    _validate_dtype(data, label=label)
     if data.size != expected_count:
         raise InputError(
             f"{label}: длина {data.size} не совпадает с manifest.sample_count={expected_count}",
         )
+
+
+def _spool_channel(
+    path: Path,
+    chunks: Iterator[Float32Array],
+    expected_count: int,
+    label: str,
+) -> None:
+    with path.open("wb") as stream:
+        np.lib.format.write_array_header_1_0(
+            stream,
+            {
+                "descr": np.dtype(np.float32).str,
+                "fortran_order": False,
+                "shape": (expected_count,),
+            },
+        )
+        filled = 0
+        for chunk in chunks:
+            _validate_dtype(chunk, label=label)
+            if filled + chunk.size > expected_count:
+                raise InputError(
+                    f"{label}: сумма чанков превышает manifest.sample_count={expected_count}",
+                )
+            stream.write(chunk.tobytes())
+            filled += chunk.size
+        if filled != expected_count:
+            raise InputError(
+                f"{label}: длина {filled} не совпадает с manifest.sample_count={expected_count}",
+            )
 
 
 def _load_channel(path: Path, expected_count: int, label: str) -> Float32Array:

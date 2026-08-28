@@ -7,15 +7,19 @@
 """
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
-from typing import Final, Protocol, cast
+from pathlib import Path
+from typing import TYPE_CHECKING, Final, Protocol, cast
 
 import numpy as np
 from numpy.typing import NDArray
 
 from lnt.errors import DeviceNotFoundError
 from lnt.types import AcquisitionTelemetry
+
+if TYPE_CHECKING:
+    from io import BufferedWriter
 
 RawCallback = Callable[[object, object], None]
 
@@ -97,6 +101,44 @@ class _BlockCollector:
         self.ch2_blocks.append(ch2)
         self.callback_times.append(time.monotonic())
         self.total_samples += ch1.size
+
+
+class SpooledBlockCollector:
+    """Дисковый двойник ``_BlockCollector``: тот же ``on_block``, но блоки уходят в файлы."""
+
+    def __init__(self, scratch_dir: Path) -> None:
+        """Открывает дампы ``ch1.raw``/``ch2.raw``; жизненным циклом каталога владеет вызывающий."""
+        self.scratch_dir: Path = scratch_dir
+        self.block_lengths: list[int] = []
+        self.callback_times: list[float] = []
+        self.total_samples: int = 0
+        self._handles: tuple[BufferedWriter, BufferedWriter] = (
+            (scratch_dir / "ch1.raw").open("wb"),
+            (scratch_dir / "ch2.raw").open("wb"),
+        )
+
+    def on_block(self, ch1_raw: object, ch2_raw: object) -> None:
+        ch1 = np.frombuffer(bytes(cast("bytearray", ch1_raw)), dtype=np.uint8)
+        ch2 = np.frombuffer(bytes(cast("bytearray", ch2_raw)), dtype=np.uint8)
+        self._handles[0].write(ch1.tobytes())
+        self._handles[1].write(ch2.tobytes())
+        self.block_lengths.append(int(ch1.size))
+        self.callback_times.append(time.monotonic())
+        self.total_samples += ch1.size
+
+    def finish(self) -> "SpooledBlockCollector":
+        """Закрывает дампы и возвращает себя; после него читайте ``iter_chunks``."""
+        for handle in self._handles:
+            handle.close()
+        return self
+
+    def iter_chunks(
+        self, name: str, chunk_size: int = BLOCK_SAMPLES_PER_CHANNEL
+    ) -> Iterator[NDArray[np.uint8]]:
+        """Отдаёт канал ``name`` порциями через memmap — без полной загрузки в RAM."""
+        data = np.memmap(self.scratch_dir / f"{name}.raw", dtype=np.uint8, mode="r")
+        for start in range(0, len(data), chunk_size):
+            yield np.asarray(data[start : start + chunk_size])
 
 
 def open_real_scope() -> ScopeProtocol:
@@ -191,10 +233,11 @@ def _stream_capture(  # noqa: PLR0913 - mirrors the public backend contract
     sample_rate_hz: float,
     requested_samples: int,
     cancellation_token: CancellationToken,
+    sink: SpooledBlockCollector | None = None,
 ) -> tuple[NDArray[np.uint8], NDArray[np.uint8], AcquisitionTelemetry] | CancelledResult:
-    collector = _BlockCollector()
     if cancellation_token.is_cancelled():
         return CancelledResult()
+    collector = sink if sink is not None else _BlockCollector()
     try:
         _configure_scope(scope, rate_code, ch1_range_code)
         shutdown = cast(
@@ -217,9 +260,17 @@ def _stream_capture(  # noqa: PLR0913 - mirrors the public backend contract
             shutdown.set()
     finally:
         scope.close_handle()
-    ch1 = np.concatenate(collector.ch1_blocks)[:requested_samples]
-    ch2 = np.concatenate(collector.ch2_blocks)[:requested_samples]
-    block_lengths = tuple(int(block.size) for block in collector.ch1_blocks)
+        if sink is not None:
+            sink.finish()
+    if isinstance(collector, _BlockCollector):
+        ch1 = np.concatenate(collector.ch1_blocks)[:requested_samples]
+        ch2 = np.concatenate(collector.ch2_blocks)[:requested_samples]
+        block_lengths = tuple(int(block.size) for block in collector.ch1_blocks)
+    else:
+        collector.finish()
+        ch1 = np.concatenate(list(collector.iter_chunks("ch1")))[:requested_samples]
+        ch2 = np.concatenate(list(collector.iter_chunks("ch2")))[:requested_samples]
+        block_lengths = tuple(collector.block_lengths)
     gaps = tuple(float(gap) for gap in np.diff(np.asarray(collector.callback_times)))
     ch1_clip_low, ch1_clip_high = _clip_counts(ch1)
     ch2_clip_low, ch2_clip_high = _clip_counts(ch2)
