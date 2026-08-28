@@ -120,7 +120,7 @@ def test_full_pipeline_backend_to_artifacts(tmp_path: Path) -> None:
 
     # Then: metrics.json parses with the canonical key set and an ok cm_dm
     # section carrying at most eight attributed peaks.
-    assert result.session_type.value == "cm_dm"
+    assert result.analysis.session_type.value == "cm_dm"
     payload = json.loads((session / "metrics.json").read_text(encoding="utf-8"))
     assert set(payload) == {
         "schema_version",

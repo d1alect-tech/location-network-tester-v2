@@ -105,8 +105,13 @@ def _dispatch(context: WorkerContext, request: JobRequest) -> WorkerSucceeded:
         case AnalyzeRequest(session_name=session_name):
             session_dir = resolve_session_dir(context.root, session_name)
             context.report(WorkerUpdate(stage=JobStage.ANALYZING))
-            context.backend.analyze_and_write(session_dir)
-            return WorkerSucceeded(result={"sessions": [session_name]})
+            analyzed = context.backend.analyze_and_write(session_dir)
+            return WorkerSucceeded(
+                result={
+                    "sessions": [session_name],
+                    "branch_failures": analyzed.branch_failures,
+                },
+            )
         case CompareRequest(session_a=session_a, session_b=session_b):
             dir_a = resolve_session_dir(context.root, session_a)
             dir_b = resolve_session_dir(context.root, session_b)
@@ -153,6 +158,7 @@ def _execute_series(
         repeat=request.repeat,
     )
     dirs = series_dirs(base, request.repeat)
+    branch_failures: list[Mapping[str, str]] = []
 
     def start_session(position: SeriesPosition) -> Path:
         if context.is_cancelled():
@@ -187,7 +193,8 @@ def _execute_series(
                         series_total=position.total,
                     ),
                 )
-                context.backend.analyze_and_write(path)
+                analyzed = context.backend.analyze_and_write(path)
+                branch_failures.extend(analyzed.branch_failures)
                 return path
             case CaptureRequest():
                 path = context.backend.capture_one(
@@ -213,7 +220,8 @@ def _execute_series(
                         series_total=position.total,
                     ),
                 )
-                context.backend.analyze_and_write(path)
+                analyzed = context.backend.analyze_and_write(path)
+                branch_failures.extend(analyzed.branch_failures)
                 return path
         assert_never(request)
 
@@ -222,7 +230,12 @@ def _execute_series(
         interval_s=request.interval_s,
         start_session=start_session,
     )
-    return WorkerSucceeded(result={"sessions": [path.name for path in written]})
+    return WorkerSucceeded(
+        result={
+            "sessions": [path.name for path in written],
+            "branch_failures": tuple(branch_failures),
+        },
+    )
 
 
 def _series_settings(

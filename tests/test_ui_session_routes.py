@@ -8,13 +8,14 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from lnt.analysis import AnalysisResult, analyze_measurement_session, write_analysis
+from lnt.analysis import analyze_measurement_session, write_analysis
 from lnt.compare import ComparisonResult
 from lnt.runtime.store import JobStore
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 from lnt.selftest import SelftestResult
 from lnt.simulate import simulate_session
 from lnt.types import SeriesPosition
+from lnt.ui.analysis_v2_wire import AnalyzeWriteResult
 from lnt.ui.dependencies import AppServices, install_services
 from lnt.ui.device import DeviceStatus
 from lnt.ui.jobs import JobManager
@@ -46,7 +47,7 @@ class _UnusedBackend:
         del request, out_dir, series, cancellation_token
         raise AssertionError("задачи не должны запускаться")
 
-    def analyze_and_write(self, session_dir: Path) -> AnalysisResult:
+    def analyze_and_write(self, session_dir: Path) -> AnalyzeWriteResult:
         del session_dir
         raise AssertionError("задачи не должны запускаться")
 

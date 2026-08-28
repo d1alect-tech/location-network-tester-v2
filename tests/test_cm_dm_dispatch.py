@@ -43,7 +43,7 @@ class TestBackendRouting:
         assert "cm_dm" in payload
         assert payload["cm_dm"]["status"] == "unavailable"
         assert (session / "cm_dm_spectrum.csv").is_file()
-        assert result.session_type.value == "cm_dm"
+        assert result.analysis.session_type.value == "cm_dm"
 
     def test_backend_analyze_measurement_unchanged(self, tmp_path: Path) -> None:
         # Given: an ordinary synthetic measurement session.
@@ -59,7 +59,7 @@ class TestBackendRouting:
         result = LntBackend().analyze_and_write(session)
 
         # Then: the v1 payload is produced unchanged, without a cm_dm section.
-        assert isinstance(result, AnalysisResult)
+        assert isinstance(result.analysis, AnalysisResult)
         payload = json.loads((session / "metrics.json").read_text(encoding="utf-8"))
         assert "cm_dm" not in payload
         assert payload["needle"] is not None
@@ -72,7 +72,7 @@ class TestBackendRouting:
         result = LntBackend().analyze_and_write(session)
 
         # Then: the line-quality path stays untouched, without a cm_dm section.
-        assert isinstance(result, LineQualityAnalysis)
+        assert isinstance(result.analysis, LineQualityAnalysis)
         payload = json.loads((session / "metrics.json").read_text(encoding="utf-8"))
         assert "cm_dm" not in payload
         assert payload["line_quality"] is not None
