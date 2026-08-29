@@ -31,11 +31,13 @@ app.append(
     h("div", "navrow", {}, [buildTabbar("Инспекция")]),
     h("div", "app-body", {}, [
       h("div", "col-cat", {}, [buildCatalog()]),
-      h("div", "cards", {}, [
-        kpiCard,
-        spectrum,
-        metrics,
-        h("div", "col-stack", {}, [capture, buildError()]),
+      h("div", "col-main", {}, [
+        h("div", "cards", {}, [
+          kpiCard,
+          spectrum,
+          metrics,
+          h("div", "col-stack", {}, [capture, buildError()]),
+        ]),
       ]),
     ]),
     buildStatusbar(),

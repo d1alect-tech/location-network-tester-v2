@@ -46,7 +46,7 @@ export function buildMetrics(): HTMLElement {
       meterGrid,
       h("h3", "panel-title peaks-title", {}, ["Пики спектра"]),
       h("div", "tbl-wrap", {}, [
-        h("table", "tbl tbl-tight", {}, [
+        h("table", "tbl tbl-tight tbl-peaks", {}, [
           h("thead", "", {}, [
             h("tr", "", {}, [
               h("th", "", { scope: "col" }, ["f0, Гц"]),

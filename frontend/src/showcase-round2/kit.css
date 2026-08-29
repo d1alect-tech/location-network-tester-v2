@@ -280,16 +280,22 @@ a {
   table-layout: fixed;
 }
 
+/* Ширины подобраны так, чтобы в рейле 280px колонка «Метка» оставалась читаемой (§9.2). */
 .tbl-cat th:nth-child(1) {
-  width: 28px;
+  width: 24px;
 }
 
 .tbl-cat th:nth-child(3) {
-  width: 96px;
+  width: 78px;
 }
 
 .tbl-cat th:nth-child(4) {
-  width: 96px;
+  width: 84px;
+}
+
+.tbl-cat th {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Глифы состояний: цвет — семантика, сам глиф кодирует состояние и без цвета (§6). */
@@ -688,6 +694,17 @@ select.ctl {
   padding: 8px;
 }
 
+/* Голая панель (таблица во всю ширину) остаётся без отступов и в плотном режиме. */
+.is-dense .panel-bd.is-bare {
+  padding: 0;
+}
+
 .is-dense .meter-value {
   font-size: 12px;
+}
+
+/* Инспектор 260px: шапка таблицы пиков переносится, чтобы колонка Q не обрезалась (§9.2). */
+.is-dense .tbl-peaks th {
+  white-space: normal;
+  line-height: 12px;
 }

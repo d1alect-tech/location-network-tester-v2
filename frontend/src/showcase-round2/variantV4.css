@@ -29,16 +29,21 @@
   background: var(--lnt-chrome);
 }
 
-.app-v4 .cards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  align-items: start;
+/* Прокрутка и отступы — на обёртке, сетка карточек — чистый grid:
+   скролл-контейнер с фиксированной высотой сжимает треки и карточки налезают. */
+.app-v4 .col-main {
   min-width: 0;
   min-height: 0;
   overflow: auto;
   padding: 16px;
   background: var(--lnt-chrome);
+}
+
+.app-v4 .cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
 }
 
 .app-v4 .panel {

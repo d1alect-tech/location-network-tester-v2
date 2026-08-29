@@ -143,3 +143,98 @@ test.describe("S9: V4 несёт левый рейл каталога как V1 
     expect(railBox.height).toBeGreaterThanOrEqual(600);
   });
 });
+
+test.describe("S10: секции витрины не накладываются друг на друга (§9.1)", () => {
+  for (const pageName of ALL) {
+    test(`${pageName}: геометрия секций без перекрытий`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto(`${BASE}/${pageName}`);
+      const boxes = await page.evaluate(() =>
+        Array.from(document.querySelectorAll("[data-showcase]"))
+          .filter((el) => el.getAttribute("data-showcase") !== "shell")
+          .map((el) => {
+            const r = el.getBoundingClientRect();
+            return {
+              id: el.getAttribute("data-showcase") ?? "",
+              left: r.left,
+              top: r.top,
+              right: r.right,
+              bottom: r.bottom,
+            };
+          }),
+      );
+      expect(boxes.length).toBeGreaterThanOrEqual(5);
+      const overlaps: string[] = [];
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          const a = boxes[i];
+          const b = boxes[j];
+          if (!a || !b) continue;
+          const dx = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          const dy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (dx > 1 && dy > 1) overlaps.push(`${a.id} ∩ ${b.id}`);
+        }
+      }
+      expect(overlaps, `перекрытия секций на ${pageName}`).toEqual([]);
+    });
+  }
+});
+
+test.describe("S11: каталог — колонка «Метка» читаема (§9.2, §9.3)", () => {
+  for (const pageName of ALL) {
+    test(`${pageName}: столбец метки не схлопнут, заголовки не наезжают`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto(`${BASE}/${pageName}`);
+      const head = await page.evaluate(() => {
+        const cells = Array.from(
+          document.querySelectorAll('[data-showcase="catalog"] thead th'),
+        ).map((el) => {
+          const r = el.getBoundingClientRect();
+          return {
+            text: (el.textContent ?? "").trim(),
+            left: r.left,
+            right: r.right,
+            width: r.width,
+          };
+        });
+        const table = document.querySelector('[data-showcase="catalog"] .tbl-cat');
+        const body = document.querySelector('[data-showcase="catalog"] .panel-bd');
+        return {
+          cells,
+          tableWidth: table?.getBoundingClientRect().width ?? 0,
+          bodyWidth: body?.getBoundingClientRect().width ?? 0,
+        };
+      });
+      // Плотность сжимает данные, а не рабочую область каталога: таблица во всю панель.
+      expect(head.tableWidth).toBeGreaterThanOrEqual(head.bodyWidth - 1);
+      const label = head.cells[1];
+      expect(label?.text).toBe("Метка");
+      expect(label?.width ?? 0).toBeGreaterThanOrEqual(88);
+      // Соседние заголовки разделены, а не слиты в «МЕТКАТИП».
+      for (let i = 1; i < head.cells.length; i++) {
+        const prev = head.cells[i - 1];
+        const cur = head.cells[i];
+        if (!prev || !cur) continue;
+        expect(cur.left).toBeGreaterThanOrEqual(prev.right - 0.5);
+      }
+    });
+  }
+});
+
+test.describe("S12: таблицы панелей не обрезаны по горизонтали (§9.2)", () => {
+  for (const pageName of ALL) {
+    test(`${pageName}: содержимое таблиц помещается в свои панели`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto(`${BASE}/${pageName}`);
+      const clipped = await page.evaluate(() =>
+        Array.from(document.querySelectorAll(".tbl-wrap"))
+          .filter((el) => el.scrollWidth > el.clientWidth + 1)
+          .map((el) => {
+            const panel = el.closest("[data-showcase]");
+            return `${panel?.getAttribute("data-showcase") ?? "?"}: ${el.scrollWidth}>${el.clientWidth}`;
+          }),
+      );
+      expect(clipped, `обрезанные таблицы на ${pageName}`).toEqual([]);
+    });
+  }
+});
