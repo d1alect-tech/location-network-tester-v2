@@ -12,11 +12,13 @@ import type uPlot from "uplot";
 import { METRICS, formatHz } from "../showcase-redesign/data";
 import { buildSpectrumData } from "../showcase-redesign/spectrum";
 import { h } from "./kit";
+import { DELTA_SPAN_DB, clamp01, deltaColor, heatColor } from "./spectrogramPalette";
 
 type Mode = "a" | "b" | "delta";
 
-const TIME_BINS = 56;
-const DELTA_SPAN_DB = 8;
+// 48 бинов и 4 периода: на полном наборе бинов сумма косинусов точно нулевая.
+const TIME_BINS = 48;
+const TIME_PERIODS = 4;
 const DAMPED_HZ = 22418;
 
 const MODE_TITLE: Readonly<Record<Mode, string>> = {
@@ -33,42 +35,23 @@ function at(column: Column | undefined, index: number): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-/** Временная модуляция с единичным средним: усреднение по времени возвращает трассу. */
-function modulation(timeNorm: number, freq: number, amp: number, seed: number): number {
+/** Временная модуляция СРАЗУ В ДЕЦИБЕЛАХ.
+ *
+ *  Первая версия модулировала линейную мощность множителем с единичным средним, и это
+ *  казалось достаточным. Но полотно показывает 10·lg, а логарифм вогнут: по неравенству
+ *  Йенсена E[lg(mod)] < lg(E[mod]) = 0, причём тем сильнее, чем больше амплитуда. У базы и
+ *  сравнения амплитуды разные, смещения не сокращались, и средняя Δ полотна уходила
+ *  на 0.58 дБ от колонки таблицы (измерено контрактом V6-S15). В дБ-домене среднее ровно
+ *  нулевое, и согласованность с таблицей становится тождеством, а не приближением. */
+function modulationDb(timeNorm: number, freq: number, ampDb: number, seed: number): number {
   const phase = Math.sin(freq * 0.0004 + seed) * Math.PI;
-  return 1 + amp * Math.cos(2 * Math.PI * timeNorm * 3 + phase);
+  return ampDb * Math.cos(2 * Math.PI * timeNorm * TIME_PERIODS + phase);
 }
 
 /** У сравнения демпфированный пик «дышит» сильнее — это и видно во времени. */
 function amplitudeB(freq: number): number {
   const bell = Math.exp(-(((freq - DAMPED_HZ) / 3000) ** 2));
-  return 0.3 + 0.42 * bell;
-}
-
-function clamp01(value: number): number {
-  return value < 0 ? 0 : value > 1 ? 1 : value;
-}
-
-/** Тепловая шкала уровня: тёмный синий → бирюзовый → песочный. */
-function heatColor(unit: number): [number, number, number] {
-  const t = clamp01(unit);
-  if (t < 0.5) {
-    const k = t * 2;
-    return [Math.round(18 + 12 * k), Math.round(26 + 96 * k), Math.round(54 + 78 * k)];
-  }
-  const k = (t - 0.5) * 2;
-  return [Math.round(30 + 200 * k), Math.round(122 + 78 * k), Math.round(132 - 42 * k)];
-}
-
-/** Расходящаяся шкала дельты в цветах самих трасс: синий — тише, оранжевый — громче. */
-function deltaColor(db: number): [number, number, number] {
-  const t = clamp01(Math.abs(db) / DELTA_SPAN_DB);
-  const base: [number, number, number] = db < 0 ? [86, 129, 255] : [230, 134, 25];
-  return [
-    Math.round(29 + (base[0] - 29) * t),
-    Math.round(29 + (base[1] - 29) * t),
-    Math.round(29 + (base[2] - 29) * t),
-  ];
+  return 1.3 + 1.9 * bell;
 }
 
 export interface SpectrogramV6 {
@@ -118,11 +101,13 @@ export function buildSpectrogramV6(): SpectrogramV6 {
   /** Значение полотна в дБ: уровень трассы либо отношение трасс. */
   function valueAt(freq: number, timeNorm: number): number {
     const index = indexAt(freq);
-    const a = at(columnA, index) * modulation(timeNorm, freq, 0.3, 0.7);
-    const b = at(columnB, index) * modulation(timeNorm, freq, amplitudeB(freq), 2.1);
-    if (mode === "delta") return a > 0 && b > 0 ? 10 * Math.log10(b / a) : 0;
-    const level = mode === "a" ? a : b;
-    return level > 0 ? 10 * Math.log10(level) : -120;
+    const a = at(columnA, index);
+    const b = at(columnB, index);
+    if (a <= 0 || b <= 0) return mode === "delta" ? 0 : -120;
+    const aDb = 10 * Math.log10(a) + modulationDb(timeNorm, freq, 1.3, 0.7);
+    const bDb = 10 * Math.log10(b) + modulationDb(timeNorm, freq, amplitudeB(freq), 2.1);
+    if (mode === "delta") return bDb - aDb;
+    return mode === "a" ? aDb : bDb;
   }
 
   function levelRange(): { low: number; high: number } {

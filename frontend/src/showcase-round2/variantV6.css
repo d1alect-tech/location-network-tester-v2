@@ -399,18 +399,14 @@
 .app-v6 .cat-search {
   flex: 1;
   min-width: 0;
-  height: 22px;
+  /* §2.3: инпут 32px. Прежние 22px были ниже и нормы, и цели §6 в 28px. */
+  height: 32px;
   padding: 0 4px;
-  font: 400 12px / 22px var(--lnt-ui);
+  font: 400 12px / 32px var(--lnt-ui);
   color: var(--lnt-text);
   background: none;
   border: 0;
   border-bottom: 1px solid var(--lnt-line-struct);
-}
-
-.app-v6 .cat-search:focus-visible {
-  border-bottom-color: var(--lnt-accent);
-  outline: none;
 }
 
 .app-v6 .cat-search::placeholder {
@@ -422,13 +418,14 @@
   padding: 0;
 }
 
+/* §2.3: шапка таблицы 30-32px, §6: цель ≥ 28px. */
 .app-v6 .cat-sort {
   display: flex;
   align-items: center;
   gap: 4px;
   width: 100%;
   padding: 0 8px;
-  font: 600 11px / 24px var(--lnt-ui);
+  font: 600 11px / 30px var(--lnt-ui);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--lnt-text-sec);
@@ -583,6 +580,15 @@
   flex-direction: column;
 }
 
+/* §2.3: фокус-рамка видима у каждого органа — подсветки границы для этого мало. */
+.app-v6 .cat-search:focus-visible,
+.app-v6 .cat-sort:focus-visible,
+.app-v6 .gram-mode:focus-visible,
+.app-v6 [data-cat-clear]:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: 2px;
+}
+
 /* Полоса управления живёт в шапке панели спектра, правее заголовка. */
 .app-v6 .gram-bar {
   display: flex;
@@ -624,6 +630,12 @@
   display: flex;
   gap: 2px;
   flex: none;
+}
+
+/* §6: цели ≥ 28px даже в плотной шапке панели. */
+.app-v6 .gram-mode,
+.app-v6 [data-cat-clear] {
+  min-height: 28px;
 }
 
 .app-v6 .gram-mode[aria-pressed="true"] {

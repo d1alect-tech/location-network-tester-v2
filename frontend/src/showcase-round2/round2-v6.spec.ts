@@ -456,3 +456,89 @@ test("V6-S13: курсор спектрограммы называет част�
   expect(text).toMatch(/дБ/);
   expect(text).toMatch(/\d/);
 });
+
+test("V6-S14: органы каталога и спектрограммы держат геометрию и фокус ТЗ", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+
+  // §2.3: инпут 32px, шапка таблицы 30-32px; §6: цели ≥28px.
+  const small = await page.evaluate(() => {
+    const bad: string[] = [];
+    const probes: readonly [string, number][] = [
+      ["[data-cat-search]", 32],
+      ["[data-cat-sort] .cat-sort", 30],
+      ["[data-cat-clear]", 28],
+      ["[data-spectrogram-mode]", 28],
+    ];
+    for (const [selector, min] of probes) {
+      for (const node of document.querySelectorAll(selector)) {
+        const height = node.getBoundingClientRect().height;
+        if (height < min - 0.5) bad.push(`${selector} ${height} < ${min}`);
+      }
+    }
+    return bad;
+  });
+  expect(small, "геометрия контролов").toEqual([]);
+
+  // §2.3: фокус-рамка видима, а не снята outline:none.
+  const focusable: readonly string[] = [
+    "[data-cat-search]",
+    "[data-cat-clear]",
+    '[data-cat-sort="label"] .cat-sort',
+    '[data-spectrogram-mode="a"]',
+  ];
+  for (const selector of focusable) {
+    await page.locator(selector).focus();
+    const ring = await page.evaluate((sel) => {
+      const node = document.querySelector(sel);
+      if (node === null) return { width: "", style: "" };
+      const cs = getComputedStyle(node);
+      return { width: cs.outlineWidth, style: cs.outlineStyle };
+    }, selector);
+    expect(ring.style, `${selector}: стиль рамки фокуса`).not.toBe("none");
+    expect(
+      Number.parseFloat(ring.width),
+      `${selector}: толщина рамки фокуса`,
+    ).toBeGreaterThanOrEqual(2);
+  }
+});
+
+test("V6-S15: средняя по времени дельта полотна совпадает с колонкой дельты", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+
+  // Колонка Δ первой строки таблицы пиков — демпфированный пик 22.4 кГц.
+  const column = Number(
+    await page.locator('[data-showcase="metrics"] [data-delta]').first().getAttribute("data-delta"),
+  );
+  expect(Number.isFinite(column)).toBe(true);
+
+  // Тот же пик на графике: маркер даёт координату частоты.
+  const marker = await page.locator('[data-peak="0"]').boundingBox();
+  const canvas = await page.locator("[data-spectrogram-canvas]").boundingBox();
+  expect(marker).not.toBeNull();
+  expect(canvas).not.toBeNull();
+  if (marker === null || canvas === null) return;
+
+  const readout = page.locator("[data-spectrogram-readout]");
+  const x = marker.x + marker.width / 2;
+  // 24 пробы при 48 бинах и 4 периодах попадают в целое число циклов: сумма модуляции точно ноль.
+  const samples: number[] = [];
+  for (let step = 0; step < 24; step += 1) {
+    const y = canvas.y + ((step + 0.5) / 24) * canvas.height;
+    await page.mouse.move(x, y);
+    const text = (await readout.textContent()) ?? "";
+    const match = /(-|−|\+)?\d+[.,]\d+\s*дБ/.exec(text);
+    if (match === null) continue;
+    samples.push(Number(match[0].replace(/\s*дБ/, "").replace("−", "-").replace(",", ".")));
+  }
+  expect(samples.length).toBeGreaterThanOrEqual(22);
+
+  // Модуляция обязана иметь нулевое среднее ИМЕННО В ДЕЦИБЕЛАХ: единичное среднее
+  // в линейных величинах смещает среднее по Йенсену, и полотно разошлось бы с таблицей.
+  const mean = samples.reduce((sum, value) => sum + value, 0) / samples.length;
+  expect(mean, `среднее полотна ${mean.toFixed(2)} против колонки ${column}`).toBeCloseTo(
+    column,
+    0,
+  );
+});
