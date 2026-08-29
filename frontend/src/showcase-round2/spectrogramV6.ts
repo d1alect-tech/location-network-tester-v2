@@ -43,8 +43,11 @@ function at(column: Column | undefined, index: number): number {
  *  сравнения амплитуды разные, смещения не сокращались, и средняя Δ полотна уходила
  *  на 0.58 дБ от колонки таблицы (измерено контрактом V6-S15). В дБ-домене среднее ровно
  *  нулевое, и согласованность с таблицей становится тождеством, а не приближением. */
-function modulationDb(timeNorm: number, freq: number, ampDb: number, seed: number): number {
-  const phase = Math.sin(freq * 0.0004 + seed) * Math.PI;
+function modulationDb(timeNorm: number, freq: number, ampDb: number): number {
+  // Фаза ОБЩАЯ для обеих сессий: флуктуации сети коррелированы, и разность трасс
+  // обязана зависеть только от разницы амплитуд. При разных фазах дельта покрывалась
+  // интерференционным муаром размахом 4.5 дБ там, где сессии не расходятся вовсе.
+  const phase = Math.sin(freq * 0.0004) * Math.PI;
   return ampDb * Math.cos(2 * Math.PI * timeNorm * TIME_PERIODS + phase);
 }
 
@@ -104,8 +107,8 @@ export function buildSpectrogramV6(): SpectrogramV6 {
     const a = at(columnA, index);
     const b = at(columnB, index);
     if (a <= 0 || b <= 0) return mode === "delta" ? 0 : -120;
-    const aDb = 10 * Math.log10(a) + modulationDb(timeNorm, freq, 1.3, 0.7);
-    const bDb = 10 * Math.log10(b) + modulationDb(timeNorm, freq, amplitudeB(freq), 2.1);
+    const aDb = 10 * Math.log10(a) + modulationDb(timeNorm, freq, 1.3);
+    const bDb = 10 * Math.log10(b) + modulationDb(timeNorm, freq, amplitudeB(freq));
     if (mode === "delta") return bDb - aDb;
     return mode === "a" ? aDb : bDb;
   }

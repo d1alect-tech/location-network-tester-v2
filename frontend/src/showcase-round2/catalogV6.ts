@@ -21,6 +21,7 @@ interface CatalogState {
 }
 
 const DAY_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" });
+const SHORT_DAY_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" });
 
 /** «2026-08-29» -> «29 августа»: день читается словами, а не машинной датой. */
 function formatDay(date: string): string {
@@ -30,6 +31,12 @@ function formatDay(date: string): string {
 
 /** «2026-08-29_14-30-00_rc» -> «14:30». Когда день уже назван заголовком группы,
  *  повторять его в каждой строке незачем — внутри дня сессии различаются временем. */
+/** «2026-08-25» -> «25 авг.»: полная ISO-дата съедала ширину у метки; точная дата в подсказке. */
+function formatShortDay(date: string): string {
+  const parsed = new Date(`${date}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? date : SHORT_DAY_FORMAT.format(parsed);
+}
+
 function formatTime(id: string): string {
   const match = /_(\d{2})-(\d{2})-\d{2}/.exec(id);
   return match === null ? "" : `${match[1]}:${match[2]}`;
@@ -52,18 +59,19 @@ function compareSessions(
   return signed === 0 ? left.id.localeCompare(right.id) : signed;
 }
 
-/** Роль сессии в текущей работе — это и есть та самая «связь» между записями. */
+/** Роль сессии в текущей работе — это и есть та самая «связь» между записями.
+ *
+ *  Самошум своего чипа не получает: колонка «Тип» и так говорит «Самошум», а его
+ *  принадлежность дню выражена группой. Дублирующий чип сжимал метку до «са…». */
 function roleOf(session: ShowcaseSession, pair: CatalogPair): { key: string; text: string } | null {
   if (session.id === pair.base.id) return { key: "a", text: "А" };
   if (session.id === pair.compare.id) return { key: "b", text: "Б" };
-  if (session.typeLabel === "Самошум") return { key: "noise", text: "базис" };
   return null;
 }
 
 const ROLE_TITLE: Readonly<Record<string, string>> = {
   a: "Слот А полосы сравнения: база",
   b: "Слот Б полосы сравнения: сравнение",
-  noise: "Самошум — инструментальный базис этого дня",
 };
 
 function buildRow(session: ShowcaseSession, pair: CatalogPair, grouped: boolean): HTMLElement {
@@ -101,7 +109,9 @@ function buildRow(session: ShowcaseSession, pair: CatalogPair, grouped: boolean)
     labelCell,
     h("td", "cell-ellipsis", { title: session.typeLabel }, [session.typeLabel]),
     // В режиме групп день назван выше, и колонка отдаёт ширину типу, показывая время.
-    h("td", "num", { title: session.date }, [grouped ? formatTime(session.id) : session.date]),
+    h("td", "num", { title: session.date }, [
+      grouped ? formatTime(session.id) : formatShortDay(session.date),
+    ]),
   );
   return row;
 }
@@ -135,6 +145,7 @@ export function buildCatalogV6(pair: CatalogPair): HTMLElement {
   const state: CatalogState = { query: "", sort: "date", dir: "descending" };
 
   const tbody = h("tbody");
+  const table = h("table", "tbl tbl-tight tbl-cat");
   const found = h("span", "cat-found", { "data-cat-found": "" });
   const search = h("input", "cat-search", {
     type: "search",
@@ -168,6 +179,7 @@ export function buildCatalogV6(pair: CatalogPair): HTMLElement {
     heads.set(column.key, cell);
     headRow.append(cell);
   }
+  table.append(h("thead", "", {}, [headRow]), tbody);
 
   function render(): void {
     for (const [key, cell] of heads) {
@@ -184,6 +196,8 @@ export function buildCatalogV6(pair: CatalogPair): HTMLElement {
     // В группах колонка показывает время, и заголовок не должен говорить «Дата».
     const dateTitle = titles.get("date");
     if (dateTitle !== undefined) dateTitle.data = grouped ? "Время" : "Дата";
+    // Без групп колонка несёт полную дату и требует больше места, чем «14:30».
+    table.classList.toggle("is-flat", !grouped);
     if (visible.length === 0) {
       tbody.append(buildEmptyRow());
     } else if (grouped) {
@@ -221,10 +235,6 @@ export function buildCatalogV6(pair: CatalogPair): HTMLElement {
       search,
       clear,
     ]),
-    h("div", "panel-bd is-bare", {}, [
-      h("div", "tbl-wrap", {}, [
-        h("table", "tbl tbl-tight tbl-cat", {}, [h("thead", "", {}, [headRow]), tbody]),
-      ]),
-    ]),
+    h("div", "panel-bd is-bare", {}, [h("div", "tbl-wrap", {}, [table])]),
   ]);
 }

@@ -94,7 +94,7 @@
 
 .app-v6 .app-body {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: 336px minmax(0, 1fr);
   min-height: 0;
 }
 
@@ -507,6 +507,11 @@
 
 .app-v6 .cat-v6 .tbl-cat tr > :nth-child(4) {
   width: 50px;
+}
+
+/* Без групп в колонке полная дата «2026-08-29», а не время — ширины под «14:30» ей мало. */
+.app-v6 .cat-v6 .tbl-cat.is-flat tr > :nth-child(4) {
+  width: 90px;
 }
 
 /* Заголовок дня — единственная ячейка строки, фиксированные ширины её не касаются. */

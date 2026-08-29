@@ -275,6 +275,86 @@ test("V6-S8: одна плотная строка на сессию вместо
   expect(clipped, "тип сессии обрезан").toEqual([]);
 });
 
+test("V6-S17: каталог держит высоту колонки и не режет дату", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+
+  const fills = async (): Promise<number> =>
+    page.evaluate((sel) => {
+      const panel = document.querySelector(sel);
+      const column = document.querySelector(".app-v6 .col-cat");
+      if (!(panel instanceof HTMLElement) || !(column instanceof HTMLElement)) return 0;
+      return panel.getBoundingClientRect().height / column.getBoundingClientRect().height;
+    }, CATALOG);
+
+  // Панель занимает всю колонку, иначе под коротким списком зияет дыра.
+  expect(await fills(), "полный список").toBeGreaterThan(0.98);
+  await page.locator(`${CATALOG} [data-cat-search]`).fill("такого-нет");
+  await expect(page.locator(`${CATALOG} [data-cat-empty]`)).toBeVisible();
+  expect(await fills(), "пустой результат").toBeGreaterThan(0.98);
+  await page.locator(`${CATALOG} [data-cat-clear]`).click();
+
+  // При распущенных группах колонка показывает ПОЛНУЮ дату, а ширина была под «14:30».
+  await page.locator(`${CATALOG} [data-cat-sort="label"]`).click();
+  const clippedDate = await page.evaluate((sel) => {
+    const bad: string[] = [];
+    for (const row of document.querySelectorAll(`${sel} [data-session]`)) {
+      const cell = row.children[3];
+      if (!(cell instanceof HTMLElement)) continue;
+      if (cell.scrollWidth > cell.clientWidth + 1) {
+        bad.push(`${cell.textContent ?? ""} ${cell.scrollWidth}>${cell.clientWidth}`);
+      }
+    }
+    return bad;
+  }, CATALOG);
+  expect(clippedDate, "дата обрезана").toEqual([]);
+
+  // Короткие метки обязаны читаться целиком: широкая дата сжала «самошум» до «са…».
+  const clippedLabel = await page.evaluate((sel) => {
+    const bad: string[] = [];
+    for (const node of document.querySelectorAll(`${sel} [data-cat-label]`)) {
+      if (!(node instanceof HTMLElement)) continue;
+      const text = (node.textContent ?? "").trim();
+      if (text.length > 10) continue;
+      if (node.scrollWidth > node.clientWidth + 1) {
+        bad.push(`${text} ${node.scrollWidth}>${node.clientWidth}`);
+      }
+    }
+    return bad;
+  }, CATALOG);
+  expect(clippedLabel, "короткая метка обрезана").toEqual([]);
+});
+
+test("V6-S18: дельта спокойна там, где трассы не расходятся", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+
+  const canvas = await page.locator("[data-spectrogram-canvas]").boundingBox();
+  const marker = await page.locator('[data-peak="0"]').boundingBox();
+  expect(canvas).not.toBeNull();
+  expect(marker).not.toBeNull();
+  if (canvas === null || marker === null) return;
+
+  const readout = page.locator("[data-spectrogram-readout]");
+  const swingAt = async (x: number): Promise<number> => {
+    const values: number[] = [];
+    for (let step = 0; step < 12; step += 1) {
+      await page.mouse.move(x, canvas.y + ((step + 0.5) / 12) * canvas.height);
+      const match = /(-|−|\+)?\d+[.,]\d+\s*дБ/.exec((await readout.textContent()) ?? "");
+      if (match === null) continue;
+      values.push(Number(match[0].replace(/\s*дБ/, "").replace("−", "-").replace(",", ".")));
+    }
+    return Math.max(...values) - Math.min(...values);
+  };
+
+  // Вдали от демпфированного пика трассы совпадают: собственная рябь дельты там —
+  // декоративный муар, маскирующий единственное настоящее различие.
+  const quiet = await swingAt(canvas.x + canvas.width * 0.9);
+  const atPeak = await swingAt(marker.x + marker.width / 2);
+  expect(quiet, `размах вдали от пика ${quiet.toFixed(2)} дБ`).toBeLessThan(1);
+  expect(atPeak, `размах на пике ${atPeak.toFixed(2)} дБ`).toBeGreaterThan(quiet);
+});
+
 test("V6-S9: каталог сортируется кликом по колонке и ищет по метке", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(PAGE);
@@ -344,12 +424,9 @@ test("V6-S10: каталог показывает роли сессий и со�
   await expect(rowA.locator("[data-cat-label]")).toHaveText("стенд-А");
   await expect(rowB.locator("[data-cat-label]")).toHaveText("bad-damped");
 
-  // Самошум назван инструментальным базисом своего дня, а не просто ещё одной записью.
-  const noise = page.locator(`${CATALOG} [data-cat-role="noise"]`);
-  await expect(noise).toHaveCount(1);
-  const noiseRow = page
-    .locator(`${CATALOG} [data-session]`)
-    .filter({ has: page.locator('[data-cat-role="noise"]') });
+  // Самошум своего чипа не получает: колонка типа и так его называет, а дубль сжимал метку.
+  await expect(page.locator(`${CATALOG} [data-cat-role]`)).toHaveCount(2);
+  const noiseRow = page.locator(`${CATALOG} [data-session]`).filter({ hasText: "Самошум" });
   await expect(noiseRow.locator("[data-cat-label]")).toHaveText("самошум");
 });
 
@@ -541,4 +618,33 @@ test("V6-S15: средняя по времени дельта полотна с�
     column,
     0,
   );
+});
+
+test("V6-S16: витрина снимается артефактом в каждом рабочем состоянии", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+  const shot = async (name: string): Promise<void> => {
+    await page.screenshot({ path: resolve(EVIDENCE_DIR, `v6-${name}-1280.png`), fullPage: true });
+  };
+
+  // Сортировка по метке: группы распущены, колонка отдаёт полную дату.
+  await page.locator(`${CATALOG} [data-cat-sort="label"]`).click();
+  await shot("catalog-sorted");
+
+  // Пустой результат поиска.
+  await page.locator(`${CATALOG} [data-cat-search]`).fill("такого-нет");
+  await shot("catalog-empty");
+  await page.locator(`${CATALOG} [data-cat-clear]`).click();
+
+  // Спектрограмма в режиме уровня, а не дельты.
+  await page.locator('[data-spectrogram-mode="a"]').click();
+  await page.mouse.move(640, 300);
+  await shot("gram-level");
+  await page.locator('[data-spectrogram-mode="delta"]').click();
+
+  // Фокус-рамки на органах управления.
+  await page.locator(`${CATALOG} [data-cat-search]`).focus();
+  await shot("focus-search");
+  await page.locator('[data-cat-sort="label"] .cat-sort').focus();
+  await shot("focus-sort");
 });
