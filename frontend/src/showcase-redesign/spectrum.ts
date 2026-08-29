@@ -22,12 +22,15 @@ export interface SpectrumLabels {
 
 export interface SpectrumChrome {
   readonly header: HTMLElement;
+  /** Вызывается на каждой перерисовке: слой аннотаций пересчитывает координаты. */
+  readonly onDraw?: (u: uPlot) => void;
 }
 
 type PlotExtras = {
   readonly ticksStroke: string;
   readonly fillA?: string;
   readonly onCursor?: (u: uPlot) => void;
+  readonly onDraw?: (u: uPlot) => void;
 };
 
 /** Детерминированный PSD: шумовой пол + гауссовы пики; трасса Б ниже А на ~12 дБ у 22.4 кГц. */
@@ -186,9 +189,10 @@ function buildOptions(style: SpectrumStyle, width: number, extras: PlotExtras): 
     ],
     legend: { show: false },
   };
-  if (extras.onCursor !== undefined) {
-    options.hooks = { setCursor: [extras.onCursor] };
-  }
+  const hooks: uPlot.Hooks.Arrays = {};
+  if (extras.onCursor !== undefined) hooks.setCursor = [extras.onCursor];
+  if (extras.onDraw !== undefined) hooks.draw = [extras.onDraw];
+  if (Object.keys(hooks).length > 0) options.hooks = hooks;
   return options;
 }
 
@@ -199,7 +203,7 @@ export function renderSpectrum(
   style: SpectrumStyle,
   labels: SpectrumLabels,
   chrome?: SpectrumChrome,
-): void {
+): uPlot {
   host.textContent = "";
   const plotHost = document.createElement("div");
   plotHost.className = "spectrum-plot";
@@ -216,6 +220,7 @@ export function renderSpectrum(
       onCursor: (u: uPlot) => {
         readout.textContent = formatReadout(u, u.cursor.idx ?? null);
       },
+      onDraw: chrome.onDraw,
     };
   } else {
     host.append(buildLegend(labels));
@@ -227,14 +232,19 @@ export function renderSpectrum(
     plotHost,
   );
   let lastWidth = 0;
+  let lastHeight = 0;
+  // Высота тоже отслеживается: вариант может отдать графику всю свободную высоту.
   const observer = new ResizeObserver((entries) => {
     const entry = entries[0];
     if (!entry) return;
     const width = Math.floor(entry.contentRect.width);
-    if (width > 0 && width !== lastWidth) {
+    const height = Math.floor(entry.contentRect.height) || plotStyle.height;
+    if (width > 0 && (width !== lastWidth || height !== lastHeight)) {
       lastWidth = width;
-      plot.setSize({ width, height: plotStyle.height });
+      lastHeight = height;
+      plot.setSize({ width, height });
     }
   });
   observer.observe(plotHost);
+  return plot;
 }

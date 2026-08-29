@@ -19,7 +19,36 @@ export const METERS: readonly KpiItem[] = [
   { label: "Разрешение", value: `${METRICS.resolutionHz}`, unit: "Гц" },
 ];
 
-/** Панель «Показания»: сетка метрик + таблица пиков (f0, уровень, выделенность, Q). */
+/** Таблица пиков (f0, уровень, выделенность, Q). Строки адресуемы через data-peak-row
+ *  и достижимы с клавиатуры: V5 связывает их с маркерами частот на спектре. */
+export function buildPeaks(): HTMLElement {
+  const peakBody = h("tbody");
+  PEAKS.forEach((peak, index) => {
+    peakBody.append(
+      h("tr", "", { "data-peak-row": String(index), tabindex: "0" }, [
+        h("td", "num", {}, [ruNumber.format(Math.round(peak.frequencyHz))]),
+        h("td", "num", {}, [peak.levelDb.toFixed(2)]),
+        h("td", "num", {}, [peak.prominenceDb.toFixed(2)]),
+        h("td", "num", {}, [peak.q.toFixed(2)]),
+      ]),
+    );
+  });
+  return h("div", "tbl-wrap", {}, [
+    h("table", "tbl tbl-tight tbl-peaks", {}, [
+      h("thead", "", {}, [
+        h("tr", "", {}, [
+          h("th", "", { scope: "col" }, ["f0, Гц"]),
+          h("th", "", { scope: "col" }, ["Уровень, дБ"]),
+          h("th", "", { scope: "col" }, ["Выдел., дБ"]),
+          h("th", "", { scope: "col" }, ["Q"]),
+        ]),
+      ]),
+      peakBody,
+    ]),
+  ]);
+}
+
+/** Панель «Показания»: сетка метрик + таблица пиков (V1-V4). */
 export function buildMetrics(): HTMLElement {
   const meterGrid = h("div", "meter-grid");
   for (const meter of METERS) {
@@ -27,37 +56,12 @@ export function buildMetrics(): HTMLElement {
     if (meter.unit) value.append(h("span", "t-unit", {}, [meter.unit]));
     meterGrid.append(h("div", "meter", {}, [h("span", "meter-label", {}, [meter.label]), value]));
   }
-
-  const peakBody = h("tbody");
-  for (const peak of PEAKS) {
-    peakBody.append(
-      h("tr", "", {}, [
-        h("td", "num", {}, [ruNumber.format(Math.round(peak.frequencyHz))]),
-        h("td", "num", {}, [peak.levelDb.toFixed(2)]),
-        h("td", "num", {}, [peak.prominenceDb.toFixed(2)]),
-        h("td", "num", {}, [peak.q.toFixed(2)]),
-      ]),
-    );
-  }
-
   return h("section", "panel", { "data-showcase": "metrics" }, [
     h("div", "panel-hd", {}, [h("h2", "panel-title", {}, ["Показания"])]),
     h("div", "panel-bd", {}, [
       meterGrid,
       h("h3", "panel-title peaks-title", {}, ["Пики спектра"]),
-      h("div", "tbl-wrap", {}, [
-        h("table", "tbl tbl-tight tbl-peaks", {}, [
-          h("thead", "", {}, [
-            h("tr", "", {}, [
-              h("th", "", { scope: "col" }, ["f0, Гц"]),
-              h("th", "", { scope: "col" }, ["Уровень, дБ"]),
-              h("th", "", { scope: "col" }, ["Выдел., дБ"]),
-              h("th", "", { scope: "col" }, ["Q"]),
-            ]),
-          ]),
-          peakBody,
-        ]),
-      ]),
+      buildPeaks(),
     ]),
   ]);
 }

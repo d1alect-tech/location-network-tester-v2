@@ -10,6 +10,7 @@ const ALL = [
   "showcase-v2.html",
   "showcase-v3.html",
   "showcase-v4.html",
+  "showcase-v5.html",
 ] as const;
 
 /** Собирает все отрисованные носители текста мельче 11px, включая ::before/::after. */

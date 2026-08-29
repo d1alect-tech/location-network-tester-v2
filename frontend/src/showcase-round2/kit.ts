@@ -1,5 +1,7 @@
 /** Общий скелет раунда 2 (ТЗ 2026-08-29): DOM-хелпер, шелл, каталог, спектр, KPI.
  *  Все варианты используют одни секции; скелеты различаются только сеткой и плотностью. */
+import type uPlot from "uplot";
+
 import "../showcase-redesign/fonts/fonts.css";
 import "./tokens.css";
 import "./kit.css";
@@ -152,18 +154,23 @@ export const SPECTRUM_STYLE: SpectrumStyle = {
   height: 300,
 };
 
+/** Хуки варианта к графику: перерисовка слоя аннотаций и доступ к экземпляру uPlot. */
+export interface SpectrumHooks {
+  onDraw?: (plot: uPlot) => void;
+  onPlot?: (plot: uPlot) => void;
+}
+
 /** Спектр в канве #1D1D1D: сигнал отделён от хрома (§5.1). */
-export function buildSpectrumPanel(height: number): HTMLElement {
+export function buildSpectrumPanel(height: number, hooks: SpectrumHooks = {}): HTMLElement {
   const host = h("div", "frame");
   const header = h("div", "panel-hd", {}, [h("h2", "panel-title", {}, ["Спектр мощности"])]);
-  renderSpectrum(
+  const plot = renderSpectrum(
     host,
     { ...SPECTRUM_STYLE, height },
     { a: "Сессия А", b: "Сессия Б" },
-    {
-      header,
-    },
+    { header, onDraw: hooks.onDraw },
   );
+  hooks.onPlot?.(plot);
   return h("section", "panel", { "data-showcase": "spectrum" }, [
     header,
     h("div", "panel-bd", {}, [host]),
