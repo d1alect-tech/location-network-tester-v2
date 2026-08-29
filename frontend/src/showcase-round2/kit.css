@@ -593,14 +593,6 @@ select.ctl {
   min-width: 0;
 }
 
-/* Playwright hover() целится в canvas; оверлей uPlot не должен перехватывать hit-test. */
-.spectrum-plot .u-over,
-.spectrum-plot .u-cursor-x,
-.spectrum-plot .u-cursor-y,
-.spectrum-plot .u-cursor-pt {
-  pointer-events: none;
-}
-
 .spectrum-plot .uplot,
 .spectrum-plot .u-wrap {
   background: transparent;
