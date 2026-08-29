@@ -41,21 +41,21 @@ describe("AppShell (baseline characterization)", () => {
     expect(active?.getAttribute("data-route")).toBe("capture");
   });
 
-  it("redirects an empty hash to #/prepare and renders the default view", async () => {
+  it("redirects an empty hash to #/catalog and renders the default view", async () => {
     const shell = new AppShell(container);
     shell.init();
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 0);
     });
-    expect(window.location.hash).toBe("#/prepare");
-    expect(container.querySelector(".placeholder-title")?.textContent).toBe("Подготовка");
+    expect(window.location.hash).toBe("#/catalog");
+    expect(container.querySelector(".placeholder-title")?.textContent).toBe("Каталог");
   });
 
   it("falls back to the default view for an unknown route and keeps the hash", () => {
     window.location.hash = "#/unknown";
     const shell = new AppShell(container);
     shell.init();
-    expect(container.querySelector(".placeholder-title")?.textContent).toBe("Подготовка");
+    expect(container.querySelector(".placeholder-title")?.textContent).toBe("Каталог");
     expect(window.location.hash).toBe("#/unknown");
   });
 

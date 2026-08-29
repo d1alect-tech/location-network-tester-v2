@@ -54,6 +54,10 @@ describe("serializeLocation", () => {
 });
 
 describe("RouteStore reload safety", () => {
+  it("DEFAULT_ROUTE is catalog", () => {
+    expect(DEFAULT_ROUTE).toBe("catalog");
+  });
+
   it("restores route and filters from the URL on reload (fresh construction)", () => {
     window.location.hash = "#/inspect?session=abc&health=ok";
     const store = new RouteStore(window);

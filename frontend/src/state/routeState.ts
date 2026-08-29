@@ -14,7 +14,7 @@ export const WORKSPACE_ROUTES = [
 
 export type WorkspaceRoute = (typeof WORKSPACE_ROUTES)[number];
 
-export const DEFAULT_ROUTE: WorkspaceRoute = "prepare";
+export const DEFAULT_ROUTE: WorkspaceRoute = "catalog";
 
 export interface WorkspaceLocation {
   route: WorkspaceRoute;

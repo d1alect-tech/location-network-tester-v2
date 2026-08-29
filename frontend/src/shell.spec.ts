@@ -17,6 +17,8 @@ test("AppShell loads offline with zero non-loopback requests", async ({ page }) 
 
   // Verify the app shell title is correct
   await expect(page).toHaveTitle("LNT v2 Workbench");
+  await expect(page).toHaveURL("http://127.0.0.1:4101/static/v2/#/catalog");
+  await expect(page.locator(".placeholder-title")).toHaveText("Каталог");
 
   // Verify navigation links exist
   const navLinks = page.locator(".nav-link");
@@ -38,12 +40,12 @@ test("AppShell loads offline with zero non-loopback requests", async ({ page }) 
   await expect(errorPanel.locator(".error-title")).toHaveText("Критическая ошибка интерфейса");
   await expect(errorPanel.locator(".error-message")).toContainText("Тестовая критическая ошибка");
 
-  // Click recovery button and verify we are back on prepare
-  // Note: window.location.reload() is called, so we wait for the page to reload and hash to be #/prepare
+  // Click recovery button and verify we are back on catalog
+  // Note: window.location.reload() is called, so we wait for the page to reload and hash to be #/catalog
   await page.click("#btn-recover");
-  // Wait for the URL to change back to prepare
-  await expect(page).toHaveURL("http://127.0.0.1:4101/static/v2/#/prepare");
-  await expect(page.locator(".placeholder-title")).toHaveText("Подготовка");
+  // Wait for the URL to change back to catalog
+  await expect(page).toHaveURL("http://127.0.0.1:4101/static/v2/#/catalog");
+  await expect(page.locator(".placeholder-title")).toHaveText("Каталог");
 
   // Assert zero non-loopback requests
   expect(nonLoopbackRequests).toEqual([]);
