@@ -75,9 +75,10 @@ def test_lifespan_creates_nested_root(tmp_path: Path) -> None:
         assert root.is_dir()
 
 
-def test_index_serves_panel_html(tmp_path: Path) -> None:
+@pytest.mark.parametrize("path", ["/legacy", "/legacy/"])
+def test_index_serves_panel_html(tmp_path: Path, path: str) -> None:
     with TestClient(create_app(root=tmp_path, backend=_InstantBackend())) as client:
-        response = client.get("/")
+        response = client.get(path)
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
@@ -87,7 +88,7 @@ def test_index_serves_panel_html(tmp_path: Path) -> None:
 
 def test_index_preloads_ibm_plex_sans_regular(tmp_path: Path) -> None:
     with TestClient(create_app(root=tmp_path, backend=_InstantBackend())) as client:
-        html = client.get("/").text
+        html = client.get("/legacy").text
 
     link_tags = re.findall(r"<link\b[^>]*>", html)
     font_preloads = [tag for tag in link_tags if 'rel="preload"' in tag and 'as="font"' in tag]
@@ -233,7 +234,7 @@ def test_index_and_static_cache_contract(tmp_path: Path) -> None:
     """Index и unhashed static никогда не кэшируются."""
     app = create_app(root=tmp_path)
     with TestClient(app) as client:
-        index = client.get("/")
+        index = client.get("/legacy")
         unhashed = client.get("/static/app.js")
 
     assert index.headers["cache-control"] == "no-store"

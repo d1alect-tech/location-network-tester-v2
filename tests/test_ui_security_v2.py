@@ -70,7 +70,7 @@ def test_request_body_limit_is_enforced_before_validation(tmp_path: Path) -> Non
 
 def test_security_headers_and_cache_contract(tmp_path: Path) -> None:
     with TestClient(create_app(root=tmp_path)) as client:
-        index = client.get("/")
+        index = client.get("/legacy")
         config = client.get("/api/config").json()
         asset = client.get(config["static_assets"]["app"])
 
@@ -81,16 +81,27 @@ def test_security_headers_and_cache_contract(tmp_path: Path) -> None:
     assert index.headers["referrer-policy"] == "no-referrer"
     assert asset.headers["cache-control"] == "public, max-age=31536000, immutable"
     assert f".{config['static_asset_hash']}.js" in config["static_assets"]["app"]
+    assert config["static_assets"]["app"] in index.text
 
 
 def test_health_config_and_index_share_build_identity(tmp_path: Path) -> None:
     with TestClient(create_app(root=tmp_path)) as client:
         health = client.get("/api/health").json()
         config = client.get("/api/config").json()
-        index = client.get("/").text
+        index = client.get("/legacy").text
 
     assert health["build_id"] == config["build_id"]
     assert f'data-build-id="{config["build_id"]}"' in index
+
+
+def test_root_is_v2_html_no_store_without_requiring_build_id(tmp_path: Path) -> None:
+    with TestClient(create_app(root=tmp_path)) as client:
+        response = client.get("/")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "LNT v2 Workbench" in response.text
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_page_size_limit_is_typed_validation_error(tmp_path: Path) -> None:

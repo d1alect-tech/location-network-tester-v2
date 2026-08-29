@@ -131,7 +131,7 @@ def create_app(
     app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
     def index_v2() -> Response:
-        """Возвращает главную страницу локальной панели v2."""
+        """Возвращает Vite HTML панели v2 без data-build-id."""
         index_path = _STATIC / "v2" / "index.html"
         if not index_path.exists():
             raise HTTPException(status_code=404, detail="v2 index.html not found")
@@ -140,11 +140,12 @@ def create_app(
         response.headers["Cache-Control"] = "no-store"
         return response
 
+    app.get("/", include_in_schema=False)(index_v2)
     app.get("/v2/", include_in_schema=False)(index_v2)
     app.get("/v2", include_in_schema=False)(index_v2)
 
     def index() -> Response:
-        """Возвращает главную страницу локальной панели."""
+        """Возвращает legacy-панель с hashed app.js и data-build-id."""
         html = (_STATIC / "index.html").read_text(encoding="utf-8")
         html = html.replace(
             '<html lang="ru">',
@@ -155,7 +156,8 @@ def create_app(
         response.headers["Cache-Control"] = "no-store"
         return response
 
-    app.get("/", include_in_schema=False)(index)
+    app.get("/legacy/", include_in_schema=False)(index)
+    app.get("/legacy", include_in_schema=False)(index)
 
     def showcase() -> Response:
         """Возвращает страницу витрины дизайн-системы."""
