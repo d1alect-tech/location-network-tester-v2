@@ -120,6 +120,15 @@ test("V6-S4: приборный ритм показаний, весь срез �
       docScroll: document.documentElement.scrollHeight,
       docClient: document.documentElement.clientHeight,
       plotHeight: plot?.getBoundingClientRect().height ?? 0,
+      spectrumPanel:
+        document.querySelector('[data-showcase="spectrum"]')?.getBoundingClientRect().height ?? 0,
+      band: document.querySelector(".app-v6 .analysis-band")?.getBoundingClientRect().height ?? 0,
+      readoutPanel: document.querySelector(".app-v6 .readout")?.getBoundingClientRect().height ?? 0,
+      peaksPanel:
+        document.querySelector('[data-showcase="metrics"]')?.getBoundingClientRect().height ?? 0,
+      mainBox: main?.getBoundingClientRect().height ?? 0,
+      gramHeight:
+        document.querySelector("[data-spectrogram-canvas]")?.getBoundingClientRect().height ?? 0,
     };
   });
   expect(readout.count).toBe(7);
@@ -130,9 +139,15 @@ test("V6-S4: приборный ритм показаний, весь срез �
   expect(readout.docScroll).toBeLessThanOrEqual(readout.docClient + 1);
   expect(readout.mainScroll).toBeLessThanOrEqual(readout.mainClient + 1);
   // График остаётся героем: больше, чем в V5 (303.5px).
-  expect(readout.plotHeight, `высота графика V6: ${readout.plotHeight}`).toBeGreaterThanOrEqual(
-    320,
-  );
+  // Сигнальная зона — спектр вместе со спектрограммой: вторая дорожка берёт высоту
+  // у первой, поэтому сумма остаётся на уровне прежнего графика, а сам спектр не вырождается.
+  const signalZone = readout.plotHeight + readout.gramHeight;
+  expect(
+    signalZone,
+    `спектр ${readout.plotHeight} + спектрограмма ${readout.gramHeight}`,
+  ).toBeGreaterThanOrEqual(320);
+  expect(readout.plotHeight).toBeGreaterThanOrEqual(210);
+  expect(readout.gramHeight).toBeGreaterThanOrEqual(88);
 });
 
 /** Измеряет фактическую ширину одной и той же числовой строки в таблице пиков. */
@@ -336,4 +351,108 @@ test("V6-S10: каталог показывает роли сессий и со�
     .locator(`${CATALOG} [data-session]`)
     .filter({ has: page.locator('[data-cat-role="noise"]') });
   await expect(noiseRow.locator("[data-cat-label]")).toHaveText("самошум");
+});
+
+/** Спектрограмма V6: вторая дорожка под спектром, делящая с ним ось частот.
+ *  Главный дефицит продукта — спектрограмма и линейный спектр живут порознь и
+ *  не синхронизированы; здесь они по построению стоят на одной шкале. */
+const GRAM = "[data-spectrogram]";
+
+test("V6-S11: спектрограмма делит ось частот с линейным спектром", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const consoleErrors = watchConsoleErrors(page);
+  await page.goto(PAGE);
+
+  await expect(page.locator(GRAM)).toBeVisible();
+
+  const geometry = await page.evaluate(() => {
+    const canvas = document.querySelector("[data-spectrogram-canvas]");
+    const over = document.querySelector('[data-showcase="spectrum"] .u-over');
+    if (!(canvas instanceof HTMLElement) || !(over instanceof HTMLElement)) return null;
+    const left = canvas.getBoundingClientRect();
+    const right = over.getBoundingClientRect();
+    return {
+      gramLeft: left.left,
+      gramRight: left.right,
+      plotLeft: right.left,
+      plotRight: right.right,
+    };
+  });
+  expect(geometry).not.toBeNull();
+  // Полотно спектрограммы стоит ровно под областью данных графика: одна шкала частот.
+  const where = `полотно ${geometry?.gramLeft}..${geometry?.gramRight} | график ${geometry?.plotLeft}..${geometry?.plotRight}`;
+  expect(
+    Math.abs((geometry?.gramLeft ?? 0) - (geometry?.plotLeft ?? 0)),
+    where,
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs((geometry?.gramRight ?? 0) - (geometry?.plotRight ?? 0)),
+    where,
+  ).toBeLessThanOrEqual(1);
+
+  // Полотно действительно закрашено, а не осталось пустым.
+  const painted = await page.evaluate(() => {
+    const canvas = document.querySelector("[data-spectrogram-canvas]");
+    if (!(canvas instanceof HTMLCanvasElement)) return 0;
+    const ctx = canvas.getContext("2d");
+    if (ctx === null) return 0;
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let opaque = 0;
+    for (let index = 3; index < data.length; index += 4) {
+      if ((data[index] ?? 0) > 0) opaque += 1;
+    }
+    return opaque / (data.length / 4);
+  });
+  expect(painted).toBeGreaterThan(0.9);
+  expect(consoleErrors).toEqual([]);
+});
+
+test("V6-S12: спектрограмма переключается между А, Б и дельтой", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+
+  const modes = page.locator("[data-spectrogram-mode]");
+  await expect(modes).toHaveCount(3);
+
+  // По умолчанию открыта дельта: единица работы V6 — разница между парой.
+  const active = page.locator('[data-spectrogram-mode][aria-pressed="true"]');
+  await expect(active).toHaveCount(1);
+  await expect(active).toHaveAttribute("data-spectrogram-mode", "delta");
+
+  const snapshot = async (): Promise<string> =>
+    page.evaluate(() => {
+      const canvas = document.querySelector("[data-spectrogram-canvas]");
+      return canvas instanceof HTMLCanvasElement ? canvas.toDataURL().slice(-96) : "";
+    });
+
+  const deltaImage = await snapshot();
+  await page.locator('[data-spectrogram-mode="a"]').click();
+  await expect(page.locator('[data-spectrogram-mode="a"]')).toHaveAttribute("aria-pressed", "true");
+  const traceImage = await snapshot();
+  // Переключение действительно перерисовывает полотно, а не только подсветку кнопки.
+  expect(traceImage).not.toBe(deltaImage);
+
+  // Шкала цвета названа и снабжена числами в дБ.
+  const scale = page.locator("[data-spectrogram-scale]");
+  await expect(scale).toBeVisible();
+  await expect(scale).toContainText("дБ");
+});
+
+test("V6-S13: курсор спектрограммы называет частоту, время и значение", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+
+  const readout = page.locator("[data-spectrogram-readout]");
+  const canvas = page.locator("[data-spectrogram-canvas]");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  if (box === null) return;
+
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+  const text = (await readout.textContent()) ?? "";
+  expect(text).toMatch(/Гц/);
+  // \b не работает на кириллице: \w — только ASCII, границы у «с» нет.
+  expect(text).toMatch(/\d\s?мс|\d\s?с/);
+  expect(text).toMatch(/дБ/);
+  expect(text).toMatch(/\d/);
 });

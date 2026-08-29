@@ -563,3 +563,97 @@
   color: var(--lnt-text-dim);
   text-align: center;
 }
+
+/* ── Спектрограмма: вторая дорожка на общей со спектром шкале частот ────── */
+
+/* Тело панели раскладывает детей в строку; вторая дорожка должна стоять под графиком,
+   иначе она встаёт сбоку и отбирает у спектра ширину. */
+.app-v6 [data-showcase="spectrum"] .panel-bd {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* График растягивается по остатку, поэтому снятый воздух уходит самому сигналу. */
+  padding-block: 0;
+}
+
+/* Полотно примыкает к оси частот графика: разделитель читался как отрыв в другую
+   карточку, хотя шкала частот у них общая и стоит как раз между дорожками. */
+.app-v6 .gram {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Полоса управления живёт в шапке панели спектра, правее заголовка. */
+.app-v6 .gram-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+/* Шкала времени занимает зазор под осью Y графика; ширина приходит из стиль-листа. */
+.app-v6 .gram-axis {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 1px 4px 1px 0;
+  border-right: 1px solid var(--lnt-line-struct);
+}
+
+.app-v6 .gram-tick {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font: 400 11px / 12px var(--lnt-mono);
+  color: var(--lnt-text-dim);
+}
+
+/* Засечка у каждой подписи — иначе полоса читается как пустое поле, а не как шкала. */
+.app-v6 .gram-tick::after {
+  content: "";
+  width: 3px;
+  height: 1px;
+  margin-right: -4px;
+  background: var(--lnt-line-struct);
+}
+
+.app-v6 .gram-modes {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+
+.app-v6 .gram-mode[aria-pressed="true"] {
+  color: var(--lnt-text);
+  background: var(--lnt-field);
+  border-color: var(--lnt-line-struct);
+}
+
+.app-v6 .gram-readout {
+  font: 400 11px / 16px var(--lnt-mono);
+  color: var(--lnt-text);
+  flex: none;
+  white-space: nowrap;
+}
+
+.app-v6 .gram-scale {
+  font: 400 11px / 16px var(--lnt-mono);
+  color: var(--lnt-text-dim);
+  flex: none;
+  white-space: nowrap;
+}
+
+.app-v6 .gram-canvas-wrap {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Высота полотна постоянна; ширина и левый отступ приходят из bbox графика. */
+.app-v6 .gram-canvas {
+  display: block;
+  height: 104px;
+}

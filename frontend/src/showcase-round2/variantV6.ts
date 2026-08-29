@@ -11,6 +11,7 @@ import { METERS } from "./metrics";
 import { buildPairbar } from "./pairbar";
 import { mountPeakMarkers } from "./peakMarkers";
 import { buildPeaksCompare } from "./peaksCompare";
+import { buildSpectrogramV6 } from "./spectrogramV6";
 
 const app = document.getElementById("app");
 if (!(app instanceof HTMLElement)) throw new Error("нет #app");
@@ -81,13 +82,23 @@ const peaksPanel = h("section", "panel", { "data-showcase": "metrics" }, [
 const peakRows = Array.from(peaksPanel.querySelectorAll<HTMLElement>("[data-peak-row]"));
 
 let redrawMarkers: (() => void) | undefined;
-const spectrum = buildSpectrumPanel(320, {
+// Спектрограмма берёт высоту у самого спектра: сигнальная зона остаётся прежней,
+// но вместо одной картины даёт две, стоящие на одной шкале частот.
+const gram = buildSpectrogramV6();
+const spectrum = buildSpectrumPanel(264, {
   labels: { a: base.label, b: compare.label },
-  onDraw: () => redrawMarkers?.(),
+  onDraw: () => {
+    redrawMarkers?.();
+    gram.redraw();
+  },
   onPlot: (plot) => {
     redrawMarkers = mountPeakMarkers(plot, peakRows);
+    gram.attach(plot);
   },
 });
+spectrum.querySelector(".panel-bd")?.append(gram.host);
+// Органы управления второй дорожкой живут в шапке панели: отдельная полоса съела бы высоту.
+spectrum.querySelector(".panel-hd")?.append(gram.bar);
 
 app.append(
   h("div", "app-v6", { "data-showcase": "shell" }, [
@@ -105,3 +116,6 @@ app.append(
     buildStationStatusbar(),
   ]),
 );
+
+// Первая отрисовка возможна только когда полотно уже в DOM и имеет высоту.
+gram.redraw();
