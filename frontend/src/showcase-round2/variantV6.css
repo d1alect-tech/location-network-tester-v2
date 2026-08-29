@@ -364,3 +364,202 @@
 .app-v6 .tbl-peaks tbody tr.is-hot {
   background: var(--lnt-elev);
 }
+
+/* ── Каталог V6: дни как группы, порядок под рукой, роли вместо догадок ──── */
+
+.app-v6 .cat-v6 .panel-hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.app-v6 .cat-found {
+  font: 400 11px / 14px var(--lnt-mono);
+  color: var(--lnt-text-dim);
+  flex: none;
+}
+
+.app-v6 .cat-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-line);
+}
+
+.app-v6 .cat-find {
+  flex: none;
+  font-size: 12px;
+  color: var(--lnt-text-dim);
+}
+
+/* Поле живёт в хроме панели, а не выглядит веб-формой: без рамки и фона. */
+.app-v6 .cat-search {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0 4px;
+  font: 400 12px / 22px var(--lnt-ui);
+  color: var(--lnt-text);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--lnt-line-struct);
+}
+
+.app-v6 .cat-search:focus-visible {
+  border-bottom-color: var(--lnt-accent);
+  outline: none;
+}
+
+.app-v6 .cat-search::placeholder {
+  color: var(--lnt-text-dim);
+}
+
+/* Заголовок колонки — настоящая кнопка: сортировка доступна и с клавиатуры (§6). */
+.app-v6 .cat-th {
+  padding: 0;
+}
+
+.app-v6 .cat-sort {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0 8px;
+  font: 600 11px / 24px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.app-v6 .cat-sort:hover {
+  color: var(--lnt-text);
+}
+
+/* Направление читается глифом, а не только подсветкой колонки (§6). */
+.app-v6 .cat-th[aria-sort="ascending"] .cat-sort-mark::after {
+  content: "▲";
+}
+
+.app-v6 .cat-th[aria-sort="descending"] .cat-sort-mark::after {
+  content: "▼";
+}
+
+.app-v6 .cat-th[aria-sort="ascending"] .cat-sort,
+.app-v6 .cat-th[aria-sort="descending"] .cat-sort {
+  color: var(--lnt-text);
+}
+
+/* Кегль не мельчит: глиф наследует 11px кнопки — нижняя граница §2.5. */
+.app-v6 .cat-sort-mark {
+  color: var(--lnt-accent);
+}
+
+/* Заголовок дня отделяет один выезд от другого.
+   Ячейка остаётся table-cell, иначе colspan перестаёт действовать. */
+.app-v6 .cat-group th {
+  height: 24px;
+  padding: 0 8px;
+  font: 600 11px / 24px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  color: var(--lnt-text-sec);
+  background: var(--lnt-panel-hd);
+  border-top: 1px solid var(--lnt-line-struct);
+  border-bottom: 1px solid var(--lnt-line);
+}
+
+.app-v6 .cat-group-in {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.app-v6 .cat-group-count {
+  font: 400 11px / 24px var(--lnt-mono);
+  color: var(--lnt-text-dim);
+}
+
+.app-v6 .cat-v6 .tbl-cat tbody td {
+  height: 28px;
+  padding: 0 8px;
+}
+
+/* Колонки фиксированы: тип и время получают своё, остаток уходит метке.
+   Метка — имя, её узнают по началу и обрезать можно; тип — словарь, его нельзя. */
+.app-v6 .cat-v6 .tbl-cat {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.app-v6 .cat-v6 .tbl-cat tr > :first-child {
+  width: 22px;
+  padding-right: 0;
+}
+
+/* 104px — измеренная ширина самого длинного типа «Качество сети» (101px) с запасом. */
+.app-v6 .cat-v6 .tbl-cat tr > :nth-child(3) {
+  width: 104px;
+}
+
+.app-v6 .cat-v6 .tbl-cat tr > :nth-child(4) {
+  width: 50px;
+}
+
+/* Заголовок дня — единственная ячейка строки, фиксированные ширины её не касаются. */
+.app-v6 .cat-group > th {
+  width: auto;
+}
+
+.app-v6 .cat-label-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.app-v6 .cat-label-cell .cell-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Роль связывает строку каталога с полосой пары и с трассой графика (§4). */
+.app-v6 .cat-role {
+  flex: none;
+  min-width: 16px;
+  padding: 0 4px;
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  border: 1px solid currentcolor;
+  border-radius: var(--lnt-r-ctl);
+}
+
+.app-v6 .cat-role-a {
+  color: #9db4ff;
+}
+
+.app-v6 .cat-role-b {
+  color: #f0a95c;
+}
+
+.app-v6 .cat-role-noise {
+  color: var(--lnt-text-dim);
+}
+
+.app-v6 .cat-empty {
+  height: 48px;
+  padding: 0 8px;
+  font: 400 12px / 48px var(--lnt-ui);
+  color: var(--lnt-text-dim);
+  text-align: center;
+}

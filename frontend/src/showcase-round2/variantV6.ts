@@ -4,8 +4,9 @@
  *  докированную командную полосу — освободившаяся высота уходит графику. */
 import "./variantV6.css";
 import { ERROR_STATE, JOB, SESSIONS } from "../showcase-redesign/data";
+import { buildCatalogV6 } from "./catalogV6";
 import { buildCommandbar } from "./commandbar";
-import { buildCatalog, buildSpectrumPanel, buildTabbar, h } from "./kit";
+import { buildSpectrumPanel, buildTabbar, h } from "./kit";
 import { METERS } from "./metrics";
 import { buildPairbar } from "./pairbar";
 import { mountPeakMarkers } from "./peakMarkers";
@@ -93,7 +94,7 @@ app.append(
     buildStationHeader(),
     buildPairbar(base, compare),
     h("div", "app-body", {}, [
-      h("div", "col-cat", {}, [buildCatalog()]),
+      h("div", "col-cat", {}, [buildCatalogV6({ base, compare })]),
       h("div", "col-main", {}, [
         spectrum,
         h("div", "analysis-band", {}, [buildReadout(), peaksPanel]),

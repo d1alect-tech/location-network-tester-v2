@@ -170,3 +170,170 @@ test("V6-S5: индекс ведёт на V6, витрина снимается 
   await page.goto(PAGE);
   await page.screenshot({ path: resolve(EVIDENCE_DIR, "v6-compare-1280.png"), fullPage: true });
 });
+
+/** Каталог V6: структура вместо плоского списка (жалоба «нет структуры»). */
+const CATALOG = '[data-showcase="catalog"]';
+
+test("V6-S7: каталог сгруппирован по дням, каждая группа названа и посчитана", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+
+  const groups = page.locator(`${CATALOG} [data-cat-group]`);
+  await expect(groups).toHaveCount(5);
+
+  const shape = await groups.evaluateAll((els) =>
+    els.map((el) => ({
+      date: el.getAttribute("data-cat-group") ?? "",
+      count: Number(el.querySelector("[data-cat-count]")?.textContent ?? "0"),
+      text: (el.textContent ?? "").trim(),
+    })),
+  );
+  // Дни идут от свежего к старому, как и весь каталог.
+  const dates = shape.map((group) => group.date);
+  expect([...dates].sort((left, right) => right.localeCompare(left))).toEqual(dates);
+  // Счётчики групп в сумме дают весь список.
+  expect(shape.reduce((sum, group) => sum + group.count, 0)).toBe(10);
+  // Заголовок называет день словами, а не только машинной датой.
+  expect(shape[0]?.text).toContain("август");
+
+  // Заголовок дня тянется на всю таблицу: display:flex на th отменяет colspan
+  // и схлопывает его до первой колонки — тогда от «29 августа» видно только «29».
+  const spans = await page.evaluate((sel) => {
+    const root = document.querySelector(sel);
+    const group = root?.querySelector("[data-cat-group] th");
+    const row = root?.querySelector("[data-session]");
+    if (!(group instanceof HTMLElement) || !(row instanceof HTMLElement)) return null;
+    return { group: group.getBoundingClientRect().width, row: row.getBoundingClientRect().width };
+  }, CATALOG);
+  expect(spans).not.toBeNull();
+  expect(spans?.group ?? 0).toBeGreaterThanOrEqual((spans?.row ?? 0) - 1);
+
+  // Каждая строка лежит в группе своего дня.
+  const misplaced = await page.evaluate((sel) => {
+    const root = document.querySelector(sel);
+    if (root === null) return ["нет каталога"];
+    const bad: string[] = [];
+    let current = "";
+    for (const row of root.querySelectorAll("tbody tr")) {
+      const group = row.getAttribute("data-cat-group");
+      if (group !== null) {
+        current = group;
+        continue;
+      }
+      const date = row.getAttribute("data-cat-date");
+      if (date !== current) bad.push(`${row.getAttribute("data-session")}: ${date} в ${current}`);
+    }
+    return bad;
+  }, CATALOG);
+  expect(misplaced).toEqual([]);
+});
+
+test("V6-S8: одна плотная строка на сессию вместо двух", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+
+  await expect(page.locator(`${CATALOG} [data-session]`)).toHaveCount(10);
+  // 10 сессий + 5 заголовков дней: подстроки-дубля с тем же id больше нет.
+  await expect(page.locator(`${CATALOG} tbody tr`)).toHaveCount(15);
+
+  const rows = await page
+    .locator(`${CATALOG} [data-session]`)
+    .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
+  for (const height of rows) {
+    expect(height).toBeGreaterThanOrEqual(24);
+    expect(height).toBeLessThanOrEqual(30);
+  }
+
+  // Тип — закрытый словарь из четырёх значений: обрезанные «Симул…» и «Самошум»
+  // перестают различаться, поэтому эта колонка обязана вмещать самое длинное слово.
+  const clipped = await page.evaluate((sel) => {
+    const bad: string[] = [];
+    for (const row of document.querySelectorAll(`${sel} [data-session]`)) {
+      const cell = row.children[2];
+      if (!(cell instanceof HTMLElement)) continue;
+      if (cell.scrollWidth > cell.clientWidth + 1) {
+        bad.push(`${cell.textContent ?? ""} ${cell.scrollWidth}>${cell.clientWidth}`);
+      }
+    }
+    return bad;
+  }, CATALOG);
+  expect(clipped, "тип сессии обрезан").toEqual([]);
+});
+
+test("V6-S9: каталог сортируется кликом по колонке и ищет по метке", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+
+  const labels = async (): Promise<string[]> =>
+    page
+      .locator(`${CATALOG} [data-session]:visible [data-cat-label]`)
+      .evaluateAll((els) => els.map((el) => (el.textContent ?? "").trim()));
+
+  const sortLabel = page.locator(`${CATALOG} [data-cat-sort="label"]`);
+  await sortLabel.click();
+  const ascending = await labels();
+  // Порядок сверяем той же коллацией, что и страница: у Node и браузера она разная.
+  const monotone = await page.evaluate(
+    (items) =>
+      items.every((item, index) => index === 0 || items[index - 1]!.localeCompare(item, "ru") <= 0),
+    ascending,
+  );
+  expect(monotone, ascending.join(" | ")).toBe(true);
+  expect(ascending).toHaveLength(10);
+  await expect(sortLabel).toHaveAttribute("aria-sort", "ascending");
+
+  await sortLabel.click();
+  const descending = await labels();
+  expect(descending).toEqual([...ascending].reverse());
+  await expect(sortLabel).toHaveAttribute("aria-sort", "descending");
+
+  // Сортировка по метке распускает группировку по дням: одно или другое, без вранья.
+  await expect(page.locator(`${CATALOG} [data-cat-group]`)).toHaveCount(0);
+
+  const search = page.locator(`${CATALOG} [data-cat-search]`);
+  await search.fill("стенд");
+  // Состав найденного, а не порядок: поиск не отменяет выбранную сортировку.
+  expect([...(await labels())].sort()).toEqual(["стенд-А", "стенд-Б"]);
+  await expect(page.locator(`${CATALOG} [data-cat-found]`)).toContainText("2");
+
+  await search.fill("такого-нет");
+  expect(await labels()).toEqual([]);
+  await expect(page.locator(`${CATALOG} [data-cat-empty]`)).toBeVisible();
+
+  await page.locator(`${CATALOG} [data-cat-clear]`).click();
+  expect(await labels()).toHaveLength(10);
+  // Очистка возвращает и группы по дням.
+  await expect(page.locator(`${CATALOG} [data-cat-group]`)).toHaveCount(5);
+});
+
+test("V6-S10: каталог показывает роли сессий и совпадает с полосой пары", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+
+  const roleA = page.locator(`${CATALOG} [data-cat-role="a"]`);
+  const roleB = page.locator(`${CATALOG} [data-cat-role="b"]`);
+  await expect(roleA).toHaveCount(1);
+  await expect(roleB).toHaveCount(1);
+
+  // Роль читается текстом, а не только цветом (§6).
+  await expect(roleA).toContainText("А");
+  await expect(roleB).toContainText("Б");
+
+  // Каталог и полоса пары говорят об одних и тех же сессиях.
+  const rowA = page
+    .locator(`${CATALOG} [data-session]`)
+    .filter({ has: page.locator('[data-cat-role="a"]') });
+  const rowB = page
+    .locator(`${CATALOG} [data-session]`)
+    .filter({ has: page.locator('[data-cat-role="b"]') });
+  await expect(rowA.locator("[data-cat-label]")).toHaveText("стенд-А");
+  await expect(rowB.locator("[data-cat-label]")).toHaveText("bad-damped");
+
+  // Самошум назван инструментальным базисом своего дня, а не просто ещё одной записью.
+  const noise = page.locator(`${CATALOG} [data-cat-role="noise"]`);
+  await expect(noise).toHaveCount(1);
+  const noiseRow = page
+    .locator(`${CATALOG} [data-session]`)
+    .filter({ has: page.locator('[data-cat-role="noise"]') });
+  await expect(noiseRow.locator("[data-cat-label]")).toHaveText("самошум");
+});
