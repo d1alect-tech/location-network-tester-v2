@@ -1,0 +1,454 @@
+/* Вариант C — Терминал: CRT/TUI, нулевой радиус, фосфор только на живых отсчётах. */
+
+:root {
+  --tui-canvas: #05080a;
+  --tui-panel: #0c1015;
+  --tui-raised: #131b24;
+  --tui-inset: #1c2633;
+  --tui-border: #1e2c3a;
+  --tui-fg: #33ff88;
+  --tui-cyan: #00d0ff;
+  --tui-muted: #4a6b82;
+  --tui-dim: #243746;
+  --tui-trace-a: #00ff88;
+  --tui-trace-b: #00e5ff;
+  --tui-ok: #00ff88;
+  --tui-warn: #ffb300;
+  --tui-fatal: #ff3366;
+  --tui-font: "JetBrains Mono Variable", ui-monospace, monospace;
+  --tui-fs: 11px;
+  --tui-fs-chip: 10px;
+  --tui-fs-tele: 24px;
+  --tui-row: 22px;
+  --tui-phosphor: 0 0 5px rgba(51, 255, 136, 0.5);
+  --tui-focus: #00ff88;
+  --tui-focus-ring: rgba(0, 255, 136, 0.3);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+html,
+body {
+  margin: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  background: var(--tui-canvas);
+  color: var(--tui-fg);
+  font-family: var(--tui-font);
+  font-size: var(--tui-fs);
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.tui {
+  position: relative;
+  min-height: 100dvb;
+  min-width: 0;
+  background: var(--tui-canvas);
+}
+
+.tui::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 1px,
+    rgba(5, 8, 10, 0.08) 1px,
+    rgba(5, 8, 10, 0.08) 2px
+  );
+}
+
+.tui-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+  padding: 4px 10px;
+  background: var(--tui-inset);
+  border-bottom: 1px solid var(--tui-border);
+  font-size: var(--tui-fs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tui-brand {
+  color: var(--tui-cyan);
+}
+
+.tui-pipe {
+  color: var(--tui-dim);
+  font-weight: 400;
+}
+
+.tui-bar-end {
+  margin-inline-start: auto;
+  color: var(--tui-muted);
+  font-weight: 400;
+}
+
+.tui-live {
+  color: var(--tui-fg);
+  text-shadow: var(--tui-phosphor);
+}
+
+.is-ok {
+  color: var(--tui-ok);
+}
+
+.tui-body {
+  display: grid;
+  grid-template-columns: minmax(0, 38%) minmax(0, 62%);
+  gap: 8px;
+  padding: 8px;
+  min-width: 0;
+  align-items: start;
+}
+
+.tui-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tui-pane {
+  min-width: 0;
+  background: var(--tui-panel);
+  border: 1px solid var(--tui-border);
+}
+
+.tui-hd {
+  margin: 0;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--tui-border);
+  background: var(--tui-raised);
+  color: var(--tui-cyan);
+  font-size: var(--tui-fs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.tui-list {
+  min-width: 0;
+}
+
+.tui-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--tui-row);
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  border-bottom: 1px dashed var(--tui-border);
+  background: transparent;
+  color: var(--tui-fg);
+  font: inherit;
+  font-size: var(--tui-fs);
+  line-height: var(--tui-row);
+  text-align: start;
+  cursor: pointer;
+}
+
+.tui-idx {
+  color: var(--tui-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tui-name {
+  flex: 1 1 72px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tui-type,
+.tui-date {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tui-type,
+.tui-date {
+  color: var(--tui-muted);
+}
+
+.tui-chip {
+  font-size: var(--tui-fs-chip);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--tui-ok);
+}
+
+.tui-chip.is-partial,
+.tui-chip.is-warn {
+  color: var(--tui-warn);
+}
+
+.tui-chip.is-corrupt,
+.tui-chip.is-fatal {
+  color: var(--tui-fatal);
+}
+
+.tui-path {
+  flex: 1 1 100%;
+  min-width: 0;
+  padding: 0 0 6px;
+  color: var(--tui-muted);
+  font-size: var(--tui-fs);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.tui-row:hover:not(.is-on) {
+  background: var(--tui-raised);
+  color: var(--tui-trace-b);
+}
+
+.tui-row.is-on {
+  background: var(--tui-fg);
+  color: var(--tui-canvas);
+}
+
+.tui-row.is-on .tui-idx,
+.tui-row.is-on .tui-type,
+.tui-row.is-on .tui-date,
+.tui-row.is-on .tui-chip,
+.tui-row.is-on .tui-path {
+  color: var(--tui-canvas);
+}
+
+.tui-plot,
+.spectrum-plot {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--tui-panel);
+}
+
+.spectrum-plot {
+  height: 220px;
+}
+
+.spectrum-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 6px 8px;
+  border-top: 1px dashed var(--tui-border);
+  font-size: var(--tui-fs);
+  font-weight: 700;
+}
+
+.spectrum-legend [data-series="a"] {
+  color: var(--tui-trace-a);
+}
+
+.spectrum-legend [data-series="b"] {
+  color: var(--tui-trace-b);
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
+}
+
+.u-wrap,
+.u-over,
+.u-under {
+  border-radius: 0 !important;
+}
+
+.tui-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+  gap: 1px;
+  background: var(--tui-border);
+}
+
+.tui-metric {
+  padding: 10px 8px 8px;
+  background: var(--tui-panel);
+  min-width: 0;
+}
+
+.tui-val {
+  font-size: var(--tui-fs-tele);
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums lining-nums;
+  overflow-wrap: anywhere;
+}
+
+.tui-metric.is-live .tui-val {
+  text-shadow: var(--tui-phosphor);
+}
+
+.tui-key {
+  margin-top: 4px;
+  color: var(--tui-muted);
+  font-size: var(--tui-fs-chip);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tui-form {
+  padding-bottom: 8px;
+}
+
+.tui-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+
+.tui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tui-k {
+  color: var(--tui-muted);
+  font-size: var(--tui-fs-chip);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.tui-ctl {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--tui-border);
+  background: var(--tui-canvas);
+  color: var(--tui-fg);
+  font: inherit;
+  font-size: var(--tui-fs);
+}
+
+.tui-ctl:focus,
+.tui-row:focus-visible,
+.tui-btn:focus-visible,
+summary:focus-visible {
+  outline: 1px solid var(--tui-focus-ring);
+  outline-offset: 0;
+  border-color: var(--tui-focus);
+}
+
+.tui-ctl:focus {
+  caret-color: var(--tui-fg);
+  caret-shape: block;
+  animation: tui-caret 1s steps(1, end) infinite;
+}
+
+@keyframes tui-caret {
+  0%,
+  49% {
+    caret-color: var(--tui-fg);
+  }
+  50%,
+  100% {
+    caret-color: transparent;
+  }
+}
+
+.tui-more {
+  margin: 0 8px 8px;
+  border: 1px dashed var(--tui-border);
+}
+
+.tui-more summary {
+  padding: 6px 8px;
+  color: var(--tui-cyan);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tui-btn {
+  display: block;
+  margin: 0 8px 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--tui-fg);
+  background: var(--tui-canvas);
+  color: var(--tui-fg);
+  font: inherit;
+  font-size: var(--tui-fs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.tui-btn:hover {
+  background: var(--tui-raised);
+}
+
+.tui-fatal {
+  border-color: var(--tui-fatal);
+}
+
+.tui-hd-fatal {
+  background: var(--tui-inset);
+  color: var(--tui-fatal);
+  border-bottom-color: var(--tui-fatal);
+}
+
+.tui-err-title,
+.tui-err-msg {
+  margin: 8px 8px 0;
+  color: var(--tui-fatal);
+}
+
+.tui-err-title {
+  font-weight: 700;
+}
+
+.tui-btn-fatal {
+  border-color: var(--tui-fatal);
+  color: var(--tui-fatal);
+}
+
+@media (max-width: 900px) {
+  .tui-body,
+  .tui-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tui-row {
+    height: auto;
+    padding: 6px 8px;
+    line-height: 1.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
