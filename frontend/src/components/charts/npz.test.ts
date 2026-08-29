@@ -172,6 +172,18 @@ describe("readNpzArrays", () => {
     await expect(readNpzArrays(zip, ["time_s"])).rejects.toMatchObject({ code: "corrupt_payload" });
   });
 
+  it("отклоняет power_db с descr не <f4", async () => {
+    const zip = storedZip([
+      { name: "time_s.npy", content: npyF8([0, 1]) },
+      { name: "frequency_hz.npy", content: npyF8([10]) },
+      { name: "power_db.npy", content: npyF8([1, 2]) },
+    ]);
+    await expect(readNpzArrays(zip, ["time_s", "frequency_hz", "power_db"])).rejects.toMatchObject({
+      name: "TileError",
+      code: "corrupt_payload",
+    });
+  });
+
   it("parseNpy отклоняет fortran_order и кривую форму", () => {
     const header = "{'descr': '<f8', 'fortran_order': True, 'shape': (2,), }";
     const padded = `${header + " ".repeat(63 - header.length)}\n`;

@@ -112,7 +112,11 @@ export async function readNpzArrays(
           : (() => {
               throw new TileError("corrupt_payload", { detail: `(метод ${entry.method})` });
             })();
-    result.set(name, parseNpy(payload));
+    const parsed = parseNpy(payload);
+    if (name === "power_db" && parsed.descr !== "<f4") {
+      throw new TileError("corrupt_payload", { detail: "(power_db descr)" });
+    }
+    result.set(name, parsed);
   }
   return result;
 }

@@ -25,6 +25,8 @@ import { createSpectrogramView } from "./spectrogramView";
 import type { TileRenderData as TileRenderSlice } from "./spectrogramView";
 import { TileError } from "./tileError";
 
+const RECORDING = "спектрограмма записи";
+
 export interface SpectrogramPanelOptions {
   client: Pick<LntApiClient, "catalogSessions" | "analysis">;
 }
@@ -50,7 +52,7 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
   const status = el("p", {
     className: "lnt-spec-status",
     attrs: { role: "status" },
-    text: "Выберите сессию и введите ключ артефакта анализа.",
+    text: RECORDING,
   });
   const errorBanner = el("div", {
     className: "lnt-spec-error",
@@ -161,7 +163,7 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
     loadAbort = new AbortController();
     const signal = loadAbort.signal;
     errorBanner.setAttribute("hidden", "");
-    status.textContent = "Загрузка спектрограммы…";
+    status.textContent = RECORDING;
     try {
       const [bytes, inventory] = await Promise.all([
         options.client.analysis.artifactBytes(session, key, "spectrogram.npz", { signal }),
@@ -285,7 +287,7 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
   ]);
 
   const root = el("section", { className: "lnt-spec-panel" }, [
-    el("h3", { className: "lnt-chart-title", text: "Спектрограмма (STFT)" }),
+    el("h3", { className: "lnt-chart-title", text: RECORDING }),
     controls,
     status,
     errorBanner,
@@ -297,9 +299,7 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
   void options.client
     .catalogSessions()
     .then((page) => fillSessions(selectSession, page.items, "Выберите сессию"))
-    .catch(() => {
-      /* Каталог недоступен: селект остаётся с подсказкой выбора. */
-    });
+    .catch(() => undefined);
 
   return {
     root,
@@ -315,6 +315,7 @@ function isAbort(error: unknown): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
-    (error as { name?: unknown }).name === "AbortError"
+    ((error as { name?: unknown }).name === "AbortError" ||
+      (error as { status?: number }).status === 404)
   );
 }
