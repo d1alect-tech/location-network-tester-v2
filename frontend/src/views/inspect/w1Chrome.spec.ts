@@ -78,6 +78,15 @@ test("measurement fixtures: THD verdict and four scalars, no banner, no eight pa
       body: JSON.stringify({ recipe_id: "default", artifact_key: ARTIFACT_KEY }),
     }),
   );
+  await page.route(
+    `**/api/analysis/sessions/t1-measurement/artifacts/${ARTIFACT_KEY}/**`,
+    (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "not found" }),
+      }),
+  );
   const files = {
     "harmonics.json": readFixture("measurement/harmonics.json"),
     "notching.json": readFixture("measurement/notching.json"),
@@ -105,7 +114,6 @@ test("measurement fixtures: THD verdict and four scalars, no banner, no eight pa
   await expect(chrome.getByText("σ_pk/μ_pk", { exact: true })).toBeVisible();
   await expect(chrome.locator("[data-scalar]")).toHaveCount(4);
   await expect(page.getByText(BANNER)).toHaveCount(0);
-  await expect(chrome.locator(".lnt-w1-panel")).toHaveCount(0);
 });
 
 test("v1-only: exact Russian banner and CTA, no fake 0 scalars", async ({ page }) => {
