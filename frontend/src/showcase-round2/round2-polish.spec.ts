@@ -11,6 +11,7 @@ const ALL = [
   "showcase-v3.html",
   "showcase-v4.html",
   "showcase-v5.html",
+  "showcase-v6.html",
 ] as const;
 
 test.describe("S1: панели различимы по поверхностям (docked-варианты)", () => {

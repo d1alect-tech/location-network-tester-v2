@@ -164,8 +164,9 @@
   flex: none;
   flex-direction: row;
   align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
+  height: 32px;
+  gap: 8px;
+  padding: 0 12px;
   border: 0;
   border-left: 3px solid var(--lnt-err);
   border-radius: 0;
@@ -181,6 +182,9 @@
   flex: 1;
   min-width: 0;
   color: var(--lnt-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Маркеры пиков поверх спектра ──────────────────────────────────────────
@@ -196,7 +200,7 @@
   position: absolute;
   top: 0;
   height: 12px;
-  left: var(--peak-x, -100px);
+  left: -100px;
   width: 0;
   border-left: 1px solid rgb(255 255 255 / 0.28);
   transition: height var(--lnt-t-fast) var(--lnt-ease);
@@ -214,7 +218,7 @@
 .app-v5 .peak-mark-index {
   position: absolute;
   top: 0;
-  left: 3px;
+  left: 4px;
   font: 600 11px / 14px var(--lnt-mono);
   color: var(--lnt-text-dim);
 }
@@ -226,7 +230,7 @@
 .app-v5 .peak-mark-label {
   position: absolute;
   top: 16px;
-  left: 3px;
+  left: 4px;
   font: 500 11px / 14px var(--lnt-mono);
   color: var(--lnt-text);
   white-space: nowrap;

@@ -2,8 +2,9 @@
  *  связанная со строкой таблицы пиков. Слой лежит в plot.over и не перехватывает
  *  указатель — родной курсор и drag-зум uPlot остаются рабочими.
  *
- *  Координата маркера — данные шкалы, а не оформление: через переменную --peak-x.
- *  Всё оформление (цвет, толщина, шрифт, состояния) живёт в классах (§2.5). */
+ *  Координата приходит из шкалы графика, но в разметку не попадает: позиции
+ *  публикуются правилами конструируемого стиль-листа по классу и атрибуту,
+ *  поэтому в DOM нет ни одного inline-стиля (§2.5, §7). */
 import type uPlot from "uplot";
 import { PEAKS } from "../showcase-redesign/data";
 
@@ -52,16 +53,21 @@ export function mountPeakMarkers(plot: uPlot, rows: readonly HTMLElement[]): () 
     if (mark !== undefined) bindRow(row, mark);
   });
 
+  const sheet = new CSSStyleSheet();
+  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+
   const place = (): void => {
     const width = plot.over.clientWidth;
+    const rules: string[] = [];
     PEAKS.forEach((peak, index) => {
       const mark = marks[index];
       if (mark === undefined) return;
       const x = plot.valToPos(peak.frequencyHz, "x");
       const visible = Number.isFinite(x) && x >= 0 && x <= width;
-      mark.style.setProperty("--peak-x", `${Math.round(x)}px`);
       mark.classList.toggle("is-off", !visible);
+      rules.push(`.peak-mark[data-peak="${index}"] { left: ${Math.round(x)}px; }`);
     });
+    sheet.replaceSync(rules.join("\n"));
   };
   place();
   return place;

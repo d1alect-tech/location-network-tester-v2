@@ -158,6 +158,8 @@ export const SPECTRUM_STYLE: SpectrumStyle = {
 export interface SpectrumHooks {
   onDraw?: (plot: uPlot) => void;
   onPlot?: (plot: uPlot) => void;
+  /** Подписи трасс: вариант может назвать реальные сессии вместо «Сессия А/Б». */
+  labels?: { a: string; b: string };
 }
 
 /** Спектр в канве #1D1D1D: сигнал отделён от хрома (§5.1). */
@@ -167,7 +169,7 @@ export function buildSpectrumPanel(height: number, hooks: SpectrumHooks = {}): H
   const plot = renderSpectrum(
     host,
     { ...SPECTRUM_STYLE, height },
-    { a: "Сессия А", b: "Сессия Б" },
+    hooks.labels ?? { a: "Сессия А", b: "Сессия Б" },
     { header, onDraw: hooks.onDraw },
   );
   hooks.onPlot?.(plot);

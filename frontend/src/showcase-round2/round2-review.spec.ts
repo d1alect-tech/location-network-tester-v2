@@ -11,6 +11,7 @@ const ALL = [
   "showcase-v3.html",
   "showcase-v4.html",
   "showcase-v5.html",
+  "showcase-v6.html",
 ] as const;
 
 /** Собирает все отрисованные носители текста мельче 11px, включая ::before/::after. */
@@ -78,7 +79,8 @@ test.describe("S7: текст на акценте ≥4.5:1 (§4, §6)", () => {
     test(`${pageName}: основная кнопка контрастна в покое и при наведении`, async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 800 });
       await page.goto(`${BASE}/${pageName}`);
-      const button = page.locator('[data-showcase="capture-form"] .form-actions .btn');
+      // Селектор не зависит от скелета: в V6 захват — командная строка, а не панель с .form-actions.
+      const button = page.locator('[data-showcase="capture-form"] button.btn').first();
       await expect(button).toBeVisible();
       const ratio = () =>
         button.evaluate((el) => {
@@ -236,6 +238,27 @@ test.describe("S12: таблицы панелей не обрезаны по г�
           }),
       );
       expect(clipped, `обрезанные таблицы на ${pageName}`).toEqual([]);
+    });
+  }
+});
+
+test.describe("S13: разметка витрин без inline-стилей (§2.5, §7)", () => {
+  for (const pageName of ALL) {
+    test(`${pageName}: атрибут style есть только у чужого uPlot`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto(`${BASE}/${pageName}`);
+      const inline = await page.evaluate(() => {
+        // uPlot — вендорная библиотека, её собственные узлы позиционируются ею самой.
+        const vendor = (el: Element): boolean => {
+          if (el.tagName === "CANVAS") return true;
+          const classes = Array.from(el.classList);
+          return classes.includes("uplot") || classes.some((name) => name.startsWith("u-"));
+        };
+        return Array.from(document.querySelectorAll("[style]"))
+          .filter((el) => !vendor(el))
+          .map((el) => `${el.tagName.toLowerCase()}.${el.getAttribute("class") ?? ""}`);
+      });
+      expect(inline, `inline-стили в разметке ${pageName}`).toEqual([]);
     });
   }
 });
