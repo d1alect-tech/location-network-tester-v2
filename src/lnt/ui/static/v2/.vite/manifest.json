@@ -10,18 +10,28 @@
     "file": "assets/chartshell.CjJRDo9O.css",
     "src": "_chartshell.CjJRDo9O.css"
   },
-  "_spectrum.2iO96qtK.css": {
-    "file": "assets/spectrum.2iO96qtK.css",
-    "src": "_spectrum.2iO96qtK.css"
+  "_metrics.B1eGG3ha.js": {
+    "file": "assets/metrics.B1eGG3ha.js",
+    "name": "metrics",
+    "imports": [
+      "_spectrum.BeGRNgpf.js"
+    ],
+    "css": [
+      "assets/metrics.DDuL_p-3.css"
+    ]
   },
-  "_spectrum.COxqisDq.js": {
-    "file": "assets/spectrum.COxqisDq.js",
+  "_metrics.DDuL_p-3.css": {
+    "file": "assets/metrics.DDuL_p-3.css",
+    "src": "_metrics.DDuL_p-3.css"
+  },
+  "_spectrum.BeGRNgpf.js": {
+    "file": "assets/spectrum.BeGRNgpf.js",
     "name": "spectrum",
     "imports": [
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
-      "assets/spectrum.2iO96qtK.css"
+      "assets/spectrum.CXwmWaak.css"
     ],
     "assets": [
       "assets/inter-cyrillic-wght-normal.DqGufNeO.woff2",
@@ -32,12 +42,20 @@
       "assets/source-serif-4-latin-wght-normal.D9elroTD.woff2",
       "assets/jetbrains-mono-cyrillic-wght-normal.D73BlboJ.woff2",
       "assets/jetbrains-mono-latin-wght-normal.B9CIFXIH.woff2",
+      "assets/source-sans-3-cyrillic-wght-normal.BMDVbyM7.woff2",
+      "assets/source-sans-3-latin-wght-normal.BqRLTx4X.woff2",
+      "assets/source-code-pro-cyrillic-wght-normal.aqTvhEeI.woff2",
+      "assets/source-code-pro-latin-wght-normal.BP8Zz55n.woff2",
       "assets/IBMPlexSans-Regular.BiEB_oxT.woff2",
       "assets/IBMPlexSans-Medium.BQLKo0ot.woff2",
       "assets/IBMPlexSans-SemiBold.KfaJl9PC.woff2",
       "assets/IBMPlexMono-Regular.Du0PCiXT.woff2",
       "assets/IBMPlexMono-Medium.CiYsa3y2.woff2"
     ]
+  },
+  "_spectrum.CXwmWaak.css": {
+    "file": "assets/spectrum.CXwmWaak.css",
+    "src": "_spectrum.CXwmWaak.css"
   },
   "_uPlot.D1GxaB_c.css": {
     "file": "assets/uPlot.D1GxaB_c.css",
@@ -49,6 +67,10 @@
     "css": [
       "assets/uPlot.D1GxaB_c.css"
     ]
+  },
+  "_variantV1.CCz54TsC.css": {
+    "file": "assets/variantV1.CCz54TsC.css",
+    "src": "_variantV1.CCz54TsC.css"
   },
   "index.html": {
     "file": "assets/main.BT0yMJZd.js",
@@ -64,12 +86,12 @@
     ]
   },
   "showcase-a.html": {
-    "file": "assets/showcaseVariantA.CqUmZUSC.js",
+    "file": "assets/showcaseVariantA.CxE139R0.js",
     "name": "showcaseVariantA",
     "src": "showcase-a.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.COxqisDq.js",
+      "_spectrum.BeGRNgpf.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -77,12 +99,12 @@
     ]
   },
   "showcase-b.html": {
-    "file": "assets/showcaseVariantB.AeVX-Q-_.js",
+    "file": "assets/showcaseVariantB.D0Sb1KSV.js",
     "name": "showcaseVariantB",
     "src": "showcase-b.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.COxqisDq.js",
+      "_spectrum.BeGRNgpf.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -90,12 +112,12 @@
     ]
   },
   "showcase-c.html": {
-    "file": "assets/showcaseVariantC.HyuW9QD5.js",
+    "file": "assets/showcaseVariantC.HXfUb_Tw.js",
     "name": "showcaseVariantC",
     "src": "showcase-c.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.COxqisDq.js",
+      "_spectrum.BeGRNgpf.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -103,12 +125,12 @@
     ]
   },
   "showcase-d.html": {
-    "file": "assets/showcaseVariantD.DLZu50_p.js",
+    "file": "assets/showcaseVariantD.c_zaazMh.js",
     "name": "showcaseVariantD",
     "src": "showcase-d.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.COxqisDq.js",
+      "_spectrum.BeGRNgpf.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -118,6 +140,67 @@
   "showcase-redesign.html": {
     "file": "assets/showcaseRedesignIndex.CGYVNnuy.css",
     "src": "showcase-redesign.html"
+  },
+  "showcase-round2.html": {
+    "file": "assets/showcaseRound2Index.D7ra9ITW.css",
+    "src": "showcase-round2.html"
+  },
+  "showcase-v1.html": {
+    "file": "assets/showcaseRound2V1.CNkGX_x4.js",
+    "name": "showcaseRound2V1",
+    "src": "showcase-v1.html",
+    "isEntry": true,
+    "imports": [
+      "_metrics.B1eGG3ha.js",
+      "_spectrum.BeGRNgpf.js",
+      "_uPlot.min.I5bB1VQk.js"
+    ],
+    "css": [
+      "assets/variantV1.CCz54TsC.css"
+    ]
+  },
+  "showcase-v2.html": {
+    "file": "assets/showcaseRound2V2.DENpoh16.js",
+    "name": "showcaseRound2V2",
+    "src": "showcase-v2.html",
+    "isEntry": true,
+    "imports": [
+      "_metrics.B1eGG3ha.js",
+      "_spectrum.BeGRNgpf.js",
+      "_uPlot.min.I5bB1VQk.js"
+    ],
+    "css": [
+      "assets/showcaseRound2V2.B-XMgjJx.css",
+      "assets/variantV1.CCz54TsC.css"
+    ]
+  },
+  "showcase-v3.html": {
+    "file": "assets/showcaseRound2V3.CfUcUTnd.js",
+    "name": "showcaseRound2V3",
+    "src": "showcase-v3.html",
+    "isEntry": true,
+    "imports": [
+      "_metrics.B1eGG3ha.js",
+      "_spectrum.BeGRNgpf.js",
+      "_uPlot.min.I5bB1VQk.js"
+    ],
+    "css": [
+      "assets/showcaseRound2V3.C4S2jets.css"
+    ]
+  },
+  "showcase-v4.html": {
+    "file": "assets/showcaseRound2V4.B9jSSOVE.js",
+    "name": "showcaseRound2V4",
+    "src": "showcase-v4.html",
+    "isEntry": true,
+    "imports": [
+      "_metrics.B1eGG3ha.js",
+      "_spectrum.BeGRNgpf.js",
+      "_uPlot.min.I5bB1VQk.js"
+    ],
+    "css": [
+      "assets/showcaseRound2V4.XDe1i0Lh.css"
+    ]
   },
   "showcase.html": {
     "file": "assets/showcase.DjdZBuIA.js",
@@ -171,6 +254,22 @@
   "src/showcase-redesign/fonts/jetbrains-mono-latin-wght-normal.woff2": {
     "file": "assets/jetbrains-mono-latin-wght-normal.B9CIFXIH.woff2",
     "src": "src/showcase-redesign/fonts/jetbrains-mono-latin-wght-normal.woff2"
+  },
+  "src/showcase-redesign/fonts/source-code-pro-cyrillic-wght-normal.woff2": {
+    "file": "assets/source-code-pro-cyrillic-wght-normal.aqTvhEeI.woff2",
+    "src": "src/showcase-redesign/fonts/source-code-pro-cyrillic-wght-normal.woff2"
+  },
+  "src/showcase-redesign/fonts/source-code-pro-latin-wght-normal.woff2": {
+    "file": "assets/source-code-pro-latin-wght-normal.BP8Zz55n.woff2",
+    "src": "src/showcase-redesign/fonts/source-code-pro-latin-wght-normal.woff2"
+  },
+  "src/showcase-redesign/fonts/source-sans-3-cyrillic-wght-normal.woff2": {
+    "file": "assets/source-sans-3-cyrillic-wght-normal.BMDVbyM7.woff2",
+    "src": "src/showcase-redesign/fonts/source-sans-3-cyrillic-wght-normal.woff2"
+  },
+  "src/showcase-redesign/fonts/source-sans-3-latin-wght-normal.woff2": {
+    "file": "assets/source-sans-3-latin-wght-normal.BqRLTx4X.woff2",
+    "src": "src/showcase-redesign/fonts/source-sans-3-latin-wght-normal.woff2"
   },
   "src/showcase-redesign/fonts/source-serif-4-cyrillic-wght-normal.woff2": {
     "file": "assets/source-serif-4-cyrillic-wght-normal.DwHjdM4S.woff2",
