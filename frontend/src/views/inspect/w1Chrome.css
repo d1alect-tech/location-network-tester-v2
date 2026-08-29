@@ -97,6 +97,38 @@
   font-size: 13px;
 }
 
+.lnt-w1-panels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-2);
+  margin-top: var(--lnt-space-3);
+}
+
+.lnt-w1-panel {
+  background-color: var(--lnt-bg-raised);
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-panel);
+}
+
+.lnt-w1-panel > summary {
+  min-height: var(--lnt-control-height);
+  padding: var(--lnt-space-2) var(--lnt-space-3);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: var(--lnt-weight-medium);
+}
+
+.lnt-w1-panel-body {
+  padding: 0 var(--lnt-space-3) var(--lnt-space-3);
+}
+
+.lnt-w1-panel-note {
+  margin: 0 0 var(--lnt-space-2);
+  color: var(--lnt-fg-secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lnt-w1-job-bar {
     transition: none;
