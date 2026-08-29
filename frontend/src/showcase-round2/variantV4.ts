@@ -1,4 +1,4 @@
-/** V4 — «Карточный дашборд»: сайдбар-навигация как в V1, центр — сетка карточек
+/** V4 — «Карточный дашборд»: слева рейл каталога как в V1, центр — сетка карточек
  *  (r8, hairline-рамки, без теней), отступы 16px, больше воздуха (§8 V4). */
 import "./variantV4.css";
 import { buildCaptureForm, buildError } from "./form";
@@ -22,8 +22,6 @@ const kpiCard = h("section", "panel span2", {}, [
 ]);
 const spectrum = buildSpectrumPanel(300);
 spectrum.classList.add("span2");
-const catalog = buildCatalog();
-catalog.classList.add("span2");
 const capture = buildCaptureForm();
 const metrics = buildMetrics();
 
@@ -32,10 +30,10 @@ app.append(
     buildHeader(false),
     h("div", "navrow", {}, [buildTabbar("Инспекция")]),
     h("div", "app-body", {}, [
+      h("div", "col-cat", {}, [buildCatalog()]),
       h("div", "cards", {}, [
         kpiCard,
         spectrum,
-        catalog,
         metrics,
         h("div", "col-stack", {}, [capture, buildError()]),
       ]),

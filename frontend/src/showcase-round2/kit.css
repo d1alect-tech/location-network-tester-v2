@@ -30,6 +30,11 @@ a {
   color: var(--lnt-text);
 }
 
+/* Атрибут hidden сильнее раскладочных display у компонентов (disclosure §1.5). */
+[hidden] {
+  display: none !important;
+}
+
 /* ── Шелл: шапка 32px и статус-бар 32px (§5.5) ─────────────────────────── */
 
 .hdr {
@@ -262,7 +267,6 @@ a {
 
 .tbl .num {
   font-family: var(--lnt-mono);
-  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -286,10 +290,6 @@ a {
 
 .tbl-cat th:nth-child(4) {
   width: 96px;
-}
-
-.tbl-cat td:not(.cell-path) {
-  height: 24px;
 }
 
 /* Глифы состояний: цвет — семантика, сам глиф кодирует состояние и без цвета (§6). */
@@ -343,7 +343,8 @@ a {
   border: 0;
   border-radius: var(--lnt-r-ctl);
   background: var(--lnt-accent);
-  color: #ffffff;
+  /* Тёмный текст на акценте: белый даёт лишь ~3.5:1, канва — 4.7:1 (§4, §6). */
+  color: var(--lnt-canvas);
   font: 600 14px / 20px var(--lnt-ui);
   cursor: pointer;
   transition: background var(--lnt-t-fast) var(--lnt-ease);
@@ -450,7 +451,7 @@ select.ctl {
 
 .disc-toggle::before {
   content: "▸";
-  font-size: 10px;
+  font-size: 11px;
   transition: transform var(--lnt-t-fast) var(--lnt-ease);
 }
 
@@ -680,7 +681,7 @@ select.ctl {
 
 .is-dense .tbl th {
   height: 28px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .is-dense .panel-bd {

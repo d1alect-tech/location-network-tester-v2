@@ -17,7 +17,8 @@
 
   /* §4 Слот акцента (дефолт) */
   --lnt-accent: #5681ff;
-  --lnt-accent-press: #4170f0;
+  /* Тёмная тема: hover/press осветляют акцент, чтобы тёмный текст держал ≥4.5:1 (§4). */
+  --lnt-accent-press: #7396ff;
   --lnt-ok: #2d9d78;
   --lnt-warn: #e68619;
   --lnt-err: #ec5b62;

@@ -52,16 +52,26 @@ test.describe("S2: каталог — эллипсис вместо перено
       const sample = cells.first();
       const style = await sample.evaluate((el) => {
         const cs = getComputedStyle(el);
+        // Однорядность читается по базовым линиям текста, а не по высоте ячейки: высота
+        // задана ТЗ §2.3 (28-32px), а обрезанный текст браузер вправе вернуть
+        // несколькими фрагментами одной и той же строки.
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const tops = new Set(
+          Array.from(range.getClientRects()).map((rect) => Math.round(rect.top)),
+        );
         return {
           textOverflow: cs.textOverflow,
           whiteSpace: cs.whiteSpace,
           height: el.getBoundingClientRect().height,
+          lines: tops.size,
           title: el.getAttribute("title") ?? "",
         };
       });
       expect(style.textOverflow).toBe("ellipsis");
       expect(style.whiteSpace).toBe("nowrap");
-      expect(style.height).toBeLessThanOrEqual(24);
+      expect(style.lines).toBe(1);
+      expect(style.height).toBeLessThanOrEqual(32);
       expect(style.title.length).toBeGreaterThan(0);
     });
   }
