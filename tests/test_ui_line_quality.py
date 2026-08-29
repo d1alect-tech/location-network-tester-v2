@@ -84,7 +84,7 @@ class TestBackendLineQuality:
 
         result = LntBackend().analyze_and_write(session)
 
-        assert isinstance(result, LineQualityAnalysis)
+        assert isinstance(result.analysis, LineQualityAnalysis)
         assert (session / "metrics.json").is_file()
         assert not (session / "spectrum.csv").exists()
 

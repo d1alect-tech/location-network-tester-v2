@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Callable
 from pathlib import Path  # noqa: TC003 - runtime artifact paths
@@ -10,24 +9,12 @@ from typing import Final
 
 import numpy as np
 
-from lnt.analysis_store import (
-    AnalysisRecipe,
-    ArtifactCorruptError,
-    ArtifactInputs,
-    ArtifactStore,
-    CodeIdentity,
-    NamedDigest,
-)
-from lnt.apd import apd_preset
-from lnt.audio_panel import audio_panel_preset
-from lnt.burst import burst_preset
+from lnt.analysis_store import AnalysisRecipe, ArtifactCorruptError, ArtifactStore, CodeIdentity
 from lnt.errors import InputError
-from lnt.harmonics import harmonics_preset
-from lnt.notching import notching_preset
-from lnt.power_quality import power_quality_preset
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
-from lnt.trends import trends_preset
 
+from .artifact_inputs import artifact_inputs as _artifact_inputs
+from .artifact_inputs import sha256_file as _sha256_file  # noqa: F401 - tests import digest helper
 from .projection import project_default
 from .types import (
     AnalysisCancelledError,
@@ -40,7 +27,6 @@ from .types import (
 
 ProgressCallback = Callable[[str, int, int], None]
 MAX_CHUNK_SECONDS: Final = 0.25
-_DIGEST_CHUNK_BYTES: Final = 1024 * 1024
 _DISPATCH: Final = {
     SessionKind.MEASUREMENT: (
         "psd",
@@ -49,6 +35,11 @@ _DISPATCH: Final = {
         "features",
         "correction",
         "audio_panel",
+        "harmonics",
+        "notching",
+        "apd",
+        "burst",
+        "trends",
     ),
     SessionKind.SELF_NOISE: ("psd", "spectrogram", "events", "features"),
     SessionKind.LINE_QUALITY: ("line_quality",),
@@ -152,110 +143,6 @@ def _session_metadata(session_dir: Path) -> tuple[SessionKind, float]:
     except ValueError as error:
         raise InputError(f"неизвестный для анализа тип сессии: {raw_kind!r}") from error
     return kind, float(payload["sample_rate_hz"])
-
-
-def _sha256_file(path: Path) -> str:
-    """Стриминговый SHA-256 файла порциями по 1 МиБ; значение как у read_bytes."""
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        while chunk := stream.read(_DIGEST_CHUNK_BYTES):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _artifact_inputs(
-    recipe: AnalysisRecipe,
-    channel_paths: tuple[Path, ...],
-    identity: CodeIdentity,
-    kind: SessionKind | None = None,
-) -> ArtifactInputs:
-    raw = tuple(NamedDigest(name=path.name, digest=_sha256_file(path)) for path in channel_paths)
-    context: tuple[NamedDigest, ...] = ()
-    if kind is SessionKind.POWER_QUALITY:
-        context = (_power_quality_dependency(),)
-    elif kind is SessionKind.MEASUREMENT:
-        context = (_audio_panel_dependency(),)
-    elif kind is SessionKind.NOTCHING:
-        context = (_notching_dependency(),)
-    elif kind is SessionKind.HARMONICS:
-        context = (_harmonics_dependency(),)
-    elif kind is SessionKind.BURST:
-        context = (_burst_dependency(),)
-    elif kind is SessionKind.APD:
-        context = (_apd_dependency(),)
-    elif kind is SessionKind.TRENDS:
-        context = (_trends_dependency(),)
-    return ArtifactInputs(
-        recipe_sha256=recipe.recipe_sha256,
-        raw_inputs=raw,
-        context_dependencies=context,
-        profile_dependencies=(),
-        calibration_dependencies=(),
-        code_identity=identity,
-    )
-
-
-def _audio_panel_dependency() -> NamedDigest:
-    settings = audio_panel_preset("audio_default")
-    payload = json.dumps(
-        settings.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
-    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return NamedDigest(name="audio_panel_settings.json", digest=digest)
-
-
-def _power_quality_dependency() -> NamedDigest:
-    settings = power_quality_preset("itic_default")
-    payload = json.dumps(
-        settings.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
-    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return NamedDigest(name="power_quality_settings.json", digest=digest)
-
-
-def _notching_dependency() -> NamedDigest:
-    settings = notching_preset("notching_default")
-    payload = json.dumps(
-        settings.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
-    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return NamedDigest(name="notching_settings.json", digest=digest)
-
-
-def _apd_dependency() -> NamedDigest:
-    settings = apd_preset("apd_default")
-    payload = json.dumps(
-        settings.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
-    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return NamedDigest(name="apd_settings.json", digest=digest)
-
-
-def _burst_dependency() -> NamedDigest:
-    settings = burst_preset("burst_default")
-    payload = json.dumps(
-        settings.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
-    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return NamedDigest(name="burst_settings.json", digest=digest)
-
-
-def _trends_dependency() -> NamedDigest:
-    settings = trends_preset("trends_default")
-    payload = json.dumps(
-        settings.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
-    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return NamedDigest(name="trends_settings.json", digest=digest)
-
-
-def _harmonics_dependency() -> NamedDigest:
-    settings = harmonics_preset("harmonics_default")
-    payload = json.dumps(
-        settings.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
-    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return NamedDigest(name="harmonics_settings.json", digest=digest)
 
 
 def _encode_failures(failures: list[BranchFailure]) -> bytes:

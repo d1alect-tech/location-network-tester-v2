@@ -115,11 +115,12 @@ def test_orchestrator_dispatches_power_quality(tmp_path: Path) -> None:
     np.save(session2 / "ch1.npy", samples)
     np.save(session2 / "ch2.npy", samples)
     (session2 / "manifest.json").write_text(
-        json.dumps({"session_type": "measurement", "sample_rate_hz": 1000.0}),
+        json.dumps({"session_type": "measurement", "sample_rate_hz": 100_000.0}),
         encoding="utf-8",
     )
     result2 = orch.run(session2, _recipe(channels=("ch1", "ch2")))
-    assert result2.failures == () or any(f.branch == "events" for f in result2.failures)
+    assert not (result2.artifact_dir / "power_quality.json").is_file()
+    assert all(failure.branch != "power_quality" for failure in result2.failures)
 
 
 def test_cache_key_includes_power_quality_settings_hash(tmp_path: Path) -> None:
@@ -155,7 +156,7 @@ def test_cache_key_includes_power_quality_settings_hash(tmp_path: Path) -> None:
     np.save(meas_session / "ch1.npy", samples)
     np.save(meas_session / "ch2.npy", samples)
     (meas_session / "manifest.json").write_text(
-        json.dumps({"session_type": "measurement", "sample_rate_hz": 1000.0}), encoding="utf-8"
+        json.dumps({"session_type": "measurement", "sample_rate_hz": 100_000.0}), encoding="utf-8"
     )
     result_meas = orch.run(meas_session, _recipe(channels=("ch1", "ch2")))
     manifest_meas = json.loads(

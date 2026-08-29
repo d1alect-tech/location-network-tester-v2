@@ -18,6 +18,7 @@ from lnt.analysis_v2 import (
     BranchContext,
     BranchFailure,
     BranchOutput,
+    DefaultAnalysisEngine,
     SessionKind,
 )
 from lnt.scope_io import CancellationToken
@@ -95,12 +96,36 @@ def _orchestrator(engine: RecordingEngine) -> AnalysisOrchestrator:
         (
             SessionKind.MEASUREMENT,
             2,
-            {"psd", "spectrogram", "events", "features", "correction", "audio_panel"},
+            {
+                "psd",
+                "spectrogram",
+                "events",
+                "features",
+                "correction",
+                "audio_panel",
+                "harmonics",
+                "notching",
+                "apd",
+                "burst",
+                "trends",
+            },
         ),
         (
             SessionKind.MEASUREMENT,
             1,
-            {"psd", "spectrogram", "events", "features", "correction", "audio_panel"},
+            {
+                "psd",
+                "spectrogram",
+                "events",
+                "features",
+                "correction",
+                "audio_panel",
+                "harmonics",
+                "notching",
+                "apd",
+                "burst",
+                "trends",
+            },
         ),
         (SessionKind.SELF_NOISE, 1, {"psd", "spectrogram", "events", "features"}),
         (SessionKind.LINE_QUALITY, 1, {"line_quality"}),
@@ -169,3 +194,31 @@ def test_cancellation_is_acknowledged_within_500_ms_and_publishes_no_partial(
 
     assert time.monotonic() - started < 0.5
     assert not tuple((session / "analyses").glob("*.partial-*"))
+
+
+def _measurement_sine_session(path: Path) -> Path:
+    rate = 10_000.0
+    duration_s = 2.4
+    t = np.arange(round(rate * duration_s), dtype=np.float64) / rate
+    ch1 = (np.sin(2.0 * np.pi * 50.0 * t)).astype(np.float32)
+    path.mkdir()
+    np.save(path / "ch1.npy", ch1)
+    np.save(path / "ch2.npy", ch1)
+    (path / "manifest.json").write_text(
+        json.dumps({"session_type": SessionKind.MEASUREMENT.value, "sample_rate_hz": rate}),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_measurement_orchestrator_writes_batch_2_6_json(tmp_path: Path) -> None:
+    session = _measurement_sine_session(tmp_path / "measurement")
+    orchestrator = AnalysisOrchestrator(
+        engine=DefaultAnalysisEngine(),
+        code_identity=CodeIdentity(lnt="test", numpy=np.__version__, scipy="test"),
+    )
+
+    result = orchestrator.run(session, _recipe(), project_legacy=False)
+
+    for name in ("harmonics.json", "notching.json", "apd.json", "burst.json", "trends.json"):
+        assert (result.artifact_dir / name).is_file()

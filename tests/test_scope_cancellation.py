@@ -27,9 +27,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    from lnt.analysis import AnalysisResult, LineQualityAnalysis
-    from lnt.cm_dm.analysis import CmDmAnalysis
     from lnt.types import SeriesPosition
+    from lnt.ui.analysis_v2_wire import AnalyzeWriteResult
 
 
 @dataclass(slots=True)
@@ -250,7 +249,7 @@ class _SeriesBackend(LntBackend):
     def analyze_and_write(
         self,
         session_dir: Path,
-    ) -> AnalysisResult | LineQualityAnalysis | CmDmAnalysis:
+    ) -> AnalyzeWriteResult:
         result = LntBackend.analyze_and_write(self, session_dir)
         self.cancelled.set()
         return result
