@@ -8,13 +8,13 @@ import pytest
 from fastapi import Depends, FastAPI, HTTPException
 from starlette.testclient import TestClient
 
-from lnt.ui.analysis_v2_wire import AnalyzeWriteResult
 from lnt.compare import ComparisonResult
 from lnt.errors import InputError
 from lnt.runtime.store import JobStore
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 from lnt.selftest import SelftestResult
 from lnt.types import SeriesPosition
+from lnt.ui.analysis_v2_wire import AnalyzeWriteResult
 from lnt.ui.dependencies import (
     AppServices,
     get_services,

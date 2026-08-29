@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from lnt.types import SeriesPosition
+    from lnt.ui.analysis_v2_wire import BranchFailureRecord
     from lnt.ui.operations import JobBackend
 
 _LOGGER = logging.getLogger(__name__)
@@ -158,7 +159,7 @@ def _execute_series(
         repeat=request.repeat,
     )
     dirs = series_dirs(base, request.repeat)
-    branch_failures: list[Mapping[str, str]] = []
+    branch_failures: list[BranchFailureRecord] = []
 
     def start_session(position: SeriesPosition) -> Path:
         if context.is_cancelled():

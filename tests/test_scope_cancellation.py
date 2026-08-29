@@ -27,8 +27,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    from lnt.ui.analysis_v2_wire import AnalyzeWriteResult
     from lnt.types import SeriesPosition
+    from lnt.ui.analysis_v2_wire import AnalyzeWriteResult
 
 
 @dataclass(slots=True)
