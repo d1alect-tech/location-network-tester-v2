@@ -10,19 +10,19 @@
     "file": "assets/chartshell.CjJRDo9O.css",
     "src": "_chartshell.CjJRDo9O.css"
   },
-  "_metrics.B1eGG3ha.js": {
-    "file": "assets/metrics.B1eGG3ha.js",
+  "_metrics.CgP5Hqd6.css": {
+    "file": "assets/metrics.CgP5Hqd6.css",
+    "src": "_metrics.CgP5Hqd6.css"
+  },
+  "_metrics.D7K8sryc.js": {
+    "file": "assets/metrics.D7K8sryc.js",
     "name": "metrics",
     "imports": [
       "_spectrum.BeGRNgpf.js"
     ],
     "css": [
-      "assets/metrics.DDuL_p-3.css"
+      "assets/metrics.CgP5Hqd6.css"
     ]
-  },
-  "_metrics.DDuL_p-3.css": {
-    "file": "assets/metrics.DDuL_p-3.css",
-    "src": "_metrics.DDuL_p-3.css"
   },
   "_spectrum.BeGRNgpf.js": {
     "file": "assets/spectrum.BeGRNgpf.js",
@@ -146,12 +146,12 @@
     "src": "showcase-round2.html"
   },
   "showcase-v1.html": {
-    "file": "assets/showcaseRound2V1.CNkGX_x4.js",
+    "file": "assets/showcaseRound2V1.DlO0KWOT.js",
     "name": "showcaseRound2V1",
     "src": "showcase-v1.html",
     "isEntry": true,
     "imports": [
-      "_metrics.B1eGG3ha.js",
+      "_metrics.D7K8sryc.js",
       "_spectrum.BeGRNgpf.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
@@ -160,12 +160,12 @@
     ]
   },
   "showcase-v2.html": {
-    "file": "assets/showcaseRound2V2.DENpoh16.js",
+    "file": "assets/showcaseRound2V2.DBB1Ss_P.js",
     "name": "showcaseRound2V2",
     "src": "showcase-v2.html",
     "isEntry": true,
     "imports": [
-      "_metrics.B1eGG3ha.js",
+      "_metrics.D7K8sryc.js",
       "_spectrum.BeGRNgpf.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
@@ -175,12 +175,12 @@
     ]
   },
   "showcase-v3.html": {
-    "file": "assets/showcaseRound2V3.CfUcUTnd.js",
+    "file": "assets/showcaseRound2V3.Dcupqy2J.js",
     "name": "showcaseRound2V3",
     "src": "showcase-v3.html",
     "isEntry": true,
     "imports": [
-      "_metrics.B1eGG3ha.js",
+      "_metrics.D7K8sryc.js",
       "_spectrum.BeGRNgpf.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
@@ -189,17 +189,17 @@
     ]
   },
   "showcase-v4.html": {
-    "file": "assets/showcaseRound2V4.B9jSSOVE.js",
+    "file": "assets/showcaseRound2V4.VDCW6L4R.js",
     "name": "showcaseRound2V4",
     "src": "showcase-v4.html",
     "isEntry": true,
     "imports": [
-      "_metrics.B1eGG3ha.js",
+      "_metrics.D7K8sryc.js",
       "_spectrum.BeGRNgpf.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
-      "assets/showcaseRound2V4.XDe1i0Lh.css"
+      "assets/showcaseRound2V4.DEZsaNTr.css"
     ]
   },
   "showcase.html": {
