@@ -1,0 +1,99 @@
+{
+  "schema_version": 2,
+  "session_id": "t1-measurement",
+  "profile": "quiet",
+  "source": "synthetic",
+  "session_type": "measurement",
+  "sample_rate_hz": 100000.0,
+  "duration_s": 2.4,
+  "needle": {
+    "sync_source": "ch2",
+    "cycles_analyzed": 118,
+    "line_frequency_hz": 50.00000069705113,
+    "needle_mean_v": 1.2904716830239729,
+    "needle_sigma_ratio": 6.2177539712658225,
+    "sync_power_v2": 0.010697658248215683,
+    "async_power_v2": 0.7839909077582152,
+    "async_sync_ratio": 73.28621737275829,
+    "lf_envelope_cv": 0.0,
+    "uncertainty": {
+      "method": "seeded_cycle_bootstrap_percentile_95",
+      "confidence_level": 0.95,
+      "needle_mean_v": {
+        "low": 8.415150282416734e-06,
+        "high": 3.0110893565854435
+      },
+      "needle_sigma_ratio": {
+        "low": 2.4208623515917334e-12,
+        "high": 10.862567985796284
+      }
+    }
+  },
+  "line_quality": null,
+  "spectrum": {
+    "resolution_hz": 97.65625,
+    "band_low_hz": 3000.0,
+    "band_high_hz": 45000.0,
+    "peaks": [
+      {
+        "frequency_hz": 27439.753411811755,
+        "level_db": -49.94822526269054,
+        "prominence_db": 27.081353397222998,
+        "q_factor": 10.954579077247553
+      },
+      {
+        "frequency_hz": 32456.7257325008,
+        "level_db": -50.947810941394884,
+        "prominence_db": 26.873981560610822,
+        "q_factor": 12.939527803161242
+      },
+      {
+        "frequency_hz": 22418.217172121924,
+        "level_db": -48.57427178370778,
+        "prominence_db": 26.499263233034675,
+        "q_factor": 8.923531964015023
+      },
+      {
+        "frequency_hz": 37471.698824031366,
+        "level_db": -51.64742114524902,
+        "prominence_db": 26.061419163784855,
+        "q_factor": 14.965164127348714
+      },
+      {
+        "frequency_hz": 17384.24186572901,
+        "level_db": -46.66809616011789,
+        "prominence_db": 25.23586459363944,
+        "q_factor": 6.939999518222137
+      },
+      {
+        "frequency_hz": 12328.978480547026,
+        "level_db": -43.92771420959286,
+        "prominence_db": 24.523195919850927,
+        "q_factor": 4.913944473716992
+      },
+      {
+        "frequency_hz": 42482.89005258587,
+        "level_db": -52.09113263248299,
+        "prominence_db": 24.00333049587983,
+        "q_factor": 16.95757966097634
+      },
+      {
+        "frequency_hz": 7199.2917151614665,
+        "level_db": -39.504850483863386,
+        "prominence_db": 23.940797351183726,
+        "q_factor": 2.849050899164769
+      }
+    ]
+  },
+  "ch1_input_reference": {
+    "status": "unavailable",
+    "reason_code": "manifest_schema_v1",
+    "model_kind": null,
+    "baseline_session_id": null,
+    "model": null,
+    "qualification_rule_id": null,
+    "qualified_bin_count": 0,
+    "total_bin_count": 0,
+    "corrected_peaks": []
+  }
+}

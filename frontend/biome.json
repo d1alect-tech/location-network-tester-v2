@@ -12,6 +12,9 @@
       }
     }
   },
+  "files": {
+    "ignore": ["src/test-support/analysis-v2-fixtures/**"]
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",

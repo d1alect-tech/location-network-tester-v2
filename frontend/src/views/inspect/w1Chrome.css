@@ -1,0 +1,104 @@
+/* W1 inspect chrome: banner, THD badge, four optional scalars. Tokens only. */
+
+.lnt-w1-chrome {
+  margin-top: var(--lnt-space-4);
+  padding: var(--lnt-space-4);
+  background-color: var(--lnt-bg-panel);
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-panel);
+}
+
+.lnt-w1-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lnt-space-3);
+  align-items: center;
+  margin-bottom: var(--lnt-space-3);
+}
+
+.lnt-w1-banner {
+  border: var(--lnt-border-width) solid var(--lnt-border-strong);
+  background-color: var(--lnt-status-warn-bg);
+  color: var(--lnt-fg-primary);
+  border-radius: var(--lnt-radius-control);
+  padding: var(--lnt-space-2) var(--lnt-space-3);
+  margin: var(--lnt-space-2) 0;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.lnt-w1-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--lnt-control-height);
+  padding: 0 var(--lnt-space-3);
+  border-radius: var(--lnt-radius-control);
+  font-size: 13px;
+  font-weight: var(--lnt-weight-medium);
+}
+
+.lnt-w1-badge-ok {
+  background-color: var(--lnt-status-ok-bg);
+  color: var(--lnt-status-ok);
+}
+
+.lnt-w1-badge-fail {
+  background-color: var(--lnt-status-error-bg);
+  color: var(--lnt-status-error);
+}
+
+.lnt-w1-badge-legacy {
+  background-color: var(--lnt-bg-raised);
+  color: var(--lnt-fg-secondary);
+}
+
+.lnt-w1-scalars {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--lnt-space-1) var(--lnt-space-4);
+  margin: var(--lnt-space-3) 0 0;
+  font-family: var(--lnt-font-mono);
+  font-size: 13px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.lnt-w1-scalars div {
+  display: contents;
+}
+
+.lnt-w1-scalars dt {
+  font-family: var(--lnt-font-sans);
+  font-weight: var(--lnt-weight-medium);
+  color: var(--lnt-fg-secondary);
+}
+
+.lnt-w1-scalars dd {
+  margin: 0;
+  color: var(--lnt-fg-primary);
+}
+
+.lnt-w1-job-rail {
+  margin-top: var(--lnt-space-3);
+}
+
+.lnt-w1-job-bar {
+  height: 8px;
+  width: 0;
+  background-color: var(--lnt-accent-a);
+  border-radius: var(--lnt-radius-status);
+  transition: width 120ms linear;
+}
+
+.lnt-w1-failures {
+  margin: var(--lnt-space-2) 0 0;
+  padding-left: var(--lnt-space-5);
+  color: var(--lnt-fg-secondary);
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lnt-w1-job-bar {
+    transition: none;
+  }
+}
