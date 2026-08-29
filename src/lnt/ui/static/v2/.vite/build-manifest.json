@@ -144,8 +144,9 @@
     "src/showcase-round2/round2-polish.spec.ts": "5d7fab2716eb3d7de4fd2ea23d965880ab1680789ad4dcba3158638c15bec715",
     "src/showcase-round2/round2-review.spec.ts": "6b544e03517f583aa22f7854a43099b7256f8f7f428bed1dc72e495f26a60d82",
     "src/showcase-round2/round2-v5.spec.ts": "597496131bb6f99d982e7b649de5030b0a11934b805d0ce56f9401d5afa78258",
-    "src/showcase-round2/round2-v6.spec.ts": "295603346afacf5fd485987d3d3a9be66e1a84849cabe0855ed6121bbed7eaa8",
+    "src/showcase-round2/round2-v6.spec.ts": "c511fb82cd52660dd76be8c7414e1c09312796fa84fb15dbd6dffd77fe8fbc75",
     "src/showcase-round2/showcase-round2.spec.ts": "212d6c221dccbb6d2736f9800ea9f977d999d80ced42684b625060c3a36d9fc4",
+    "src/showcase-round2/spectrogramV6.ts": "7a0c3a82b4f80608563b86a8689142f12b01c7eec3603d1be837cc5be7ab2882",
     "src/showcase-round2/tokens.css": "338d79849b8ced98a6589a09b6e6e7d5aa6b9631f165000688cb9c248b522eed",
     "src/showcase-round2/variantV1.css": "d9b55240727e1ec626d284c31b3b36303ebec0c001f703c70c4fee7fe7c4746f",
     "src/showcase-round2/variantV1.ts": "7b3772604e2cbee488164dae71da68cbe59117b5bf3c7301c0353a730f7d10cd",
@@ -157,8 +158,8 @@
     "src/showcase-round2/variantV4.ts": "1ecce880215199f3bfb8681abd8ee571eafb220455675fe459e372fffa341714",
     "src/showcase-round2/variantV5.css": "5ac5649e49a24613aa06d124f238874981f68ca4324c2338246ad51cf12ba063",
     "src/showcase-round2/variantV5.ts": "22b088571643dc4f6d8f1bf7103aa1fa4dea9c7bda2551d296bd60ab8b424d80",
-    "src/showcase-round2/variantV6.css": "76bd6a75c4242c5433a978d5a169950f493008020b7605b26940f5a039ce99df",
-    "src/showcase-round2/variantV6.ts": "93616782ea3e0bb092185bf4102d913deca469cbc3d818ef0d438a6d337da1d5",
+    "src/showcase-round2/variantV6.css": "6dec9778a61cf8a6bad7bd0ceb0bde3d5fa414bad7471bf61b5c267cfb2b58fb",
+    "src/showcase-round2/variantV6.ts": "9ebc1aa7292d7ea85935d641a2523e3ca3c84f163cee504621a104c4fa6de6c4",
     "src/showcase.spec.ts": "bf78abc9f0b4be7f25640051df7b04a78e9c9c51443b3cedce8f8b6d5cde237d",
     "src/showcase.ts": "4c629332bc2591161b93e370562c589792f07153eae32830b62d6745ca76f7f6",
     "src/spectrogram.spec.ts": "0ac59839819b020f164a69756090c4069166800ac1b32f76210d5efa643b941f",
@@ -265,7 +266,7 @@
     "src/vite-env.d.ts": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
   },
   "outputs": {
-    ".vite/manifest.json": "80218b96093c96b40bd410e8bebcaf6b1f4fb7cb1e1f155f514e4e353510a0dd",
+    ".vite/manifest.json": "b12a6f4d428dbeff5e43e082c469312bc68a2a0c19c457acc4d3e69f2a399401",
     "assets/chartshell.Cgb8IiO0.js": "e8b875130ba2231393e0ef91ac6112f5b0a4b3bcc88062dacee8ad2263411c91",
     "assets/chartshell.CjJRDo9O.css": "402d77ae161808e8980ece8a379a8191bb7bcd0d342b6c6111161eddaab6c5a2",
     "assets/form.BtFZCkTj.js": "fb341ae57d4c8edb51acdcb30d645694b8ef0b14f8fdf12c61c4be42c9112b10",
@@ -297,8 +298,8 @@
     "assets/showcaseRound2V4.DEZsaNTr.css": "10f101fa049fda158f5298f2544697a68cf9c7b2dad8a24e61a3040524af830f",
     "assets/showcaseRound2V5.C0Cvx3hi.css": "8512ee8e0eb663256ef846703f49720bbcd062459cc39edd9c8e6fb3cf9f7b4b",
     "assets/showcaseRound2V5.ueK2AZMY.js": "f781bb808d700aa94cc607dbd940913c2ce72193f1eb187830c31b4d3645e475",
-    "assets/showcaseRound2V6.Bns0XiSU.css": "8c4511a9f8381cb0afc24f4d449d21d1d99d6564de22d1dee7f4a65580efff61",
-    "assets/showcaseRound2V6.Dbd2Kwcs.js": "f612eb84805538e8ebdd3a7f19a170b34b30d698d4fe6718f31814836472ba23",
+    "assets/showcaseRound2V6.Bt9xEPr3.css": "5fe3da5db39efab67fce04d41aaf71d9b9261244636410da4e131e34fde5548b",
+    "assets/showcaseRound2V6.DGQgbV6u.js": "1306e5fe7fdc25ec50932928824bf57a6b6f4a432c98e6b8c2ec31e600ba6809",
     "assets/showcaseVariantA.77Q9WTpI.css": "5b1a3863e45f09307b5e9640641b07cde5db6dd88eaf76bd378f707c64d32d18",
     "assets/showcaseVariantA.dlOoM6d4.js": "3647aca21890d96ef66dd060c70da4f26dc2331c400402973352057874dad7d5",
     "assets/showcaseVariantB.BTVqluv_.css": "63f22b5430706bac45ed4e7e0ab36d86cd28bd547347b032dd4275303bb281af",
@@ -330,7 +331,7 @@
     "showcase-v3.html": "eff3e9f2da8d79b9059ae3f06d335c72192ff6cf36c2336f3fa7ee3d7675b9bd",
     "showcase-v4.html": "e0b49745f15310bac37c54779e1ec531ab816af4b596c7601d6c6691b427fbe7",
     "showcase-v5.html": "a3553f63630f48b3158b19ba9a002665047724cedd0c659b78a317b9fb645dc1",
-    "showcase-v6.html": "4fed7d1e9fbd1eb4be3e6d4dcb6cbf921a302fea203f98126e9c81517ca97492",
+    "showcase-v6.html": "a9b234e2356b7935e9da931d8c7c1c1243a37de62c0e95225ed8cc7c0c15f33c",
     "showcase.html": "0581ffceebd037c51d69d4c99027d940b1c9fe4b2533fb68a819ce912873a8a0"
   }
 }
