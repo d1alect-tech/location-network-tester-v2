@@ -19,13 +19,16 @@ export const METERS: readonly KpiItem[] = [
   { label: "Разрешение", value: `${METRICS.resolutionHz}`, unit: "Гц" },
 ];
 
-/** Таблица пиков (f0, уровень, выделенность, Q). Строки адресуемы через data-peak-row
- *  и достижимы с клавиатуры: V5 связывает их с маркерами частот на спектре. */
-export function buildPeaks(): HTMLElement {
+/** Таблица пиков (f0, уровень, выделенность, Q). Строки адресуемы через data-peak-row.
+ *  interactive включает фокусируемость только там, где фокус что-то делает (V5 связывает
+ *  строку с маркером частоты): пустые точки остановки клавиатуры — антипаттерн (§6). */
+export function buildPeaks(interactive = false): HTMLElement {
   const peakBody = h("tbody");
   PEAKS.forEach((peak, index) => {
+    const attrs: Record<string, string> = { "data-peak-row": String(index) };
+    if (interactive) attrs.tabindex = "0";
     peakBody.append(
-      h("tr", "", { "data-peak-row": String(index), tabindex: "0" }, [
+      h("tr", "", attrs, [
         h("td", "num", {}, [ruNumber.format(Math.round(peak.frequencyHz))]),
         h("td", "num", {}, [peak.levelDb.toFixed(2)]),
         h("td", "num", {}, [peak.prominenceDb.toFixed(2)]),

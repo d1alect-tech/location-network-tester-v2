@@ -74,7 +74,7 @@ function buildInlineError(): HTMLElement {
 
 const peaksPanel = h("section", "panel", { "data-showcase": "metrics" }, [
   h("div", "panel-hd", {}, [h("h2", "panel-title", {}, ["Пики спектра"])]),
-  h("div", "panel-bd is-bare", {}, [buildPeaks()]),
+  h("div", "panel-bd is-bare", {}, [buildPeaks(true)]),
 ]);
 const peakRows = Array.from(peaksPanel.querySelectorAll<HTMLElement>("[data-peak-row]"));
 

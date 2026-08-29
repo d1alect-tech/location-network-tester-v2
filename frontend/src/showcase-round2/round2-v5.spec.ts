@@ -74,6 +74,10 @@ test("V5-S2: весь срез читается на 1280x800 без верти�
       peaksBottom: peaks?.getBoundingClientRect().bottom ?? 0,
       formBottom: form?.getBoundingClientRect().bottom ?? 0,
       plotHeight: plot?.getBoundingClientRect().height ?? 0,
+      spectrumHeight:
+        document.querySelector('[data-showcase="spectrum"]')?.getBoundingClientRect().height ?? 0,
+      bottomRowHeight:
+        document.querySelector(".app-v5 .bottom-row")?.getBoundingClientRect().height ?? 0,
       viewport: window.innerHeight,
       blocks: Array.from(main?.children ?? []).map(
         (el) =>
@@ -87,6 +91,8 @@ test("V5-S2: весь срез читается на 1280x800 без верти�
   expect(fit.formBottom).toBeLessThanOrEqual(fit.viewport + 1);
   // График забирает свободную высоту, а не сидит на фиксированных 280px как в V3.
   expect(fit.plotHeight, `ярусы: ${fit.blocks.join(" ")}`).toBeGreaterThanOrEqual(300);
+  // График — самый высокий ярус рабочей области, а не остаток после форм и таблиц.
+  expect(fit.spectrumHeight).toBeGreaterThan(fit.bottomRowHeight);
 });
 
 test("V5-S3: показания не задвоены — каждое число на экране один раз", async ({ page }) => {
@@ -138,6 +144,28 @@ test("V5-S4: маркеры пиков нанесены на график и с�
   await expect(page.locator('.peak-mark[data-peak="1"]')).toHaveClass(/is-hot/);
   await expect(page.locator('.peak-mark[data-peak="0"]')).not.toHaveClass(/is-hot/);
   await page.screenshot({ path: resolve(EVIDENCE_DIR, "v5-peak-hover-1280.png"), fullPage: true });
+});
+
+test("V5-S6: фокусируемы только те строки пиков, где фокус что-то делает", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  // V5: строка ведёт к маркеру на графике — точка остановки клавиатуры оправдана (§6).
+  await page.goto(PAGE);
+  const v5Rows = await page
+    .locator('[data-showcase="metrics"] [data-peak-row]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute("tabindex")));
+  expect(v5Rows).toHaveLength(5);
+  expect(new Set(v5Rows)).toEqual(new Set(["0"]));
+  await page.locator('[data-showcase="metrics"] [data-peak-row="2"]').focus();
+  await expect(page.locator('.peak-mark[data-peak="2"]')).toHaveClass(/is-hot/);
+
+  // V1: та же таблица никуда не ведёт — пустых точек остановки быть не должно.
+  await page.goto(`${BASE}/showcase-v1.html`);
+  const v1Rows = await page
+    .locator('[data-showcase="metrics"] [data-peak-row]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute("tabindex")));
+  expect(v1Rows).toHaveLength(5);
+  expect(v1Rows.filter((value) => value !== null)).toEqual([]);
 });
 
 test("V5-S5: индекс раунда 2 ведёт на V5 и витрина снимается артефактом", async ({ page }) => {
