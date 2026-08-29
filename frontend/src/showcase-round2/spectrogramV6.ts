@@ -144,13 +144,20 @@ export function buildSpectrogramV6(): SpectrogramV6 {
     const over = current.over.getBoundingClientRect();
     const wrap = canvas.parentElement?.getBoundingClientRect();
     if (wrap === undefined) return;
-    const width = Math.round(over.width);
+    const cssWidth = Math.round(over.width);
     const left = Math.round(over.left - wrap.left);
     // Зазор под осью Y графика занимает шкала времени, а не пустота.
-    sheet.replaceSync(`.app-v6 .gram-axis{width:${left}px}.app-v6 .gram-canvas{width:${width}px}`);
-    const height = Math.round(canvas.getBoundingClientRect().height);
-    if (width <= 0 || height <= 0) return;
+    sheet.replaceSync(
+      `.app-v6 .gram-axis{width:${left}px}.app-v6 .gram-canvas{width:${cssWidth}px}`,
+    );
+    const cssHeight = Math.round(canvas.getBoundingClientRect().height);
+    if (cssWidth <= 0 || cssHeight <= 0) return;
 
+    // Буфер — в ФИЗИЧЕСКИХ пикселях. Прежде он считался в CSS-пикселях, и на любом
+    // экране с масштабированием отличным от 100% браузер растягивал полотно интерполяцией — мыло.
+    const ratio = devicePixelRatio || 1;
+    const width = Math.round(cssWidth * ratio);
+    const height = Math.round(cssHeight * ratio);
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
@@ -160,7 +167,8 @@ export function buildSpectrogramV6(): SpectrogramV6 {
     const { low, high } = levelRange();
     const span = high - low || 1;
     for (let x = 0; x < width; x += 1) {
-      const freq = current.posToVal(x, "x");
+      // Частота — по CSS-координате: шкала uPlot живёт в них, а не в физических.
+      const freq = current.posToVal(x / ratio, "x");
       for (let y = 0; y < height; y += 1) {
         // Время растёт сверху вниз: верх полотна — начало записи.
         const timeNorm = Math.floor((y / height) * TIME_BINS) / TIME_BINS;

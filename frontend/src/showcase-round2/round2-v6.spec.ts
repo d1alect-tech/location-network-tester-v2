@@ -647,4 +647,51 @@ test("V6-S16: витрина снимается артефактом в кажд
   await shot("focus-search");
   await page.locator('[data-cat-sort="label"] .cat-sort').focus();
   await shot("focus-sort");
+
+  // Стык под полотном крупным планом: туда ни разу не смотрели вблизи.
+  const box = await page.locator("[data-spectrogram-canvas]").boundingBox();
+  if (box !== null) {
+    await page.screenshot({
+      path: resolve(EVIDENCE_DIR, "v6-gram-seam-1280.png"),
+      clip: { x: box.x - 80, y: box.y + box.height - 40, width: box.width + 80, height: 90 },
+    });
+  }
+});
+
+test.describe("V6-S19: полотно чёткое на экране с масштабированием", () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  test("буфер холста считается в физических пикселях", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(PAGE);
+
+    const canvas = await page.evaluate(() => {
+      const node = document.querySelector("[data-spectrogram-canvas]");
+      if (!(node instanceof HTMLCanvasElement)) return null;
+      const box = node.getBoundingClientRect();
+      return {
+        bufferWidth: node.width,
+        bufferHeight: node.height,
+        cssWidth: box.width,
+        cssHeight: box.height,
+        ratio: devicePixelRatio,
+      };
+    });
+    expect(canvas).not.toBeNull();
+    if (canvas === null) return;
+
+    // Буфер меньше физического размера — браузер растянет его интерполяцией, и полотно
+    // поплывёт мылом на любом экране с масштабированием, отличным от 100%.
+    expect(canvas.ratio).toBeGreaterThan(1);
+    expect(
+      canvas.bufferWidth,
+      `буфер ${canvas.bufferWidth}x${canvas.bufferHeight} против css ${canvas.cssWidth}x${canvas.cssHeight} при dpr ${canvas.ratio}`,
+    ).toBe(Math.round(canvas.cssWidth * canvas.ratio));
+    expect(canvas.bufferHeight).toBe(Math.round(canvas.cssHeight * canvas.ratio));
+
+    await page.screenshot({
+      path: resolve(EVIDENCE_DIR, "v6-gram-dpr2-1280.png"),
+      clip: { x: 264, y: 250, width: 760, height: 140 },
+    });
+  });
 });
