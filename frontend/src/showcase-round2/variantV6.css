@@ -7,8 +7,10 @@
   display: grid;
   grid-template-rows: 32px 40px minmax(0, 1fr) auto auto 32px;
   height: 100vh;
-  /* §3: данные — Source Code Pro, шрифт данных самого Adobe. Цифры уже
-     JetBrains Mono, поэтому числовые колонки перестают распирать панели. */
+  /* §3: данные — Source Code Pro, шрифт данных самого Adobe и дефолт слота §3:
+     направление ТЗ — Adobe, и данные набраны его же шрифтом. Шаг знака тот же,
+     что у JetBrains Mono (измерено: 43.2px на «22 418» в 12px), поэтому колонки
+     не расширяются; выигрыш в рисунке знака, а не в плотности. */
   --lnt-mono: "Source Code Pro Variable", "Consolas", monospace;
 }
 

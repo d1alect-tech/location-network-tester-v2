@@ -130,7 +130,37 @@ test("V6-S4: приборный ритм показаний, весь срез �
   expect(readout.docScroll).toBeLessThanOrEqual(readout.docClient + 1);
   expect(readout.mainScroll).toBeLessThanOrEqual(readout.mainClient + 1);
   // График остаётся героем: больше, чем в V5 (303.5px).
-  expect(readout.plotHeight).toBeGreaterThanOrEqual(320);
+  expect(readout.plotHeight, `высота графика V6: ${readout.plotHeight}`).toBeGreaterThanOrEqual(
+    320,
+  );
+});
+
+/** Измеряет фактическую ширину одной и той же числовой строки в таблице пиков. */
+async function peakDigitsWidth(page: Page, url: string): Promise<number> {
+  await page.goto(url);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+  return page.evaluate(() => {
+    const cell = document.querySelector('[data-showcase="metrics"] tbody td.num');
+    if (cell === null) return 0;
+    const range = document.createRange();
+    range.selectNodeContents(cell);
+    return range.getBoundingClientRect().width;
+  });
+}
+
+test("V6-S6: смена шрифта данных не расширяет числовые колонки", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const jetbrains = await peakDigitsWidth(page, `${BASE}/showcase-v5.html`);
+  const sourceCodePro = await peakDigitsWidth(page, PAGE);
+  expect(jetbrains).toBeGreaterThan(0);
+  // Измерено: у обоих моноширинных одинаковый шаг знака (43.2px на «22 418» в 12px),
+  // поэтому контракт — «не шире»: смена слота §3 не должна распирать числовые колонки.
+  expect(
+    sourceCodePro,
+    `Source Code Pro ${sourceCodePro.toFixed(1)}px против JetBrains Mono ${jetbrains.toFixed(1)}px`,
+  ).toBeLessThanOrEqual(jetbrains);
 });
 
 test("V6-S5: индекс ведёт на V6, витрина снимается артефактом", async ({ page }) => {
