@@ -5,3 +5,4 @@ packaging/spike/__pycache__/
 /dist/
 __pycache__/
 .omo/
+.scratch/

@@ -1,0 +1,71 @@
+/* Индекс витрин редизайна: нейтральная навигационная страница без брендирования. */
+body {
+  margin: 0;
+  background: #101216;
+  color: #e8eaed;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.index {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 64px 32px 96px;
+}
+
+.index-kicker {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8a8f98;
+  margin: 0 0 12px;
+}
+
+.index-title {
+  font-size: 32px;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+
+.index-note {
+  font-size: 15px;
+  line-height: 1.55;
+  color: #b6bac1;
+  max-width: 640px;
+  margin: 0 0 40px;
+}
+
+.index-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.index-list li {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.index-list a {
+  color: #e8eaed;
+  font-size: 17px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.index-list a:hover {
+  text-decoration: underline;
+}
+
+.index-list span {
+  color: #8a8f98;
+  font-size: 13px;
+  line-height: 1.45;
+}

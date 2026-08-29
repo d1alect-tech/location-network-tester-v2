@@ -14,6 +14,11 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         showcase: resolve(__dirname, 'showcase.html'),
+        showcaseRedesignIndex: resolve(__dirname, 'showcase-redesign.html'),
+        showcaseVariantA: resolve(__dirname, 'showcase-a.html'),
+        showcaseVariantB: resolve(__dirname, 'showcase-b.html'),
+        showcaseVariantC: resolve(__dirname, 'showcase-c.html'),
+        showcaseVariantD: resolve(__dirname, 'showcase-d.html'),
       },
       output: {
         entryFileNames: 'assets/[name].[hash].js',

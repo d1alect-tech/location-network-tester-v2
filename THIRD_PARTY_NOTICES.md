@@ -63,8 +63,16 @@ This inventory is generated from `uv.lock` and the vendored static assets commit
 | ibm-plex-sans-medium | 1.1.0 | `OFL-1.1` | https://registry.npmjs.org/@ibm/plex-sans/-/plex-sans-1.1.0.tgz | `sha256:5660f8a658f8bb50dbc005232f885eadffd2bc1c235c4f6fbb63469d1f9cde6d` |
 | ibm-plex-sans-regular | 1.1.0 | `OFL-1.1` | https://registry.npmjs.org/@ibm/plex-sans/-/plex-sans-1.1.0.tgz | `sha256:ba711a3085ff9f27440b6b9c4550cfc47c97bf36591d5da958b975bb3add8c1a` |
 | ibm-plex-sans-semibold | 1.1.0 | `OFL-1.1` | https://registry.npmjs.org/@ibm/plex-sans/-/plex-sans-1.1.0.tgz | `sha256:f78048030eab62e860efa39a0df79e2e5581bf122eb95b9bc42c0b8a4988d205` |
+| inter-variable-cyrillic | 5.3.0 | `OFL-1.1` | https://registry.npmjs.org/@fontsource-variable/inter/-/inter-5.3.0.tgz | `sha256:71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075` |
+| inter-variable-latin | 5.3.0 | `OFL-1.1` | https://registry.npmjs.org/@fontsource-variable/inter/-/inter-5.3.0.tgz | `sha256:3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62` |
+| golos-text-variable-cyrillic | 5.3.0 | `OFL-1.1` | https://registry.npmjs.org/@fontsource-variable/golos-text/-/golos-text-5.3.0.tgz | `sha256:17d048ca05cb1218af3c0d6dcdf882989e6d1cc5dcb598ea50eaf54850ff7229` |
+| golos-text-variable-latin | 5.3.0 | `OFL-1.1` | https://registry.npmjs.org/@fontsource-variable/golos-text/-/golos-text-5.3.0.tgz | `sha256:9a69d0aa4734c4022224c002a3d944a702e0204972a49d892789f5668b922c2a` |
+| source-serif-4-variable-cyrillic | 5.3.0 | `OFL-1.1` | https://registry.npmjs.org/@fontsource-variable/source-serif-4/-/source-serif-4-5.3.0.tgz | `sha256:25e85aef8acff54f91ea7e85c9c2c260caf97101fdef194ed6b8b58bc34ce3eb` |
+| source-serif-4-variable-latin | 5.3.0 | `OFL-1.1` | https://registry.npmjs.org/@fontsource-variable/source-serif-4/-/source-serif-4-5.3.0.tgz | `sha256:c1df4596be5029233ed2afbb8b2f6ea20784b3fb1aa5d6b5c6519ccd85eb3dfb` |
+| jetbrains-mono-variable-cyrillic | 5.3.0 | `OFL-1.1` | https://registry.npmjs.org/@fontsource-variable/jetbrains-mono/-/jetbrains-mono-5.3.0.tgz | `sha256:d274604c40757f98f07df623a8b8fb5194508a6fa4f5413a7a107f09e3b7452a` |
+| jetbrains-mono-variable-latin | 5.3.0 | `OFL-1.1` | https://registry.npmjs.org/@fontsource-variable/jetbrains-mono/-/jetbrains-mono-5.3.0.tgz | `sha256:18be452724bfdc236c074ca94a249a7f41a86752c7d04ab258ce9ed5651f6a7e` |
 
-The IBM Plex package provenance and npm integrity values are also retained in `src/lnt/ui/static/fonts/manifest.json`; the OFL text is retained beside the fonts and in `LICENSES/OFL-1.1.txt`. uPlot identifies its version and MIT license in its committed vendor header.
+The IBM Plex package provenance and npm integrity values are also retained in `src/lnt/ui/static/fonts/manifest.json`; the OFL text is retained beside the fonts and in `LICENSES/OFL-1.1.txt`. uPlot identifies its version and MIT license in its committed vendor header. WOFF2 subsets for the redesign showcases (Inter, Golos Text, Source Serif 4, JetBrains Mono; copies of the vendored IBM Plex) live in `frontend/src/showcase-redesign/fonts/`, with per-file SHA-256 and npm provenance retained in `frontend/src/showcase-redesign/fonts/manifest.json`.
 
 ## Frontend build toolchain
 
