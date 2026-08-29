@@ -10,17 +10,114 @@
     "file": "assets/chartshell.CjJRDo9O.css",
     "src": "_chartshell.CjJRDo9O.css"
   },
+  "_spectrum.2iO96qtK.css": {
+    "file": "assets/spectrum.2iO96qtK.css",
+    "src": "_spectrum.2iO96qtK.css"
+  },
+  "_spectrum.COxqisDq.js": {
+    "file": "assets/spectrum.COxqisDq.js",
+    "name": "spectrum",
+    "imports": [
+      "_uPlot.min.I5bB1VQk.js"
+    ],
+    "css": [
+      "assets/spectrum.2iO96qtK.css"
+    ],
+    "assets": [
+      "assets/inter-cyrillic-wght-normal.DqGufNeO.woff2",
+      "assets/inter-latin-wght-normal.Dx4kXJAl.woff2",
+      "assets/golos-text-cyrillic-wght-normal.mKek_fSS.woff2",
+      "assets/golos-text-latin-wght-normal.BS5oQT7X.woff2",
+      "assets/source-serif-4-cyrillic-wght-normal.DwHjdM4S.woff2",
+      "assets/source-serif-4-latin-wght-normal.D9elroTD.woff2",
+      "assets/jetbrains-mono-cyrillic-wght-normal.D73BlboJ.woff2",
+      "assets/jetbrains-mono-latin-wght-normal.B9CIFXIH.woff2",
+      "assets/IBMPlexSans-Regular.BiEB_oxT.woff2",
+      "assets/IBMPlexSans-Medium.BQLKo0ot.woff2",
+      "assets/IBMPlexSans-SemiBold.KfaJl9PC.woff2",
+      "assets/IBMPlexMono-Regular.Du0PCiXT.woff2",
+      "assets/IBMPlexMono-Medium.CiYsa3y2.woff2"
+    ]
+  },
+  "_uPlot.D1GxaB_c.css": {
+    "file": "assets/uPlot.D1GxaB_c.css",
+    "src": "_uPlot.D1GxaB_c.css"
+  },
+  "_uPlot.min.I5bB1VQk.js": {
+    "file": "assets/uPlot.min.I5bB1VQk.js",
+    "name": "uPlot.min",
+    "css": [
+      "assets/uPlot.D1GxaB_c.css"
+    ]
+  },
   "index.html": {
-    "file": "assets/main.BA37JvMa.js",
+    "file": "assets/main.BT0yMJZd.js",
     "name": "main",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.Cgb8IiO0.js"
+      "_chartshell.Cgb8IiO0.js",
+      "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
-      "assets/main.D66Td37s.css"
+      "assets/main.CWbpkDty.css"
     ]
+  },
+  "showcase-a.html": {
+    "file": "assets/showcaseVariantA.CqUmZUSC.js",
+    "name": "showcaseVariantA",
+    "src": "showcase-a.html",
+    "isEntry": true,
+    "imports": [
+      "_spectrum.COxqisDq.js",
+      "_uPlot.min.I5bB1VQk.js"
+    ],
+    "css": [
+      "assets/showcaseVariantA.77Q9WTpI.css"
+    ]
+  },
+  "showcase-b.html": {
+    "file": "assets/showcaseVariantB.AeVX-Q-_.js",
+    "name": "showcaseVariantB",
+    "src": "showcase-b.html",
+    "isEntry": true,
+    "imports": [
+      "_spectrum.COxqisDq.js",
+      "_uPlot.min.I5bB1VQk.js"
+    ],
+    "css": [
+      "assets/showcaseVariantB.BTVqluv_.css"
+    ]
+  },
+  "showcase-c.html": {
+    "file": "assets/showcaseVariantC.HyuW9QD5.js",
+    "name": "showcaseVariantC",
+    "src": "showcase-c.html",
+    "isEntry": true,
+    "imports": [
+      "_spectrum.COxqisDq.js",
+      "_uPlot.min.I5bB1VQk.js"
+    ],
+    "css": [
+      "assets/showcaseVariantC.C_Iqsi7E.css"
+    ]
+  },
+  "showcase-d.html": {
+    "file": "assets/showcaseVariantD.DLZu50_p.js",
+    "name": "showcaseVariantD",
+    "src": "showcase-d.html",
+    "isEntry": true,
+    "imports": [
+      "_spectrum.COxqisDq.js",
+      "_uPlot.min.I5bB1VQk.js"
+    ],
+    "css": [
+      "assets/showcaseVariantD.DzlPL82p.css"
+    ]
+  },
+  "showcase-redesign.html": {
+    "file": "assets/showcaseRedesignIndex.CGYVNnuy.css",
+    "src": "showcase-redesign.html"
   },
   "showcase.html": {
     "file": "assets/showcase.DjdZBuIA.js",
@@ -30,5 +127,57 @@
     "imports": [
       "_chartshell.Cgb8IiO0.js"
     ]
+  },
+  "src/showcase-redesign/fonts/IBMPlexMono-Medium.woff2": {
+    "file": "assets/IBMPlexMono-Medium.CiYsa3y2.woff2",
+    "src": "src/showcase-redesign/fonts/IBMPlexMono-Medium.woff2"
+  },
+  "src/showcase-redesign/fonts/IBMPlexMono-Regular.woff2": {
+    "file": "assets/IBMPlexMono-Regular.Du0PCiXT.woff2",
+    "src": "src/showcase-redesign/fonts/IBMPlexMono-Regular.woff2"
+  },
+  "src/showcase-redesign/fonts/IBMPlexSans-Medium.woff2": {
+    "file": "assets/IBMPlexSans-Medium.BQLKo0ot.woff2",
+    "src": "src/showcase-redesign/fonts/IBMPlexSans-Medium.woff2"
+  },
+  "src/showcase-redesign/fonts/IBMPlexSans-Regular.woff2": {
+    "file": "assets/IBMPlexSans-Regular.BiEB_oxT.woff2",
+    "src": "src/showcase-redesign/fonts/IBMPlexSans-Regular.woff2"
+  },
+  "src/showcase-redesign/fonts/IBMPlexSans-SemiBold.woff2": {
+    "file": "assets/IBMPlexSans-SemiBold.KfaJl9PC.woff2",
+    "src": "src/showcase-redesign/fonts/IBMPlexSans-SemiBold.woff2"
+  },
+  "src/showcase-redesign/fonts/golos-text-cyrillic-wght-normal.woff2": {
+    "file": "assets/golos-text-cyrillic-wght-normal.mKek_fSS.woff2",
+    "src": "src/showcase-redesign/fonts/golos-text-cyrillic-wght-normal.woff2"
+  },
+  "src/showcase-redesign/fonts/golos-text-latin-wght-normal.woff2": {
+    "file": "assets/golos-text-latin-wght-normal.BS5oQT7X.woff2",
+    "src": "src/showcase-redesign/fonts/golos-text-latin-wght-normal.woff2"
+  },
+  "src/showcase-redesign/fonts/inter-cyrillic-wght-normal.woff2": {
+    "file": "assets/inter-cyrillic-wght-normal.DqGufNeO.woff2",
+    "src": "src/showcase-redesign/fonts/inter-cyrillic-wght-normal.woff2"
+  },
+  "src/showcase-redesign/fonts/inter-latin-wght-normal.woff2": {
+    "file": "assets/inter-latin-wght-normal.Dx4kXJAl.woff2",
+    "src": "src/showcase-redesign/fonts/inter-latin-wght-normal.woff2"
+  },
+  "src/showcase-redesign/fonts/jetbrains-mono-cyrillic-wght-normal.woff2": {
+    "file": "assets/jetbrains-mono-cyrillic-wght-normal.D73BlboJ.woff2",
+    "src": "src/showcase-redesign/fonts/jetbrains-mono-cyrillic-wght-normal.woff2"
+  },
+  "src/showcase-redesign/fonts/jetbrains-mono-latin-wght-normal.woff2": {
+    "file": "assets/jetbrains-mono-latin-wght-normal.B9CIFXIH.woff2",
+    "src": "src/showcase-redesign/fonts/jetbrains-mono-latin-wght-normal.woff2"
+  },
+  "src/showcase-redesign/fonts/source-serif-4-cyrillic-wght-normal.woff2": {
+    "file": "assets/source-serif-4-cyrillic-wght-normal.DwHjdM4S.woff2",
+    "src": "src/showcase-redesign/fonts/source-serif-4-cyrillic-wght-normal.woff2"
+  },
+  "src/showcase-redesign/fonts/source-serif-4-latin-wght-normal.woff2": {
+    "file": "assets/source-serif-4-latin-wght-normal.D9elroTD.woff2",
+    "src": "src/showcase-redesign/fonts/source-serif-4-latin-wght-normal.woff2"
   }
 }
