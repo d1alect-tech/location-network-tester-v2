@@ -1,0 +1,43 @@
+/* V4 «Карточный дашборд» (§8): центр — сетка карточек на хроме; карточки — осознанное
+   исключение из правила стыка панелей (§5.2): r8, hairline-рамки, без теней, отступы 16px. */
+
+.app-v4 {
+  display: grid;
+  grid-template-rows: 32px 32px minmax(0, 1fr) 32px;
+  height: 100vh;
+}
+
+.app-v4 .app-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  background: var(--lnt-chrome);
+}
+
+.app-v4 .cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.app-v4 .panel {
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.app-v4 .span2 {
+  grid-column: 1 / -1;
+}
+
+.app-v4 .col-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.app-v4 .banner {
+  border-radius: 8px;
+}

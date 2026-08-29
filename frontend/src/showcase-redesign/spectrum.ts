@@ -20,6 +20,16 @@ export interface SpectrumLabels {
   b: string;
 }
 
+export interface SpectrumChrome {
+  readonly header: HTMLElement;
+}
+
+type PlotExtras = {
+  readonly ticksStroke: string;
+  readonly fillA?: string;
+  readonly onCursor?: (u: uPlot) => void;
+};
+
 /** Детерминированный PSD: шумовой пол + гауссовы пики; трасса Б ниже А на ~12 дБ у 22.4 кГц. */
 export function buildSpectrumData(): uPlot.AlignedData {
   const n = 1000;
@@ -49,14 +59,102 @@ function logRange(_self: uPlot, initMin: number, initMax: number) {
   return uPlot.rangeLog(initMin, initMax, 10, true);
 }
 
-function buildOptions(style: SpectrumStyle, width: number): uPlot.Options {
+function chromePlotStyle(style: SpectrumStyle): SpectrumStyle {
+  return {
+    ...style,
+    lineWidth: 2,
+    grid: "rgba(255,255,255,0.08)",
+    axisText: "#8E8E8E",
+    axisFont: '500 10px "JetBrains Mono Variable", monospace',
+  };
+}
+
+function sampleAt(column: uPlot.AlignedData[number] | undefined, idx: number): number | undefined {
+  if (column === undefined) return undefined;
+  const value = column[idx];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function formatReadout(u: uPlot, idx: number | null): string {
+  if (idx == null) return "наведите на график";
+  const f = sampleAt(u.data[0], idx);
+  const a = sampleAt(u.data[1], idx);
+  const b = sampleAt(u.data[2], idx);
+  if (f === undefined || a === undefined || b === undefined || !(a > 0) || !(b > 0)) {
+    return "наведите на график";
+  }
+  const fStr =
+    f >= 1000
+      ? `${(f / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} кГц`
+      : `${Math.round(f)} Гц`;
+  const aStr = (10 * Math.log10(a)).toFixed(1);
+  const bStr = (10 * Math.log10(b)).toFixed(1);
+  return `f ${fStr} · A ${aStr} дБ · B ${bStr} дБ`;
+}
+
+function appendChip(
+  parent: HTMLElement,
+  series: "a" | "b",
+  swatchKind: "solid" | "dash",
+  label: string,
+): void {
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "chip";
+  chip.setAttribute("data-series", series);
+  const swatch = document.createElement("span");
+  swatch.className = `swatch swatch-${swatchKind}`;
+  swatch.setAttribute("data-swatch", swatchKind);
+  const text = document.createElement("span");
+  text.textContent = label;
+  chip.append(swatch, text);
+  parent.append(chip);
+}
+
+function mountChrome(header: HTMLElement, labels: SpectrumLabels): HTMLElement {
+  const chips = document.createElement("div");
+  chips.className = "spectrum-chips";
+  appendChip(chips, "a", "solid", `● ${labels.a}`);
+  appendChip(chips, "b", "dash", `■ ${labels.b}`);
+  const readout = document.createElement("span");
+  readout.className = "spectrum-readout";
+  readout.setAttribute("data-readout", "");
+  readout.textContent = "наведите на график";
+  header.append(chips, readout);
+  return readout;
+}
+
+function buildLegend(labels: SpectrumLabels): HTMLElement {
+  const legend = document.createElement("div");
+  legend.className = "spectrum-legend";
+  const seriesA = document.createElement("span");
+  seriesA.setAttribute("data-series", "a");
+  seriesA.textContent = labels.a;
+  const seriesB = document.createElement("span");
+  seriesB.setAttribute("data-series", "b");
+  seriesB.textContent = labels.b;
+  legend.append(seriesA, seriesB);
+  return legend;
+}
+
+function buildOptions(style: SpectrumStyle, width: number, extras: PlotExtras): uPlot.Options {
   const axis = {
     stroke: style.axisText,
     grid: { stroke: style.grid, width: 1 },
-    ticks: { stroke: style.grid, width: 1 },
+    ticks: { stroke: extras.ticksStroke, width: 1 },
     font: style.axisFont,
   };
-  return {
+  const seriesA: uPlot.Series = {
+    label: "Сессия А",
+    stroke: style.traceA,
+    width: style.lineWidth,
+    points: { show: false },
+    spanGaps: true,
+  };
+  if (extras.fillA !== undefined) {
+    seriesA.fill = extras.fillA;
+  }
+  const options: uPlot.Options = {
     width,
     height: style.height,
     cursor: { drag: { setScale: true, x: true, y: false } },
@@ -66,13 +164,7 @@ function buildOptions(style: SpectrumStyle, width: number): uPlot.Options {
     },
     series: [
       {},
-      {
-        label: "Сессия А",
-        stroke: style.traceA,
-        width: style.lineWidth,
-        points: { show: false },
-        spanGaps: true,
-      },
+      seriesA,
       {
         label: "Сессия Б",
         stroke: style.traceB,
@@ -84,43 +176,64 @@ function buildOptions(style: SpectrumStyle, width: number): uPlot.Options {
     ],
     axes: [
       { ...axis, label: "Частота, Гц" },
-      { ...axis, label: "PSD, В²/Гц" },
+      {
+        ...axis,
+        label: "PSD, В²/Гц",
+        // Лог-шкала: порядок вместо «0» — деления должны читаться (§9.4).
+        values: (_u: uPlot, ticks: (number | null)[]) =>
+          ticks.map((tick) => (tick == null ? "" : tick.toExponential(0))),
+      },
     ],
     legend: { show: false },
   };
+  if (extras.onCursor !== undefined) {
+    options.hooks = { setCursor: [extras.onCursor] };
+  }
+  return options;
 }
 
-/** Рисует график внутри host и добавляет легенду с двумя элементами [data-series]. */
+/** Рисует график внутри host. Без chrome — нижняя легенда .spectrum-legend (раунд 1).
+ *  С chrome — чипы и ридеут в header, нижней легенды нет. */
 export function renderSpectrum(
   host: HTMLElement,
   style: SpectrumStyle,
   labels: SpectrumLabels,
+  chrome?: SpectrumChrome,
 ): void {
   host.textContent = "";
   const plotHost = document.createElement("div");
   plotHost.className = "spectrum-plot";
-  const legend = document.createElement("div");
-  legend.className = "spectrum-legend";
-  const seriesA = document.createElement("span");
-  seriesA.setAttribute("data-series", "a");
-  seriesA.textContent = labels.a;
-  const seriesB = document.createElement("span");
-  seriesB.setAttribute("data-series", "b");
-  seriesB.textContent = labels.b;
-  legend.append(seriesA, seriesB);
-  host.append(plotHost, legend);
+  host.append(plotHost);
+
+  let extras: PlotExtras = { ticksStroke: style.grid };
+  let plotStyle = style;
+  if (chrome !== undefined) {
+    const readout = mountChrome(chrome.header, labels);
+    plotStyle = chromePlotStyle(style);
+    extras = {
+      ticksStroke: "rgba(255,255,255,0.15)",
+      fillA: "rgba(86,129,255,0.12)",
+      onCursor: (u: uPlot) => {
+        readout.textContent = formatReadout(u, u.cursor.idx ?? null);
+      },
+    };
+  } else {
+    host.append(buildLegend(labels));
+  }
 
   const plot = new uPlot(
-    buildOptions(style, Math.max(plotHost.clientWidth, 320)),
+    buildOptions(plotStyle, Math.max(plotHost.clientWidth, 320), extras),
     buildSpectrumData(),
     plotHost,
   );
+  let lastWidth = 0;
   const observer = new ResizeObserver((entries) => {
     const entry = entries[0];
     if (!entry) return;
     const width = Math.floor(entry.contentRect.width);
-    if (width > 0) {
-      plot.setSize({ width, height: style.height });
+    if (width > 0 && width !== lastWidth) {
+      lastWidth = width;
+      plot.setSize({ width, height: plotStyle.height });
     }
   });
   observer.observe(plotHost);
