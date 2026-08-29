@@ -73,7 +73,7 @@ const shellClient = new LntApiClient();
 
 export class AppShell {
   private container: HTMLElement;
-  private currentRoute: Route = "prepare";
+  private currentRoute: Route = "catalog";
   private readonly routes: RouteStore;
   // BEGIN Todo 40
   private captureView: CaptureViewHandle | null = null;
@@ -136,13 +136,13 @@ export class AppShell {
       const hash = window.location.hash;
       if (!hash.startsWith("#/")) {
         // Redirect to default
-        window.location.hash = "#/prepare";
+        window.location.hash = "#/catalog";
         return;
       }
       // Маршрут и фильтры читаются из модели состояния (safe-restore при перезагрузке).
       this.routes.syncFromUrl();
       const parsed = this.routes.get();
-      const route: Route = parsed.route in ROUTES ? (parsed.route as Route) : "prepare";
+      const route: Route = parsed.route in ROUTES ? (parsed.route as Route) : "catalog";
       if (route !== this.currentRoute) {
         announcePolite(`Раздел: ${ROUTES[route].title}`);
       }
@@ -294,7 +294,7 @@ export class AppShell {
     if (btn) {
       btn.addEventListener("click", () => {
         // Clear search query parameter and reset hash
-        window.location.href = `${window.location.origin}${window.location.pathname}#/prepare`;
+        window.location.href = `${window.location.origin}${window.location.pathname}#/catalog`;
       });
     }
   }
