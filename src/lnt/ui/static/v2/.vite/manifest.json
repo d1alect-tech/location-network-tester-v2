@@ -10,22 +10,26 @@
     "file": "assets/chartshell.CjJRDo9O.css",
     "src": "_chartshell.CjJRDo9O.css"
   },
-  "_metrics.CgP5Hqd6.css": {
-    "file": "assets/metrics.CgP5Hqd6.css",
-    "src": "_metrics.CgP5Hqd6.css"
-  },
-  "_metrics.D7K8sryc.js": {
-    "file": "assets/metrics.D7K8sryc.js",
+  "_metrics.BMV9q9Yy.js": {
+    "file": "assets/metrics.BMV9q9Yy.js",
     "name": "metrics",
     "imports": [
-      "_spectrum.BeGRNgpf.js"
+      "_spectrum.DBu7QvyM.js"
     ],
     "css": [
       "assets/metrics.CgP5Hqd6.css"
     ]
   },
-  "_spectrum.BeGRNgpf.js": {
-    "file": "assets/spectrum.BeGRNgpf.js",
+  "_metrics.CgP5Hqd6.css": {
+    "file": "assets/metrics.CgP5Hqd6.css",
+    "src": "_metrics.CgP5Hqd6.css"
+  },
+  "_spectrum.CXwmWaak.css": {
+    "file": "assets/spectrum.CXwmWaak.css",
+    "src": "_spectrum.CXwmWaak.css"
+  },
+  "_spectrum.DBu7QvyM.js": {
+    "file": "assets/spectrum.DBu7QvyM.js",
     "name": "spectrum",
     "imports": [
       "_uPlot.min.I5bB1VQk.js"
@@ -52,10 +56,6 @@
       "assets/IBMPlexMono-Regular.Du0PCiXT.woff2",
       "assets/IBMPlexMono-Medium.CiYsa3y2.woff2"
     ]
-  },
-  "_spectrum.CXwmWaak.css": {
-    "file": "assets/spectrum.CXwmWaak.css",
-    "src": "_spectrum.CXwmWaak.css"
   },
   "_uPlot.D1GxaB_c.css": {
     "file": "assets/uPlot.D1GxaB_c.css",
@@ -86,12 +86,12 @@
     ]
   },
   "showcase-a.html": {
-    "file": "assets/showcaseVariantA.CxE139R0.js",
+    "file": "assets/showcaseVariantA.CdXfpvDP.js",
     "name": "showcaseVariantA",
     "src": "showcase-a.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.BeGRNgpf.js",
+      "_spectrum.DBu7QvyM.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -99,12 +99,12 @@
     ]
   },
   "showcase-b.html": {
-    "file": "assets/showcaseVariantB.D0Sb1KSV.js",
+    "file": "assets/showcaseVariantB.D8Yo7BZn.js",
     "name": "showcaseVariantB",
     "src": "showcase-b.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.BeGRNgpf.js",
+      "_spectrum.DBu7QvyM.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -112,12 +112,12 @@
     ]
   },
   "showcase-c.html": {
-    "file": "assets/showcaseVariantC.HXfUb_Tw.js",
+    "file": "assets/showcaseVariantC.CGscoQWb.js",
     "name": "showcaseVariantC",
     "src": "showcase-c.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.BeGRNgpf.js",
+      "_spectrum.DBu7QvyM.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -125,12 +125,12 @@
     ]
   },
   "showcase-d.html": {
-    "file": "assets/showcaseVariantD.c_zaazMh.js",
+    "file": "assets/showcaseVariantD.BV5008ib.js",
     "name": "showcaseVariantD",
     "src": "showcase-d.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.BeGRNgpf.js",
+      "_spectrum.DBu7QvyM.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -146,13 +146,13 @@
     "src": "showcase-round2.html"
   },
   "showcase-v1.html": {
-    "file": "assets/showcaseRound2V1.DlO0KWOT.js",
+    "file": "assets/showcaseRound2V1.BXPPW3UB.js",
     "name": "showcaseRound2V1",
     "src": "showcase-v1.html",
     "isEntry": true,
     "imports": [
-      "_metrics.D7K8sryc.js",
-      "_spectrum.BeGRNgpf.js",
+      "_metrics.BMV9q9Yy.js",
+      "_spectrum.DBu7QvyM.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -160,13 +160,13 @@
     ]
   },
   "showcase-v2.html": {
-    "file": "assets/showcaseRound2V2.DBB1Ss_P.js",
+    "file": "assets/showcaseRound2V2.CLNxPKGA.js",
     "name": "showcaseRound2V2",
     "src": "showcase-v2.html",
     "isEntry": true,
     "imports": [
-      "_metrics.D7K8sryc.js",
-      "_spectrum.BeGRNgpf.js",
+      "_metrics.BMV9q9Yy.js",
+      "_spectrum.DBu7QvyM.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -175,13 +175,13 @@
     ]
   },
   "showcase-v3.html": {
-    "file": "assets/showcaseRound2V3.Dcupqy2J.js",
+    "file": "assets/showcaseRound2V3.yiOBpjUA.js",
     "name": "showcaseRound2V3",
     "src": "showcase-v3.html",
     "isEntry": true,
     "imports": [
-      "_metrics.D7K8sryc.js",
-      "_spectrum.BeGRNgpf.js",
+      "_metrics.BMV9q9Yy.js",
+      "_spectrum.DBu7QvyM.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -189,17 +189,31 @@
     ]
   },
   "showcase-v4.html": {
-    "file": "assets/showcaseRound2V4.VDCW6L4R.js",
+    "file": "assets/showcaseRound2V4.CW1G4IlF.js",
     "name": "showcaseRound2V4",
     "src": "showcase-v4.html",
     "isEntry": true,
     "imports": [
-      "_metrics.D7K8sryc.js",
-      "_spectrum.BeGRNgpf.js",
+      "_metrics.BMV9q9Yy.js",
+      "_spectrum.DBu7QvyM.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
       "assets/showcaseRound2V4.DEZsaNTr.css"
+    ]
+  },
+  "showcase-v5.html": {
+    "file": "assets/showcaseRound2V5.CoXqIsQj.js",
+    "name": "showcaseRound2V5",
+    "src": "showcase-v5.html",
+    "isEntry": true,
+    "imports": [
+      "_spectrum.DBu7QvyM.js",
+      "_metrics.BMV9q9Yy.js",
+      "_uPlot.min.I5bB1VQk.js"
+    ],
+    "css": [
+      "assets/showcaseRound2V5.Bgf3QKV_.css"
     ]
   },
   "showcase.html": {
