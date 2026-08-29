@@ -10,6 +10,7 @@ import { RouteStore } from "./state/routeState";
 // --- todo 41 (uPlot workbench): единственная точка регистрации графиков ---
 import "./components/charts/charts.css";
 import { mountInspectSpectrogram, mountInspectWorkbench } from "./components/charts/register";
+import { mountInspectW1Chrome } from "./views/inspect/w1Chrome";
 
 // Simple Hash Router
 export type Route =
@@ -263,6 +264,10 @@ export class AppShell {
       specHost.setAttribute("aria-label", "Спектрограмма сессии");
       host.after(specHost);
       mountInspectSpectrogram(specHost);
+      const w1Host = document.createElement("section");
+      w1Host.className = "lnt-w1-host";
+      specHost.after(w1Host);
+      mountInspectW1Chrome(w1Host);
     }
   }
 
