@@ -53,7 +53,7 @@ export function createSpectrogramView(): SpectrogramViewHandle {
     attrs: {
       tabindex: "0",
       role: "img",
-      "aria-label": "Спектрограмма: матрица мощность-время-частота",
+      "aria-label": "спектрограмма записи",
     },
   });
   const markerLayer = el("div", {

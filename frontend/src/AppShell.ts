@@ -261,7 +261,7 @@ export class AppShell {
       // --- todo 42 (спектрограмма): аддитивный монтаж под workbench ---
       const specHost = document.createElement("section");
       specHost.className = "charts-spectrogram-host";
-      specHost.setAttribute("aria-label", "Спектрограмма сессии");
+      specHost.setAttribute("aria-label", "спектрограмма записи");
       host.after(specHost);
       mountInspectSpectrogram(specHost);
       const w1Host = document.createElement("section");
