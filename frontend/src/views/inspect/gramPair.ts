@@ -28,6 +28,8 @@ export type GramPairHandle = {
   setMode(mode: GramMode): void;
   mode(): GramMode;
   gridMatches(): boolean;
+  /** Оба уровня загружены (есть и база, и сравнение). */
+  paired(): boolean;
   /** Оба уровня отсутствуют (нет артефактов ни у одной сессии пары). */
   empty(): boolean;
   current(): GramPairTile | GramPairMismatch;
@@ -202,6 +204,7 @@ export function createGramPair(opts: GramPairOpts): GramPairHandle {
     },
     mode: () => activeMode,
     gridMatches: () => matches,
+    paired: () => levelA !== null && levelB !== null,
     empty: () => levelA === null && levelB === null,
     current() {
       switch (activeMode) {

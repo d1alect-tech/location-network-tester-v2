@@ -73,6 +73,7 @@ describe("createGramPair", () => {
     // Then
     expect(pair.mode()).toBe("b");
     expect(pair.gridMatches()).toBe(true);
+    expect(pair.paired()).toBe(true);
     expect(pair.current().kind).toBe("tile");
     pair.dispose();
   });
@@ -157,6 +158,7 @@ describe("createGramPair", () => {
     // Then: сравнение невозможно, но база показана; дельта отклонена
     expect(pair.mode()).toBe("a");
     expect(pair.gridMatches()).toBe(false);
+    expect(pair.paired()).toBe(false);
     expect(pair.empty()).toBe(false);
     expect(pair.current().kind).toBe("tile");
     pair.setMode("delta");

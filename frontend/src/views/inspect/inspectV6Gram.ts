@@ -145,7 +145,9 @@ export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle 
       if (delta !== undefined) delta.disabled = !matches;
       paintPressed();
       renderCurrent();
-      if (!matches) scale.textContent = MISMATCH_NOTE;
+      // Нота несовпадения — только когда обе сессии загружены, но сетки разные:
+      // отсутствие одной сессии не является несовпадением.
+      if (gramPair.paired() && !matches) scale.textContent = MISMATCH_NOTE;
     },
     dispose() {
       gramPair.dispose();
