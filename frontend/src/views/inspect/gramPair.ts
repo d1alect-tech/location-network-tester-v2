@@ -83,10 +83,15 @@ async function fetchLevel(
   session: string,
   signal: AbortSignal,
 ): Promise<SpectrogramLevel> {
-  const requestJson = client.requestJson;
-  if (requestJson === undefined) throw new GramPairError("missing_client");
+  if (client.requestJson === undefined) throw new GramPairError("missing_client");
+  // requestJson зовём методом исходного клиента: детаченный вызов теряет
+  // this.fetchImpl и падает в network-ошибку.
+  const artifactClient: ArtifactClient = {
+    requestJson: (...args) => client.requestJson!(...args),
+    rawFetch: client.rawFetch ?? unusedRawFetch,
+  };
   const pointerRaw = await getArtifactJson(
-    { requestJson, rawFetch: client.rawFetch ?? unusedRawFetch },
+    artifactClient,
     `/api/analysis/sessions/${encodeURIComponent(session)}/.lnt-default-analysis.json`,
     signal,
   );

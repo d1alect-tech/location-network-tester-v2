@@ -180,10 +180,16 @@
 .app-v6 [data-showcase="spectrum"] .frame {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  /* Фиксированная высота контейнера графика: иначе uPlot + легенда дают петлю
+     обратной связи через ResizeObserver (график растёт на высоту легенды). */
+  flex: none;
+  height: 288px;
   min-width: 0;
   min-height: 0;
   padding: 4px;
+  /* Резерв под легенду uPlot: она рисуется ниже графика и не должна
+     наезжать на ленту анализа. */
+  margin-bottom: 36px;
 }
 
 .app-v6 .spectrum-plot {
@@ -787,4 +793,36 @@
   border-radius: var(--lnt-r-pill);
   background: var(--lnt-ok);
   flex: none;
+}
+
+/* ── Сворачиваемые панели под лентой анализа ─────────────────────────── */
+
+.app-v6 .v6-extras summary {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  cursor: pointer;
+  font: 600 12px / 16px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+}
+
+.app-v6 .v6-extras summary:hover {
+  color: var(--lnt-text);
+}
+
+.app-v6 .v6-extras summary:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -2px;
+}
+
+/* Контейнер осциллограммы обязан иметь высоту: uPlot не рисуется в 0px.
+   margin-bottom резервирует место под легенду uPlot, чтобы она не наезжала
+   на следующую сворачиваемую панель. */
+.app-v6 .v6-extras-wave {
+  height: 240px;
+  min-width: 0;
+  margin-bottom: 40px;
 }

@@ -1,3 +1,4 @@
+import "./v6.css";
 import { LntApiClient } from "../../api/client";
 import type { CatalogQuery, CatalogSession } from "../../api/types";
 import type { ChartHandle } from "../../components/charts/types";
