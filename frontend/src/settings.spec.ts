@@ -172,8 +172,67 @@ test("persona journey: prepare→capture→inspect→experiments→reports→set
   await page.goto(`${BASE}#/capture`);
   await expect(page.locator(".view-title, .placeholder-title").first()).toBeVisible();
 
+  const personaId = "persona-001";
+  const json = (body: unknown): string => JSON.stringify(body);
+  await page.route("**/api/catalog/sessions**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: json({
+        items: [
+          {
+            id: personaId,
+            health: "ok",
+            created_utc: "2026-08-01T10:00:00Z",
+            source: "capture",
+            session_type: "capture",
+            profile: "quiet",
+            label: "персона",
+            storage_path: null,
+          },
+        ],
+        next_cursor: null,
+      }),
+    }),
+  );
+  await page.route(`**/api/sessions/${personaId}`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: json({
+        name: personaId,
+        manifest: {},
+        analysis: null,
+        spectrum_available: true,
+        waveform_available: false,
+        ch2_available: false,
+      }),
+    }),
+  );
+  await page.route(`**/api/sessions/${personaId}/spectrum?*`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: json({
+        frequency_hz: [10, 100, 1000],
+        psd_v2_per_hz: [1e-6, 1e-4, 1e-2],
+        point_count: 3,
+      }),
+    }),
+  );
+  await page.route(
+    `**/api/analysis/sessions/${personaId}/.lnt-default-analysis.json`,
+    (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: json({ detail: "нет указателя" }),
+      }),
+  );
+
   await page.goto(`${BASE}#/inspect`);
-  await expect(page.locator(".charts-workbench-host")).toBeVisible();
+  await expect(page.locator(".app-v6")).toBeVisible();
+  await expect(page.locator(".app-header")).toBeHidden();
 
   await page.goto(`${BASE}#/experiments`);
   await expect(page.locator(".lnt-exp-workspace")).toBeVisible();
