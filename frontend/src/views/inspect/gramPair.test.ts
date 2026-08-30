@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ApiError } from "../../api/errors";
 import type { SpectrogramLevel } from "../../components/charts/spectrogramModel";
 import { createGramPair } from "./gramPair";
 import type { GramPairTile } from "./gramPair";
@@ -137,6 +138,61 @@ describe("createGramPair", () => {
 
     // Then
     expect(pair.mode()).toBe("a");
+    pair.dispose();
+  });
+
+  it("treats 404 absence of B as no comparison: mode a, not empty", async () => {
+    // Given: у сессии Б нет артефакта анализа v2 (404)
+    const pair = createGramPair({
+      client: STUB_CLIENT,
+      loadLevel: async (session) => {
+        if (session === "sess-b") throw new ApiError("http", { status: 404 });
+        return LEVEL_A;
+      },
+    });
+
+    // When
+    await pair.load("sess-a", "sess-b");
+
+    // Then: сравнение невозможно, но база показана; дельта отклонена
+    expect(pair.mode()).toBe("a");
+    expect(pair.gridMatches()).toBe(false);
+    expect(pair.empty()).toBe(false);
+    expect(pair.current().kind).toBe("tile");
+    pair.setMode("delta");
+    expect(pair.mode()).toBe("a");
+    pair.dispose();
+  });
+
+  it("both sessions absent → empty() without throwing", async () => {
+    // Given: ни у одной сессии нет артефакта
+    const pair = createGramPair({
+      client: STUB_CLIENT,
+      loadLevel: async () => {
+        throw new ApiError("http", { status: 404 });
+      },
+    });
+
+    // When
+    await pair.load("sess-a", "sess-b");
+
+    // Then
+    expect(pair.empty()).toBe(true);
+    expect(pair.current().kind).toBe("mismatch");
+    pair.dispose();
+  });
+
+  it("non-absence errors still propagate", async () => {
+    // Given: сетевой сбой — это не отсутствие артефакта
+    const pair = createGramPair({
+      client: STUB_CLIENT,
+      loadLevel: async () => {
+        throw new ApiError("network");
+      },
+    });
+
+    // When / Then
+    await expect(pair.load("sess-a", null)).rejects.toThrow(ApiError);
     pair.dispose();
   });
 });

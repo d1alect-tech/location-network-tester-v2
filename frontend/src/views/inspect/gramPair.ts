@@ -1,3 +1,4 @@
+import { ApiError } from "../../api/errors";
 import { readNpzArrays } from "../../components/charts/npz";
 import { sliceTile } from "../../components/charts/spectrogramModel";
 import type { SpectrogramLevel } from "../../components/charts/spectrogramModel";
@@ -27,6 +28,8 @@ export type GramPairHandle = {
   setMode(mode: GramMode): void;
   mode(): GramMode;
   gridMatches(): boolean;
+  /** Оба уровня отсутствуют (нет артефактов ни у одной сессии пары). */
+  empty(): boolean;
   current(): GramPairTile | GramPairMismatch;
   dispose(): void;
 };
@@ -65,6 +68,14 @@ function isAbort(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   if (!("name" in error)) return false;
   return error.name === "AbortError";
+}
+
+/** 404/отсутствие указателя — это «артефакта нет», а не сбой: сессия без
+ * анализа v2 не должна ломать загрузку пары. */
+function isAbsence(error: unknown): boolean {
+  if (error instanceof GramPairError) return error.code === "missing_pointer";
+  if (error instanceof ApiError) return error.status === 404;
+  return false;
 }
 
 function bytesToArrayBuffer(bytes: ArrayBuffer | Uint8Array): ArrayBuffer {
@@ -158,15 +169,26 @@ export function createGramPair(opts: GramPairOpts): GramPairHandle {
       controller.abort();
       controller = new AbortController();
       const { signal } = controller;
+      const resolveSafe = async (session: string): Promise<SpectrogramLevel | null> => {
+        try {
+          return await resolveLevel(session, signal);
+        } catch (error) {
+          if (isAbsence(error)) return null;
+          throw error;
+        }
+      };
       try {
         const [loadedA, loadedB] = await Promise.all([
-          resolveLevel(a, signal),
-          b === null ? Promise.resolve(null) : resolveLevel(b, signal),
+          resolveSafe(a),
+          b === null ? Promise.resolve(null) : resolveSafe(b),
         ]);
         if (gen !== generation) return;
         levelA = loadedA;
         levelB = loadedB;
-        matches = loadedB !== null && alignGramLevels(loadedA, loadedB).kind === "ok";
+        matches =
+          loadedA !== null &&
+          loadedB !== null &&
+          alignGramLevels(loadedA, loadedB).kind === "ok";
         activeMode = loadedB !== null ? "b" : "a";
       } catch (error) {
         if (gen !== generation || isAbort(error)) return;
@@ -180,6 +202,7 @@ export function createGramPair(opts: GramPairOpts): GramPairHandle {
     },
     mode: () => activeMode,
     gridMatches: () => matches,
+    empty: () => levelA === null && levelB === null,
     current() {
       switch (activeMode) {
         case "a":

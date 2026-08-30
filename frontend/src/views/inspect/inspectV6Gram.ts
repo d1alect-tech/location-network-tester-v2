@@ -28,6 +28,7 @@ const MODES = [
 ] as const;
 
 const MISMATCH_NOTE = "сетки спектрограмм не совпадают";
+const EMPTY_NOTE = "нет спектрограммы записи";
 
 function assertNever(value: never): never {
   throw new Error(`unhandled ${String(value)}`);
@@ -129,6 +130,16 @@ export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle 
     async refresh(a, b) {
       if (a === null || a === "") return;
       await gramPair.load(a, b);
+      for (const button of buttons) button.disabled = false;
+      if (gramPair.empty()) {
+        // Ни у одной сессии пары нет артефакта: режимы недоступны, без ошибки.
+        for (const button of buttons) {
+          button.disabled = true;
+          button.setAttribute("aria-pressed", "false");
+        }
+        scale.textContent = EMPTY_NOTE;
+        return;
+      }
       const matches = gramPair.gridMatches();
       const delta = deltaButton();
       if (delta !== undefined) delta.disabled = !matches;
