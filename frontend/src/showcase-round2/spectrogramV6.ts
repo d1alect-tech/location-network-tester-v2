@@ -1,12 +1,12 @@
-/** Спектрограмма V6 — вторая дорожка под линейным спектром.
+/** Спектрограмма V6 — отдельный вид сигнального окна: время × частота.
  *
- *  В продукте спектрограмма и спектр живут порознь: своя сессия, свой зум, общей
- *  шкалы нет. Здесь полотно стоит ровно под областью данных графика и берёт частоту
- *  каждой своей колонки у самого uPlot, поэтому шкала совпадает по построению.
- *  Ось X — частота (общая со спектром), ось Y — время записи.
+ *  Спектр и спектрограмма не стоят стопкой: это два переключаемых вида одного
+ *  окна. Шкала частот у грама собственная, но значения и лог-позиции она берёт
+ *  у шкалы спектра при attach, поэтому оба вида говорят на одной шкале.
+ *  Ось X — частота, ось Y — время записи.
  *
- *  Содержимое переключается А / Б / Δ: единица работы V6 — пара, поэтому по
- *  умолчанию открыта разница, показывающая, где именно во времени разошлись трассы. */
+ *  Содержимое переключается А / Б / Δ: по умолчанию уровень сравнения —
+ *  спокойная дельта вдали от пиков почти чёрная и читалась бы пустым полем. */
 import type uPlot from "uplot";
 
 import { METRICS, formatHz } from "../showcase-redesign/data";
@@ -20,6 +20,7 @@ type Mode = "a" | "b" | "delta";
 const TIME_BINS = 48;
 const TIME_PERIODS = 4;
 const DAMPED_HZ = 22418;
+const FREQ_TICKS = [1000, 10000, 100000, 1000000, 10000000] as const;
 
 const MODE_TITLE: Readonly<Record<Mode, string>> = {
   a: "База",
@@ -35,18 +36,11 @@ function at(column: Column | undefined, index: number): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-/** Временная модуляция СРАЗУ В ДЕЦИБЕЛАХ.
- *
- *  Первая версия модулировала линейную мощность множителем с единичным средним, и это
- *  казалось достаточным. Но полотно показывает 10·lg, а логарифм вогнут: по неравенству
- *  Йенсена E[lg(mod)] < lg(E[mod]) = 0, причём тем сильнее, чем больше амплитуда. У базы и
- *  сравнения амплитуды разные, смещения не сокращались, и средняя Δ полотна уходила
- *  на 0.58 дБ от колонки таблицы (измерено контрактом V6-S15). В дБ-домене среднее ровно
- *  нулевое, и согласованность с таблицей становится тождеством, а не приближением. */
+/** Временная модуляция СРАЗУ В ДЕЦИБЕЛАХ: единичное среднее в линейных величинах
+ *  смещает среднее по Йенсену, и полотно расходится с колонкой дельты. */
 function modulationDb(timeNorm: number, freq: number, ampDb: number): number {
   // Фаза ОБЩАЯ для обеих сессий: флуктуации сети коррелированы, и разность трасс
-  // обязана зависеть только от разницы амплитуд. При разных фазах дельта покрывалась
-  // интерференционным муаром размахом 4.5 дБ там, где сессии не расходятся вовсе.
+  // обязана зависеть только от разницы амплитуд.
   const phase = Math.sin(freq * 0.0004) * Math.PI;
   return ampDb * Math.cos(2 * Math.PI * timeNorm * TIME_PERIODS + phase);
 }
@@ -58,7 +52,7 @@ function amplitudeB(freq: number): number {
 }
 
 export interface SpectrogramV6 {
-  /** Полотно; встаёт под графиком внутри той же панели. */
+  /** Полотно вида «Спектрограмма»; видимость управляется классом на панели. */
   readonly host: HTMLElement;
   /** Органы управления; едут в шапку панели спектра, чтобы не тратить высоту. */
   readonly bar: HTMLElement;
@@ -73,12 +67,14 @@ export function buildSpectrogramV6(): SpectrogramV6 {
   const columnB = data[2] as Column | undefined;
   const durationS = METRICS.durationS;
 
-  // По умолчанию — уровень сравнения: спокойная дельта вдали от пиков почти чёрная,
-  // и дорожка читается пустым полем; дельта остаётся в один клик и числом в таблице пиков.
+  // По умолчанию — уровень сравнения; дельта — в один клик и числом в таблице.
   let mode: Mode = "b";
-  let plot: uPlot | undefined;
-  // Позиция полотна публикуется правилом стиль-листа: разметка витрин свободна
-  // от inline-стилей (§2.5, контракт S13).
+  // Домен частот захватывается у шкалы спектра: виды делят одну шкалу.
+  let logMin = Math.log10(FREQ_TICKS[0]);
+  let logMax = Math.log10(FREQ_TICKS[FREQ_TICKS.length - 1]);
+
+  // Позиции тиков — правилом стиль-листа: разметка витрин свободна от inline-стилей
+  // (§2.5, контракт S13).
   const sheet = new CSSStyleSheet();
   document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
 
@@ -86,6 +82,25 @@ export function buildSpectrogramV6(): SpectrogramV6 {
   // В покое показания пусты: приглашение «наведите» переполняло шапку и резало шкалу.
   const readout = h("span", "gram-readout num", { "data-spectrogram-readout": "" });
   const scale = h("span", "gram-scale", { "data-spectrogram-scale": "" });
+  const ticksRow = h("div", "gram-freq-ticks", { "data-gram-freq-ticks": "", "aria-hidden": "true" });
+
+  function freqAt(cssX: number, cssWidth: number): number {
+    return 10 ** (logMin + clamp01(cssX / cssWidth) * (logMax - logMin));
+  }
+
+  function paintTicks(): void {
+    ticksRow.replaceChildren(
+      ...FREQ_TICKS.map((hz) =>
+        h("span", "gram-freq-tick num", { "data-hz": String(hz) }, [hz.toLocaleString("en-US")]),
+      ),
+    );
+    sheet.replaceSync(
+      FREQ_TICKS.map((hz) => {
+        const t = ((Math.log10(hz) - logMin) / (logMax - logMin)) * 100;
+        return `.app-v6 [data-hz="${hz}"]{left:${t.toFixed(2)}%}`;
+      }).join(""),
+    );
+  }
 
   /** Ближайший индекс частоты — сетка спектра неравномерна по пикселям. */
   function indexAt(freq: number): number {
@@ -139,24 +154,13 @@ export function buildSpectrogramV6(): SpectrogramV6 {
   }
 
   function redraw(): void {
-    const current = plot;
-    if (current === undefined) return;
-    // Геометрию берём у самой области данных, а не из bbox: внутренние отступы
-    // обёртки графика иначе сдвигают полотно относительно шкалы.
-    const over = current.over.getBoundingClientRect();
-    const wrap = canvas.parentElement?.getBoundingClientRect();
-    if (wrap === undefined) return;
-    const cssWidth = Math.round(over.width);
-    const left = Math.round(over.left - wrap.left);
-    // Зазор под осью Y графика занимает шкала времени, а не пустота.
-    sheet.replaceSync(
-      `.app-v6 .gram-axis{width:${left}px}.app-v6 .gram-canvas{width:${cssWidth}px}`,
-    );
-    const cssHeight = Math.round(canvas.getBoundingClientRect().height);
+    const box = canvas.getBoundingClientRect();
+    const cssWidth = Math.round(box.width);
+    const cssHeight = Math.round(box.height);
     if (cssWidth <= 0 || cssHeight <= 0) return;
 
-    // Буфер — в ФИЗИЧЕСКИХ пикселях. Прежде он считался в CSS-пикселях, и на любом
-    // экране с масштабированием отличным от 100% браузер растягивал полотно интерполяцией — мыло.
+    // Буфер — в ФИЗИЧЕСКИХ пикселях: иначе браузер растягивает полотно
+    // интерполяцией на любом экране с масштабированием, отличным от 100%.
     const ratio = devicePixelRatio || 1;
     const width = Math.round(cssWidth * ratio);
     const height = Math.round(cssHeight * ratio);
@@ -169,8 +173,8 @@ export function buildSpectrogramV6(): SpectrogramV6 {
     const { low, high } = levelRange();
     const span = high - low || 1;
     for (let x = 0; x < width; x += 1) {
-      // Частота — по CSS-координате: шкала uPlot живёт в них, а не в физических.
-      const freq = current.posToVal(x / ratio, "x");
+      // Частота — по CSS-координате собственной лог-шкалы вида.
+      const freq = freqAt(x / ratio, cssWidth);
       for (let y = 0; y < height; y += 1) {
         // Время растёт сверху вниз: верх полотна — начало записи.
         const timeNorm = Math.floor((y / height) * TIME_BINS) / TIME_BINS;
@@ -206,12 +210,10 @@ export function buildSpectrogramV6(): SpectrogramV6 {
   }
 
   canvas.addEventListener("mousemove", (event) => {
-    const current = plot;
-    if (current === undefined) return;
     const box = canvas.getBoundingClientRect();
     const x = event.clientX - box.left;
     const timeNorm = clamp01((event.clientY - box.top) / box.height);
-    const freq = current.posToVal(x, "x");
+    const freq = freqAt(x, box.width);
     const value = valueAt(freq, Math.floor(timeNorm * TIME_BINS) / TIME_BINS);
     const seconds = (timeNorm * durationS).toFixed(2);
     const sign = mode === "delta" && value > 0 ? "+" : "";
@@ -228,15 +230,21 @@ export function buildSpectrogramV6(): SpectrogramV6 {
     h("span", "gram-tick num", {}, [`${(durationS / 2).toFixed(1)} с`]),
     h("span", "gram-tick num", {}, [`${durationS.toFixed(1)} с`]),
   ]);
-  const host = h("div", "gram", { "data-spectrogram": "" }, [
-    h("div", "gram-canvas-wrap", {}, [axis, canvas]),
-  ]);
+  const wrap = h("div", "gram-canvas-wrap", {}, [axis, canvas]);
+  const host = h("div", "gram", { "data-spectrogram": "" }, [wrap, ticksRow]);
+
+  // Полотно тянется flex-ом: перерисовка при любом изменении размера окна вида.
+  const observer = new ResizeObserver(() => redraw());
+  observer.observe(wrap);
 
   return {
     host,
     bar,
-    attach(instance: uPlot): void {
-      plot = instance;
+    attach(plot) {
+      const scaleX = plot.scales.x;
+      if (typeof scaleX?.min === "number" && scaleX.min > 0) logMin = Math.log10(scaleX.min);
+      if (typeof scaleX?.max === "number" && scaleX.max > 0) logMax = Math.log10(scaleX.max);
+      paintTicks();
       redraw();
     },
     redraw,

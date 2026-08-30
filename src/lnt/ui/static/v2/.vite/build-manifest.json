@@ -144,10 +144,10 @@
     "src/showcase-round2/round2-polish.spec.ts": "5d7fab2716eb3d7de4fd2ea23d965880ab1680789ad4dcba3158638c15bec715",
     "src/showcase-round2/round2-review.spec.ts": "6b544e03517f583aa22f7854a43099b7256f8f7f428bed1dc72e495f26a60d82",
     "src/showcase-round2/round2-v5.spec.ts": "597496131bb6f99d982e7b649de5030b0a11934b805d0ce56f9401d5afa78258",
-    "src/showcase-round2/round2-v6.spec.ts": "3ea225713ca17bffae50f655dcb9f24e48b6726ef3e0e41d3cc10f1ac7cb32a3",
+    "src/showcase-round2/round2-v6.spec.ts": "74ba9f847423db9fd718a4771fae0ba963ad083324a743b858b6501696eb6526",
     "src/showcase-round2/showcase-round2.spec.ts": "212d6c221dccbb6d2736f9800ea9f977d999d80ced42684b625060c3a36d9fc4",
     "src/showcase-round2/spectrogramPalette.ts": "d23a779526f8a77165f83322e9579f30e182d51a472f5e81cd2d203b41d309be",
-    "src/showcase-round2/spectrogramV6.ts": "67697f4c243b7606c0e925a3f47609bfe5dc6c3aa08dcc82a544e33a61b493a7",
+    "src/showcase-round2/spectrogramV6.ts": "037731715d90ec0542a6ab488e8d2ebe929472545c156b0d647ac2da437b2f98",
     "src/showcase-round2/tokens.css": "338d79849b8ced98a6589a09b6e6e7d5aa6b9631f165000688cb9c248b522eed",
     "src/showcase-round2/variantV1.css": "d9b55240727e1ec626d284c31b3b36303ebec0c001f703c70c4fee7fe7c4746f",
     "src/showcase-round2/variantV1.ts": "7b3772604e2cbee488164dae71da68cbe59117b5bf3c7301c0353a730f7d10cd",
@@ -159,8 +159,8 @@
     "src/showcase-round2/variantV4.ts": "1ecce880215199f3bfb8681abd8ee571eafb220455675fe459e372fffa341714",
     "src/showcase-round2/variantV5.css": "5ac5649e49a24613aa06d124f238874981f68ca4324c2338246ad51cf12ba063",
     "src/showcase-round2/variantV5.ts": "22b088571643dc4f6d8f1bf7103aa1fa4dea9c7bda2551d296bd60ab8b424d80",
-    "src/showcase-round2/variantV6.css": "f388805f50883d5d5ca600f41558718afd40acc12147c69b099ef4d643a631dd",
-    "src/showcase-round2/variantV6.ts": "b39b679540bd8ca2d5e5c7420b2a6ca392650de5aa61c0501fcc6cf03088ef47",
+    "src/showcase-round2/variantV6.css": "0bc89229ec2f98f88246f7eacc85ee38c72e05e5a0df8dec83af1f6d9b7ed2b3",
+    "src/showcase-round2/variantV6.ts": "159605ec2daa8aacc5ed8f382727e9689704659745e5f8c0b9a082dfadac6884",
     "src/showcase.spec.ts": "bf78abc9f0b4be7f25640051df7b04a78e9c9c51443b3cedce8f8b6d5cde237d",
     "src/showcase.ts": "4c629332bc2591161b93e370562c589792f07153eae32830b62d6745ca76f7f6",
     "src/spectrogram.spec.ts": "0ac59839819b020f164a69756090c4069166800ac1b32f76210d5efa643b941f",
@@ -267,7 +267,7 @@
     "src/vite-env.d.ts": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
   },
   "outputs": {
-    ".vite/manifest.json": "3613ddd2f7f3076e7d7c496a8f85721e01920367596ef0d69332968aea347476",
+    ".vite/manifest.json": "9eb8fc4196890ea50ff45c3426e77406f5f8e4b69c7a55e83609b0b734e4a12c",
     "assets/chartshell.Cgb8IiO0.js": "e8b875130ba2231393e0ef91ac6112f5b0a4b3bcc88062dacee8ad2263411c91",
     "assets/chartshell.CjJRDo9O.css": "402d77ae161808e8980ece8a379a8191bb7bcd0d342b6c6111161eddaab6c5a2",
     "assets/form.BArInMtH.js": "602bfd1b0412dfaa6d5017333eeacf3092cb3a0a0e096b9f1f3ba1084142492c",
@@ -299,8 +299,8 @@
     "assets/showcaseRound2V4.DEZsaNTr.css": "10f101fa049fda158f5298f2544697a68cf9c7b2dad8a24e61a3040524af830f",
     "assets/showcaseRound2V5.B-_19Ks-.js": "cbd00f22c8032ea4c65d3adeca3fe36fc4bb8de69ff70c7495ebdc75308f1a07",
     "assets/showcaseRound2V5.C0Cvx3hi.css": "8512ee8e0eb663256ef846703f49720bbcd062459cc39edd9c8e6fb3cf9f7b4b",
-    "assets/showcaseRound2V6.B8EWXQCO.css": "62d6680dbd9033c290b757a65faccf608b7ccbe9715df8284fffc57d6907af00",
-    "assets/showcaseRound2V6.Wa4dgQOu.js": "f461d32f1c592e5ad2d68a0bac37b5a8a779b72704c63154bd4e713e8c09bd09",
+    "assets/showcaseRound2V6.Bv5RxbY0.css": "70453e6a9043eec483e16fe72d2a88a28d1f6d629fb82c09a890753e78766635",
+    "assets/showcaseRound2V6.DjpVPHuD.js": "61e1ca846cf53c77f4df3a7425c6f84ea175dd3792f834a4a1ca9b52a68a735d",
     "assets/showcaseVariantA.77Q9WTpI.css": "5b1a3863e45f09307b5e9640641b07cde5db6dd88eaf76bd378f707c64d32d18",
     "assets/showcaseVariantA.PO0Udm05.js": "cd45b5d71f9a276888599efeb13c22080e195c638a688d2249aa85b0844c29fb",
     "assets/showcaseVariantB.BTVqluv_.css": "63f22b5430706bac45ed4e7e0ab36d86cd28bd547347b032dd4275303bb281af",
@@ -332,7 +332,7 @@
     "showcase-v3.html": "769e4af174692cd06c21da473bb521ce983d28a97be3814c830534b8d8185cb5",
     "showcase-v4.html": "e702d06d5bf41a59769a82310305bf36fb2943d4e445d8764e0f2716f521cfdd",
     "showcase-v5.html": "580c0b9cec73ef619a76635a2243570bc79fd3c73b41d4932a60b00f3ded7dd3",
-    "showcase-v6.html": "4996fefb7b2d1f1a286a88566e3a2eaad96e0505e791572863a18861efc685f4",
+    "showcase-v6.html": "3c085cb9a80ad13b395733056355f9d869ab42c0ee03f5e92210756d099c3e82",
     "showcase.html": "0581ffceebd037c51d69d4c99027d940b1c9fe4b2533fb68a819ce912873a8a0"
   }
 }

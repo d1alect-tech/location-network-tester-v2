@@ -89,21 +89,42 @@ const spectrum = buildSpectrumPanel(264, {
   labels: { a: base.label, b: compare.label },
   // Заголовок оси X ушёл в шапку панели: под графиком оставалась мёртвая тёмная
   // полоса с одинокой подписью «Частота, Гц», читавшаяся пустым местом.
-  // Дорожка ниже делит с графиком сами тики — это и есть общая шкала частот.
-  title: "Спектр мощности · частота, Гц",
+  title: "Спектр мощности · Гц",
   xLabel: "",
   onDraw: () => {
     redrawMarkers?.();
-    gram.redraw();
   },
   onPlot: (plot) => {
     redrawMarkers = mountPeakMarkers(plot, peakRows);
+    // Грам захватывает домен шкалы спектра: оба вида говорят на одной шкале.
     gram.attach(plot);
   },
 });
 spectrum.querySelector(".panel-bd")?.append(gram.host);
-// Органы управления второй дорожкой живут в шапке панели: отдельная полоса съела бы высоту.
-spectrum.querySelector(".panel-hd")?.append(gram.bar);
+
+// Сигнальное окно одно, вида два: спектр и спектрограмма переключаются, а не
+// стоят стопкой — стопка читалась пользователем как артефакт.
+const viewToggle = h("div", "view-toggle", { role: "group", "aria-label": "Вид сигнального окна" });
+const viewButtons = new Map<"spectrum" | "gram", HTMLElement>();
+for (const [key, title] of [
+  ["spectrum", "Спектр"],
+  ["gram", "Спектрограмма"],
+] as const) {
+  const button = h(
+    "button",
+    "btn-quiet view-toggle-btn",
+    { type: "button", "data-spectrum-view": key, "aria-pressed": String(key === "spectrum") },
+    [title],
+  );
+  button.addEventListener("click", () => {
+    spectrum.classList.toggle("is-gram", key === "gram");
+    for (const [name, node] of viewButtons) node.setAttribute("aria-pressed", String(name === key));
+  });
+  viewButtons.set(key, button);
+  viewToggle.append(button);
+}
+// Органы управления грамом живут в шапке панели: отдельная полоса съела бы высоту.
+spectrum.querySelector(".panel-hd")?.append(viewToggle, gram.bar);
 
 app.append(
   h("div", "app-v6", { "data-showcase": "shell" }, [

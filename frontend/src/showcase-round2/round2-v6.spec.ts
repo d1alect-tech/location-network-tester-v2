@@ -138,16 +138,15 @@ test("V6-S4: приборный ритм показаний, весь срез �
   expect(readout.valueNumeric).toContain("tabular-nums");
   expect(readout.docScroll).toBeLessThanOrEqual(readout.docClient + 1);
   expect(readout.mainScroll).toBeLessThanOrEqual(readout.mainClient + 1);
-  // График остаётся героем: больше, чем в V5 (303.5px).
-  // Сигнальная зона — спектр вместе со спектрограммой: вторая дорожка берёт высоту
-  // у первой, поэтому сумма остаётся на уровне прежнего графика, а сам спектр не вырождается.
-  const signalZone = readout.plotHeight + readout.gramHeight;
-  expect(
-    signalZone,
-    `спектр ${readout.plotHeight} + спектрограмма ${readout.gramHeight}`,
-  ).toBeGreaterThanOrEqual(320);
-  expect(readout.plotHeight).toBeGreaterThanOrEqual(210);
-  expect(readout.gramHeight).toBeGreaterThanOrEqual(88);
+  // Сигнальное окно одно и занимает всё, что осталось: в виде «спектр» график — герой.
+  expect(readout.plotHeight).toBeGreaterThanOrEqual(260);
+
+  // Вид «спектрограмма» отдаёт то же окно полотну.
+  await page.locator('[data-spectrum-view="gram"]').click();
+  const gramHeight = await page.evaluate(
+    () => document.querySelector("[data-spectrogram-canvas]")?.getBoundingClientRect().height ?? 0,
+  );
+  expect(gramHeight).toBeGreaterThanOrEqual(200);
 });
 
 /** Измеряет фактическую ширину одной и той же числовой строки в таблице пиков. */
@@ -328,14 +327,16 @@ test("V6-S17: каталог держит высоту колонки и не р
 test("V6-S18: дельта спокойна там, где трассы не расходятся", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(PAGE);
+  await openGram(page);
   // Дефолт — уровень сравнения; спокойствие дельты проверяем в её собственном режиме.
   await page.locator('[data-spectrogram-mode="delta"]').click();
 
   const canvas = await page.locator("[data-spectrogram-canvas]").boundingBox();
-  const marker = await page.locator('[data-peak="0"]').boundingBox();
   expect(canvas).not.toBeNull();
-  expect(marker).not.toBeNull();
-  if (canvas === null || marker === null) return;
+  if (canvas === null) return;
+  const peakX = await peakXFromGramScale(page, 22418);
+  expect(peakX).not.toBeNull();
+  if (peakX === null) return;
 
   const readout = page.locator("[data-spectrogram-readout]");
   const swingAt = async (x: number): Promise<number> => {
@@ -352,7 +353,7 @@ test("V6-S18: дельта спокойна там, где трассы не р�
   // Вдали от демпфированного пика трассы совпадают: собственная рябь дельты там —
   // декоративный муар, маскирующий единственное настоящее различие.
   const quiet = await swingAt(canvas.x + canvas.width * 0.9);
-  const atPeak = await swingAt(marker.x + marker.width / 2);
+  const atPeak = await swingAt(peakX);
   expect(quiet, `размах вдали от пика ${quiet.toFixed(2)} дБ`).toBeLessThan(1);
   expect(atPeak, `размах на пике ${atPeak.toFixed(2)} дБ`).toBeGreaterThan(quiet);
 });
@@ -437,70 +438,82 @@ test("V6-S10: каталог показывает роли сессий и со�
  *  не синхронизированы; здесь они по построению стоят на одной шкале. */
 const GRAM = "[data-spectrogram]";
 
-test("V6-S11: спектрограмма делит ось частот с линейным спектром", async ({ page }) => {
+/** Спектрограмма — отдельный вид сигнального окна; перед замерами дорожки открываем его. */
+async function openGram(page: Page): Promise<void> {
+  await page.locator('[data-spectrum-view="gram"]').click();
+}
+
+/** Абсцисса частоты в виде грама: лог-интерполяция между тиками его собственной шкалы. */
+async function peakXFromGramScale(page: Page, hz: number): Promise<number | null> {
+  return page.evaluate((targetHz) => {
+    const canvas = document.querySelector("[data-spectrogram-canvas]");
+    const ticks = [...document.querySelectorAll("[data-gram-freq-ticks] [data-hz]")];
+    if (!(canvas instanceof HTMLElement) || ticks.length < 2) return null;
+    const c = canvas.getBoundingClientRect();
+    const points = ticks
+      .map((tick) => {
+        const box = tick.getBoundingClientRect();
+        return {
+          logHz: Math.log10(Number(tick.getAttribute("data-hz"))),
+          x: box.left + box.width / 2 - c.left,
+        };
+      })
+      .sort((a, b) => a.logHz - b.logHz);
+    const target = Math.log10(targetHz);
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const a = points[i];
+      const b = points[i + 1];
+      if (a === undefined || b === undefined || target < a.logHz || target > b.logHz) continue;
+      const k = (target - a.logHz) / (b.logHz - a.logHz);
+      return c.left + a.x + (b.x - a.x) * k;
+    }
+    return null;
+  }, hz);
+}
+
+test("V6-S11: вид спектрограммы обрамлён шкалами частоты и времени", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   const consoleErrors = watchConsoleErrors(page);
   await page.goto(PAGE);
+  await openGram(page);
 
-  await expect(page.locator(GRAM)).toBeVisible();
-
+  // Собственная шкала грама — те же значения, что у спектра; тики обрамляют полотно,
+  // а не висят в стороне: сигнал занимает всё окно вида.
   const geometry = await page.evaluate(() => {
     const canvas = document.querySelector("[data-spectrogram-canvas]");
-    const over = document.querySelector('[data-showcase="spectrum"] .u-over');
-    if (!(canvas instanceof HTMLElement) || !(over instanceof HTMLElement)) return null;
-    const left = canvas.getBoundingClientRect();
-    const right = over.getBoundingClientRect();
+    const freqTicks = document.querySelector("[data-gram-freq-ticks]");
+    const timeTicks = [...document.querySelectorAll(".app-v6 .gram-tick")];
+    if (!(canvas instanceof HTMLElement) || !(freqTicks instanceof HTMLElement)) return null;
+    const c = canvas.getBoundingClientRect();
+    const first = freqTicks.firstElementChild?.getBoundingClientRect();
+    const last = freqTicks.lastElementChild?.getBoundingClientRect();
+    const top = timeTicks[0]?.getBoundingClientRect();
+    const bottom = timeTicks[timeTicks.length - 1]?.getBoundingClientRect();
+    if (!first || !last || !top || !bottom) return null;
     return {
-      gramLeft: left.left,
-      gramRight: left.right,
-      plotLeft: right.left,
-      plotRight: right.right,
+      left: first.left - c.left,
+      right: c.right - last.right,
+      top: top.top - c.top,
+      bottom: c.bottom - bottom.bottom,
+      tickCount: freqTicks.children.length,
     };
   });
   expect(geometry).not.toBeNull();
-  // Полотно спектрограммы стоит ровно под областью данных графика: одна шкала частот.
-  const where = `полотно ${geometry?.gramLeft}..${geometry?.gramRight} | график ${geometry?.plotLeft}..${geometry?.plotRight}`;
-  expect(
-    Math.abs((geometry?.gramLeft ?? 0) - (geometry?.plotLeft ?? 0)),
-    where,
-  ).toBeLessThanOrEqual(1);
-  expect(
-    Math.abs((geometry?.gramRight ?? 0) - (geometry?.plotRight ?? 0)),
-    where,
-  ).toBeLessThanOrEqual(1);
-
-  // Между данными графика и спектрограммой нет мёртвой зоны: строка тиков частоты —
-  // единственное, что разделяет дорожки общей шкалы. Прежде здесь висела тёмная
-  // полоса с заголовком оси, которую пользователь читал как «пустое место».
-  const gap = await page.evaluate(() => {
-    const over = document.querySelector('[data-showcase="spectrum"] .u-over');
-    const gram = document.querySelector("[data-spectrogram]");
-    if (!(over instanceof HTMLElement) || !(gram instanceof HTMLElement)) return null;
-    return gram.getBoundingClientRect().top - over.getBoundingClientRect().bottom;
-  });
-  expect(gap).not.toBeNull();
-  expect(gap ?? 0, `зазор между графиком и спектрограммой ${gap}px`).toBeLessThanOrEqual(44);
-
-  // Полотно действительно закрашено, а не осталось пустым.
-  const painted = await page.evaluate(() => {
-    const canvas = document.querySelector("[data-spectrogram-canvas]");
-    if (!(canvas instanceof HTMLCanvasElement)) return 0;
-    const ctx = canvas.getContext("2d");
-    if (ctx === null) return 0;
-    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    let opaque = 0;
-    for (let index = 3; index < data.length; index += 4) {
-      if ((data[index] ?? 0) > 0) opaque += 1;
-    }
-    return opaque / (data.length / 4);
-  });
-  expect(painted).toBeGreaterThan(0.9);
+  expect(geometry?.tickCount, "тики частоты").toBeGreaterThanOrEqual(5);
+  expect(Math.abs(geometry?.left ?? 99), "первый тик у левого края").toBeLessThanOrEqual(30);
+  // Последний тик центрирован на правой кромке и выступает за неё половиной подписи.
+  expect(Math.abs(geometry?.right ?? 99), "последний тик у правого края").toBeLessThanOrEqual(40);
+  expect(geometry?.top ?? 99, "0 с у верха полотна").toBeGreaterThanOrEqual(-2);
+  expect(geometry?.top ?? 99, "0 с у верха полотна").toBeLessThanOrEqual(20);
+  expect(geometry?.bottom ?? 99, "2.4 с у низа полотна").toBeGreaterThanOrEqual(-2);
+  expect(geometry?.bottom ?? 99, "2.4 с у низа полотна").toBeLessThanOrEqual(20);
   expect(consoleErrors).toEqual([]);
 });
 
 test("V6-S12: спектрограмма переключается между А, Б и дельтой", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(PAGE);
+  await openGram(page);
 
   const modes = page.locator("[data-spectrogram-mode]");
   await expect(modes).toHaveCount(3);
@@ -536,6 +549,7 @@ test("V6-S12: спектрограмма переключается между �
 test("V6-S13: курсор спектрограммы называет частоту, время и значение", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(PAGE);
+  await openGram(page);
 
   const readout = page.locator("[data-spectrogram-readout]");
   const canvas = page.locator("[data-spectrogram-canvas]");
@@ -555,6 +569,8 @@ test("V6-S13: курсор спектрограммы называет част�
 test("V6-S14: органы каталога и спектрограммы держат геометрию и фокус ТЗ", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(PAGE);
+  // Режимы грама живут в шапке только в его виде.
+  await openGram(page);
 
   // §2.3: инпут 32px, шапка таблицы 30-32px; §6: цели ≥28px.
   const small = await page.evaluate(() => {
@@ -576,6 +592,9 @@ test("V6-S14: органы каталога и спектрограммы дер
   expect(small, "геометрия контролов").toEqual([]);
 
   // §2.3: фокус-рамка видима, а не снята outline:none.
+  // Клавиша возвращает клавиатурную модальность после клика по тумблеру:
+  // иначе программный focus кнопки не активирует :focus-visible.
+  await page.keyboard.press("Shift");
   const focusable: readonly string[] = [
     "[data-cat-search]",
     "[data-cat-clear]",
@@ -601,6 +620,7 @@ test("V6-S14: органы каталога и спектрограммы дер
 test("V6-S15: средняя по времени дельта полотна совпадает с колонкой дельты", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(PAGE);
+  await openGram(page);
   // Дефолт — уровень сравнения; согласованность с таблицей — свойство дельта-режима.
   await page.locator('[data-spectrogram-mode="delta"]').click();
 
@@ -610,15 +630,16 @@ test("V6-S15: средняя по времени дельта полотна с�
   );
   expect(Number.isFinite(column)).toBe(true);
 
-  // Тот же пик на графике: маркер даёт координату частоты.
-  const marker = await page.locator('[data-peak="0"]').boundingBox();
+  // Координата демпфированного пика — из собственной шкалы грама: тики частоты
+  // несут data-hz, позиция лог-интерполируется между соседними тиками.
   const canvas = await page.locator("[data-spectrogram-canvas]").boundingBox();
-  expect(marker).not.toBeNull();
   expect(canvas).not.toBeNull();
-  if (marker === null || canvas === null) return;
+  if (canvas === null) return;
+  const x = await peakXFromGramScale(page, 22418);
+  expect(x).not.toBeNull();
+  if (x === null) return;
 
   const readout = page.locator("[data-spectrogram-readout]");
-  const x = marker.x + marker.width / 2;
   // 24 пробы при 48 бинах и 4 периодах попадают в целое число циклов: сумма модуляции точно ноль.
   const samples: number[] = [];
   for (let step = 0; step < 24; step += 1) {
@@ -657,6 +678,7 @@ test("V6-S16: витрина снимается артефактом в кажд
   await page.locator(`${CATALOG} [data-cat-clear]`).click();
 
   // Спектрограмма в режиме уровня, а не дельты.
+  await openGram(page);
   await page.locator('[data-spectrogram-mode="a"]').click();
   await page.mouse.move(640, 300);
   await shot("gram-level");
@@ -668,14 +690,65 @@ test("V6-S16: витрина снимается артефактом в кажд
   await page.locator('[data-cat-sort="label"] .cat-sort').focus();
   await shot("focus-sort");
 
-  // Стык под полотном крупным планом: туда ни разу не смотрели вблизи.
-  const box = await page.locator("[data-spectrogram-canvas]").boundingBox();
+  // Вид спектрограммы крупным планом: полотно, обрамлённое шкалами.
+  const box = await page.locator(GRAM).boundingBox();
   if (box !== null) {
     await page.screenshot({
-      path: resolve(EVIDENCE_DIR, "v6-gram-seam-1280.png"),
-      clip: { x: box.x - 80, y: box.y + box.height - 40, width: box.width + 80, height: 90 },
+      path: resolve(EVIDENCE_DIR, "v6-gram-view-1280.png"),
+      clip: { x: box.x - 8, y: box.y - 8, width: box.width + 16, height: box.height + 16 },
     });
   }
+});
+
+test("V6-S20: спектр и спектрограмма — два переключаемых вида одного окна", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(PAGE);
+
+  const viewSpectrum = page.locator('[data-spectrum-view="spectrum"]');
+  const viewGram = page.locator('[data-spectrum-view="gram"]');
+  await expect(viewSpectrum).toBeVisible();
+  await expect(viewGram).toBeVisible();
+
+  // Дефолт — линейный спектр: график виден, дорожка скрыта.
+  await expect(viewSpectrum).toHaveAttribute("aria-pressed", "true");
+  await expect(viewGram).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator('[data-showcase="spectrum"] .u-over')).toBeVisible();
+  await expect(page.locator(GRAM)).toBeHidden();
+
+  // Вид «Спектрограмма»: полноэкранный грам с собственной шкалой частот и шкалой секунд.
+  await viewGram.click();
+  await expect(viewGram).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[data-showcase="spectrum"] .u-over')).toBeHidden();
+  const gram = page.locator(GRAM);
+  await expect(gram).toBeVisible();
+
+  const canvasBox = await page.locator("[data-spectrogram-canvas]").boundingBox();
+  expect(canvasBox).not.toBeNull();
+  expect(canvasBox?.height ?? 0, "полотно во весь сигнал").toBeGreaterThanOrEqual(200);
+
+  // Нижние тики частот — те же значения, что у спектра: шкала общая по смыслу.
+  const ticks = (await page.locator("[data-gram-freq-ticks]").textContent()) ?? "";
+  expect(ticks).toContain("10,000");
+  expect(ticks).toContain("100,000");
+  await expect(page.locator(".app-v6 .gram-axis")).toBeVisible();
+
+  // Полотно закрашено, а не пустое.
+  const painted = await page.evaluate(() => {
+    const canvas = document.querySelector("[data-spectrogram-canvas]");
+    if (!(canvas instanceof HTMLCanvasElement)) return 0;
+    const ctx = canvas.getContext("2d");
+    if (ctx === null) return 0;
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let opaque = 0;
+    for (let index = 3; index < data.length; index += 4) if ((data[index] ?? 0) > 0) opaque += 1;
+    return opaque / (data.length / 4);
+  });
+  expect(painted).toBeGreaterThan(0.9);
+
+  // Возврат к спектру восстанавливает график.
+  await viewSpectrum.click();
+  await expect(page.locator('[data-showcase="spectrum"] .u-over')).toBeVisible();
+  await expect(gram).toBeHidden();
 });
 
 test.describe("V6-S19: полотно чёткое на экране с масштабированием", () => {
@@ -684,6 +757,13 @@ test.describe("V6-S19: полотно чёткое на экране с масш
   test("буфер холста считается в физических пикселях", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(PAGE);
+    await openGram(page);
+    // Перерисовку запускает ResizeObserver после раскрытия вида — ждём фактический буфер.
+    await expect
+      .poll(async () =>
+        page.evaluate(() => document.querySelector("[data-spectrogram-canvas]")?.width ?? 0),
+      )
+      .toBeGreaterThan(500);
 
     const canvas = await page.evaluate(() => {
       const node = document.querySelector("[data-spectrogram-canvas]");
@@ -703,11 +783,15 @@ test.describe("V6-S19: полотно чёткое на экране с масш
     // Буфер меньше физического размера — браузер растянет его интерполяцией, и полотно
     // поплывёт мылом на любом экране с масштабированием, отличным от 100%.
     expect(canvas.ratio).toBeGreaterThan(1);
+    // ±1px на двойное округление дробных CSS-размеров; суть — буфер равен
+    // физическому размеру, а не CSS-пикселям, иначе полотно плывёт мылом.
+    const dw = Math.abs(canvas.bufferWidth - Math.round(canvas.cssWidth * canvas.ratio));
+    const dh = Math.abs(canvas.bufferHeight - Math.round(canvas.cssHeight * canvas.ratio));
     expect(
-      canvas.bufferWidth,
+      dw,
       `буфер ${canvas.bufferWidth}x${canvas.bufferHeight} против css ${canvas.cssWidth}x${canvas.cssHeight} при dpr ${canvas.ratio}`,
-    ).toBe(Math.round(canvas.cssWidth * canvas.ratio));
-    expect(canvas.bufferHeight).toBe(Math.round(canvas.cssHeight * canvas.ratio));
+    ).toBeLessThanOrEqual(1);
+    expect(dh).toBeLessThanOrEqual(1);
 
     const box = await page.locator("[data-spectrogram]").boundingBox();
     if (box !== null) {
@@ -746,7 +830,6 @@ test.describe("V6-S19: полотно чёткое на экране с масш
       };
     });
     expect(layout).not.toBeNull();
-    expect(layout?.canvas, "CSS-высота полотна").toBeCloseTo(104, 0);
     expect(
       Math.abs((layout?.axis ?? 0) - (layout?.canvas ?? 0)),
       `ось ${layout?.axis} против полотна ${layout?.canvas}`,
