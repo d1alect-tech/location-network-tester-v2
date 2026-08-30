@@ -229,7 +229,8 @@ test("persona journey: prepare→capture→inspect→experiments→reports→set
 
   await page.goto(`${BASE}#/inspect`);
   await expect(page.locator(".app-v6")).toBeVisible();
-  await expect(page.locator(".app-header")).toBeHidden();
+  await expect(page.locator("header.hdr")).toBeVisible();
+  await expect(page.locator(".app-header")).toHaveCount(0);
 
   await page.goto(`${BASE}#/experiments`);
   await expect(page.locator(".lnt-exp-workspace")).toBeVisible();

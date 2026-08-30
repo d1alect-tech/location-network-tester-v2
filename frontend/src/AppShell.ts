@@ -3,12 +3,13 @@ import { LntApiClient } from "./api/client";
 // BEGIN Todo 40: регистрация рабочего процесса захвата (аддитивно, один блок).
 import { createCaptureView } from "./capture/captureView";
 import type { CaptureViewHandle } from "./capture/captureView";
-import { clearElement } from "./components/primitives/dom";
+import { clearElement, el } from "./components/primitives/dom";
 import { announcePolite } from "./components/primitives/status";
 import { RouteStore } from "./state/routeState";
 // END Todo 40
 // --- Инспекция V6: единое окно сравнения (полный захват экрана) ---
 import "./components/charts/charts.css";
+import { createV6ShellHeader, createV6ShellStatusbar, type V6ShellHeader } from "./shell/v6Shell";
 import { mountInspectV6 } from "./views/inspect/inspectV6";
 
 // Simple Hash Router
@@ -55,7 +56,6 @@ export const ROUTES: Record<Route, { title: string; desc: string }> = {
 };
 
 import { createThemePreference } from "./state/themePreference";
-import type { ThemeController } from "./state/themePreference";
 // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
 import { mountCatalogWorkspace } from "./views/catalog/catalogWorkspace";
 // ===== END T39 CATALOG REGISTRATION =====
@@ -77,9 +77,7 @@ export class AppShell {
   // BEGIN Todo 40
   private captureView: CaptureViewHandle | null = null;
   // END Todo 40
-  // BEGIN Todo 44
-  private readonly theme: ThemeController;
-  // END Todo 44
+  private v6Header: V6ShellHeader | null = null;
 
   // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
   /** Смонтированное представление и его очистка; смена фильтров внутри
@@ -92,9 +90,8 @@ export class AppShell {
   constructor(container: HTMLElement) {
     this.container = container;
     this.routes = new RouteStore(window);
-    // BEGIN Todo 44: тема применяется до первой отрисовки (без вспышки).
-    this.theme = createThemePreference(window);
-    // END Todo 44
+    // Тема применяется до первой отрисовки (без вспышки); переключатель в шапке не монтируем.
+    createThemePreference(window);
     window.addEventListener("hashchange", () => this.handleRoute());
   }
 
@@ -108,26 +105,11 @@ export class AppShell {
   }
 
   private renderShell(): void {
-    this.container.innerHTML = `
-      <header class="app-header">
-        <h1 class="app-title">LNT v2</h1>
-        <nav class="app-nav" role="navigation">
-          ${Object.entries(ROUTES)
-            .map(
-              ([key, value]) => `
-            <a href="#/${key}" class="nav-link" id="nav-${key}" data-route="${key}">${value.title}</a>
-          `,
-            )
-            .join("")}
-        </nav>
-      </header>
-      <main class="app-main" id="app-main">
-        <div class="view-container" id="view-container"></div>
-      </main>
-    `;
-    // BEGIN Todo 44: переключатель темы в шапке (система/светлая/тёмная).
-    this.container.querySelector(".app-header")?.append(this.theme.control());
-    // END Todo 44
+    clearElement(this.container);
+    this.v6Header = createV6ShellHeader({ activeRoute: this.currentRoute });
+    const view = el("div", { className: "view-container", attrs: { id: "view-container" } });
+    const main = el("main", { className: "app-main", attrs: { id: "app-main" } }, [view]);
+    this.container.append(this.v6Header.root, main, createV6ShellStatusbar().root);
   }
 
   private handleRoute(): void {
@@ -160,15 +142,7 @@ export class AppShell {
   }
 
   private updateActiveNav(): void {
-    const links = this.container.querySelectorAll(".nav-link");
-    for (const link of links) {
-      const route = link.getAttribute("data-route");
-      if (route === this.currentRoute) {
-        link.classList.add("active");
-      } else {
-        link.classList.remove("active");
-      }
-    }
+    this.v6Header?.setActiveRoute(this.currentRoute);
   }
 
   private renderView(): void {
@@ -239,34 +213,29 @@ export class AppShell {
       this.captureView = view;
       clearElement(viewContainer);
       viewContainer.append(view.root);
+      this.mountedRoute = this.currentRoute;
       return;
     }
     // END Todo 40
 
-    // --- Инспекция V6: полный захват экрана (глобальная шапка скрывается классом) ---
+    // --- Инспекция V6: окно сравнения под общей оболочкой ---
     if (this.currentRoute === "inspect") {
       viewContainer.innerHTML = "";
       viewContainer.className = "view-container";
-      this.container.classList.add("is-inspect-v6");
       let inspectCleanup: (() => void) | null = null;
       let cancelled = false;
       void mountInspectV6(viewContainer as HTMLElement, {
         client: this.apiClient,
         routes: this.routes,
-      })
-        .then((cleanup) => {
-          if (cancelled) {
-            cleanup();
-            return;
-          }
-          inspectCleanup = cleanup;
-        })
-        .catch(() => {
-          this.container.classList.remove("is-inspect-v6");
-        });
+      }).then((cleanup) => {
+        if (cancelled) {
+          cleanup();
+          return;
+        }
+        inspectCleanup = cleanup;
+      });
       this.activeViewCleanup = () => {
         cancelled = true;
-        this.container.classList.remove("is-inspect-v6");
         if (inspectCleanup !== null) inspectCleanup();
         inspectCleanup = null;
       };
