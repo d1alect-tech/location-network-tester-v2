@@ -16,14 +16,14 @@ export interface ChartTheme {
 /** Резервные цвета — светлая тема DESIGN.md §4.1 (jsdom не вычисляет
  * custom properties); в браузере всегда читаются актуальные токены. */
 const FALLBACK: ChartTheme = {
-  accentA: "#0072c3",
-  accentB: "#b25e00",
-  panel: "#ffffff",
-  canvasBg: "#f4f4f4",
-  fgSecondary: "#525252",
-  borderSubtle: "#e0e0e0",
-  fontMono: '"IBM Plex Mono", Consolas, monospace',
-  fontSans: '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif',
+  accentA: "#5681ff",
+  accentB: "#e68619",
+  panel: "#323232",
+  canvasBg: "#1d1d1d",
+  fgSecondary: "#d1d1d1",
+  borderSubtle: "#3f3f3f",
+  fontMono: '"Source Code Pro Variable", Consolas, monospace',
+  fontSans: '"Golos Text Variable", "Segoe UI", system-ui, sans-serif',
   lineWidth: 1,
 };
 

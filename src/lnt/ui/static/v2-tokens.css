@@ -2,8 +2,8 @@
 
 :root {
   /* Typography */
-  --lnt-font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --lnt-font-mono: "IBM Plex Mono", Consolas, monospace;
+  --lnt-font-sans: "Golos Text Variable", "Segoe UI", system-ui, sans-serif;
+  --lnt-font-mono: "Source Code Pro Variable", Consolas, monospace;
   --lnt-weight-regular: 400;
   --lnt-weight-medium: 500;
   --lnt-weight-semibold: 600;
@@ -36,7 +36,7 @@
   --lnt-content-max: 1480px;
   --lnt-session-list-width: 320px;
   --lnt-session-list-max-height: 680px;
-  --lnt-header-height: 56px;
+  --lnt-header-height: 32px;
   --lnt-chart-height-mobile: 300px;
   --lnt-chart-height-tablet: 400px;
   --lnt-chart-height-desktop: 520px;
@@ -50,10 +50,56 @@
   --lnt-motion-fast: 100ms;
   --lnt-motion-standard: 160ms;
   --lnt-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* V6 showcase aliases */
+  --lnt-canvas: #1d1d1d;
+  --lnt-chrome: #262626;
+  --lnt-panel: #323232;
+  --lnt-elev: #3f3f3f;
+  --lnt-line: #3f3f3f;
+  --lnt-line-struct: #545454;
+  --lnt-line-hot: #707070;
+  --lnt-text: #ebebeb;
+  --lnt-text-sec: #d1d1d1;
+  --lnt-text-dim: #909090;
+  --lnt-accent: #5681ff;
+  --lnt-ok: #2d9d78;
+  --lnt-warn: #e68619;
+  --lnt-err: #ec5b62;
+  --lnt-mono: var(--lnt-font-mono);
+  --lnt-ui: var(--lnt-font-sans);
+  --lnt-r-ctl: 4px;
+  --lnt-t-fast: 120ms;
+  --lnt-ease: cubic-bezier(0.2, 0, 0, 1);
+  --lnt-panel-hd: rgb(0 0 0 / 0.18);
+  --lnt-field: var(--lnt-chrome);
+  --lnt-r-pill: 9999px;
 }
 
-/* Light Theme (Default) */
-:root, [data-theme="light"] {
+/* Dark Theme (Default) */
+:root, [data-theme="dark"] {
+  color-scheme: dark;
+  --lnt-bg-canvas: #1d1d1d;
+  --lnt-bg-panel: #323232;
+  --lnt-bg-raised: #3f3f3f;
+  --lnt-bg-selected: #3f3f3f;
+  --lnt-fg-primary: #ebebeb;
+  --lnt-fg-secondary: #d1d1d1;
+  --lnt-fg-disabled: #909090;
+  --lnt-border-subtle: #3f3f3f;
+  --lnt-border-strong: #545454;
+  --lnt-accent-a: #5681ff;
+  --lnt-accent-b: #e68619;
+  --lnt-status-ok: #2d9d78;
+  --lnt-status-ok-bg: #1a3d32;
+  --lnt-status-warn: #e68619;
+  --lnt-status-warn-bg: #3d2a12;
+  --lnt-status-error: #ec5b62;
+  --lnt-status-error-bg: #3d1a1c;
+}
+
+/* Light Theme */
+[data-theme="light"] {
   color-scheme: light;
   --lnt-bg-canvas: #f4f4f4;
   --lnt-bg-panel: #ffffff;
@@ -72,28 +118,6 @@
   --lnt-status-warn-bg: #fff8e6;
   --lnt-status-error: #da1e28;
   --lnt-status-error-bg: #fff1f1;
-}
-
-/* Dark Theme */
-[data-theme="dark"] {
-  color-scheme: dark;
-  --lnt-bg-canvas: #12161a;
-  --lnt-bg-panel: #1a1f24;
-  --lnt-bg-raised: #22282e;
-  --lnt-bg-selected: #1e293b;
-  --lnt-fg-primary: #f4f4f4;
-  --lnt-fg-secondary: #a3a3a3;
-  --lnt-fg-disabled: #525252;
-  --lnt-border-subtle: #2d3748;
-  --lnt-border-strong: #4a5568;
-  --lnt-accent-a: #00a3ff;
-  --lnt-accent-b: #ffb000;
-  --lnt-status-ok: #22c55e;
-  --lnt-status-ok-bg: #14532d;
-  --lnt-status-warn: #f59e0b;
-  --lnt-status-warn-bg: #78350f;
-  --lnt-status-error: #ef4444;
-  --lnt-status-error-bg: #7f1d1d;
 }
 
 /* Forced Colors Mode (Windows High Contrast) */

@@ -3,9 +3,6 @@
    Tokens live on .app-v6 (not :root) so they do not leak into production
    --lnt-bg-* / --lnt-fg-* / --lnt-accent-a/b. */
 
-@import "@fontsource-variable/source-code-pro";
-@import "@fontsource-variable/golos-text";
-
 /* ── Tokens + shell grid ───────────────────────────────────────────────── */
 
 .app-v6 {

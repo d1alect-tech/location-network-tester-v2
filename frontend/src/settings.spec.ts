@@ -35,14 +35,11 @@ async function openSettings(page: Page): Promise<void> {
 
 test("settings persistence journey: theme choice survives reload", async ({ page }) => {
   await openSettings(page);
-  await page.locator("#lnt-theme-dark").check();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.reload();
   await expect(page.locator(".lnt-set-workspace")).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  // Возврат в системный режим не оставляет тёмную тему «приклеенной».
-  await page.locator("#lnt-theme-system").check();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", /(light|dark)/);
+  await expect(page.locator("[id^='lnt-theme-']")).toHaveCount(0);
 });
 
 test("session root shows the server fact; local note persists but is marked local", async ({

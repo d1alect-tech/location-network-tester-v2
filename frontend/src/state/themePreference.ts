@@ -37,17 +37,8 @@ export function createThemePreference(win: Window = window): ThemeController {
   };
   media?.addEventListener?.("change", onMediaChange);
 
-  function systemPrefersDark(): boolean {
-    return media?.matches === true;
-  }
-
-  function resolved(): Exclude<ThemeChoice, "system"> {
-    if (choice !== "system") return choice;
-    return systemPrefersDark() ? "dark" : "light";
-  }
-
   function apply(): void {
-    win.document.documentElement.setAttribute("data-theme", resolved());
+    win.document.documentElement.setAttribute("data-theme", "dark");
   }
 
   function readStored(target: Window): ThemeChoice {

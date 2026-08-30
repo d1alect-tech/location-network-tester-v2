@@ -1,5 +1,7 @@
 /* Import design tokens from T36 */
 @import "../../src/lnt/ui/static/v2-tokens.css";
+@import "@fontsource-variable/source-code-pro";
+@import "@fontsource-variable/golos-text";
 @import "./components/primitives/primitives.css";
 @import "./capture/capture.css";
 
@@ -120,7 +122,7 @@ body {
 
 .btn-recovery {
   background-color: var(--lnt-accent-a);
-  color: white;
+  color: var(--lnt-fg-primary);
   border: none;
   padding: var(--lnt-space-2) var(--lnt-space-4);
   border-radius: var(--lnt-radius-control);
