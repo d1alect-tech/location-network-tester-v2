@@ -469,6 +469,18 @@ test("V6-S11: спектрограмма делит ось частот с ли�
     where,
   ).toBeLessThanOrEqual(1);
 
+  // Между данными графика и спектрограммой нет мёртвой зоны: строка тиков частоты —
+  // единственное, что разделяет дорожки общей шкалы. Прежде здесь висела тёмная
+  // полоса с заголовком оси, которую пользователь читал как «пустое место».
+  const gap = await page.evaluate(() => {
+    const over = document.querySelector('[data-showcase="spectrum"] .u-over');
+    const gram = document.querySelector("[data-spectrogram]");
+    if (!(over instanceof HTMLElement) || !(gram instanceof HTMLElement)) return null;
+    return gram.getBoundingClientRect().top - over.getBoundingClientRect().bottom;
+  });
+  expect(gap).not.toBeNull();
+  expect(gap ?? 0, `зазор между графиком и спектрограммой ${gap}px`).toBeLessThanOrEqual(44);
+
   // Полотно действительно закрашено, а не осталось пустым.
   const painted = await page.evaluate(() => {
     const canvas = document.querySelector("[data-spectrogram-canvas]");

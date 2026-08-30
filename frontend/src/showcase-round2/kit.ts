@@ -160,15 +160,21 @@ export interface SpectrumHooks {
   onPlot?: (plot: uPlot) => void;
   /** Подписи трасс: вариант может назвать реальные сессии вместо «Сессия А/Б». */
   labels?: { a: string; b: string };
+  /** Заголовок панели; по умолчанию «Спектр мощности». */
+  title?: string;
+  /** Подпись оси X; пустая строка сжимает ось до строки тиков (общая шкала с дорожкой). */
+  xLabel?: string;
 }
 
 /** Спектр в канве #1D1D1D: сигнал отделён от хрома (§5.1). */
 export function buildSpectrumPanel(height: number, hooks: SpectrumHooks = {}): HTMLElement {
   const host = h("div", "frame");
-  const header = h("div", "panel-hd", {}, [h("h2", "panel-title", {}, ["Спектр мощности"])]);
+  const header = h("div", "panel-hd", {}, [
+    h("h2", "panel-title", {}, [hooks.title ?? "Спектр мощности"]),
+  ]);
   const plot = renderSpectrum(
     host,
-    { ...SPECTRUM_STYLE, height },
+    { ...SPECTRUM_STYLE, height, xLabel: hooks.xLabel ?? "Частота, Гц" },
     hooks.labels ?? { a: "Сессия А", b: "Сессия Б" },
     { header, onDraw: hooks.onDraw },
   );

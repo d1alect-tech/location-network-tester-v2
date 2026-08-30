@@ -10,19 +10,19 @@
     "file": "assets/chartshell.CjJRDo9O.css",
     "src": "_chartshell.CjJRDo9O.css"
   },
-  "_form.BtFZCkTj.js": {
-    "file": "assets/form.BtFZCkTj.js",
+  "_form.BArInMtH.js": {
+    "file": "assets/form.BArInMtH.js",
     "name": "form",
     "imports": [
-      "_spectrum.-aomxqbo.js",
-      "_metrics.BSd7LNf1.js"
+      "_spectrum.caPTC1_b.js",
+      "_metrics.C8XMEfh9.js"
     ]
   },
-  "_metrics.BSd7LNf1.js": {
-    "file": "assets/metrics.BSd7LNf1.js",
+  "_metrics.C8XMEfh9.js": {
+    "file": "assets/metrics.C8XMEfh9.js",
     "name": "metrics",
     "imports": [
-      "_spectrum.-aomxqbo.js"
+      "_spectrum.caPTC1_b.js"
     ],
     "css": [
       "assets/metrics.CgP5Hqd6.css"
@@ -32,15 +32,19 @@
     "file": "assets/metrics.CgP5Hqd6.css",
     "src": "_metrics.CgP5Hqd6.css"
   },
-  "_peakMarkers.CUCzgdWK.js": {
-    "file": "assets/peakMarkers.CUCzgdWK.js",
+  "_peakMarkers.CMVx9hrh.js": {
+    "file": "assets/peakMarkers.CMVx9hrh.js",
     "name": "peakMarkers",
     "imports": [
-      "_spectrum.-aomxqbo.js"
+      "_spectrum.caPTC1_b.js"
     ]
   },
-  "_spectrum.-aomxqbo.js": {
-    "file": "assets/spectrum.-aomxqbo.js",
+  "_spectrum.CXwmWaak.css": {
+    "file": "assets/spectrum.CXwmWaak.css",
+    "src": "_spectrum.CXwmWaak.css"
+  },
+  "_spectrum.caPTC1_b.js": {
+    "file": "assets/spectrum.caPTC1_b.js",
     "name": "spectrum",
     "imports": [
       "_uPlot.min.I5bB1VQk.js"
@@ -67,10 +71,6 @@
       "assets/IBMPlexMono-Regular.Du0PCiXT.woff2",
       "assets/IBMPlexMono-Medium.CiYsa3y2.woff2"
     ]
-  },
-  "_spectrum.CXwmWaak.css": {
-    "file": "assets/spectrum.CXwmWaak.css",
-    "src": "_spectrum.CXwmWaak.css"
   },
   "_uPlot.D1GxaB_c.css": {
     "file": "assets/uPlot.D1GxaB_c.css",
@@ -101,12 +101,12 @@
     ]
   },
   "showcase-a.html": {
-    "file": "assets/showcaseVariantA.dlOoM6d4.js",
+    "file": "assets/showcaseVariantA.PO0Udm05.js",
     "name": "showcaseVariantA",
     "src": "showcase-a.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.-aomxqbo.js",
+      "_spectrum.caPTC1_b.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -114,12 +114,12 @@
     ]
   },
   "showcase-b.html": {
-    "file": "assets/showcaseVariantB.CokPoex8.js",
+    "file": "assets/showcaseVariantB.Dg0M9uUO.js",
     "name": "showcaseVariantB",
     "src": "showcase-b.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.-aomxqbo.js",
+      "_spectrum.caPTC1_b.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -127,12 +127,12 @@
     ]
   },
   "showcase-c.html": {
-    "file": "assets/showcaseVariantC.Bd2bNIDs.js",
+    "file": "assets/showcaseVariantC.BqjyaNqT.js",
     "name": "showcaseVariantC",
     "src": "showcase-c.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.-aomxqbo.js",
+      "_spectrum.caPTC1_b.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -140,12 +140,12 @@
     ]
   },
   "showcase-d.html": {
-    "file": "assets/showcaseVariantD.DzAiwzkI.js",
+    "file": "assets/showcaseVariantD.AzciWK_M.js",
     "name": "showcaseVariantD",
     "src": "showcase-d.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.-aomxqbo.js",
+      "_spectrum.caPTC1_b.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -161,14 +161,14 @@
     "src": "showcase-round2.html"
   },
   "showcase-v1.html": {
-    "file": "assets/showcaseRound2V1.DH983aMJ.js",
+    "file": "assets/showcaseRound2V1.BSRC9eaY.js",
     "name": "showcaseRound2V1",
     "src": "showcase-v1.html",
     "isEntry": true,
     "imports": [
-      "_form.BtFZCkTj.js",
-      "_metrics.BSd7LNf1.js",
-      "_spectrum.-aomxqbo.js",
+      "_form.BArInMtH.js",
+      "_metrics.C8XMEfh9.js",
+      "_spectrum.caPTC1_b.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -176,14 +176,14 @@
     ]
   },
   "showcase-v2.html": {
-    "file": "assets/showcaseRound2V2.2PXTTS3g.js",
+    "file": "assets/showcaseRound2V2.C5OrQ45J.js",
     "name": "showcaseRound2V2",
     "src": "showcase-v2.html",
     "isEntry": true,
     "imports": [
-      "_form.BtFZCkTj.js",
-      "_metrics.BSd7LNf1.js",
-      "_spectrum.-aomxqbo.js",
+      "_form.BArInMtH.js",
+      "_metrics.C8XMEfh9.js",
+      "_spectrum.caPTC1_b.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -192,14 +192,14 @@
     ]
   },
   "showcase-v3.html": {
-    "file": "assets/showcaseRound2V3.OgnXuxsv.js",
+    "file": "assets/showcaseRound2V3.DkPgSjgS.js",
     "name": "showcaseRound2V3",
     "src": "showcase-v3.html",
     "isEntry": true,
     "imports": [
-      "_form.BtFZCkTj.js",
-      "_metrics.BSd7LNf1.js",
-      "_spectrum.-aomxqbo.js",
+      "_form.BArInMtH.js",
+      "_metrics.C8XMEfh9.js",
+      "_spectrum.caPTC1_b.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -207,14 +207,14 @@
     ]
   },
   "showcase-v4.html": {
-    "file": "assets/showcaseRound2V4.BHaEascT.js",
+    "file": "assets/showcaseRound2V4.Cm-g0Hvh.js",
     "name": "showcaseRound2V4",
     "src": "showcase-v4.html",
     "isEntry": true,
     "imports": [
-      "_form.BtFZCkTj.js",
-      "_metrics.BSd7LNf1.js",
-      "_spectrum.-aomxqbo.js",
+      "_form.BArInMtH.js",
+      "_metrics.C8XMEfh9.js",
+      "_spectrum.caPTC1_b.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -222,15 +222,15 @@
     ]
   },
   "showcase-v5.html": {
-    "file": "assets/showcaseRound2V5.ueK2AZMY.js",
+    "file": "assets/showcaseRound2V5.B-_19Ks-.js",
     "name": "showcaseRound2V5",
     "src": "showcase-v5.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.-aomxqbo.js",
-      "_form.BtFZCkTj.js",
-      "_metrics.BSd7LNf1.js",
-      "_peakMarkers.CUCzgdWK.js",
+      "_spectrum.caPTC1_b.js",
+      "_form.BArInMtH.js",
+      "_metrics.C8XMEfh9.js",
+      "_peakMarkers.CMVx9hrh.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -238,14 +238,14 @@
     ]
   },
   "showcase-v6.html": {
-    "file": "assets/showcaseRound2V6.D-TPAaMk.js",
+    "file": "assets/showcaseRound2V6.Wa4dgQOu.js",
     "name": "showcaseRound2V6",
     "src": "showcase-v6.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.-aomxqbo.js",
-      "_metrics.BSd7LNf1.js",
-      "_peakMarkers.CUCzgdWK.js",
+      "_spectrum.caPTC1_b.js",
+      "_metrics.C8XMEfh9.js",
+      "_peakMarkers.CMVx9hrh.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [

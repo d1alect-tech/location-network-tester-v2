@@ -13,6 +13,8 @@ export interface SpectrumStyle {
   dash: number[];
   axisFont: string;
   height: number;
+  /** Подпись оси X; пустая строка убирает заголовок и сжимает ось до строки тиков. */
+  xLabel?: string;
 }
 
 export interface SpectrumLabels {
@@ -178,7 +180,11 @@ function buildOptions(style: SpectrumStyle, width: number, extras: PlotExtras): 
       },
     ],
     axes: [
-      { ...axis, label: "Частота, Гц" },
+      // label == null (а не ""): иначе uPlot всё равно резервирует labelSize 30px
+      // мёртвой полосы под тиками; size ужат до строки тиков (дефолт оси X — 50px).
+      ...(style.xLabel ?? "Частота, Гц") !== ""
+        ? [{ ...axis, label: style.xLabel ?? "Частота, Гц" }]
+        : [{ ...axis, size: 30 }],
       {
         ...axis,
         label: "PSD, В²/Гц",

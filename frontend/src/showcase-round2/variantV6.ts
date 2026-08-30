@@ -87,6 +87,11 @@ let redrawMarkers: (() => void) | undefined;
 const gram = buildSpectrogramV6();
 const spectrum = buildSpectrumPanel(264, {
   labels: { a: base.label, b: compare.label },
+  // Заголовок оси X ушёл в шапку панели: под графиком оставалась мёртвая тёмная
+  // полоса с одинокой подписью «Частота, Гц», читавшаяся пустым местом.
+  // Дорожка ниже делит с графиком сами тики — это и есть общая шкала частот.
+  title: "Спектр мощности · частота, Гц",
+  xLabel: "",
   onDraw: () => {
     redrawMarkers?.();
     gram.redraw();
