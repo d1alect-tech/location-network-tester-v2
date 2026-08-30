@@ -603,13 +603,16 @@
   margin-left: auto;
 }
 
-/* Шкала времени занимает зазор под осью Y графика; ширина приходит из стиль-листа. */
+/* Шкала времени занимает зазор под осью Y графика; ширина приходит из стиль-листа.
+   Высота явная и равна высоте полотна: ось не должна тянуться flex-ом за обёрткой,
+   иначе любой сбой высоты полотна распустит шкалу в пустоту под спектрограммой. */
 .app-v6 .gram-axis {
   display: flex;
   flex: none;
   flex-direction: column;
   justify-content: space-between;
   align-items: flex-end;
+  height: 104px;
   padding: 1px 4px 1px 0;
   border-right: 1px solid var(--lnt-line-struct);
 }

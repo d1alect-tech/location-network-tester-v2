@@ -73,7 +73,9 @@ export function buildSpectrogramV6(): SpectrogramV6 {
   const columnB = data[2] as Column | undefined;
   const durationS = METRICS.durationS;
 
-  let mode: Mode = "delta";
+  // По умолчанию — уровень сравнения: спокойная дельта вдали от пиков почти чёрная,
+  // и дорожка читается пустым полем; дельта остаётся в один клик и числом в таблице пиков.
+  let mode: Mode = "b";
   let plot: uPlot | undefined;
   // Позиция полотна публикуется правилом стиль-листа: разметка витрин свободна
   // от inline-стилей (§2.5, контракт S13).

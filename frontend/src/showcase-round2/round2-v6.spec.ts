@@ -328,6 +328,8 @@ test("V6-S17: каталог держит высоту колонки и не р
 test("V6-S18: дельта спокойна там, где трассы не расходятся", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(PAGE);
+  // Дефолт — уровень сравнения; спокойствие дельты проверяем в её собственном режиме.
+  await page.locator('[data-spectrogram-mode="delta"]').click();
 
   const canvas = await page.locator("[data-spectrogram-canvas]").boundingBox();
   const marker = await page.locator('[data-peak="0"]').boundingBox();
@@ -491,10 +493,11 @@ test("V6-S12: спектрограмма переключается между �
   const modes = page.locator("[data-spectrogram-mode]");
   await expect(modes).toHaveCount(3);
 
-  // По умолчанию открыта дельта: единица работы V6 — разница между парой.
+  // По умолчанию открыт уровень сравнения: спокойная дельта вдали от пиков почти
+  // чёрная и читается пустым полем; дельта — в один клик и числом в таблице пиков.
   const active = page.locator('[data-spectrogram-mode][aria-pressed="true"]');
   await expect(active).toHaveCount(1);
-  await expect(active).toHaveAttribute("data-spectrogram-mode", "delta");
+  await expect(active).toHaveAttribute("data-spectrogram-mode", "b");
 
   const snapshot = async (): Promise<string> =>
     page.evaluate(() => {
@@ -502,12 +505,15 @@ test("V6-S12: спектрограмма переключается между �
       return canvas instanceof HTMLCanvasElement ? canvas.toDataURL().slice(-96) : "";
     });
 
+  const levelImage = await snapshot();
+  await page.locator('[data-spectrogram-mode="delta"]').click();
+  await expect(page.locator('[data-spectrogram-mode="delta"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   const deltaImage = await snapshot();
-  await page.locator('[data-spectrogram-mode="a"]').click();
-  await expect(page.locator('[data-spectrogram-mode="a"]')).toHaveAttribute("aria-pressed", "true");
-  const traceImage = await snapshot();
   // Переключение действительно перерисовывает полотно, а не только подсветку кнопки.
-  expect(traceImage).not.toBe(deltaImage);
+  expect(deltaImage).not.toBe(levelImage);
 
   // Шкала цвета названа и снабжена числами в дБ.
   const scale = page.locator("[data-spectrogram-scale]");
@@ -583,6 +589,8 @@ test("V6-S14: органы каталога и спектрограммы дер
 test("V6-S15: средняя по времени дельта полотна совпадает с колонкой дельты", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(PAGE);
+  // Дефолт — уровень сравнения; согласованность с таблицей — свойство дельта-режима.
+  await page.locator('[data-spectrogram-mode="delta"]').click();
 
   // Колонка Δ первой строки таблицы пиков — демпфированный пик 22.4 кГц.
   const column = Number(
@@ -689,9 +697,51 @@ test.describe("V6-S19: полотно чёткое на экране с масш
     ).toBe(Math.round(canvas.cssWidth * canvas.ratio));
     expect(canvas.bufferHeight).toBe(Math.round(canvas.cssHeight * canvas.ratio));
 
-    await page.screenshot({
-      path: resolve(EVIDENCE_DIR, "v6-gram-dpr2-1280.png"),
-      clip: { x: 264, y: 250, width: 760, height: 140 },
+    const box = await page.locator("[data-spectrogram]").boundingBox();
+    if (box !== null) {
+      await page.screenshot({
+        path: resolve(EVIDENCE_DIR, "v6-gram-dpr2-1280.png"),
+        clip: {
+          x: Math.max(0, box.x - 40),
+          y: Math.max(0, box.y - 40),
+          width: box.width + 80,
+          height: box.height + 80,
+        },
+      });
+    }
+
+    // Битмап не должен становиться flex min-content: иначе обёртка и ось
+    // вырастают до физических пикселей, а CSS-высота полотна остаётся 104px —
+    // под спектрограммой дыра, в которой висят «0 с / 1.2 с / 2.4 с».
+    const layout = await page.evaluate(() => {
+      const node = document.querySelector("[data-spectrogram-canvas]");
+      const axis = document.querySelector(".app-v6 .gram-axis");
+      const wrap = document.querySelector(".app-v6 .gram-canvas-wrap");
+      if (
+        !(node instanceof HTMLCanvasElement) ||
+        !(axis instanceof HTMLElement) ||
+        !(wrap instanceof HTMLElement)
+      ) {
+        return null;
+      }
+      node.width = 2000;
+      node.height = 800;
+      void wrap.offsetHeight;
+      return {
+        canvas: node.getBoundingClientRect().height,
+        axis: axis.getBoundingClientRect().height,
+        wrap: wrap.getBoundingClientRect().height,
+      };
     });
+    expect(layout).not.toBeNull();
+    expect(layout?.canvas, "CSS-высота полотна").toBeCloseTo(104, 0);
+    expect(
+      Math.abs((layout?.axis ?? 0) - (layout?.canvas ?? 0)),
+      `ось ${layout?.axis} против полотна ${layout?.canvas}`,
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs((layout?.wrap ?? 0) - (layout?.canvas ?? 0)),
+      `обёртка ${layout?.wrap} против полотна ${layout?.canvas}`,
+    ).toBeLessThanOrEqual(1);
   });
 });
