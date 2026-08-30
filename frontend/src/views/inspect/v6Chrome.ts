@@ -1,28 +1,14 @@
 import { el } from "../../components/primitives/dom";
 
-const NAV = [
-  { href: "#/catalog", title: "Каталог" },
-  { href: "#/capture", title: "Захват" },
-  { href: "#/inspect", title: "Инспекция" },
-  { href: "#/experiments", title: "Эксперименты" },
-  { href: "#/reports", title: "Отчёты" },
-  { href: "#/settings", title: "Настройки" },
-] as const;
-
-const INSPECT_HREF = "#/inspect";
-
 export type V6ChromeOpts = {
   readonly onCapture: () => void;
 };
 
 export type V6Chrome = {
-  readonly header: HTMLElement;
   readonly commandbar: HTMLElement;
-  readonly statusbar: HTMLElement;
   readonly errorBand: HTMLElement;
   showError(msg: string): void;
   hideError(): void;
-  setDeviceStatus(text: string): void;
 };
 
 type SelectItem = {
@@ -55,25 +41,6 @@ function inputField(spec: {
     spec.label,
     el("input", { className: "ctl", attrs: { name: spec.name, type: spec.type, value: spec.value } }),
   );
-}
-
-function buildHeader(device: HTMLElement): HTMLElement {
-  const nav = el("nav", { className: "tabbar", attrs: { "aria-label": "Разделы" } });
-  for (const item of NAV) {
-    const active = item.href === INSPECT_HREF;
-    nav.append(
-      el("a", {
-        className: active ? "snav-item is-active" : "snav-item",
-        text: item.title,
-        attrs: active ? { href: item.href, "aria-current": "page" } : { href: item.href },
-      }),
-    );
-  }
-  return el("header", { className: "hdr" }, [
-    el("span", { className: "hdr-brand", text: "LNT" }),
-    nav,
-    device,
-  ]);
 }
 
 function buildCommandbar(onCapture: () => void): HTMLFormElement {
@@ -117,20 +84,13 @@ function buildCommandbar(onCapture: () => void): HTMLFormElement {
 }
 
 export function createV6Chrome(opts: V6ChromeOpts): V6Chrome {
-  const device = el("span", { className: "hdr-status", text: "устройство · готов" });
   const errorBand = el("aside", {
     className: "banner banner-inline",
     attrs: { "data-inspect-error": "", role: "alert" },
   });
   errorBand.hidden = true;
   return {
-    header: buildHeader(device),
     commandbar: buildCommandbar(opts.onCapture),
-    statusbar: el("footer", { className: "statusbar" }, [
-      el("span", { className: "statusbar-item", text: "готов" }),
-      el("span", { className: "statusbar-spacer" }),
-      el("span", { className: "statusbar-item", text: "Корень: …" }),
-    ]),
     errorBand,
     showError(msg: string): void {
       errorBand.textContent = msg;
@@ -138,9 +98,6 @@ export function createV6Chrome(opts: V6ChromeOpts): V6Chrome {
     },
     hideError(): void {
       errorBand.hidden = true;
-    },
-    setDeviceStatus(text: string): void {
-      device.textContent = text;
     },
   };
 }

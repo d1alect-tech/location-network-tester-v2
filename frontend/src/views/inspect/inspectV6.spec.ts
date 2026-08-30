@@ -152,8 +152,9 @@ test("V6-P1: полная сетка сравнения, не стопка во�
   await mockApi(page);
   await page.goto(BASE);
   await expect(page.locator(".app-v6")).toBeVisible();
-  // Глобальная шапка скрыта на инспекции.
-  await expect(page.locator(".app-header")).toBeHidden();
+  // Общая оболочка держит шапку; старой .app-header нет.
+  await expect(page.locator("header.hdr")).toBeVisible();
+  await expect(page.locator(".app-header")).toHaveCount(0);
   // Пара названа.
   await expect(page.locator(".pairbar [data-pair='a']")).toContainText("База");
   await expect(page.locator(".pairbar [data-pair='b']")).toContainText("Сравнение");
@@ -234,16 +235,15 @@ test("V6-P4: дельта пика из трасс, глиф направлен�
 test("V6-P5: полный захват и возврат через таббар", async ({ page }) => {
   await mockApi(page);
   await page.goto(BASE);
-  await expect(page.locator(".app-header")).toBeHidden();
-  await expect(page.locator(".app-v6 .tabbar a[href='#/inspect']")).toHaveAttribute(
+  await expect(page.locator("header.hdr .tabbar a[href='#/inspect']")).toHaveAttribute(
     "aria-current",
     "page",
   );
-  // Клик по «Каталог» в таббаре возвращает глобальную шапку.
-  await page.locator(".app-v6 .tabbar a[href='#/catalog']").click();
+  await page.locator("header.hdr .tabbar a[href='#/catalog']").click();
   await expect(page).toHaveURL(/#\/catalog/);
-  await expect(page.locator(".app-header")).toBeVisible();
+  await expect(page.locator("header.hdr")).toBeVisible();
   await expect(page.locator(".app-v6")).toHaveCount(0);
+  await expect(page.locator(".app-header")).toHaveCount(0);
 });
 
 test("V6-P6: сворачиваемые панели осциллограммы и анализа", async ({ page }) => {

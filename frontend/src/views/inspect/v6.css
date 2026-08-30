@@ -1,130 +1,22 @@
-/* Inspect V6 — scoped design tokens + grid geometry.
-   Port of showcase-round2/variantV6.css + tokens.css.
-   Tokens live on .app-v6 (not :root) so they do not leak into production
-   --lnt-bg-* / --lnt-fg-* / --lnt-accent-a/b. */
+/* Inspect V6 — comparison grid. Chrome tokens live on the shared shell. */
 
-/* ── Tokens + shell grid ───────────────────────────────────────────────── */
+.view-container:has(> .app-v6) {
+  padding: 0;
+  overflow: hidden;
+}
+
+.app-main:has(.app-v6) {
+  overflow: hidden;
+}
 
 .app-v6 {
-  --lnt-canvas: #1d1d1d;
-  --lnt-chrome: #262626;
-  --lnt-panel: #323232;
-  --lnt-elev: #3f3f3f;
-  --lnt-line: #3f3f3f;
-  --lnt-line-struct: #545454;
-  --lnt-line-hot: #707070;
-  --lnt-text: #ebebeb;
-  --lnt-text-sec: #d1d1d1;
-  --lnt-text-dim: #909090;
-  --lnt-accent: #5681ff;
-  --lnt-ok: #2d9d78;
-  --lnt-warn: #e68619;
-  --lnt-err: #ec5b62;
-  --lnt-mono: "Source Code Pro Variable", Consolas, monospace;
-  --lnt-ui: "Golos Text Variable", "Segoe UI", system-ui, sans-serif;
-  --lnt-r-ctl: 4px;
-  --lnt-t-fast: 120ms;
-  --lnt-ease: cubic-bezier(0.2, 0, 0, 1);
-  /* Used by variantV6 rules; not on :root in tokens.css. */
-  --lnt-panel-hd: rgb(0 0 0 / 0.18);
-  --lnt-field: var(--lnt-chrome);
-  --lnt-r-pill: 9999px;
-
   display: grid;
-  grid-template-rows: 32px 40px minmax(0, 1fr) auto auto 32px;
+  grid-template-rows: 40px minmax(0, 1fr) auto auto;
   height: 100%;
   min-height: 0;
   background: var(--lnt-chrome);
   color: var(--lnt-text);
   font: 400 14px / 20px var(--lnt-ui);
-}
-
-.app-v6 .hdr {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 0 12px;
-  background: var(--lnt-chrome);
-  border-bottom: 1px solid var(--lnt-line);
-}
-
-.app-v6 .hdr-brand {
-  font: 600 13px / 16px var(--lnt-ui);
-  white-space: nowrap;
-  flex: none;
-}
-
-.app-v6 .hdr-status {
-  color: var(--lnt-text-sec);
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: none;
-  white-space: nowrap;
-  margin-left: auto;
-}
-
-.app-v6 .hdr .tabbar {
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-/* Пункт таббара: 13px w500, активный — 2px акцентная полоса снизу (§2.3). */
-.app-v6 .snav-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  font: 500 13px / 16px var(--lnt-ui);
-  color: var(--lnt-text-sec);
-  text-decoration: none;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
-}
-
-.app-v6 .snav-item:hover {
-  color: var(--lnt-text);
-  background: var(--lnt-elev);
-}
-
-.app-v6 .snav-item.is-active {
-  color: var(--lnt-text);
-  background: var(--lnt-panel);
-}
-
-.app-v6 .snav-item.is-active::before {
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 2px;
-  background: var(--lnt-accent);
-}
-
-.app-v6 .snav-item:focus-visible {
-  outline: 2px solid var(--lnt-accent);
-  outline-offset: -2px;
-}
-
-/* ── Full-takeover (production AppShell #app) ──────────────────────────── */
-
-#app.is-inspect-v6 .app-header {
-  display: none !important;
-}
-
-#app.is-inspect-v6 .view-container {
-  padding: 0;
-  overflow: hidden;
-}
-
-#app.is-inspect-v6 .app-main {
-  overflow: hidden;
 }
 
 /* ── Полоса пары А—Б: главный объект интерфейса ─────────────────────────── */
@@ -826,43 +718,6 @@
   color: var(--lnt-text);
   background: var(--lnt-field);
   border-color: var(--lnt-line-struct);
-}
-
-/* ── Статус-бар 32px ───────────────────────────────────────────────────── */
-
-.app-v6 .statusbar {
-  height: 32px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 0 12px;
-  background: var(--lnt-chrome);
-  border-top: 1px solid var(--lnt-line);
-  color: var(--lnt-text-sec);
-  font-size: 12px;
-}
-
-.app-v6 .statusbar-spacer {
-  flex: 1;
-}
-
-.app-v6 .statusbar-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.app-v6 .statusbar-item.num {
-  font-family: var(--lnt-mono);
-}
-
-.app-v6 .statusbar-item .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--lnt-r-pill);
-  background: var(--lnt-ok);
-  flex: none;
 }
 
 /* ── Сворачиваемые панели под лентой анализа ─────────────────────────── */

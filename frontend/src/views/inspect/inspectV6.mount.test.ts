@@ -104,7 +104,8 @@ describe("mountInspectV6", () => {
     // Then
     const root = container.querySelector(".app-v6");
     expect(root).toBeInstanceOf(HTMLElement);
-    expect(root?.querySelector(".hdr")).toBeInstanceOf(HTMLElement);
+    expect(root?.querySelector(".hdr")).toBeNull();
+    expect(root?.querySelector(".statusbar")).toBeNull();
     expect(root?.querySelector(".pairbar")).toBeInstanceOf(HTMLElement);
     const body = root?.querySelector(".app-body");
     expect(body?.querySelector(".col-cat")).toBeInstanceOf(HTMLElement);
@@ -114,7 +115,6 @@ describe("mountInspectV6", () => {
     expect(main?.querySelector(".analysis-band")).toBeInstanceOf(HTMLElement);
     expect(main?.querySelector(".v6-extras")).toBeInstanceOf(HTMLElement);
     expect(root?.querySelector(".cmdbar")).toBeInstanceOf(HTMLElement);
-    expect(root?.querySelector(".statusbar")).toBeInstanceOf(HTMLElement);
   });
 
   it("auto-picks the first two catalog sessions into pair slots A and B", async () => {

@@ -93,12 +93,10 @@ export async function mountInspectV6(
   ]);
   const body = el("div", { className: "app-body" }, [colCat, colMain]);
   const root = el("div", { className: "app-v6" }, [
-    chrome.header,
     pairbar.root,
     body,
     chrome.commandbar,
     chrome.errorBand,
-    chrome.statusbar,
   ]);
   container.append(root);
 
