@@ -7,10 +7,9 @@ import { clearElement } from "./components/primitives/dom";
 import { announcePolite } from "./components/primitives/status";
 import { RouteStore } from "./state/routeState";
 // END Todo 40
-// --- todo 41 (uPlot workbench): единственная точка регистрации графиков ---
+// --- Инспекция V6: единое окно сравнения (полный захват экрана) ---
 import "./components/charts/charts.css";
-import { mountInspectSpectrogram, mountInspectWorkbench } from "./components/charts/register";
-import { mountInspectW1Chrome } from "./views/inspect/w1Chrome";
+import { mountInspectV6 } from "./views/inspect/inspectV6";
 
 // Simple Hash Router
 export type Route =
@@ -244,6 +243,37 @@ export class AppShell {
     }
     // END Todo 40
 
+    // --- Инспекция V6: полный захват экрана (глобальная шапка скрывается классом) ---
+    if (this.currentRoute === "inspect") {
+      viewContainer.innerHTML = "";
+      viewContainer.className = "view-container";
+      this.container.classList.add("is-inspect-v6");
+      let inspectCleanup: (() => void) | null = null;
+      let cancelled = false;
+      void mountInspectV6(viewContainer as HTMLElement, {
+        client: this.apiClient,
+        routes: this.routes,
+      })
+        .then((cleanup) => {
+          if (cancelled) {
+            cleanup();
+            return;
+          }
+          inspectCleanup = cleanup;
+        })
+        .catch(() => {
+          this.container.classList.remove("is-inspect-v6");
+        });
+      this.activeViewCleanup = () => {
+        cancelled = true;
+        this.container.classList.remove("is-inspect-v6");
+        if (inspectCleanup !== null) inspectCleanup();
+        inspectCleanup = null;
+      };
+      this.mountedRoute = this.currentRoute;
+      return;
+    }
+
     viewContainer.innerHTML = `
       <div class="placeholder-view">
         <h2 class="placeholder-title">${routeInfo.title}</h2>
@@ -251,24 +281,6 @@ export class AppShell {
       </div>
     `;
     this.mountedRoute = this.currentRoute;
-    // --- todo 41 (uPlot workbench): аддитивный монтаж на маршруте Инспекция ---
-    if (this.currentRoute === "inspect") {
-      const host = document.createElement("section");
-      host.className = "charts-workbench-host";
-      host.setAttribute("aria-label", "Графики сессии");
-      viewContainer.querySelector(".placeholder-view")?.after(host);
-      mountInspectWorkbench(host);
-      // --- todo 42 (спектрограмма): аддитивный монтаж под workbench ---
-      const specHost = document.createElement("section");
-      specHost.className = "charts-spectrogram-host";
-      specHost.setAttribute("aria-label", "спектрограмма записи");
-      host.after(specHost);
-      mountInspectSpectrogram(specHost);
-      const w1Host = document.createElement("section");
-      w1Host.className = "lnt-w1-host";
-      specHost.after(w1Host);
-      mountInspectW1Chrome(w1Host);
-    }
   }
 
   public renderErrorBoundary(error: Error): void {
