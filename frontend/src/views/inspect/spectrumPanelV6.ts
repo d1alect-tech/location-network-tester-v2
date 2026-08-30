@@ -16,7 +16,7 @@ export type SpectrumPanelClient = {
   readonly plots: {
     spectrum: (
       name: string,
-      q?: unknown,
+      maxPoints?: number,
       o?: { readonly signal?: AbortSignal },
     ) => Promise<SpectrumPayload>;
     detail: (

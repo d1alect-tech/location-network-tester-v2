@@ -15,11 +15,11 @@ export type V6ExtrasClient = {
     waveform: (
       name: string,
       ch: "ch1",
-      q?: unknown,
+      maxPoints?: number,
       o?: { readonly signal?: AbortSignal },
     ) => Promise<WaveformPayload>;
   };
-} & Record<string, unknown>;
+};
 
 export type V6ExtrasChrome = {
   readonly root: HTMLElement;
