@@ -1,0 +1,115 @@
+.hdr {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 12px;
+  background: var(--lnt-chrome);
+  border-bottom: 1px solid var(--lnt-line);
+  flex: none;
+}
+
+.hdr-brand {
+  font: 600 13px / 16px var(--lnt-ui);
+  white-space: nowrap;
+  flex: none;
+}
+
+.hdr-status {
+  color: var(--lnt-text-sec);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: none;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.hdr .tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Пункт таббара: 13px w500, активный — 2px акцентная полоса снизу (§2.3). */
+.snav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font: 500 13px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.snav-item:hover {
+  color: var(--lnt-text);
+  background: var(--lnt-elev);
+}
+
+.snav-item.is-active {
+  color: var(--lnt-text);
+  background: var(--lnt-panel);
+}
+
+.snav-item.is-active::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: var(--lnt-accent);
+}
+
+.snav-item:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -2px;
+}
+
+.statusbar {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 12px;
+  background: var(--lnt-chrome);
+  border-top: 1px solid var(--lnt-line);
+  color: var(--lnt-text-sec);
+  font-size: 12px;
+  flex: none;
+}
+
+.statusbar-spacer {
+  flex: 1;
+}
+
+.statusbar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.statusbar-item.num {
+  font-family: var(--lnt-mono);
+}
+
+.statusbar-item .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--lnt-r-pill);
+  background: var(--lnt-ok);
+  flex: none;
+}
+
+@media (max-width: 767px) {
+  .hdr .tabbar {
+    overflow-x: auto;
+  }
+}
