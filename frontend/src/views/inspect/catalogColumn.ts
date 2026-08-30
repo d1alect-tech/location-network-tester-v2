@@ -75,7 +75,7 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
     tbody,
   ]);
 
-  const root = el("section", { className: "panel" }, [
+  const root = el("section", { className: "panel cat-v6" }, [
     el("div", { className: "panel-hd" }, [el("h2", { className: "panel-title", text: "Каталог" }), found]),
     el("div", { className: "cat-tools" }, [search, clear]),
     table,

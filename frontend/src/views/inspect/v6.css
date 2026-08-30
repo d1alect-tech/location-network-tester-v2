@@ -42,10 +42,77 @@
   font: 400 14px / 20px var(--lnt-ui);
 }
 
+.app-v6 .hdr {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 12px;
+  background: var(--lnt-chrome);
+  border-bottom: 1px solid var(--lnt-line);
+}
+
+.app-v6 .hdr-brand {
+  font: 600 13px / 16px var(--lnt-ui);
+  white-space: nowrap;
+  flex: none;
+}
+
+.app-v6 .hdr-status {
+  color: var(--lnt-text-sec);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: none;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
 .app-v6 .hdr .tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
   flex: 1;
   min-width: 0;
   overflow: hidden;
+}
+
+/* Пункт таббара: 13px w500, активный — 2px акцентная полоса снизу (§2.3). */
+.app-v6 .snav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font: 500 13px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.app-v6 .snav-item:hover {
+  color: var(--lnt-text);
+  background: var(--lnt-elev);
+}
+
+.app-v6 .snav-item.is-active {
+  color: var(--lnt-text);
+  background: var(--lnt-panel);
+}
+
+.app-v6 .snav-item.is-active::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: var(--lnt-accent);
+}
+
+.app-v6 .snav-item:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -2px;
 }
 
 /* ── Full-takeover (production AppShell #app) ──────────────────────────── */
@@ -162,12 +229,18 @@
   overflow: auto;
 }
 
+/* Дочерние блоки не сжимаются: при нехватке высоты колонка скроллится,
+   а контент не вылезает поверх соседних блоков (лента, доп. панели). */
+.app-v6 .col-main > * {
+  flex-shrink: 0;
+}
+
 .app-v6 .col-main > * + * {
   border-top: 1px solid var(--lnt-line);
 }
 
 .app-v6 [data-showcase="spectrum"] {
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   min-height: 320px;
 }
 
@@ -187,9 +260,9 @@
   min-width: 0;
   min-height: 0;
   padding: 4px;
-  /* Резерв под легенду uPlot: она рисуется ниже графика и не должна
-     наезжать на ленту анализа. */
-  margin-bottom: 36px;
+  /* Резерв под легенду uPlot (до трёх строк: Value + две сессии): легенда
+     рисуется ниже графика и не должна наезжать на ленту анализа. */
+  margin-bottom: 72px;
 }
 
 .app-v6 .spectrum-plot {
@@ -807,6 +880,24 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--lnt-text-sec);
+  list-style: none;
+}
+
+.app-v6 .v6-extras summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Шеврон раскрытия: без него заголовок выглядит мёртвой подписью. */
+.app-v6 .v6-extras summary::before {
+  content: "▸";
+  flex: none;
+  margin-right: 8px;
+  color: var(--lnt-text-dim);
+  transition: transform var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.app-v6 .v6-extras details[open] > summary::before {
+  transform: rotate(90deg);
 }
 
 .app-v6 .v6-extras summary:hover {
@@ -816,6 +907,10 @@
 .app-v6 .v6-extras summary:focus-visible {
   outline: 2px solid var(--lnt-accent);
   outline-offset: -2px;
+}
+
+.app-v6 .gram .lnt-spec-chart {
+  block-size: 420px;
 }
 
 /* Контейнер осциллограммы обязан иметь высоту: uPlot не рисуется в 0px.
