@@ -5,6 +5,8 @@ import { AppShell } from "./AppShell";
  * Базовый характеризационный тест: фиксирует наблюдаемое поведение AppShell.
  * С todo 39 в ROUTES добавлен раздел «Каталог» — ссылок стало семь;
  * остальные гарантии маршрутизации сохранены дословно.
+ * T5: маршрут «Каталог» монтирует настоящий воркспейс (.lnt-cat-workspace),
+ * плейсхолдер-заглушка удалена — фолбэк-тесты следуют новой реальности.
  */
 describe("AppShell (baseline characterization)", () => {
   let container: HTMLElement;
@@ -47,14 +49,14 @@ describe("AppShell (baseline characterization)", () => {
       setTimeout(resolve, 0);
     });
     expect(window.location.hash).toBe("#/catalog");
-    expect(container.querySelector(".placeholder-title")?.textContent).toBe("Каталог");
+    expect(container.querySelector(".lnt-cat-workspace")).not.toBeNull();
   });
 
   it("falls back to the default view for an unknown route and keeps the hash", () => {
     window.location.hash = "#/unknown";
     const shell = new AppShell(container);
     shell.init();
-    expect(container.querySelector(".placeholder-title")?.textContent).toBe("Каталог");
+    expect(container.querySelector(".lnt-cat-workspace")).not.toBeNull();
     expect(window.location.hash).toBe("#/unknown");
   });
 
