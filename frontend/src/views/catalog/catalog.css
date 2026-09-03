@@ -693,6 +693,8 @@
   color: var(--lnt-text-sec);
 }
 
+/* Инлайн-полоса по витрине (variantV6.css): без фона, только верхняя линия
+ * и тон-полоса 3px слева. Кнопки внутри переносятся — min-height вместо 32px. */
 .lnt-cat-workspace .banner-inline {
   flex-direction: row;
   flex-wrap: wrap;
@@ -700,12 +702,51 @@
   min-height: 32px;
   gap: 8px;
   padding: 4px 12px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--lnt-line);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: 0;
 }
 
+/* Тон-предупреждение: конфликт revision, восстановление без потери. */
+.lnt-cat-workspace .banner.is-warn {
+  border-color: rgb(230 134 25 / 0.35);
+  border-left-color: var(--lnt-warn);
+  background: var(--lnt-warn-bg, rgb(230 134 25 / 0.15));
+}
+
+.lnt-cat-workspace .banner-inline.is-warn {
+  border-left-color: var(--lnt-warn);
+}
+
+/* Тон-подсказка: нейтральная полоса на акценте (токена info в витрине нет). */
+.lnt-cat-workspace .banner.is-info {
+  border-color: rgb(86 129 255 / 0.35);
+  border-left-color: var(--lnt-accent);
+  background: rgb(86 129 255 / 0.12);
+}
+
+.lnt-cat-workspace .banner-inline.is-info {
+  border-left-color: var(--lnt-accent);
+}
+
+/* Глифы 12px semibold — мелкий текст, нужен 4.5:1: осветлённые тона
+ * (сырые --lnt-err/--lnt-warn дают ~2.7–3.7:1, замер axe ≥ 5:1). */
 .lnt-cat-workspace .banner-glyph {
-  color: var(--lnt-err);
+  color: #ffc4c6;
   font: 600 12px / 16px var(--lnt-ui);
   flex: none;
+}
+
+.lnt-cat-workspace .banner.is-warn .banner-glyph,
+.lnt-cat-workspace .banner-inline.is-warn .banner-glyph {
+  color: #f7c46c;
+}
+
+.lnt-cat-workspace .banner.is-info .banner-glyph,
+.lnt-cat-workspace .banner-inline.is-info .banner-glyph {
+  color: #a9c0ff;
 }
 
 .lnt-cat-workspace .banner-inline .banner-msg {
@@ -809,7 +850,25 @@
   .lnt-cat-workspace .col-cat {
     border-right: 0;
     border-bottom: 1px solid var(--lnt-line);
-    overflow: visible;
+    /* overflow-clip держим и в стопке: таблица скроллится внутри .tbl-wrap,
+     * иначе длинные метки выталкивают соседнюю колонку (spill T5). */
+    overflow: clip;
+  }
+}
+
+/* Узкий вьюпорт (375px → колонка ~336px): фиксированные 158+104+64 душат
+ * метку до ~10px. Таблица едет горизонтально внутри .tbl-wrap, страница
+ * не скроллится. */
+@media (max-width: 520px) {
+  .lnt-cat-workspace .cat-v6 .tbl-cat {
+    table-layout: auto;
+    min-width: 480px;
+  }
+
+  .lnt-cat-workspace .cat-v6 .tbl-cat tr > :first-child,
+  .lnt-cat-workspace .cat-v6 .tbl-cat tr > :nth-child(3),
+  .lnt-cat-workspace .cat-v6 .tbl-cat tr > :nth-child(4) {
+    width: auto;
   }
 }
 

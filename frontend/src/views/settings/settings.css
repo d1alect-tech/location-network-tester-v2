@@ -223,11 +223,18 @@
   margin: 0;
 }
 
+/* Инлайн-полоса по витрине (variantV6.css): без фона, верхняя линия +
+ * тон-полоса 3px слева. */
 .lnt-set-workspace .banner-inline {
   flex-direction: row;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--lnt-line);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: 0;
 }
 
 .lnt-set-workspace .banner-inline .banner-msg {
@@ -238,9 +245,14 @@
 }
 
 .lnt-set-workspace .banner-glyph {
-  color: var(--lnt-err);
+  /* Сырой --lnt-err даёт ~2.7:1 — осветляем как glyph-ok ниже. */
+  color: color-mix(in srgb, var(--lnt-err) 65%, white);
   font: 600 12px / 16px var(--lnt-ui);
   flex: none;
+}
+
+:root[data-theme="light"] .lnt-set-workspace .banner-glyph {
+  color: var(--lnt-err);
 }
 
 .lnt-set-workspace .glyph {
@@ -263,10 +275,18 @@
 }
 
 .lnt-set-workspace .glyph-warn {
+  color: color-mix(in srgb, var(--lnt-warn) 65%, white);
+}
+
+:root[data-theme="light"] .lnt-set-workspace .glyph-warn {
   color: var(--lnt-warn);
 }
 
 .lnt-set-workspace .glyph-err {
+  color: color-mix(in srgb, var(--lnt-err) 65%, white);
+}
+
+:root[data-theme="light"] .lnt-set-workspace .glyph-err {
   color: var(--lnt-err);
 }
 
@@ -277,7 +297,7 @@
 }
 
 .lnt-set-workspace .lnt-set-tone-ok .banner-glyph {
-  color: var(--lnt-ok);
+  color: color-mix(in srgb, var(--lnt-ok) 65%, white);
 }
 
 .lnt-set-workspace .lnt-set-tone-warn {
@@ -286,7 +306,7 @@
 }
 
 .lnt-set-workspace .lnt-set-tone-warn .banner-glyph {
-  color: var(--lnt-warn);
+  color: color-mix(in srgb, var(--lnt-warn) 65%, white);
 }
 
 .lnt-set-workspace .lnt-set-tone-info {
@@ -386,7 +406,8 @@
   font: 700 11px / 14px var(--lnt-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--lnt-text-dim);
+  /* dim даёт ~3:1 — мелкому тексту нужен sec (axe ≥ 4.5:1). */
+  color: var(--lnt-text-sec);
   overflow-wrap: anywhere;
 }
 

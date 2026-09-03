@@ -13,7 +13,9 @@ function panel(title: string, bodies: Node[], extraClass = ""): HTMLElement {
   const cls = extraClass ? `panel ${extraClass}` : "panel";
   return el("section", { className: cls }, [
     el("div", { className: "panel-hd" }, [el("h2", { className: "panel-title", text: title })]),
-    el("div", { className: "panel-bd" }, bodies),
+    /* Прокручиваемая область без интерактивных потомков: tabindex делает её
+     * доступной клавиатуре (axe scrollable-region-focusable). */
+    el("div", { className: "panel-bd", attrs: { tabindex: "0" } }, bodies),
   ]);
 }
 

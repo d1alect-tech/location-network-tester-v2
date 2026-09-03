@@ -288,7 +288,7 @@
 }
 
 .capture-view .lnt-error-text {
-  color: var(--lnt-err);
+  color: #ffc4c6;
 }
 
 /* Сетка полей формы (kit .form-grid, в две колонки — вариант V3). */
@@ -331,7 +331,8 @@
   font: 700 11px / 14px var(--lnt-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--lnt-text-dim);
+  /* dim (#909090) даёт ~3:1 на хроме — мелкому тексту нужен sec (≥4.5:1). */
+  color: var(--lnt-text-sec);
   padding: 0 4px;
 }
 
@@ -438,16 +439,18 @@
   flex: none;
 }
 
+/* Мелкий текст в тонах — нужен 4.5:1: осветлённые варианты (сырые тона
+ * дают ~2.7–3.7:1 на тёмной подложке, замер axe ≥ 5:1). */
 .capture-view .glyph-ok {
-  color: var(--lnt-ok);
+  color: #7fe0b8;
 }
 
 .capture-view .glyph-warn {
-  color: var(--lnt-warn);
+  color: #f7c46c;
 }
 
 .capture-view .glyph-err {
-  color: var(--lnt-err);
+  color: #ffc4c6;
 }
 
 /* Текст пилюль/строк поверх глифа наследует тон — читаемость без цвета. */
@@ -526,7 +529,7 @@
   font: 700 11px / 14px var(--lnt-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--lnt-text-dim);
+  color: var(--lnt-text-sec);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -554,7 +557,7 @@
 }
 
 .capture-view .capture-preview-term {
-  color: var(--lnt-text-dim);
+  color: var(--lnt-text-sec);
 }
 
 .capture-view .capture-preview-value {
@@ -590,13 +593,19 @@
   overflow-wrap: anywhere;
 }
 
-/* Инлайн-полоса: строка 32px+ под действиями формы/таймлайна. */
+/* Инлайн-полоса по витрине (variantV6.css): без фона, верхняя линия +
+ * тон-полоса 3px слева. Контент с кнопками переносится — min-height. */
 .capture-view .banner-inline {
   flex-direction: row;
   align-items: center;
   gap: 8px;
   min-height: 32px;
   padding: 6px 12px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--lnt-line);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: 0;
 }
 
 .capture-view .banner-inline .banner-msg {
@@ -613,6 +622,21 @@
   border: 1px solid rgb(230 134 25 / 0.35);
   border-left: 3px solid var(--lnt-warn);
   background: var(--lnt-warn-bg);
+}
+
+/* Тон-подсказка: акцентная полоса на хроме (токена info в витрине нет). */
+.capture-view .banner-info {
+  border: 1px solid rgb(86 129 255 / 0.35);
+  border-left: 3px solid var(--lnt-accent);
+  background: var(--lnt-chrome);
+}
+
+.capture-view .banner-inline.banner-warn {
+  border-left-color: var(--lnt-warn);
+}
+
+.capture-view .banner-inline.banner-info {
+  border-left-color: var(--lnt-accent);
 }
 
 /* Совместимость старого алёрта (e2e-пин .capture-alert, role=alert живёт). */
