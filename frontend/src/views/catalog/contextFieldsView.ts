@@ -1,6 +1,6 @@
-/** Таблица полей контекста: значение с единицей, источник и доступность.
- * Показывает, откуда пришло каждое поле (автоматика/профиль/пользователь)
- * и собрано ли оно вообще — по контракту ContextField бэкенда. */
+/** Таблица полей контекста V6 (.tbl) и панель восстановления (.banner).
+ * Сигнатуры и контракт без изменений: значение с единицей, источник
+ * и доступность по контракту ContextField бэкенда. */
 
 import type { CollectionStatus, ContextField, FieldSource } from "../../api/types";
 import { el } from "../../components/primitives/dom";
@@ -25,7 +25,7 @@ export function formatFieldValue(field: ContextField): string {
 }
 
 export function createFieldsTable(fields: Record<string, ContextField>): HTMLElement {
-  const table = el("table", { className: "lnt-table lnt-cat-fields" });
+  const table = el("table", { className: "tbl" });
   const head = el("tr", {}, [
     el("th", { attrs: { scope: "col" }, text: "Поле" }),
     el("th", { attrs: { scope: "col" }, text: "Значение" }),
@@ -36,11 +36,11 @@ export function createFieldsTable(fields: Record<string, ContextField>): HTMLEle
   for (const [key, field] of Object.entries(fields)) {
     const status = STATUS_LABELS[field.collection_status ?? "collected"];
     const row = el("tr", {}, [
-      el("td", { className: "lnt-mono", text: key }),
-      el("td", { className: "lnt-mono", text: formatFieldValue(field) }),
-      el("td", { text: SOURCE_LABELS[field.source ?? "automatic"] }),
+      el("td", { className: "t-mono", text: key }),
+      el("td", { className: "t-mono", text: formatFieldValue(field) }),
+      el("td", { className: "t-compact", text: SOURCE_LABELS[field.source ?? "automatic"] }),
       el("td", {
-        className: field.collection_status === "unavailable" ? "lnt-cat-unavailable" : undefined,
+        className: `t-compact${field.collection_status === "unavailable" ? " is-unavailable" : ""}`,
         text: `${status}${
           field.collection_reason ? ` — ${field.collection_reason}` : ""
         } · ${field.captured_at.slice(0, 19).replace("T", " ")}`,
@@ -54,17 +54,17 @@ export function createFieldsTable(fields: Record<string, ContextField>): HTMLEle
 
 export function createRecoveryPanel(reasonCodes: string[], healthLabel: string): HTMLElement {
   const panel = el("div", {
-    className: "lnt-cat-recovery",
+    className: "banner lnt-cat-recovery",
     attrs: { role: "note", "aria-label": "Объяснение восстановления" },
   });
   panel.append(
     el("p", {
-      className: "lnt-cat-recovery-title",
+      className: "banner-title",
       text: `Сессия повреждена или неполна (${healthLabel}). Запись недоступна для анализа, но остаётся видимой в каталоге.`,
     }),
   );
   if (reasonCodes.length > 0) {
-    const list = el("ul", { className: "lnt-cat-recovery-list" });
+    const list = el("ul", { className: "banner-list" });
     list.append(...reasonCodes.map((code) => el("li", { text: reasonCodeExplanation(code) })));
     panel.append(list);
   }

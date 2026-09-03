@@ -1,274 +1,821 @@
-/* Рабочая область каталога (Todo 39): двухпанельная раскладка DESIGN.md
- * (каталог слева, инспектор/профили справа), виртуализованный список,
- * бейджи health, конфликт-revision панель. Только токены v2-tokens.css. */
+/* Каталог V6: идиомы showcase-round2/kit.css + variantV6.css (только чтение),
+ * перенесённые в продукт на V6-токенах (--lnt-chrome/--lnt-panel/--lnt-line…).
+ * Scope — .lnt-cat-workspace, наружу ничего не течёт (MUST NOT: другие разделы).
+ * Хуки e2e (.lnt-cat-row, .lnt-status-pill, .lnt-cat-empty, .lnt-cat-saved,
+ * .lnt-cat-inspector, .lnt-cat-notes, .lnt-cat-conflict, .lnt-cat-recovery)
+ * сохранены как классы и оформлены здесь же по V6.
+ *
+ * Раскладка: .app-body [ .col-cat (.panel.cat-v6: hd + .cat-tools + таблица)
+ * | .col-main (.tabbar + панели) ]. Spill чинится overflow:clip на .col-cat. */
 
 .lnt-cat-workspace {
   display: grid;
-  grid-template-columns: minmax(420px, 1fr) minmax(360px, 420px);
-  gap: var(--lnt-space-4);
+  grid-template-columns: minmax(380px, 480px) minmax(0, 1fr);
+  min-height: 0;
   height: 100%;
-  min-height: 0;
+  background: var(--lnt-chrome);
+  color: var(--lnt-text);
+  font: 400 14px / 20px var(--lnt-ui);
 }
 
-.lnt-cat-left,
-.lnt-cat-right {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  background-color: var(--lnt-bg-panel);
-  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
-  border-radius: var(--lnt-radius-panel);
-  padding: var(--lnt-space-4);
-}
-
-.lnt-cat-filters {
-  margin-bottom: var(--lnt-space-4);
-}
-
-.lnt-cat-saved {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: var(--lnt-space-2);
-}
-
-.lnt-cat-saved .lnt-select {
-  min-width: 180px;
-}
-
-/* Виртуализованный список */
-.lnt-cat-list {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 240px;
-}
-
-.lnt-cat-viewport {
-  position: relative;
-  overflow-y: auto;
-  flex: 1;
-  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
-  border-radius: var(--lnt-radius-control);
-  background-color: var(--lnt-bg-canvas);
-}
-
-.lnt-cat-sizer {
-  width: 1px;
-}
-
-.lnt-cat-window {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  will-change: transform;
-}
-
-.lnt-cat-row {
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 3fr) auto minmax(0, auto);
-  align-items: center;
-  gap: var(--lnt-space-2);
-  height: 44px;
-  padding: 0 var(--lnt-space-3);
-  border-bottom: var(--lnt-border-width) solid var(--lnt-border-subtle);
-  cursor: pointer;
-}
-
-.lnt-cat-row:hover {
-  background-color: var(--lnt-bg-raised);
-}
-
-.lnt-cat-row:focus-visible {
-  outline: var(--lnt-focus-width) solid var(--lnt-accent-a);
-  outline-offset: calc(var(--lnt-focus-offset) * -1);
-}
-
-.lnt-cat-row-selected,
-.lnt-cat-row-selected:hover {
-  background-color: var(--lnt-bg-selected);
-}
-
-.lnt-cat-cell {
+/* Вид-контейнер под каталогом: без отступов, прокрутка внутри колонок. */
+.view-container.lnt-cat-view-container {
+  padding: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
 }
 
-.lnt-mono {
-  font-family: var(--lnt-font-mono);
-}
-
-.lnt-cat-health {
-  max-width: 200px;
-}
-
-.lnt-cat-more {
-  margin-top: var(--lnt-space-2);
-  align-self: flex-start;
-}
-
-.lnt-cat-empty,
-.lnt-cat-error {
-  padding: var(--lnt-space-6);
-}
-
-/* Инспектор */
-.lnt-cat-inspector,
-.lnt-cat-profiles {
-  display: flex;
-  flex-direction: column;
-  gap: var(--lnt-space-3);
-  overflow-y: auto;
-  min-height: 0;
-  flex: 1;
-}
-
-.lnt-cat-tabs {
-  display: flex;
-  gap: var(--lnt-space-2);
-}
-
-/* Активный таб: текст primary на selected (~8.7:1); акцент #5681ff на
- * selected даёт лишь ~3:1 и не проходит axe color-contrast. */
-.lnt-cat-tab-active {
-  background-color: var(--lnt-bg-selected);
-  color: var(--lnt-fg-primary);
-  border-color: var(--lnt-accent-a);
-}
-
-.lnt-cat-session-summary {
-  display: flex;
-  flex-direction: column;
-  gap: var(--lnt-space-1);
-}
-
-.lnt-cat-notes {
-  resize: vertical;
-}
-
-.lnt-cat-fields td,
-.lnt-cat-fields th {
-  font-size: 13px;
-  padding: var(--lnt-space-2) var(--lnt-space-3);
-}
-
-.lnt-cat-unavailable {
-  color: var(--lnt-status-warn);
-}
-
-.lnt-cat-recovery {
-  background-color: var(--lnt-status-warn-bg);
-  border: var(--lnt-border-width) solid var(--lnt-status-warn);
-  border-radius: var(--lnt-radius-control);
-  padding: var(--lnt-space-3);
-  font-size: 13px;
-}
-
-.lnt-cat-recovery-title {
-  margin: 0 0 var(--lnt-space-2);
-}
-
-.lnt-cat-recovery-list {
-  margin: 0;
-  padding-left: var(--lnt-space-5);
-}
-
-.lnt-cat-conflict {
-  background-color: var(--lnt-status-error-bg);
-  border: var(--lnt-border-width) solid var(--lnt-status-error);
-  border-radius: var(--lnt-radius-control);
-  padding: var(--lnt-space-3);
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--lnt-space-2);
-  font-size: 13px;
-}
-
-/* Атрибут hidden обязан побеждать display:flex (конфликт-панель скрывается). */
-.lnt-cat-conflict[hidden],
-.lnt-cat-inspector [hidden],
-.lnt-cat-profiles-panel[hidden] {
+/* Атрибут hidden сильнее раскладочных display внутри каталога. */
+.lnt-cat-workspace [hidden] {
   display: none !important;
 }
 
-.lnt-cat-conflict-title {
-  flex-basis: 100%;
-  margin: 0;
-  font-weight: var(--lnt-weight-medium);
+/* ── Колонки ─────────────────────────────────────────────────────────── */
+
+.lnt-cat-workspace .col-cat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  /* Spill: содержимое таблицы (fixed-раскладка, длинные метки) не должно
+   * распирать колонку и выталкивать соседнюю — отсекаем, скролл внутри. */
+  overflow: clip;
+  border-right: 1px solid var(--lnt-line);
 }
 
-/* Профили */
-.lnt-cat-profile-group {
-  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
-  border-radius: var(--lnt-radius-control);
-  margin: 0 0 var(--lnt-space-3);
-  padding: var(--lnt-space-3);
+.lnt-cat-workspace .col-cat > .panel {
+  flex: 1;
+  min-height: 0;
+  background: var(--lnt-chrome);
 }
 
-.lnt-cat-profile-group legend {
-  font-size: 13px;
-  color: var(--lnt-fg-secondary);
-  padding: 0 var(--lnt-space-2);
+.lnt-cat-workspace .col-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 
-.lnt-cat-profile-row {
+.lnt-cat-workspace .col-main > * + * {
+  border-top: 1px solid var(--lnt-line);
+}
+
+/* ── Панели ──────────────────────────────────────────────────────────── */
+
+.lnt-cat-workspace .panel {
+  background: var(--lnt-panel);
+  border: 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lnt-cat-workspace .panel-hd {
+  min-height: 30px;
   display: flex;
   align-items: center;
-  gap: var(--lnt-space-2);
-  min-height: var(--lnt-control-height);
+  gap: 8px;
+  padding: 0 12px;
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-line);
+  flex: none;
 }
 
-.lnt-cat-profile-name {
+.lnt-cat-workspace .panel-title {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  margin: 0;
+}
+
+.lnt-cat-workspace .panel-bd {
+  padding: 12px;
   flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lnt-cat-workspace .panel-bd.is-bare {
+  padding: 0;
+  gap: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+/* ── Типографика .t-* (шкала showcase tokens.css, scope каталога) ─────── */
+
+.lnt-cat-workspace .t-sub {
+  font: 600 14px / 18px var(--lnt-ui);
+  margin: 0;
+  color: var(--lnt-text);
+}
+
+.lnt-cat-workspace .t-body {
+  font: 400 14px / 20px var(--lnt-ui);
+  margin: 0;
+  color: var(--lnt-text);
+}
+
+.lnt-cat-workspace .t-compact {
+  font: 400 12px / 16px var(--lnt-ui);
+  font-variant-numeric: tabular-nums lining-nums;
+  margin: 0;
+  color: var(--lnt-text-sec);
+}
+
+.lnt-cat-workspace .t-mono {
+  font: 400 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  margin: 0;
+  color: var(--lnt-text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ── Таблицы ─────────────────────────────────────────────────────────── */
+
+.lnt-cat-workspace .tbl-wrap {
+  overflow: auto;
+  min-width: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.lnt-cat-workspace .tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 12px / 16px var(--lnt-ui);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.lnt-cat-workspace .tbl th {
+  height: 30px;
+  padding: 0 8px;
+  text-align: left;
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  background: #1d1d1d;
+  border-bottom: 1px solid var(--lnt-line);
   white-space: nowrap;
 }
 
-.lnt-cat-quantity {
+.lnt-cat-workspace .tbl td {
+  height: var(--lnt-row-h);
+  padding: 0 8px;
+  border-bottom: 1px solid var(--lnt-line);
+  color: var(--lnt-text);
+  vertical-align: middle;
+}
+
+.lnt-cat-workspace .tbl tbody tr {
+  transition: background var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-cat-workspace .tbl tbody tr:hover {
+  background: var(--lnt-elev);
+}
+
+.lnt-cat-workspace .tbl .is-selected {
+  background: var(--lnt-elev);
+}
+
+.lnt-cat-workspace .tbl .num {
+  font-family: var(--lnt-mono);
+  white-space: nowrap;
+}
+
+.lnt-cat-workspace .tbl-tight td,
+.lnt-cat-workspace .tbl-tight th {
+  padding: 0 4px;
+}
+
+.lnt-cat-workspace .cell-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Здоровье — текстовой пилюлей, не только цветом (a11y §6, хук e2e). */
+.lnt-cat-workspace .lnt-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--lnt-r-pill);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Токены --lnt-ok/--lnt-warn/--lnt-err (#2d9d78/#e68619/#ec5b62) на тонированной
+ * подложке дают 2.7–3.7:1 — мелкий текст пилюль (12px) требует 4.5:1,
+ * поэтому здесь осветлённые варианты того же тона (замер axe ≥ 5:1). */
+.lnt-cat-workspace .lnt-tone-ok {
+  background-color: var(--lnt-ok-bg, rgb(45 157 120 / 0.15));
+  color: #7fe0b8;
+}
+
+.lnt-cat-workspace .lnt-tone-warn {
+  background-color: var(--lnt-warn-bg, rgb(230 134 25 / 0.15));
+  color: #f7c46c;
+}
+
+.lnt-cat-workspace .lnt-tone-error {
+  background-color: var(--lnt-err-bg, rgb(236 91 98 / 0.15));
+  color: #ffc4c6;
+}
+
+/* ── Каталог: плотная таблица 28px ───────────────────────────────────── */
+
+.lnt-cat-workspace .cat-v6 .panel-hd {
+  justify-content: space-between;
+}
+
+.lnt-cat-workspace .cat-found {
+  font: 400 11px / 14px var(--lnt-mono);
+  color: var(--lnt-text-dim);
+  flex: none;
+}
+
+/* Слот тулбара: прозрачная обёртка, чтобы form.cat-tools была flex-ребёнком. */
+.lnt-cat-workspace .cat-tools-host {
+  display: contents;
+}
+
+.lnt-cat-workspace .cat-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-line);
+  flex: none;
+}
+
+.lnt-cat-workspace .lnt-cat-saved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.lnt-cat-workspace .cat-v6 .tbl-cat tbody td {
+  height: 28px;
+  padding: 0 8px;
+}
+
+/* Фиксированная раскладка: состояние и тип получают своё, остаток — метке.
+ * Метка — имя (узнаётся по началу, режется); тип — словарь (нельзя). */
+.lnt-cat-workspace .cat-v6 .tbl-cat {
+  table-layout: fixed;
+  width: 100%;
+}
+
+/* Пилюля «Повреждён манифест» — самый длинный текст состояния (~150px). */
+.lnt-cat-workspace .cat-v6 .tbl-cat tr > :first-child {
+  width: 158px;
+}
+
+/* Самый длинный тип «Качество сети» (~104px, измерено в витрине). */
+.lnt-cat-workspace .cat-v6 .tbl-cat tr > :nth-child(3) {
+  width: 104px;
+}
+
+.lnt-cat-workspace .cat-v6 .tbl-cat tr > :nth-child(4) {
+  width: 64px;
+}
+
+/* Без групп в колонке полная дата — ширины под «14:30» ей мало. */
+.lnt-cat-workspace .cat-v6 .tbl-cat.is-flat tr > :nth-child(4) {
+  width: 96px;
+}
+
+/* Заголовок дня — единственная ячейка строки, ширины её не касаются. */
+.lnt-cat-workspace .cat-group > th {
+  width: auto;
+}
+
+.lnt-cat-workspace .cat-label-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lnt-cat-workspace .cat-label-cell .cell-ellipsis {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Роль связывает строку с полосой пары А—Б (цвет усиливает, читается буква). */
+.lnt-cat-workspace .cat-role {
+  flex: none;
+  min-width: 16px;
+  padding: 0 4px;
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  border: 1px solid currentcolor;
+  border-radius: var(--lnt-r-ctl);
+}
+
+.lnt-cat-workspace .cat-role-a {
+  color: #9db4ff;
+}
+
+.lnt-cat-workspace .cat-role-b {
+  color: #f0a95c;
+}
+
+.lnt-cat-workspace .cat-empty {
+  height: 48px;
+  padding: 0 8px;
+  font: 400 12px / 48px var(--lnt-ui);
+  color: var(--lnt-text-dim);
+  text-align: center;
+}
+
+.lnt-cat-workspace .cat-loading {
+  padding: 12px;
+}
+
+.lnt-cat-workspace .cat-more {
+  margin: 8px 12px;
+  align-self: flex-start;
+  flex: none;
+}
+
+/* Строки фокусируемы (roving tabindex): видимый фокус §6. */
+.lnt-cat-workspace .lnt-cat-row {
+  cursor: pointer;
+}
+
+.lnt-cat-workspace .lnt-cat-row:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -2px;
+}
+
+.lnt-cat-workspace .lnt-cat-row-selected,
+.lnt-cat-workspace .lnt-cat-row-selected:hover {
+  background: var(--lnt-elev);
+}
+
+/* Заголовок колонки — настоящая кнопка: сортировка с клавиатуры (§6). */
+.lnt-cat-workspace .cat-th {
+  padding: 0;
+}
+
+.lnt-cat-workspace .cat-sort {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0 8px;
+  font: 600 11px / 30px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lnt-cat-workspace .cat-sort:hover {
+  color: var(--lnt-text);
+}
+
+.lnt-cat-workspace .cat-th[aria-sort="ascending"] .cat-sort-mark::after {
+  content: "▲";
+}
+
+.lnt-cat-workspace .cat-th[aria-sort="descending"] .cat-sort-mark::after {
+  content: "▼";
+}
+
+.lnt-cat-workspace .cat-th[aria-sort="ascending"] .cat-sort,
+.lnt-cat-workspace .cat-th[aria-sort="descending"] .cat-sort {
+  color: var(--lnt-text);
+}
+
+.lnt-cat-workspace .cat-sort-mark {
+  color: var(--lnt-accent);
+}
+
+/* Заголовок дня отделяет один выезд от другого. Ячейка остаётся table-cell,
+ * иначе colspan перестаёт действовать (находка витрины V6). */
+.lnt-cat-workspace .cat-group th {
+  height: 24px;
+  padding: 0 8px;
+  font: 600 11px / 24px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  color: var(--lnt-text-sec);
+  background: var(--lnt-panel-hd, rgb(0 0 0 / 0.18));
+  border-top: 1px solid var(--lnt-line-struct);
+  border-bottom: 1px solid var(--lnt-line);
+}
+
+.lnt-cat-workspace .cat-group-in {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lnt-cat-workspace .cat-group-count {
+  font: 400 11px / 24px var(--lnt-mono);
+  color: var(--lnt-text-dim);
+}
+
+/* ── Табы правой панели ──────────────────────────────────────────────── */
+
+.lnt-cat-workspace .tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-height: 32px;
+  flex: none;
+  padding: 0 8px;
+  background: var(--lnt-chrome);
+}
+
+.lnt-cat-workspace .snav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  min-height: 32px;
+  font: 500 13px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-cat-workspace .snav-item:hover {
+  color: var(--lnt-text);
+  background: var(--lnt-elev);
+}
+
+.lnt-cat-workspace .snav-item.is-active {
+  color: var(--lnt-text);
+  background: var(--lnt-panel);
+}
+
+/* Активный таб — акцентная полоса 2px снизу (пин T2, kit.css). */
+.lnt-cat-workspace .snav-item.is-active::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: var(--lnt-accent);
+}
+
+.lnt-cat-workspace .snav-item:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -2px;
+}
+
+/* ── Формы: .field/.ctl 32px ─────────────────────────────────────────── */
+
+.lnt-cat-workspace .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lnt-cat-workspace .cat-tools .field {
+  flex: 1 1 140px;
+  max-width: 220px;
+}
+
+.lnt-cat-workspace .field-label {
+  font: 600 12px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lnt-cat-workspace .ctl {
+  height: 32px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-field, var(--lnt-chrome));
+  color: var(--lnt-text);
+  font: 400 14px / 20px var(--lnt-ui);
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-cat-workspace .ctl:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-cat-workspace .ctl:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -1px;
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-cat-workspace select.ctl {
+  appearance: none;
+  padding-inline-end: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23D1D1D1' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+
+.lnt-cat-workspace textarea.ctl {
+  height: auto;
+  min-height: 88px;
+  padding: 8px 10px;
+  font: 400 14px / 20px var(--lnt-ui);
+  resize: vertical;
+}
+
+/* Поиск живёт в хроме тулбара: без рамки и фона, с нижней линией. */
+.lnt-cat-workspace .cat-search {
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--lnt-line-struct);
+  border-radius: 0;
+  padding: 0 4px;
+  font: 400 12px / 32px var(--lnt-ui);
+}
+
+.lnt-cat-workspace .cat-search::placeholder {
+  color: var(--lnt-text-dim);
+}
+
+.lnt-cat-workspace .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--lnt-space-2);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
 }
 
-.lnt-cat-preview-panel {
-  border-top: var(--lnt-border-width) solid var(--lnt-border-subtle);
-  margin-top: var(--lnt-space-3);
-  padding-top: var(--lnt-space-3);
+.lnt-cat-workspace .form-actions {
+  margin-top: 4px;
+  display: flex;
+  gap: 8px;
 }
 
-.lnt-cat-preview-title {
-  margin: 0 0 var(--lnt-space-2);
-  font-size: 13px;
-  font-weight: var(--lnt-weight-semibold);
+/* ── Инспектор: сводка ───────────────────────────────────────────────── */
+
+.lnt-cat-workspace .readout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
 }
 
-.lnt-cat-preview-item {
-  margin-bottom: var(--lnt-space-3);
+.lnt-cat-workspace .is-unavailable {
+  color: var(--lnt-warn);
 }
 
-.lnt-cat-preview-line {
+/* ── Кнопки ──────────────────────────────────────────────────────────── */
+
+.lnt-cat-workspace .btn {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-accent);
+  /* Тёмный текст канвы на акценте: белый даёт лишь ~3.5:1 (§4, §6 витрины). */
+  color: var(--lnt-canvas);
+  font: 600 14px / 20px var(--lnt-ui);
+  cursor: pointer;
+  transition: background var(--lnt-t-fast) var(--lnt-ease);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lnt-cat-workspace .btn:hover {
+  background: var(--lnt-accent-press, var(--lnt-accent));
+}
+
+.lnt-cat-workspace .btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lnt-cat-workspace .btn-secondary {
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+  border: 1px solid var(--lnt-line-struct);
+}
+
+.lnt-cat-workspace .btn-secondary:hover {
+  background: var(--lnt-line-hot);
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-cat-workspace .btn-quiet {
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--lnt-r-ctl);
+  background: transparent;
+  color: var(--lnt-text-sec);
+  font: 600 13px / 16px var(--lnt-ui);
+  cursor: pointer;
+  transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lnt-cat-workspace .btn-quiet:hover {
+  color: var(--lnt-text);
+  background: var(--lnt-elev);
+}
+
+/* Хук e2e .lnt-btn-primary на кнопке «Сохранить»: вид — V6-primary
+ * детерминированно (специфичность выше примитивов при любом порядке). */
+.lnt-cat-workspace .btn.lnt-btn-primary,
+.lnt-cat-workspace .lnt-btn-primary {
+  background: var(--lnt-accent);
+  border-color: transparent;
+  color: var(--lnt-canvas);
+}
+
+.lnt-cat-workspace .btn:focus-visible,
+.lnt-cat-workspace .btn-quiet:focus-visible,
+.lnt-cat-workspace .cat-sort:focus-visible,
+.lnt-cat-workspace .cat-search:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: 2px;
+}
+
+/* ── Баннеры: восстановление .banner, конфликт/ошибка .banner-inline ──── */
+
+.lnt-cat-workspace .banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgb(236 91 98 / 0.35);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-err-bg, rgb(236 91 98 / 0.15));
+}
+
+.lnt-cat-workspace .banner-title {
+  font: 600 14px / 18px var(--lnt-ui);
+  color: var(--lnt-text);
   margin: 0;
-  font-size: 12px;
-  color: var(--lnt-fg-secondary);
 }
 
-.lnt-cat-preview-json {
-  margin: var(--lnt-space-1) 0 0;
-  padding: var(--lnt-space-2);
-  background-color: var(--lnt-bg-raised);
-  border-radius: var(--lnt-radius-control);
-  font-size: 12px;
+.lnt-cat-workspace .banner-msg {
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  margin: 0;
+}
+
+.lnt-cat-workspace .banner-list {
+  margin: 0;
+  padding-left: 20px;
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+}
+
+.lnt-cat-workspace .banner-inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 32px;
+  gap: 8px;
+  padding: 4px 12px;
+}
+
+.lnt-cat-workspace .banner-glyph {
+  color: var(--lnt-err);
+  font: 600 12px / 16px var(--lnt-ui);
+  flex: none;
+}
+
+.lnt-cat-workspace .banner-inline .banner-msg {
+  flex: 1;
+  min-width: 200px;
+  color: var(--lnt-text);
+}
+
+/* ── Профили: disclosure + frame ─────────────────────────────────────── */
+
+.lnt-cat-workspace .disc-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  padding: 6px 0;
+  color: var(--lnt-text-sec);
+  font: 600 13px / 16px var(--lnt-ui);
+  cursor: pointer;
+}
+
+.lnt-cat-workspace .disc-toggle:hover {
+  color: var(--lnt-text);
+}
+
+.lnt-cat-workspace .disc-toggle::before {
+  content: "▸";
+  font-size: 11px;
+  transition: transform var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-cat-workspace .disc-toggle[aria-expanded="true"]::before {
+  transform: rotate(90deg);
+}
+
+.lnt-cat-workspace .disc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 8px 16px;
+}
+
+.lnt-cat-workspace .cat-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.lnt-cat-workspace .cat-profile-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 12px / 16px var(--lnt-mono);
+  color: var(--lnt-text);
+  cursor: pointer;
+}
+
+.lnt-cat-workspace .frame {
+  background: var(--lnt-canvas);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lnt-cat-workspace .cat-preview-json {
   white-space: pre-wrap;
   word-break: break-word;
+  background: var(--lnt-elev);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px;
+}
+
+/* Таб-панели правой колонки: контент тянется, прокрутка у колонки. */
+.lnt-cat-workspace .col-main [role="tabpanel"] {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.lnt-cat-workspace .col-main [role="tabpanel"] > .panel {
+  flex: 1;
+  min-height: 0;
 }
 
 @media (max-width: 1000px) {
   .lnt-cat-workspace {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(300px, 1fr) auto;
+    grid-template-rows: minmax(320px, 1fr) auto;
+    overflow-y: auto;
   }
+
+  .lnt-cat-workspace .col-cat {
+    border-right: 0;
+    border-bottom: 1px solid var(--lnt-line);
+    overflow: visible;
+  }
+}
+
+/* Диалоги (overlay в body, вне scope): только сетка величин формы. */
+.lnt-cat-quantity {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }

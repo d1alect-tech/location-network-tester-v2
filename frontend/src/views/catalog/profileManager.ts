@@ -1,4 +1,6 @@
-/** Менеджер профилей: CRUD локаций, оборудования, фронтенда, трансформатора
+/** Менеджер профилей V6: панель .panel, виды — disclosure .disc-toggle/
+ * .disc-body, предпросмотр — .frame, кнопки .btn/.btn-quiet, ошибка —
+ * .banner.banner-inline. CRUD локаций, оборудования, фронтенда, трансформатора
  * и условий измерения + выбор комбинации для предпросмотра снимка захвата.
  * Мутации идут через api-клиент (nonce), состояния pending/success/failure
  * блокируют кнопки; ошибки — русские тексты, не console. */
@@ -91,20 +93,26 @@ export function createProfileManager(options: ProfileManagerOptions): ProfileMan
   const combination: ProfileCombination = {};
   const loader = createResourceLoader<{ items: ProfileRevision[] }>(() => client.profiles());
 
-  const listHost = el("div", { className: "lnt-cat-profile-list" });
-  const errorNote = el("p", { className: "lnt-error-text", attrs: { role: "alert" } });
+  const listHost = el("div", { className: "cat-profile-list" });
+  const errorNote = el("div", { className: "banner banner-inline", attrs: { role: "alert" } });
+  errorNote.hidden = true;
   const createButton = el("button", {
-    className: "lnt-btn lnt-btn-primary",
+    className: "btn",
     text: "Создать профиль",
     attrs: { type: "button" },
   });
+
+  function setError(message: string): void {
+    errorNote.textContent = message;
+    errorNote.hidden = message === "";
+  }
 
   function notify(): void {
     onCombinationChange({ ...combination });
   }
 
   async function mutate(action: () => Promise<unknown>, busyHost: HTMLElement): Promise<void> {
-    errorNote.textContent = "";
+    setError("");
     const buttons = busyHost.querySelectorAll<HTMLButtonElement>("button");
     for (const button of buttons) button.disabled = true;
     try {
@@ -114,7 +122,7 @@ export function createProfileManager(options: ProfileManagerOptions): ProfileMan
       notify();
     } catch (error) {
       const apiError = normalizeThrown(error);
-      errorNote.textContent = apiError.message;
+      setError(apiError.message);
     } finally {
       for (const button of buttons) button.disabled = false;
     }
@@ -157,8 +165,7 @@ export function createProfileManager(options: ProfileManagerOptions): ProfileMan
                 );
                 close();
               } catch (validationError) {
-                errorNote.textContent =
-                  validationError instanceof Error ? validationError.message : "";
+                setError(validationError instanceof Error ? validationError.message : "");
               }
             })();
           },
@@ -242,8 +249,7 @@ export function createProfileManager(options: ProfileManagerOptions): ProfileMan
                 combination[kind] = undefined;
                 close();
               } catch (validationError) {
-                errorNote.textContent =
-                  validationError instanceof Error ? validationError.message : "";
+                setError(validationError instanceof Error ? validationError.message : "");
               }
             })();
           },
@@ -256,20 +262,30 @@ export function createProfileManager(options: ProfileManagerOptions): ProfileMan
     while (listHost.firstChild) listHost.removeChild(listHost.firstChild);
     for (const kind of KINDS) {
       const groupItems = items.filter((item) => item.kind === kind);
-      const group = el("fieldset", { className: "lnt-cat-profile-group" });
-      group.append(el("legend", { text: PROFILE_KIND_LABELS[kind] }));
+      const bodyId = `cat-profile-${kind}`;
+      const toggle = el("button", {
+        className: "disc-toggle",
+        text: PROFILE_KIND_LABELS[kind],
+        attrs: { type: "button", "aria-expanded": "true", "aria-controls": bodyId },
+      });
+      const body = el("div", { className: "disc-body", attrs: { id: bodyId } });
+      toggle.addEventListener("click", () => {
+        const open = toggle.getAttribute("aria-expanded") === "true";
+        toggle.setAttribute("aria-expanded", String(!open));
+        body.hidden = open;
+      });
       if (groupItems.length === 0) {
-        group.append(el("p", { className: "lnt-table-note", text: "Профилей этого вида нет." }));
+        body.append(el("p", { className: "t-compact", text: "Профилей этого вида нет." }));
       }
       for (const item of groupItems) {
-        group.append(renderProfileRow(item));
+        body.append(renderProfileRow(item));
       }
-      listHost.append(group);
+      listHost.append(toggle, body);
     }
   }
 
   function renderProfileRow(item: ProfileRevision): HTMLElement {
-    const row = el("div", { className: "lnt-cat-profile-row" });
+    const row = el("div", { className: "cat-profile-row" });
     const radio = document.createElement("input");
     radio.type = "radio";
     radio.name = `combo-${item.kind}`;
@@ -281,18 +297,18 @@ export function createProfileManager(options: ProfileManagerOptions): ProfileMan
       notify();
     });
     const label = el("label", {
-      className: "lnt-mono lnt-cat-profile-name",
+      className: "cat-profile-name",
       text: item.profile_id,
     });
     label.htmlFor = radio.id;
     const editButton = el("button", {
-      className: "lnt-btn",
+      className: "btn-quiet",
       text: "Изменить",
       attrs: { type: "button" },
     });
     editButton.addEventListener("click", () => openEditDialog(item));
     const deleteButton = el("button", {
-      className: "lnt-btn",
+      className: "btn-quiet",
       text: "Удалить",
       attrs: { type: "button" },
     });
@@ -310,14 +326,14 @@ export function createProfileManager(options: ProfileManagerOptions): ProfileMan
 
   loader.subscribe((state) => {
     if (state.kind === "ready") renderList(state.value.items);
-    else if (state.kind === "error") errorNote.textContent = state.error.message;
+    else if (state.kind === "error") setError(state.error.message);
   });
 
-  const root = el("section", { className: "lnt-cat-profiles" }, [
-    el("h3", { className: "lnt-cat-inspector-title", text: "Профили" }),
-    createButton,
-    listHost,
-    errorNote,
+  const root = el("section", { className: "panel lnt-cat-profiles" }, [
+    el("div", { className: "panel-hd" }, [
+      el("h2", { className: "panel-title", text: "Профили" }),
+    ]),
+    el("div", { className: "panel-bd" }, [createButton, listHost, errorNote]),
   ]);
 
   return {
