@@ -84,6 +84,207 @@
   background-color: var(--lnt-bg-raised);
 }
 
+/* ── V6 kit-подмножество (showcase-round2/kit.css §5.2/§2.3, только чтение):
+ * панели, meter/readout-сетки, баннеры, кнопки, поля, t-типографика и .md-блок.
+ * Область видимости — рабочая область отчётов; токены prod с фолбэками kit. */
+
+.lnt-rep-preview {
+  display: flex;
+  flex-direction: column;
+  border: var(--lnt-border-width, 1px) solid var(--lnt-border-subtle, var(--lnt-line, #3f3f3f));
+  border-radius: var(--lnt-radius-panel, var(--lnt-r-ctl, 4px));
+  overflow: hidden;
+}
+
+.lnt-rep-preview .panel {
+  background: var(--lnt-bg-panel, var(--lnt-panel, #323232));
+  border: 0;
+  border-bottom: 1px solid var(--lnt-border-subtle, var(--lnt-line, #3f3f3f));
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lnt-rep-preview .panel:last-child {
+  border-bottom: 0;
+}
+
+.lnt-rep-preview .panel-hd {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-border-subtle, var(--lnt-line, #3f3f3f));
+}
+
+.lnt-rep-preview .panel-title {
+  font: 700 11px / 14px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-fg-secondary, var(--lnt-text-sec, #d1d1d1));
+  margin: 0;
+}
+
+.lnt-rep-preview .panel-bd {
+  padding: 12px;
+}
+
+.lnt-rep-preview .panel-ft {
+  padding: 8px 12px;
+  border-top: 1px solid var(--lnt-border-subtle, var(--lnt-line, #3f3f3f));
+  color: var(--lnt-fg-secondary, var(--lnt-text-sec, #d1d1d1));
+}
+
+.lnt-rep-preview .meter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.lnt-rep-preview .meter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lnt-rep-preview .meter-label {
+  font: 400 12px / 16px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
+  color: var(--lnt-fg-secondary, var(--lnt-text-sec, #d1d1d1));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lnt-rep-preview .meter-value {
+  font: 600 12px / 16px var(--lnt-font-mono, var(--lnt-mono, monospace));
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--lnt-fg-primary, var(--lnt-text, #ebebeb));
+}
+
+.lnt-rep-preview .readout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.lnt-rep-preview .readout-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lnt-rep-preview .readout-label {
+  font: 700 11px / 14px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-fg-secondary, var(--lnt-text-dim, #909090));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lnt-rep-preview .readout-value {
+  font: 600 16px / 20px var(--lnt-font-mono, var(--lnt-mono, monospace));
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--lnt-fg-primary, var(--lnt-text, #ebebeb));
+}
+
+.lnt-rep-preview .t-mono {
+  font: 400 12px / 16px var(--lnt-font-mono, var(--lnt-mono, monospace));
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.lnt-rep-preview .t-compact,
+.lnt-rep-workspace .t-compact {
+  font: 400 12px / 16px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--lnt-fg-secondary, var(--lnt-text-sec, #d1d1d1));
+  margin: 0;
+}
+
+.lnt-rep-preview .md {
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--lnt-border-subtle, var(--lnt-line, #3f3f3f));
+  border-radius: var(--lnt-radius-control, var(--lnt-r-ctl, 4px));
+  background: var(--lnt-bg-canvas, var(--lnt-canvas, #1d1d1d));
+  color: var(--lnt-fg-primary, var(--lnt-text, #ebebeb));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.lnt-rep-preview .banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgb(236 91 98 / 0.35);
+  border-left: 3px solid var(--lnt-status-error, var(--lnt-err, #ec5b62));
+  border-radius: var(--lnt-radius-control, var(--lnt-r-ctl, 4px));
+  background: var(--lnt-status-error-bg, var(--lnt-err-bg, rgb(236 91 98 / 0.15)));
+}
+
+.lnt-rep-preview .banner-title {
+  font: 600 14px / 18px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
+  color: var(--lnt-fg-primary, var(--lnt-text, #ebebeb));
+  margin: 0;
+}
+
+.lnt-rep-preview .banner-msg {
+  font: 400 13px / 18px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
+  color: var(--lnt-fg-secondary, var(--lnt-text-sec, #d1d1d1));
+  margin: 0;
+}
+
+.lnt-rep-workspace .btn {
+  min-height: var(--lnt-control-height, var(--lnt-ctl-h, 32px));
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--lnt-radius-control, var(--lnt-r-ctl, 4px));
+  background: var(--lnt-accent-a, var(--lnt-accent, #5681ff));
+  color: var(--lnt-canvas, #1d1d1d);
+  font: 600 14px / 20px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
+  cursor: pointer;
+}
+
+.lnt-rep-workspace .btn-secondary {
+  background: var(--lnt-bg-raised, var(--lnt-elev, #3f3f3f));
+  color: var(--lnt-fg-primary, var(--lnt-text, #ebebeb));
+  border: 1px solid var(--lnt-border-strong, var(--lnt-line-struct, #545454));
+}
+
+.lnt-rep-workspace .btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.lnt-rep-workspace .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lnt-rep-workspace .field-label {
+  font: 600 12px / 16px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
+  color: var(--lnt-fg-secondary, var(--lnt-text-sec, #d1d1d1));
+}
+
+.lnt-rep-workspace .ctl {
+  height: var(--lnt-control-height, var(--lnt-ctl-h, 32px));
+  padding: 0 10px;
+  border: 1px solid var(--lnt-border-strong, var(--lnt-line-struct, #545454));
+  border-radius: var(--lnt-radius-control, var(--lnt-r-ctl, 4px));
+  background: var(--lnt-bg-sunken, var(--lnt-chrome, #262626));
+  color: var(--lnt-fg-primary, var(--lnt-text, #ebebeb));
+  font: 400 14px / 20px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
+}
+
 @media (max-width: 767px) {
   .lnt-rep-workspace {
     flex-direction: column;

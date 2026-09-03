@@ -1,17 +1,46 @@
-/** DOM-сборка превью отчёта: provenance, единицы/N, результат, плоскости,
- * рецепты, ограничения. Чистое построение узлов без состояния и сети —
- * рабочая область только вставляет результат в detailHost. */
+/** DOM-сборка превью отчёта: стек V6-панелей (kit.css §5.2).
+ * provenance/core — .meter-grid, результат — .readout-grid, плоскости/рецепты/
+ * ограничения — ul.t-mono, текст выгрузки — pre.md. Легаси-классы lnt-rep-*
+ * сохранены рядом для e2e reports.spec.ts. Чистое построение узлов без
+ * состояния и сети — рабочая область только вставляет результат в detailHost.
+ * Модель (reportModel.ts) не трогаем — только читаем. */
 
 import { el } from "../../components/primitives/dom";
 import type { ReportDraft } from "./reportModel";
-import { formatMetric } from "./reportModel";
+import { composeReportMarkdown, formatMetric } from "./reportModel";
 
-function definitionList(rows: [string, string][]): HTMLElement {
-  const list = el("dl", { className: "lnt-rep-grid" });
-  for (const [term, value] of rows) {
-    list.append(el("dt", { text: term }), el("dd", { className: "lnt-rep-mono", text: value }));
+function panel(title: string, bodies: Node[], extraClass = ""): HTMLElement {
+  const cls = extraClass ? `panel ${extraClass}` : "panel";
+  return el("section", { className: cls }, [
+    el("div", { className: "panel-hd" }, [el("h2", { className: "panel-title", text: title })]),
+    el("div", { className: "panel-bd" }, bodies),
+  ]);
+}
+
+function meterGrid(rows: [string, string][]): HTMLElement {
+  const grid = el("div", { className: "meter-grid lnt-rep-grid" });
+  for (const [label, value] of rows) {
+    grid.append(
+      el("div", { className: "meter" }, [
+        el("span", { className: "meter-label", text: label }),
+        el("span", { className: "meter-value t-mono", text: value }),
+      ]),
+    );
   }
-  return list;
+  return grid;
+}
+
+function readoutGrid(rows: [string, string][]): HTMLElement {
+  const grid = el("div", { className: "readout-grid" });
+  for (const [label, value] of rows) {
+    grid.append(
+      el("div", { className: "readout-cell" }, [
+        el("span", { className: "readout-label", text: label }),
+        el("span", { className: "readout-value t-mono", text: value }),
+      ]),
+    );
+  }
+  return grid;
 }
 
 function outcomeBlock(draft: ReportDraft): HTMLElement {
@@ -19,11 +48,16 @@ function outcomeBlock(draft: ReportDraft): HTMLElement {
   const outcome = draft.outcome;
   if (outcome.kind === "refusal") {
     host.append(
-      el("p", {
-        className: "lnt-rep-banner lnt-rep-banner-warn",
+      el("div", {
+        className: "banner lnt-rep-banner lnt-rep-banner-warn",
         attrs: { role: "alert" },
-        text: `Расчёт заблокирован бэкендом. Точная причина: ${outcome.reason_code}. Числовые эффекты не выдаются.`,
-      }),
+      }, [
+        el("h3", { className: "banner-title", text: "Расчёт заблокирован бэкендом" }),
+        el("p", {
+          className: "banner-msg",
+          text: `Точная причина: ${outcome.reason_code}. Числовые эффекты не выдаются.`,
+        }),
+      ]),
     );
     return host;
   }
@@ -43,19 +77,21 @@ function outcomeBlock(draft: ReportDraft): HTMLElement {
   }
   if (outcome.kind === "descriptive") {
     host.append(
-      el("p", {
-        className: "lnt-rep-banner lnt-rep-banner-info",
-        text: "Описательная оценка без доверительного интервала: не является статистической уверенностью.",
-      }),
+      el("div", { className: "banner lnt-rep-banner lnt-rep-banner-info" }, [
+        el("p", {
+          className: "banner-msg",
+          text: "Описательная оценка без доверительного интервала: не является статистической уверенностью.",
+        }),
+      ]),
     );
   }
-  host.append(definitionList(rows));
+  host.append(readoutGrid(rows));
   return host;
 }
 
 export function previewBlock(draft: ReportDraft): HTMLElement {
   const planes = el("ul", {
-    className: "lnt-rep-planes",
+    className: "lnt-rep-planes t-mono",
     attrs: { "aria-label": "Плоскости измерения" },
   });
   for (const plane of draft.planes) {
@@ -71,7 +107,7 @@ export function previewBlock(draft: ReportDraft): HTMLElement {
     planes.append(el("li", { text: "Данные о плоскостях измерения недоступны." }));
   }
   const recipes = el("ul", {
-    className: "lnt-rep-recipes",
+    className: "lnt-rep-recipes t-mono",
     attrs: { "aria-label": "Рецепты анализа" },
   });
   for (const recipe of draft.recipes) {
@@ -81,7 +117,7 @@ export function previewBlock(draft: ReportDraft): HTMLElement {
     recipes.append(el("li", { text: "Рецепты анализа не зарегистрированы." }));
   }
   const limitations = el("ul", {
-    className: "lnt-rep-limitations",
+    className: "lnt-rep-limitations t-mono",
     attrs: { "aria-label": "Ограничения отчёта" },
   });
   for (const limitation of draft.limitations) {
@@ -90,33 +126,48 @@ export function previewBlock(draft: ReportDraft): HTMLElement {
   if (draft.limitations.length === 0) {
     limitations.append(el("li", { text: "Не обнаружены." }));
   }
+  const markdown = composeReportMarkdown(draft);
+  const mdPanel = panel("Текст выгрузки (.md)", [
+    el("pre", {
+      className: "md t-mono",
+      text: markdown,
+      attrs: { tabindex: "0", "aria-label": "Текст выгрузки отчёта в формате Markdown" },
+    }),
+  ]);
+  mdPanel.append(
+    el("div", { className: "panel-ft" }, [
+      el("p", {
+        className: "t-compact",
+        text: `Файл report-${draft.provenance.experiment_id}.md формируется клиентом из тех же данных, что показаны выше.`,
+      }),
+    ]),
+  );
   return el("div", { className: "lnt-rep-preview" }, [
-    el("h3", { className: "lnt-exp-subtitle", text: "Происхождение (provenance)" }),
-    definitionList([
-      [
-        "Эксперимент",
-        `${draft.provenance.experiment_id} (ревизия ${String(draft.provenance.experiment_revision)})`,
-      ],
-      ["Оцениваемый признак", draft.provenance.estimand],
-      ["Задача расчёта", draft.provenance.job_id],
-      ["Собран", draft.provenance.generated_at],
+    panel("Происхождение (provenance)", [
+      meterGrid([
+        [
+          "Эксперимент",
+          `${draft.provenance.experiment_id} (ревизия ${String(draft.provenance.experiment_revision)})`,
+        ],
+        ["Оцениваемый признак", draft.provenance.estimand],
+        ["Задача расчёта", draft.provenance.job_id],
+        ["Собран", draft.provenance.generated_at],
+      ]),
     ]),
-    el("h3", { className: "lnt-exp-subtitle", text: "Единицы и объём выборки" }),
-    definitionList([
-      ["Единицы", draft.core.units],
-      ["N", `${String(draft.core.n)} (${draft.core.sampling_unit})`],
-      ["Иерархия", draft.core.hierarchy.join(" → ") || "—"],
-      ["Пропущено значений", String(draft.core.missing_count)],
-      ["Оценщик", draft.core.estimator],
-      ["Метод интервала", draft.core.interval_method],
+    panel("Единицы и объём выборки", [
+      meterGrid([
+        ["Единицы", draft.core.units],
+        ["N", `${String(draft.core.n)} (${draft.core.sampling_unit})`],
+        ["Иерархия", draft.core.hierarchy.join(" → ") || "—"],
+        ["Пропущено значений", String(draft.core.missing_count)],
+        ["Оценщик", draft.core.estimator],
+        ["Метод интервала", draft.core.interval_method],
+      ]),
     ]),
-    el("h3", { className: "lnt-exp-subtitle", text: "Результат" }),
-    outcomeBlock(draft),
-    el("h3", { className: "lnt-exp-subtitle", text: "Плоскости измерения" }),
-    planes,
-    el("h3", { className: "lnt-exp-subtitle", text: "Рецепты анализа" }),
-    recipes,
-    el("h3", { className: "lnt-exp-subtitle", text: "Ограничения" }),
-    limitations,
+    panel("Результат", [outcomeBlock(draft)]),
+    panel("Плоскости измерения", [planes]),
+    panel("Рецепты анализа", [recipes]),
+    panel("Ограничения", [limitations]),
+    mdPanel,
   ]);
 }
