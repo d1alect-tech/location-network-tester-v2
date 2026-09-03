@@ -2,6 +2,8 @@
  * заметка), диагностика устройства (T14: состояние + preflight), честная
  * инструкция сборника поддержки (HTTP-маршрута нет — только CLI), ссылки на
  * профили, сводка приватности (зеркало metadata_collector) и рецепты анализа.
+ * V6 (D3=A): секции — .panel/.panel-hd/.panel-bd через panelSection(),
+ * формы — .field/.ctl/.form-grid, действия — .btn в .form-actions-футерах.
  * Статическая разметка — в settingsSections.ts, здесь интерактив. */
 
 import type { LntApiClient } from "../../api/client";
@@ -14,6 +16,7 @@ import {
   buildBundleSection,
   buildPrivacySection,
   errorBlock,
+  panelSection,
   renderDeviceState,
   renderPreflight,
 } from "./settingsSections";
@@ -34,10 +37,10 @@ export function mountSettingsWorkspace(
   const deviceHost = el("div", { className: "lnt-set-device" });
   const preflightHost = el("div", {});
   const recipesHost = el("div", {});
-  const profilesHost = el("p", { className: "lnt-helper-text", text: "Загрузка профилей…" });
+  const profilesHost = el("p", { className: "t-body", text: "Загрузка профилей…" });
 
   const rootNoteInput = el("input", {
-    className: "lnt-input",
+    className: "ctl",
     attrs: {
       type: "text",
       id: "lnt-set-root-note",
@@ -51,76 +54,89 @@ export function mountSettingsWorkspace(
     hintText:
       "Фактический корень отдаёт сервер и меняется только перезапуском: uv run lnt ui --root <путь>. Заметка хранится локально в браузере.",
   });
-  const rootValue = el("code", { className: "lnt-rep-mono lnt-set-root-value", text: "…" });
+  // V6-форма поверх примитива (примитив не трогаем — он общий для разделов):
+  // .field для раскладки, .field-label для подписи; .lnt-field остаётся e2e-хуком.
+  rootNoteField.root.classList.add("field");
+  rootNoteField.root.querySelector("label")?.classList.add("field-label");
+  const rootValue = el("code", { className: "t-mono lnt-set-root-value", text: "…" });
   const savedNote = readNote();
   if (savedNote !== null) rootNoteInput.value = savedNote;
 
-  const rootSection = el("section", { className: "lnt-set-section" }, [
-    el("h3", { className: "lnt-exp-subtitle", text: "Корень сессий" }),
-    el("p", { className: "lnt-helper-text", text: "Фактический корень (GET /api/config):" }),
-    rootValue,
-    rootNoteField.root,
-  ]);
   const saveButton = el("button", {
-    className: "lnt-btn",
+    className: "btn",
     text: "Сохранить заметку",
     attrs: { type: "button", id: "lnt-set-root-save" },
   });
   saveButton.addEventListener("click", () => saveNote());
-  rootSection.append(saveButton);
+  const rootSection = panelSection(
+    "Корень сессий",
+    [
+      el("p", { className: "t-body", text: "Фактический корень (GET /api/config):" }),
+      rootValue,
+      el("div", { className: "form-grid" }, [rootNoteField.root]),
+      el("div", { className: "form-actions" }, [saveButton]),
+    ],
+    "lnt-set-root",
+  );
 
-  const deviceSection = el("section", { className: "lnt-set-section" }, [
-    el("h3", { className: "lnt-exp-subtitle", text: "Диагностика устройства" }),
-    el("p", {
-      className: "lnt-helper-text",
-      text: "Состояние цепочки драйвер → устройство → прошивка (без изменения устройства). Отсутствие прибора — штатное типизированное состояние, а не ошибка.",
-    }),
-    deviceHost,
-    el("div", { className: "lnt-exp-actions" }, [
-      el("button", {
-        className: "lnt-btn",
-        text: "Проверить устройство",
-        attrs: { type: "button", id: "lnt-set-device-check" },
+  const checkDeviceButton = el("button", {
+    className: "btn",
+    text: "Проверить устройство",
+    attrs: { type: "button", id: "lnt-set-device-check" },
+  });
+  const preflightButton = el("button", {
+    className: "btn btn-secondary",
+    text: "Проверить готовность захвата",
+    attrs: { type: "button", id: "lnt-set-preflight" },
+  });
+  checkDeviceButton.addEventListener("click", () => void refreshDevice());
+  preflightButton.addEventListener("click", () => void runPreflight());
+  const deviceSection = panelSection(
+    "Диагностика устройства",
+    [
+      el("p", {
+        className: "t-body",
+        text: "Состояние цепочки драйвер → устройство → прошивка (без изменения устройства). Отсутствие прибора — штатное типизированное состояние, а не ошибка.",
       }),
-      el("button", {
-        className: "lnt-btn",
-        text: "Проверить готовность захвата",
-        attrs: { type: "button", id: "lnt-set-preflight" },
+      deviceHost,
+      el("div", { className: "form-actions" }, [checkDeviceButton, preflightButton]),
+      preflightHost,
+    ],
+    "lnt-set-diagnostics",
+  );
+
+  const profilesSection = panelSection(
+    "Профили",
+    [
+      profilesHost,
+      el("div", { className: "form-actions" }, [
+        el("a", {
+          className: "btn btn-secondary",
+          text: "Открыть управление профилями в каталоге",
+          attrs: { href: "#/catalog", id: "lnt-set-profiles-link" },
+        }),
+      ]),
+    ],
+    "lnt-set-profiles",
+  );
+
+  const recipesSection = panelSection(
+    "Рецепты анализа (только чтение)",
+    [
+      el("p", {
+        className: "t-body",
+        text: "Рецепты неизменяемы; удаление бэкенд отклоняет (409), потому что на рецепты могут ссылаться опубликованные артефакты.",
       }),
-    ]),
-    preflightHost,
-  ]);
-  deviceSection
-    .querySelector("#lnt-set-device-check")
-    ?.addEventListener("click", () => void refreshDevice());
-  deviceSection
-    .querySelector("#lnt-set-preflight")
-    ?.addEventListener("click", () => void runPreflight());
-
-  const profilesSection = el("section", { className: "lnt-set-section" }, [
-    el("h3", { className: "lnt-exp-subtitle", text: "Профили" }),
-    profilesHost,
-    el("a", {
-      className: "lnt-btn",
-      text: "Открыть управление профилями в каталоге",
-      attrs: { href: "#/catalog", id: "lnt-set-profiles-link" },
-    }),
-  ]);
-
-  const recipesSection = el("section", { className: "lnt-set-section" }, [
-    el("h3", { className: "lnt-exp-subtitle", text: "Рецепты анализа (только чтение)" }),
-    el("p", {
-      className: "lnt-helper-text",
-      text: "Рецепты неизменяемы; удаление бэкенд отклоняет (409), потому что на рецепты могут ссылаться опубликованные артефакты.",
-    }),
-    recipesHost,
-  ]);
+      recipesHost,
+    ],
+    "lnt-set-recipes-section",
+  );
 
   const root = el(
     "div",
     { className: "lnt-set-workspace", attrs: { role: "region", "aria-label": "Настройки" } },
     [
-      el("h2", { className: "placeholder-title", text: "Настройки" }),
+      el("h2", { className: "placeholder-title t-page", text: "Настройки" }),
       rootSection,
       deviceSection,
       buildBundleSection(),
@@ -154,7 +170,7 @@ export function mountSettingsWorkspace(
 
   async function refreshDevice(): Promise<void> {
     clearElement(deviceHost);
-    deviceHost.append(el("p", { className: "lnt-helper-text", text: "Проверка устройства…" }));
+    deviceHost.append(el("p", { className: "t-compact", text: "Проверка устройства…" }));
     try {
       const state = await device.state();
       clearElement(deviceHost);
@@ -173,7 +189,7 @@ export function mountSettingsWorkspace(
   async function runPreflight(): Promise<void> {
     clearElement(preflightHost);
     preflightHost.append(
-      el("p", { className: "lnt-helper-text", text: "Проверка готовности захвата…" }),
+      el("p", { className: "t-compact", text: "Проверка готовности захвата…" }),
     );
     try {
       const report = await device.preflight({
@@ -212,13 +228,13 @@ export function mountSettingsWorkspace(
 
   async function refreshRecipes(): Promise<void> {
     clearElement(recipesHost);
-    recipesHost.append(el("p", { className: "lnt-helper-text", text: "Загрузка рецептов…" }));
+    recipesHost.append(el("p", { className: "t-compact", text: "Загрузка рецептов…" }));
     try {
       const items = await client.analysis.recipes();
       clearElement(recipesHost);
       if (items.length === 0) {
         recipesHost.append(
-          el("p", { className: "lnt-helper-text", text: "Рецепты не зарегистрированы." }),
+          el("p", { className: "t-body", text: "Рецепты не зарегистрированы." }),
         );
         return;
       }
@@ -228,10 +244,10 @@ export function mountSettingsWorkspace(
       });
       for (const recipe of items) {
         list.append(
-          el("li", {}, [
+          el("li", { className: "t-body" }, [
             el("span", { text: `${recipe.name} ` }),
             el("code", {
-              className: "lnt-rep-mono",
+              className: "t-mono",
               text: `${recipe.recipe_id} · sha256 ${recipe.sha256}`,
             }),
           ]),

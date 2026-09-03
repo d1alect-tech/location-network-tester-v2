@@ -1,156 +1,426 @@
-/* Рабочая область «Настройки» (#/settings): одна колонка с секциями;
- * на узких экранах сетки определений складываются в столбец. */
+/* Рабочая область «Настройки» (#/settings): V6-панели kit.css §5.2.
+ * kit.css витрины в бандл панели не входит, поэтому канонические классы
+ * (.panel/.btn/.field/.banner/...) получают стили здесь, скоупленные под
+ * .lnt-set-workspace — за пределы раздела ничего не протекает.
+ * Токены: рантайм v2-tokens.css; kit-имена без рантайм-эквивалента
+ * (--lnt-err-bg/--lnt-ok-bg/--lnt-warn-bg/--lnt-accent-press) алиасятся ниже. */
 
 .lnt-set-workspace {
+  --lnt-err-bg: var(--lnt-status-error-bg);
+  --lnt-ok-bg: var(--lnt-status-ok-bg);
+  --lnt-warn-bg: var(--lnt-status-warn-bg);
+  --lnt-accent-press: var(--lnt-accent);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   max-width: 980px;
+  min-width: 0;
 }
 
-.lnt-set-section {
-  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
-  border-radius: var(--lnt-radius-panel);
-  background-color: var(--lnt-bg-panel);
-  padding: var(--lnt-space-4);
-  margin-bottom: var(--lnt-space-4);
+.lnt-set-workspace :focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: 2px;
 }
 
-.lnt-set-root-value {
-  display: inline-block;
-  margin-bottom: var(--lnt-space-3);
+/* ── Типографика (роли tokens.css §2.2) ─────────────────────────────────── */
+
+.lnt-set-workspace .t-page {
+  font: 700 24px / 32px var(--lnt-ui);
+  margin: 0;
 }
 
-.lnt-set-device-state {
-  border-left: 4px solid var(--lnt-border-strong);
-  padding: var(--lnt-space-2) var(--lnt-space-3);
-  margin-bottom: var(--lnt-space-3);
-  border-radius: var(--lnt-radius-status);
+.lnt-set-workspace .t-sub {
+  font: 600 14px / 18px var(--lnt-ui);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.lnt-set-tone-ok {
-  border-left-color: var(--lnt-status-ok);
-  background-color: var(--lnt-status-ok-bg);
+.lnt-set-workspace .t-body {
+  font: 400 14px / 20px var(--lnt-ui);
+  margin: 0;
+  color: var(--lnt-text);
 }
 
-.lnt-set-tone-warn {
-  border-left-color: var(--lnt-status-warn);
-  background-color: var(--lnt-status-warn-bg);
+.lnt-set-workspace .t-compact {
+  font: 400 12px / 16px var(--lnt-ui);
+  font-variant-numeric: tabular-nums lining-nums;
+  margin: 0;
+  color: var(--lnt-text-sec);
 }
 
-.lnt-set-tone-info {
-  border-left-color: var(--lnt-accent-a);
-  background-color: var(--lnt-bg-raised);
+.lnt-set-workspace .t-mono {
+  font: 400 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  margin: 0;
 }
 
-.lnt-set-device-title {
-  font-weight: var(--lnt-weight-semibold);
+/* ── Панели (kit.css §5.2: фон панели, hairline-стыки) ───────────────────── */
+
+.lnt-set-workspace .panel {
+  background: var(--lnt-panel);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lnt-set-workspace .panel-hd {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: var(--lnt-panel-hd, rgb(0 0 0 / 0.18));
+  border-bottom: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl) var(--lnt-r-ctl) 0 0;
+}
+
+.lnt-set-workspace .panel-title {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  margin: 0;
+}
+
+.lnt-set-workspace .panel-bd {
+  padding: 12px;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lnt-set-workspace .panel-bd > p,
+.lnt-set-workspace .panel-bd > pre,
+.lnt-set-workspace .panel-bd > ul,
+.lnt-set-workspace .panel-bd > dl {
   margin-top: 0;
+  margin-bottom: 0;
 }
 
-.lnt-set-recovery {
-  color: var(--lnt-fg-secondary);
+/* ── Кнопки (kit.css §2.3) ──────────────────────────────────────────────── */
+
+.lnt-set-workspace .btn {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-accent);
+  color: var(--lnt-canvas);
+  font: 600 14px / 20px var(--lnt-ui);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: background var(--lnt-t-fast) var(--lnt-ease);
 }
 
-.lnt-set-honest-note {
-  font-weight: var(--lnt-weight-medium);
+.lnt-set-workspace .btn:hover {
+  background: var(--lnt-accent-press);
 }
 
-.lnt-set-command {
-  font-family: var(--lnt-font-mono);
+.lnt-set-workspace .btn:active {
+  background: var(--lnt-accent-press);
+}
+
+.lnt-set-workspace .btn-secondary {
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+  border: 1px solid var(--lnt-line-struct);
+}
+
+.lnt-set-workspace .btn-secondary:hover {
+  /* kit.css §2.3 даёт hover-фон --lnt-line-hot (#707070): пара с --lnt-text
+  * (#ebebeb) держит лишь 4.15:1 — курсор остаётся на кнопке после клика
+  * (preflight-тест) и axe видит hover-стиль. Затемняем миксом до ~#5a5a5a
+  * (≈5.8:1), ховер-отклик сохраняется. */
+  background: color-mix(in srgb, var(--lnt-line-hot) 55%, var(--lnt-elev));
+  border-color: var(--lnt-line-hot);
+}
+
+/* ── Формы (kit.css §2.3: контрол 32px, рамка, фон ступенью темнее) ──────── */
+
+.lnt-set-workspace .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
+  min-width: 0;
+}
+
+.lnt-set-workspace .form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.lnt-set-workspace .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lnt-set-workspace .field-label {
+  font: 400 12px / 16px var(--lnt-ui);
+  font-weight: 600;
+  color: var(--lnt-text-sec);
+}
+
+.lnt-set-workspace .ctl {
+  height: 32px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-field, var(--lnt-chrome));
+  color: var(--lnt-text);
+  font: 400 14px / 20px var(--lnt-ui);
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-set-workspace .ctl:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-set-workspace .ctl:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -1px;
+  border-color: var(--lnt-line-hot);
+}
+
+/* ── Баннеры и глифы (kit.css §1.6/§4/§6) ───────────────────────────────── */
+
+.lnt-set-workspace .banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgb(236 91 98 / 0.35);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-err-bg);
+  min-width: 0;
+}
+
+.lnt-set-workspace .banner-msg {
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.lnt-set-workspace .banner .glyph {
+  margin: 0;
+}
+
+.lnt-set-workspace .banner-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.lnt-set-workspace .banner-inline .banner-msg {
+  flex: 1;
+  min-width: 0;
+  color: var(--lnt-text);
+  overflow-wrap: anywhere;
+}
+
+.lnt-set-workspace .banner-glyph {
+  color: var(--lnt-err);
+  font: 600 12px / 16px var(--lnt-ui);
+  flex: none;
+}
+
+.lnt-set-workspace .glyph {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font: 400 14px / 20px var(--lnt-ui);
+  color: var(--lnt-text);
+}
+
+.lnt-set-workspace .glyph-ok {
+  /* Чистый --lnt-ok на --lnt-ok-bg даёт ~3.6:1 — осветляем как в примитивах. */
+  color: color-mix(in srgb, var(--lnt-ok) 65%, white);
+}
+
+:root[data-theme="light"] .lnt-set-workspace .glyph-ok {
+  color: var(--lnt-ok);
+}
+
+.lnt-set-workspace .glyph-warn {
+  color: var(--lnt-warn);
+}
+
+.lnt-set-workspace .glyph-err {
+  color: var(--lnt-err);
+}
+
+/* Тон-полоса устройства: была 4px слева на голом div — теперь баннерные 3px. */
+.lnt-set-workspace .lnt-set-tone-ok {
+  border-left-color: var(--lnt-ok);
+  background-color: var(--lnt-ok-bg);
+}
+
+.lnt-set-workspace .lnt-set-tone-ok .banner-glyph {
+  color: var(--lnt-ok);
+}
+
+.lnt-set-workspace .lnt-set-tone-warn {
+  border-left-color: var(--lnt-warn);
+  background-color: var(--lnt-warn-bg);
+}
+
+.lnt-set-workspace .lnt-set-tone-warn .banner-glyph {
+  color: var(--lnt-warn);
+}
+
+.lnt-set-workspace .lnt-set-tone-info {
+  border-left-color: var(--lnt-accent);
+  background-color: var(--lnt-elev);
+}
+
+.lnt-set-workspace .lnt-set-tone-info .banner-glyph {
+  color: var(--lnt-text-sec);
+}
+
+.lnt-set-workspace .lnt-set-ready-ok {
+  border-left-color: var(--lnt-ok);
+  background-color: var(--lnt-ok-bg);
+}
+
+.lnt-set-workspace .lnt-set-ready-ok .banner-glyph {
+  color: var(--lnt-ok);
+}
+
+.lnt-set-workspace .lnt-set-ready-blocked {
+  border-left-color: var(--lnt-warn);
+  background-color: var(--lnt-warn-bg);
+}
+
+.lnt-set-workspace .lnt-set-ready-blocked .banner-glyph {
+  color: var(--lnt-warn);
+}
+
+.lnt-set-workspace .lnt-set-preflight-findings {
+  margin: 0;
+  padding-left: 4px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lnt-set-workspace .lnt-set-preflight-findings .glyph {
   font-size: 13px;
-  background-color: var(--lnt-bg-raised);
-  border-radius: var(--lnt-radius-control);
-  padding: var(--lnt-space-2) var(--lnt-space-3);
+  line-height: 18px;
+}
+
+/* ── Команда сборника: моноширинный кадр (kit.css .frame) ───────────────── */
+
+.lnt-set-workspace .frame {
+  background: var(--lnt-canvas);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px 12px;
+  min-width: 0;
+}
+
+.lnt-set-workspace .lnt-set-command {
   overflow-x: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.lnt-set-flags,
-.lnt-set-contents,
-.lnt-set-recipes {
-  margin: var(--lnt-space-2) 0;
-  padding-left: var(--lnt-space-5);
+.lnt-set-workspace .lnt-set-honest-note {
+  font-weight: var(--lnt-weight-medium, 500);
 }
 
-.lnt-set-flags code {
-  font-family: var(--lnt-font-mono);
-  font-size: 13px;
-}
-
-.lnt-set-error {
-  color: var(--lnt-status-error);
-}
-
-.lnt-set-ready-ok {
-  color: var(--lnt-status-ok);
-  font-weight: var(--lnt-weight-medium);
-}
-
-.lnt-set-ready-blocked {
-  color: var(--lnt-status-warn);
-  font-weight: var(--lnt-weight-medium);
-}
-
-.lnt-set-finding-block::marker {
-  content: "✕ ";
-}
-
-.lnt-set-finding-warn::marker {
-  content: "▲ ";
-}
-
-.lnt-set-privacy-group {
-  margin-bottom: var(--lnt-space-4);
-}
-
-.lnt-set-privacy-title {
-  margin: 0 0 var(--lnt-space-1);
-  font-size: 15px;
-  font-weight: var(--lnt-weight-semibold);
-}
-
-.lnt-set-privacy-never .lnt-set-privacy-title::before {
-  content: "✕ ";
-}
-
-.lnt-set-privacy-opt_in .lnt-set-privacy-title::before {
-  content: "▲ ";
-}
-
-.lnt-set-privacy-automatic .lnt-set-privacy-title::before {
-  content: "● ";
-}
-
-/* Переключатель темы в шапке: компактный, нативные radio. */
-.lnt-theme-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--lnt-space-2);
-  border: none;
+.lnt-set-workspace .lnt-set-flags,
+.lnt-set-workspace .lnt-set-contents,
+.lnt-set-workspace .lnt-set-recipes {
   margin: 0;
-  padding: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.lnt-theme-option {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--lnt-space-1);
-  min-height: var(--lnt-control-height);
-  cursor: pointer;
-  color: var(--lnt-fg-secondary);
-  font-size: 13px;
+.lnt-set-workspace .lnt-set-root-value {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
-.lnt-theme-option:hover {
-  color: var(--lnt-fg-primary);
+/* ── Приватность: пары ключ/деталь сеткой показаний ─────────────────────── */
+
+.lnt-set-workspace .lnt-set-privacy-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lnt-set-workspace .readout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 4px 0 0;
+}
+
+.lnt-set-workspace .readout-label {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-dim);
+  overflow-wrap: anywhere;
+}
+
+.lnt-set-workspace .readout-grid dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Вложенные панели диагностики живут в теле родителя без внешней рамки. */
+.lnt-set-workspace .panel-bd > .panel {
+  border-left: 0;
+  border-right: 0;
+}
+
+.lnt-set-workspace .panel-bd > .panel:first-child {
+  border-top: 0;
+}
+
+.lnt-set-workspace .panel-bd > .panel:last-child {
+  border-bottom: 0;
 }
 
 @media (max-width: 767px) {
-  .lnt-rep-grid {
+  .lnt-set-workspace .readout-grid {
     grid-template-columns: 1fr;
-    gap: 0;
+    gap: 2px;
   }
 
-  .lnt-rep-grid dd {
-    margin-bottom: var(--lnt-space-2);
+  .lnt-set-workspace .readout-grid dd {
+    margin-bottom: 8px;
+  }
+
+  .lnt-set-workspace .panel-bd {
+    padding: 8px;
   }
 }
