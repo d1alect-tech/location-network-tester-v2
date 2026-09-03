@@ -1,9 +1,307 @@
-/* Рабочая область «Эксперименты» (todo 43): раскладка, таймлайн, участники,
- * баннеры-квалификаторы. Токены — из DESIGN.md; состояния не только цветом. */
+/* Рабочая область «Эксперименты» (todo 43, V6-порт T8): раскладка, таймлайн,
+ * участники, баннеры-квалификаторы.
+ *
+ * Токены — showcase-round2/tokens.css (V6-набор: --lnt-panel/--lnt-line/
+ * --lnt-text-*, --lnt-accent/--lnt-ok/--lnt-warn/--lnt-err, --lnt-mono,
+ * --lnt-r-ctl/--lnt-r-modal, --lnt-t-fast/--lnt-ease); доступны глобально
+ * через v2-tokens.css. Легаси-токены (--lnt-space-*, --lnt-border,
+ * --lnt-surface, --lnt-text-muted, --lnt-font-mono) больше не используются.
+ * Легаси-классы lnt-exp-* сохранены рядом с V6 для e2e experiments.spec.ts.
+ * Математика и тексты goldens (1.9625/[1.6000; 2.3125]) не тронуты. */
+
+/* ── V6-панели (kit.css §5.2: фон панели, hairline-стыки) ─────────────────── */
+
+.panel {
+  background: var(--lnt-panel);
+  border: 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-hd {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-line);
+}
+
+.panel-title {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+}
+
+.panel-bd {
+  padding: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.panel-bd.is-bare {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ── V6-формы (kit.css §2.3: контрол 32px, рамка, фон ступенью темнее) ─────── */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field-label {
+  font: 400 12px / 16px var(--lnt-ui);
+  font-weight: 600;
+  color: var(--lnt-text-sec);
+}
+
+.ctl {
+  height: 32px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  color: var(--lnt-text);
+  font: 400 14px / 20px var(--lnt-ui);
+}
+
+.ctl:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.ctl:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -1px;
+  border-color: var(--lnt-line-hot);
+}
+
+select.ctl {
+  appearance: none;
+  padding-inline-end: 26px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
+}
+
+.form-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── V6-таблицы (kit.css §2.3) и глифы состояний (§6: не только цвет) ──────── */
+
+.tbl-wrap {
+  overflow: auto;
+  min-width: 0;
+}
+
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 12px / 16px var(--lnt-ui);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.tbl th {
+  height: 30px;
+  padding: 0 8px;
+  text-align: left;
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-line);
+  white-space: nowrap;
+}
+
+.tbl td {
+  height: var(--lnt-row-h);
+  padding: 0 8px;
+  border-bottom: 1px solid var(--lnt-line);
+  color: var(--lnt-text);
+  vertical-align: middle;
+}
+
+.tbl tbody tr:hover {
+  background: var(--lnt-elev);
+}
+
+.tbl-tight td,
+.tbl-tight th {
+  padding: 0 4px;
+}
+
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.glyph-ok {
+  color: var(--lnt-ok);
+}
+
+.glyph-warn {
+  color: var(--lnt-warn);
+}
+
+.glyph-err {
+  color: var(--lnt-err);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-panel);
+  color: var(--lnt-text-sec);
+  font: 600 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.02em;
+}
+
+/* ── V6-метрики: meter-grid + kpi-плитки (kit.css, не слитная полоса) ──────── */
+
+.meter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.meter-label {
+  font: 400 12px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meter-value {
+  font: 600 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--lnt-text);
+  white-space: nowrap;
+}
+
+.kpi {
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+dl.meter-grid {
+  padding: 0;
+}
+
+dl.meter-grid .kpi dt {
+  font-weight: 400;
+}
+
+dl.meter-grid .kpi dd {
+  margin: 0;
+}
+
+/* ── V6-баннеры (kit.css §1.6, §4): текст + рамка, не только цвет ──────────── */
+
+.banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgb(236 91 98 / 0.35);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-err-bg);
+}
+
+.banner-title {
+  font: 600 14px / 18px var(--lnt-ui);
+  color: var(--lnt-text);
+  margin: 0;
+}
+
+.banner-msg {
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  margin: 0;
+}
+
+/* Однострочные статусы сравнения/трендов — компактная полоса без потери текста. */
+.banner-inline {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── V6-сигнал: канва, рамка, легенда трасс (kit.css §5.1) ─────────────────── */
+
+.frame {
+  background: var(--lnt-canvas);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px;
+  min-width: 0;
+}
+
+.spectrum-plot {
+  min-width: 0;
+}
+
+.spectrum-legend {
+  display: flex;
+  gap: 16px;
+  padding: 8px 4px 0;
+  font: 400 12px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  flex-wrap: wrap;
+}
+
+.spectrum-legend [data-series="a"]::before {
+  content: "●";
+  color: var(--lnt-accent);
+  margin-inline-end: 6px;
+}
+
+.spectrum-legend [data-series="b"]::before {
+  content: "■";
+  color: var(--lnt-warn);
+  margin-inline-end: 6px;
+}
+
+/* ── Рабочая область: двухколоночный app-body ─────────────────────────────── */
 
 .lnt-exp-workspace {
   display: flex;
-  gap: var(--lnt-space-md, 16px);
+  gap: 16px;
   align-items: flex-start;
 }
 
@@ -18,6 +316,7 @@
 
 .lnt-exp-right {
   flex: 1 1 auto;
+  min-width: 0;
 }
 
 .lnt-exp-list {
@@ -46,6 +345,155 @@
   margin: 12px 0 6px;
 }
 
+/* ── V6-таббар разделов (kit.css: активный — полоса акцента) ───────────────── */
+
+.lnt-exp-right .tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-height: 32px;
+  border-bottom: 1px solid var(--lnt-line);
+}
+
+.lnt-exp-right .tabbar .snav-item {
+  height: auto;
+  min-height: 32px;
+  padding: 0 12px;
+  background: transparent;
+  border: 0;
+  font: 500 13px / 16px var(--lnt-ui);
+}
+
+.lnt-exp-right .tabbar .snav-item.is-active::before {
+  inset: auto 0 0 0;
+  width: auto;
+  height: 2px;
+}
+
+.lnt-exp-pane.panel {
+  background: var(--lnt-panel);
+  border-top: 1px solid var(--lnt-line);
+  padding: 12px;
+  gap: 8px;
+}
+
+/* ── V6-командная полоса (variantV6.css .cmdbar/.cmd-fields/.cmd-actions) ──── */
+
+.cmdbar {
+  background: var(--lnt-panel);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px 12px;
+}
+
+.cmd-fields {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.cmd-field {
+  min-width: 140px;
+  flex: 1;
+}
+
+.cmd-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmd-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Гейт сравнимости: блокировка расчёта с точной причиной ────────────────── */
+
+.comparability-gate {
+  border: 1px solid var(--lnt-line-struct);
+  border-left: 3px solid var(--lnt-text-dim);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  color: var(--lnt-text-sec);
+  font: 400 13px / 18px var(--lnt-ui);
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+
+.comparability-gate[data-state="ok"] {
+  border-left-color: var(--lnt-ok);
+  color: var(--lnt-text);
+}
+
+.comparability-gate[data-state="blocked"] {
+  border-left-color: var(--lnt-err);
+  background: var(--lnt-err-bg);
+  color: var(--lnt-text);
+}
+
+/* ── Полоса пары А—Б (variantV6.css .pairbar, высота 40px) ─────────────────── */
+
+.pairbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 4px 12px;
+  background: rgb(0 0 0 / 0.18);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+
+.pair-slot {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-panel);
+}
+
+.pair-role {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  flex: none;
+}
+
+.pair-name {
+  font: 600 13px / 16px var(--lnt-ui);
+  color: var(--lnt-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.pair-meta {
+  font: 400 12px / 16px var(--lnt-mono);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+  flex: none;
+}
+
+.pair-delta {
+  font: 600 14px / 18px var(--lnt-mono);
+  color: var(--lnt-text);
+  flex: none;
+}
+
 /* Таймлайн протокола */
 .lnt-exp-timeline {
   list-style: none;
@@ -59,10 +507,10 @@
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border: 1px solid var(--lnt-border, #ccc4);
-  border-radius: 6px;
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
   margin-bottom: 6px;
-  background: var(--lnt-surface, transparent);
+  background: var(--lnt-chrome);
 }
 
 .lnt-exp-step-order {
@@ -72,15 +520,21 @@
   min-width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 1px solid var(--lnt-border-strong, #999);
+  border: 1px solid var(--lnt-line-struct);
+  color: var(--lnt-text);
   font-weight: 600;
   font-size: 0.85rem;
+  flex: none;
 }
 
 .lnt-exp-step-condition {
-  font-family: var(--lnt-font-mono, monospace);
+  font-family: var(--lnt-mono);
   font-size: 0.85rem;
-  color: var(--lnt-text-muted, #666);
+  color: var(--lnt-text-sec);
+}
+
+.lnt-exp-step-instruction {
+  color: var(--lnt-text);
 }
 
 /* Участники и исключения */
@@ -88,7 +542,6 @@
 .lnt-exp-member-table th {
   text-align: left;
   vertical-align: top;
-  padding: 6px 8px;
 }
 
 tr.lnt-exp-excluded .lnt-exp-member-session,
@@ -101,10 +554,11 @@ tr.lnt-exp-excluded {
 }
 
 .lnt-exp-audit {
-  border: 1px dashed var(--lnt-border, #ccc4);
-  border-radius: 6px;
+  border: 1px dashed var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
   padding: 8px 12px;
   margin-top: 8px;
+  color: var(--lnt-text-sec);
 }
 
 .lnt-exp-audit ul {
@@ -114,10 +568,16 @@ tr.lnt-exp-excluded {
 
 /* Баннеры-квалификаторы: текст + рамка, не только цвет */
 .lnt-exp-banner {
-  border: 1px solid var(--lnt-border-strong, #999);
-  border-radius: 6px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
   padding: 10px 12px;
   margin: 10px 0;
+  color: var(--lnt-text);
+}
+
+.lnt-exp-banner-info {
+  border-left: 3px solid var(--lnt-accent);
+  background: var(--lnt-chrome);
 }
 
 .lnt-exp-banner-info::before {
@@ -126,12 +586,19 @@ tr.lnt-exp-excluded {
 
 .lnt-exp-banner-warn {
   border-style: solid;
-  border-width: 2px;
+  border-width: 1px;
+  border-left: 3px solid var(--lnt-warn);
+  background: var(--lnt-warn-bg);
 }
 
 .lnt-exp-banner-warn::before {
   content: "▲ Внимание: ";
   font-weight: 600;
+}
+
+.lnt-exp-banner-error {
+  border-left: 3px solid var(--lnt-err);
+  background: var(--lnt-err-bg);
 }
 
 .lnt-exp-banner-error::before {
@@ -140,25 +607,14 @@ tr.lnt-exp-excluded {
 }
 
 .lnt-exp-result-grid {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 4px 16px;
   margin: 8px 0;
 }
 
-.lnt-exp-result-grid dt {
-  font-weight: 600;
-}
-
-.lnt-exp-result-grid dd {
-  margin: 0;
-  font-family: var(--lnt-font-mono, monospace);
-}
-
 .lnt-exp-provenance {
-  border-top: 1px solid var(--lnt-border, #ccc4);
+  border-top: 1px solid var(--lnt-line);
   margin-top: 12px;
   padding-top: 8px;
+  color: var(--lnt-text-sec);
 }
 
 .lnt-exp-limitations {
@@ -169,15 +625,26 @@ tr.lnt-exp-excluded {
 .lnt-exp-meta-line {
   margin: 4px 0;
   font-size: 0.9rem;
+  color: var(--lnt-text-sec);
 }
 
-/* Мастер создания */
-.lnt-exp-wizard {
-  border: 1px solid var(--lnt-border-strong, #999);
-  border-radius: 8px;
+/* Мастер создания: V6-модалка поверх рабочей области */
+.wizard-modal.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  z-index: 50;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-modal);
   padding: 12px 16px;
-  margin-bottom: 16px;
-  background: var(--lnt-surface, transparent);
+  margin: 0;
+  background: var(--lnt-chrome);
+  color: var(--lnt-text);
+  box-shadow: var(--lnt-shadow-modal);
 }
 
 .lnt-exp-wizard-form .lnt-field {
@@ -191,13 +658,40 @@ tr.lnt-exp-excluded {
   margin: 4px 0;
 }
 
+.lnt-exp-wizard-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
 /* Оверлей спектра — только просмотр: курсор uPlot не должен перекрывать
  * кнопки управления сравнением. */
 .lnt-exp-overlay .u-over {
   pointer-events: none;
 }
 
-/* Todo 44: мобильный фокус-режим — панели в одну колонку (DESIGN.md §2.3). */
+.lnt-exp-overlay.panel[data-showcase="spectrum"] {
+  background: var(--lnt-panel);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+}
+
+.lnt-exp-overlay .panel-bd {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Конфаунды трендов — V6-панель */
+.lnt-exp-confound.panel {
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px 12px;
+  margin-top: 12px;
+}
+
+/* Todo 44: мобильный фокус-режим — панели в одну колонку, 375px без обрезки. */
 @media (max-width: 767px) {
   .lnt-exp-workspace {
     flex-direction: column;
@@ -206,5 +700,15 @@ tr.lnt-exp-excluded {
   .lnt-exp-left {
     flex: 0 0 auto;
     width: 100%;
+  }
+
+  .wizard-modal.modal {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
+
+  .cmd-fields {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

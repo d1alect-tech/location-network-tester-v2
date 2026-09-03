@@ -56,7 +56,7 @@ export function renderResultPanel(input: ResultPanelInput): HTMLElement {
   if (input.refusalReason) {
     root.append(
       el("p", {
-        className: "lnt-exp-banner lnt-exp-banner-warn",
+        className: "lnt-exp-banner lnt-exp-banner-warn banner banner-inline",
         text: `Контраст заблокирован: дрейф A превышает порог (${input.refusalReason}). Числовой контраст не вычисляется.`,
       }),
     );
@@ -65,12 +65,14 @@ export function renderResultPanel(input: ResultPanelInput): HTMLElement {
   if (input.effect === null) {
     root.append(
       el("p", {
-        className: "lnt-exp-banner lnt-exp-banner-info",
+        className: "lnt-exp-banner lnt-exp-banner-info banner banner-inline",
         text: "Числовая оценка недоступна: недостаточно данных для расчёта.",
       }),
     );
   } else {
-    const grid = el("dl", { className: "lnt-exp-result-grid" });
+    // V6-метрики (kit.css): та же сетка — meter-grid с kpi-плитками.
+    // Числа и подписи бит-в-бит со старой сеткой; математика не тронута.
+    const grid = el("dl", { className: "lnt-exp-result-grid meter-grid" });
     const rows: [string, string][] = [
       ["Средний эффект (B−A)", `${fmt(input.effect.mean)} ${input.metadata.units}`],
       ["Медианный эффект", `${fmt(input.effect.median)} ${input.metadata.units}`],
@@ -83,7 +85,12 @@ export function renderResultPanel(input: ResultPanelInput): HTMLElement {
       ]);
     }
     for (const [term, definition] of rows) {
-      grid.append(el("dt", { text: term }), el("dd", { text: definition }));
+      grid.append(
+        el("div", { className: "kpi" }, [
+          el("dt", { className: "meter-label", text: term }),
+          el("dd", { className: "meter-value t-mono", text: definition }),
+        ]),
+      );
     }
     root.append(grid);
 

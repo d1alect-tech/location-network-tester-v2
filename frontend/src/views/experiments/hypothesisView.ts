@@ -56,12 +56,14 @@ export class HypothesisView {
         className: "lnt-helper-text",
         text: "Утверждения со ссылками на доказательства (запуски расчётов). Статусы неcausal: «согласуется с наблюдениями» ≠ «доказано».",
       }),
-      el("div", { className: "lnt-exp-actions" }, [
-        el("button", {
-          className: "lnt-btn lnt-btn-primary",
-          text: "Новая гипотеза…",
-          attrs: { type: "button" },
-        }),
+      el("div", { className: "lnt-exp-actions cmdbar" }, [
+        el("div", { className: "cmd-actions" }, [
+          el("button", {
+            className: "lnt-btn lnt-btn-primary btn",
+            text: "Новая гипотеза…",
+            attrs: { type: "button" },
+          }),
+        ]),
       ]),
       this.listHost,
       this.editorHost,
@@ -101,7 +103,7 @@ export class HypothesisView {
           text: `${record.status_label ?? STATUS_LABELS_RU[status] ?? status}`,
         }),
         el("button", {
-          className: "lnt-btn lnt-btn-small",
+          className: "lnt-btn lnt-btn-small btn-quiet",
           text: "Открыть",
           attrs: { type: "button", "aria-label": `Открыть гипотезу ${record.hypothesis_id}` },
         }),
@@ -153,19 +155,25 @@ export class HypothesisView {
     }
     form.append(infoLine);
 
-    const errorLine = el("p", { className: "lnt-error-text", attrs: { role: "alert" } });
+    const errorLine = el("p", {
+      className: "lnt-error-text banner banner-inline",
+      attrs: { role: "alert" },
+    });
     const submit = el("button", {
-      className: "lnt-btn lnt-btn-primary",
+      className: "lnt-btn lnt-btn-primary btn",
       text: record === null ? "Создать" : "Сохранить",
       attrs: { type: "submit" },
     });
     const cancelButton = el("button", {
-      className: "lnt-btn",
+      className: "lnt-btn btn-secondary",
       text: "Закрыть",
       attrs: { type: "button" },
     });
     cancelButton.addEventListener("click", () => clearEditor(this.editorHost));
-    form.append(el("div", { className: "lnt-exp-actions" }, [submit, cancelButton]), errorLine);
+    form.append(
+      el("div", { className: "lnt-exp-actions form-actions cmd-actions" }, [submit, cancelButton]),
+      errorLine,
+    );
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -275,11 +283,11 @@ function textInput(
   labelText: string,
   value: string,
 ): { wrap: HTMLElement; input: HTMLInputElement } {
-  const input = el("input", { className: "lnt-input", attrs: { type: "text" } });
+  const input = el("input", { className: "lnt-input ctl", attrs: { type: "text" } });
   input.value = value;
-  const label = el("label", { className: "lnt-label", text: labelText });
+  const label = el("label", { className: "lnt-label field-label", text: labelText });
   label.htmlFor = input.id = `hyp-${labelText.length}-${Math.random().toString(36).slice(2, 7)}`;
-  return { wrap: el("div", { className: "lnt-field" }, [label, input]), input };
+  return { wrap: el("div", { className: "lnt-field field" }, [label, input]), input };
 }
 
 function selectInput(
@@ -288,7 +296,7 @@ function selectInput(
   selected?: string,
   disabled = false,
 ): { wrap: HTMLElement; input: HTMLSelectElement } {
-  const select = el("select", { className: "lnt-select" });
+  const select = el("select", { className: "lnt-select ctl" });
   for (const [value, text] of options) {
     const option = el("option", { text, attrs: { value } });
     if (value === selected) option.selected = true;
@@ -296,8 +304,8 @@ function selectInput(
   }
   if (options.length === 0) select.disabled = true;
   if (disabled && options.length === 0) select.disabled = true;
-  const label = el("label", { className: "lnt-label", text: labelText });
+  const label = el("label", { className: "lnt-label field-label", text: labelText });
   label.htmlFor =
     select.id = `hyp-sel-${labelText.length}-${Math.random().toString(36).slice(2, 7)}`;
-  return { wrap: el("div", { className: "lnt-field" }, [label, select]), input: select };
+  return { wrap: el("div", { className: "lnt-field field" }, [label, select]), input: select };
 }

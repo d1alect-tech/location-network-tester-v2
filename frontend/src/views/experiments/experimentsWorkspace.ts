@@ -64,14 +64,14 @@ export function mountExperimentsWorkspace(
   const listHost = el("div", {});
   const leftPane = el("div", { className: "lnt-exp-left" }, [
     el("h2", { className: "placeholder-title", text: "Эксперименты" }),
-    el("div", { className: "lnt-exp-actions" }, [
+    el("div", { className: "lnt-exp-actions cmdbar lnt-exp-list-cmd" }, [
       el("button", {
-        className: "lnt-btn lnt-btn-primary",
+        className: "lnt-btn lnt-btn-primary btn",
         text: "Новый эксперимент…",
         attrs: { type: "button", id: "lnt-exp-create" },
       }),
       el("button", {
-        className: "lnt-btn",
+        className: "lnt-btn btn-secondary",
         text: "Обновить",
         attrs: { type: "button", id: "lnt-exp-refresh" },
       }),
@@ -85,13 +85,13 @@ export function mountExperimentsWorkspace(
   const panes = new Map<string, HTMLElement>();
   function makeTab(key: string, label: string, paneContent: HTMLElement[]): HTMLButtonElement {
     const button = el("button", {
-      className: "lnt-btn lnt-cat-tab",
+      className: "lnt-btn lnt-cat-tab snav-item",
       text: label,
       attrs: { type: "button", role: "tab", "data-exp-tab": key },
     });
     const pane = el(
       "div",
-      { attrs: { role: "tabpanel", "aria-label": label }, className: "lnt-exp-pane" },
+      { attrs: { role: "tabpanel", "aria-label": label }, className: "lnt-exp-pane panel" },
       paneContent,
     );
     button.addEventListener("click", () => selectTab(key));
@@ -99,18 +99,33 @@ export function mountExperimentsWorkspace(
     panes.set(key, pane);
     return button;
   }
+  /** Ленивая подгрузка тяжёлых панелей: монтируем содержимое вкладки
+   * при первом визите, а не вместе с рабочей областью. */
+  const attachedPanes = new Set<string>(["overview"]);
+  function attachPane(key: string): void {
+    if (attachedPanes.has(key)) return;
+    attachedPanes.add(key);
+    if (key === "compare") panes.get("compare")?.append(comparison.root);
+    if (key === "trends") panes.get("trends")?.append(trends.root);
+    if (key === "hypotheses") panes.get("hypotheses")?.append(hypotheses.root);
+  }
   function selectTab(key: string): void {
+    attachPane(key);
     for (const [tabKey, button] of tabs) {
       const active = tabKey === key;
       button.setAttribute("aria-selected", active ? "true" : "false");
       button.classList.toggle("lnt-cat-tab-active", active);
+      button.classList.toggle("is-active", active);
     }
     for (const [paneKey, pane] of panes) pane.hidden = paneKey !== key;
     if (key === "compare" && currentDetail !== null) void runOverlay();
   }
   const tabBar = el(
     "div",
-    { className: "lnt-cat-tabs", attrs: { role: "tablist", "aria-label": "Разделы эксперимента" } },
+    {
+      className: "lnt-cat-tabs tabbar",
+      attrs: { role: "tablist", "aria-label": "Разделы эксперимента" },
+    },
     [
       makeTab("overview", "Обзор", [timeline.root, members.root]),
       makeTab("compare", "Сравнение", []),
@@ -119,11 +134,10 @@ export function mountExperimentsWorkspace(
     ],
   );
   const rightPane = el("div", { className: "lnt-exp-right" }, [tabBar, ...panes.values()]);
-  const root = el("div", { className: "lnt-exp-workspace" }, [leftPane, rightPane]);
-  panes.get("compare")?.append(comparison.root);
-  panes.get("trends")?.append(trends.root);
-  panes.get("hypotheses")?.append(hypotheses.root);
+  const root = el("div", { className: "lnt-exp-workspace app-body" }, [leftPane, rightPane]);
   container.append(root);
+  // Начальное состояние вкладок: «Обзор» видима, остальные hidden (ленивость).
+  selectTab("overview");
 
   // Bootstrap до любых мутаций: nonce запуска обязателен для POST/PUT.
   void client.ensureReady().catch(() => undefined);
@@ -171,7 +185,7 @@ export function mountExperimentsWorkspace(
       const title = String(item.title ?? id);
       const li = el("li", { className: "lnt-exp-list-item" });
       const link = el("button", {
-        className: "lnt-btn lnt-exp-open",
+        className: "lnt-btn lnt-exp-open btn-quiet",
         text: `${title} (${id})`,
         attrs: { type: "button", "data-experiment-id": id },
       });

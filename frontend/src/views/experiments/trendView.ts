@@ -41,12 +41,12 @@ export class TrendView {
     this.client = options.client;
     this.valueSource = options.valueSource ?? null;
     this.minNInput = el("input", {
-      className: "lnt-input",
+      className: "lnt-input ctl",
       attrs: { type: "number", id: "lnt-trend-minn", "aria-label": "Минимальный N тренда" },
     });
     this.minNInput.value = "3";
     const runButton = el("button", {
-      className: "lnt-btn lnt-btn-primary",
+      className: "lnt-btn lnt-btn-primary btn",
       text: "Выполнить описательный запрос",
       attrs: { type: "button", id: "lnt-exp-run-trend" },
     });
@@ -61,12 +61,14 @@ export class TrendView {
         className: "lnt-helper-text",
         text: "Когортные и продольные ряды — только описательно (descriptive_exploratory). Связь ≠ причина.",
       }),
-      el("div", { className: "lnt-exp-actions" }, [
-        el("label", { className: "lnt-field-inline" }, [
-          el("span", { className: "lnt-label-text", text: "Минимальный N" }),
-          this.minNInput,
+      el("div", { className: "lnt-exp-actions cmdbar" }, [
+        el("div", { className: "cmd-fields" }, [
+          el("label", { className: "lnt-field-inline field cmd-field" }, [
+            el("span", { className: "lnt-label-text field-label cmd-label", text: "Минимальный N" }),
+            this.minNInput,
+          ]),
         ]),
-        runButton,
+        el("div", { className: "cmd-actions" }, [runButton]),
       ]),
       this.resultHost,
     ]);
@@ -156,12 +158,12 @@ export class TrendView {
         ? "Мало данных: результат ограничен, интерпретация неустойчива."
         : "Достаточно данных для описательной сводки.";
     const banner = el("p", {
-      className: `lnt-exp-banner ${meta.n < Math.max(minimumN, 5) ? "lnt-exp-banner-warn" : "lnt-exp-banner-info"}`,
+      className: `lnt-exp-banner ${meta.n < Math.max(minimumN, 5) ? "lnt-exp-banner-warn" : "lnt-exp-banner-info"} banner banner-inline`,
       attrs: { role: "status" },
       text: status,
     });
 
-    const grid = el("dl", { className: "lnt-exp-result-grid" });
+    const grid = el("dl", { className: "lnt-exp-result-grid meter-grid" });
     const pairs: [string, string][] = [
       ["Единицы", meta.units],
       ["Рецепт (estimator)", `${meta.estimator} · описательный`],
@@ -178,7 +180,12 @@ export class TrendView {
       );
     }
     for (const [term, definition] of pairs) {
-      grid.append(el("dt", { text: term }), el("dd", { text: definition }));
+      grid.append(
+        el("div", { className: "kpi" }, [
+          el("dt", { className: "meter-label", text: term }),
+          el("dd", { className: "meter-value t-mono", text: definition }),
+        ]),
+      );
     }
 
     const trendsList = el("ul", {
@@ -223,7 +230,7 @@ export class TrendView {
     checklist?: { key: string; checked: boolean; note?: string | null }[],
   ): HTMLElement {
     const items = checklist ?? this.readConfoundFromRoot();
-    const panel = el("section", { className: "lnt-exp-confound lnt-exp-confound-host" });
+    const panel = el("section", { className: "lnt-exp-confound lnt-exp-confound-host panel" });
     panel.append(el("h3", { className: "lnt-exp-subtitle", text: "Смешивающие факторы" }));
     if (items.length === 0) {
       panel.append(
@@ -266,7 +273,7 @@ export class TrendView {
     existing?.remove();
     this.resultHost.before(
       el("p", {
-        className: `lnt-exp-banner lnt-exp-banner-${tone} lnt-exp-trend-status`,
+        className: `lnt-exp-banner lnt-exp-banner-${tone} lnt-exp-trend-status banner banner-inline`,
         attrs: tone === "error" ? { role: "alert" } : { role: "status" },
         text: message,
       }),

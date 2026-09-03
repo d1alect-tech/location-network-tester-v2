@@ -22,8 +22,8 @@ const POLL_INTERVAL_MS = 300;
 const POLL_LIMIT = 40;
 
 function labeled(labelText: string, control: HTMLElement): HTMLElement {
-  return el("label", { className: "lnt-field-inline" }, [
-    el("span", { className: "lnt-label-text", text: labelText }),
+  return el("label", { className: "lnt-field-inline field cmd-field" }, [
+    el("span", { className: "lnt-label-text field-label cmd-label", text: labelText }),
     control,
   ]);
 }
@@ -70,6 +70,8 @@ export class ComparisonView {
   private lastReport: ComparabilityReport | null = null;
   private controller = new AbortController();
   private resultHost: HTMLElement;
+  private readonly gateHost: HTMLElement;
+  private readonly pairbarHost: HTMLElement;
   private readonly featureInput: HTMLInputElement;
   private readonly unitsInput: HTMLInputElement;
   private readonly seedInput: HTMLInputElement;
@@ -77,27 +79,27 @@ export class ComparisonView {
   constructor(options: ComparisonOptions) {
     this.options = options;
     this.featureInput = el("input", {
-      className: "lnt-input",
+      className: "lnt-input ctl",
       attrs: { type: "text", id: "lnt-exp-feature", "aria-label": "Оцениваемый признак" },
     });
     this.unitsInput = el("input", {
-      className: "lnt-input",
+      className: "lnt-input ctl",
       attrs: { type: "text", id: "lnt-exp-units", "aria-label": "Единицы измерения" },
     });
     this.unitsInput.value = "В²/Гц";
     this.seedInput = el("input", {
-      className: "lnt-input",
+      className: "lnt-input ctl",
       attrs: { type: "number", id: "lnt-exp-seed", "aria-label": "Seed расчёта" },
     });
     this.seedInput.value = "43";
     const checkButton = el("button", {
-      className: "lnt-btn",
+      className: "lnt-btn btn-secondary",
       text: "Проверить сравнимость",
       attrs: { type: "button", id: "lnt-exp-check-comparability" },
     });
     checkButton.addEventListener("click", () => void this.runComparability());
     const runButton = el("button", {
-      className: "lnt-btn lnt-btn-primary",
+      className: "lnt-btn lnt-btn-primary btn",
       text: "Рассчитать контраст",
       attrs: { type: "button", id: "lnt-exp-run-analysis" },
     });
@@ -111,20 +113,39 @@ export class ComparisonView {
         ),
     );
     this.resultHost = el("div", {});
-    const controls = el("div", { className: "lnt-exp-actions" }, [
-      labeled("Признак", this.featureInput),
-      labeled("Единицы", this.unitsInput),
-      labeled("Seed", this.seedInput),
-      checkButton,
-      runButton,
+    this.gateHost = el("div", {
+      className: "comparability-gate",
+      attrs: { role: "status", "data-state": "unknown" },
+      text: "Проверка сравнимости не выполнена — запустите проверку перед расчётом.",
+    });
+    this.pairbarHost = el("div", { className: "pairbar", attrs: { "aria-label": "Пара условий" } }, [
+      el("div", { className: "pair-slot" }, [
+        el("span", { className: "pair-role", text: "A" }),
+        el("span", { className: "pair-name", text: "условие не выбрано" }),
+      ]),
+      el("div", { className: "pair-slot" }, [
+        el("span", { className: "pair-role", text: "Б" }),
+        el("span", { className: "pair-name", text: "условие не выбрано" }),
+      ]),
+      el("span", { className: "pair-delta", text: "Δ —" }),
+    ]);
+    const controls = el("div", { className: "lnt-exp-actions cmdbar" }, [
+      el("div", { className: "cmd-fields" }, [
+        labeled("Признак", this.featureInput),
+        labeled("Единицы", this.unitsInput),
+        labeled("Seed", this.seedInput),
+      ]),
+      el("div", { className: "cmd-actions" }, [checkButton, runButton]),
     ]);
     this.root = el("section", { className: "lnt-exp-comparison" }, [
-      el("h2", { className: "placeholder-title", text: "Сравнение" }),
+      el("h2", { className: "placeholder-title panel-title", text: "Сравнение" }),
       el("p", {
         className: "lnt-helper-text",
         text: "Парные оценки с интервалами; для A/B/A — отдельная панель дрейфа A. Расчёт выполняется сервером (statistics-runs).",
       }),
       controls,
+      this.gateHost,
+      this.pairbarHost,
       this.resultHost,
     ]);
   }
@@ -135,7 +156,26 @@ export class ComparisonView {
     if (this.featureInput.value === "") {
       this.featureInput.value = String(detail.experiment.primary_estimands?.[0]?.feature_key ?? "");
     }
+    this.renderPairbar();
     this.renderIntro();
+  }
+
+  /** Полоса пары А—Б (для A/B/A — А1/Б/А2): только слоты условий и счётчики,
+   * никакой числовой сводки — расчёт остаётся в resultHost. */
+  private renderPairbar(): void {
+    this.pairbarHost.replaceChildren();
+    const labels = ["A", "Б", "A2"];
+    for (const [index, conditionId] of this.orderedConditions().entries()) {
+      const count = (this.includedByCondition().get(conditionId) ?? []).length;
+      this.pairbarHost.append(
+        el("div", { className: "pair-slot" }, [
+          el("span", { className: "pair-role", text: labels[index] ?? `Слот ${String(index + 1)}` }),
+          el("span", { className: "pair-name", text: conditionId }),
+          el("span", { className: "pair-meta", text: `N=${String(count)}` }),
+        ]),
+      );
+    }
+    this.pairbarHost.append(el("span", { className: "pair-delta", text: "Δ —" }));
   }
 
   abort(): void {
@@ -219,8 +259,10 @@ export class ComparisonView {
     const blocks = report.findings.filter((f) => f.level === "block");
     if (!report.comparable) {
       const reason = blocks.map((f) => f.code).join(", ");
+      this.gateHost.setAttribute("data-state", "blocked");
+      this.gateHost.textContent = `Сравнение заблокировано проверкой сравнимости. Точная причина: ${reason}. Числовой расчёт запрещён до устранения.`;
       this.resultHost.replaceChildren(
-        el("div", { className: "lnt-exp-banner lnt-exp-banner-warn", attrs: { role: "alert" } }, [
+        el("div", { className: "lnt-exp-banner lnt-exp-banner-warn banner", attrs: { role: "alert" } }, [
           el("strong", { text: "Сравнение заблокировано проверкой сравнимости." }),
           el("p", { text: `Точная причина: ${reason}. Числовой расчёт запрещён до устранения.` }),
           ...report.findings.map((f) =>
@@ -234,6 +276,8 @@ export class ComparisonView {
       announcePolite("Сравнение заблокировано проверкой сравнимости");
       return;
     }
+    this.gateHost.setAttribute("data-state", "ok");
+    this.gateHost.textContent = `Сравнимость подтверждена (${String(report.findings.length)} измерений без блокировок). Можно запускать расчёт.`;
     this.showBanner(
       `Сравнимость подтверждена (${String(report.findings.length)} измерений без блокировок). Можно запускать расчёт.`,
       "ok",
@@ -405,7 +449,7 @@ export class ComparisonView {
     const existing = this.root.querySelector(".lnt-exp-compare-status");
     existing?.remove();
     const banner = el("p", {
-      className: `lnt-exp-banner lnt-exp-banner-${tone} lnt-exp-compare-status`,
+      className: `lnt-exp-banner lnt-exp-banner-${tone} lnt-exp-compare-status banner banner-inline`,
       attrs: tone === "error" ? { role: "alert" } : { role: "status" },
       text: message,
     });
