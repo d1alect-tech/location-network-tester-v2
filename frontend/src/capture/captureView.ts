@@ -50,18 +50,18 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
   let bootstrapPromise: Promise<void> | null = null;
 
   const alertLine = el("p", {
-    className: "capture-alert",
+    className: "capture-alert banner banner-inline banner-err",
     attrs: { role: "alert" },
   });
   alertLine.hidden = true;
 
   const startButton = el("button", {
-    className: "lnt-btn lnt-btn-primary",
+    className: "lnt-btn lnt-btn-primary btn",
     text: "Запустить запись",
     attrs: { type: "button" },
   }) as HTMLButtonElement;
   const deviceRefreshButton = el("button", {
-    className: "lnt-btn",
+    className: "lnt-btn btn-quiet",
     text: "Проверить устройство",
     attrs: { type: "button" },
   }) as HTMLButtonElement;
@@ -232,16 +232,19 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
   form.onChange(refreshPreview);
 
   const previewContainer = el("aside", {
-    className: "capture-preview",
+    className: "capture-preview panel",
     attrs: { "aria-label": "Профиль записи" },
   });
-  const root = el("section", { className: "capture-view" }, [
-    el("h2", { className: "view-title", text: "Захват" }),
+  const root = el("section", { className: "capture-view t-page" }, [
+    el("h2", { className: "view-title t-page", text: "Захват" }),
     el("div", { className: "capture-layout" }, [
       el("div", { className: "capture-form-column" }, [
         form.root,
         alertLine,
-        el("div", { className: "capture-start-row" }, [startButton, deviceRefreshButton]),
+        el("div", { className: "capture-start-row form-actions" }, [
+          startButton,
+          deviceRefreshButton,
+        ]),
       ]),
       el("div", { className: "capture-side-column" }, [previewContainer, devicePanel.root]),
     ]),

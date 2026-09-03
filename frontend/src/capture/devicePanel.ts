@@ -31,7 +31,7 @@ function findingCard(finding: PreflightFinding): HTMLElement {
   const severityText = finding.severity === "block" ? "Блокирует запуск" : "Предупреждение";
   const severityClass = finding.severity === "block" ? "lnt-tone-error" : "lnt-tone-warn";
   const badge = el("span", {
-    className: `lnt-status-pill ${severityClass}`,
+    className: `lnt-status-pill glyph ${severityClass}`,
     text: `${severityText} · ${finding.code}`,
   });
   return el("div", { className: "capture-finding" }, [
@@ -47,10 +47,14 @@ function findingCard(finding: PreflightFinding): HTMLElement {
 export function createDevicePanel(): DevicePanelHandle {
   const stateSection = el("div", { className: "capture-device-state" });
   const findingsSection = el("div", { className: "capture-preflight-findings" });
-  const root = el("section", { className: "capture-device-panel" }, [
-    el("h3", { className: "capture-section-title", text: "Устройство и проверка перед записью" }),
-    stateSection,
-    findingsSection,
+  const root = el("section", { className: "capture-device-panel panel" }, [
+    el("div", { className: "panel-hd" }, [
+      el("h3", {
+        className: "capture-section-title panel-title",
+        text: "Устройство и проверка перед записью",
+      }),
+    ]),
+    el("div", { className: "panel-bd" }, [stateSection, findingsSection]),
   ]);
 
   return {
@@ -61,8 +65,8 @@ export function createDevicePanel(): DevicePanelHandle {
       const pill = el("span", {
         className:
           payload.state === "ready"
-            ? "lnt-status-pill lnt-tone-ok"
-            : "lnt-status-pill lnt-tone-warn",
+            ? "lnt-status-pill lnt-tone-ok glyph glyph-ok"
+            : "lnt-status-pill lnt-tone-warn glyph glyph-warn",
         text: STATE_LABELS_RU[payload.state],
       });
       stateSection.append(

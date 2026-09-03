@@ -11,11 +11,11 @@ export interface DisclosureHandle {
 export function createDisclosure(title: string, open = false): DisclosureHandle {
   const bodyId = nextId("lnt-disclosure");
   const body = el("div", {
-    className: "lnt-disclosure-body",
+    className: "lnt-disclosure-body disc-body",
     attrs: { id: bodyId, role: "region", "aria-label": title },
   });
   const button = el("button", {
-    className: "lnt-btn lnt-disclosure-toggle",
+    className: "lnt-btn lnt-disclosure-toggle disc-toggle",
     text: title,
     attrs: { type: "button", "aria-expanded": String(open), "aria-controls": bodyId },
   });
@@ -31,6 +31,6 @@ export function createDisclosure(title: string, open = false): DisclosureHandle 
     applyState();
   });
   applyState();
-  const root = el("div", { className: "lnt-disclosure" }, [button, body]);
+  const root = el("div", { className: "lnt-disclosure disc" }, [button, body]);
   return { root, body };
 }
