@@ -28,4 +28,30 @@ describe("themePreference", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
     theme.dispose();
   });
+
+  it("forced-dark: get() возвращает сохранённый выбор, DOM остаётся тёмным", () => {
+    const theme = createThemePreference(window);
+    theme.set("system");
+    expect(theme.get()).toBe("system");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    theme.set("dark");
+    expect(theme.get()).toBe("dark");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
+    theme.dispose();
+  });
+
+  it("forced-dark: apply() напрямую держит dark независимо от выбора", () => {
+    const theme = createThemePreference(window);
+    theme.set("light");
+    theme.apply();
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    theme.dispose();
+  });
+
+  it("dispose() отписывается от media и идемпотентен", () => {
+    const theme = createThemePreference(window);
+    expect(() => theme.dispose()).not.toThrow();
+    expect(() => theme.dispose()).not.toThrow();
+  });
 });

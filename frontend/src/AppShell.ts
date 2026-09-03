@@ -9,7 +9,7 @@ import { RouteStore } from "./state/routeState";
 // END Todo 40
 // --- Инспекция V6: единое окно сравнения (полный захват экрана) ---
 import "./components/charts/charts.css";
-import { createV6ShellHeader, createV6ShellStatusbar, type V6ShellHeader } from "./shell/v6Shell";
+import { type V6ShellHeader, createV6ShellHeader, createV6ShellStatusbar } from "./shell/v6Shell";
 import { mountInspectV6 } from "./views/inspect/inspectV6";
 
 // Simple Hash Router
@@ -55,7 +55,7 @@ export const ROUTES: Record<Route, { title: string; desc: string }> = {
   // ===== END T39 CATALOG REGISTRATION =====
 };
 
-import { createThemePreference } from "./state/themePreference";
+import { type ThemeController, createThemePreference } from "./state/themePreference";
 // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
 import { mountCatalogWorkspace } from "./views/catalog/catalogWorkspace";
 // ===== END T39 CATALOG REGISTRATION =====
@@ -74,6 +74,9 @@ export class AppShell {
   private container: HTMLElement;
   private currentRoute: Route = "catalog";
   private readonly routes: RouteStore;
+  private readonly theme: ThemeController;
+  private readonly onHashChange: () => void;
+  private disposed = false;
   // BEGIN Todo 40
   private captureView: CaptureViewHandle | null = null;
   // END Todo 40
@@ -91,8 +94,21 @@ export class AppShell {
     this.container = container;
     this.routes = new RouteStore(window);
     // Тема применяется до первой отрисовки (без вспышки); переключатель в шапке не монтируем.
-    createThemePreference(window);
-    window.addEventListener("hashchange", () => this.handleRoute());
+    this.theme = createThemePreference(window);
+    this.onHashChange = (): void => this.handleRoute();
+    window.addEventListener("hashchange", this.onHashChange);
+  }
+
+  /** Размонтирование: снимает hashchange-подписки и media-наблюдатель темы.
+   *  Поведение смонтированной оболочки не меняется — только teardown. */
+  public dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    window.removeEventListener("hashchange", this.onHashChange);
+    this.routes.dispose();
+    this.theme.dispose();
+    this.activeViewCleanup?.();
+    this.activeViewCleanup = null;
   }
 
   public init(): void {

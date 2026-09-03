@@ -1,6 +1,11 @@
-/** Предпочтение темы (система/светлая/тёмная): localStorage + data-theme.
- * Системный режим следит за prefers-color-scheme; выбор переживает
- * перезагрузку. Ничего не знает о бэкенде — это локальная настройка панели. */
+/** Предпочтение темы (система/светлая/тёмная): выбор хранится в localStorage.
+ *
+ * Инвариант forced-dark (V6): apply() всегда выставляет data-theme="dark"
+ * независимо от сохранённого выбора — светлая тема не применяется, путь
+ * data-theme="light" недостижим из оболочки. get()/set() осознанно продолжают
+ * персистить выбор (зарезервировано под будущую светлую тему), DOM при этом
+ * остаётся тёмным. Переключатель в шапке не монтируется (см. settings.spec.ts:
+ * [id^='lnt-theme-'] отсутствует). Ничего не знает о бэкенде — локальная настройка. */
 
 export type ThemeChoice = "system" | "light" | "dark";
 
@@ -8,19 +13,11 @@ export const THEME_STORAGE_KEY = "lnt-theme";
 
 const CHOICES: readonly ThemeChoice[] = ["system", "light", "dark"];
 
-const LABELS: Record<ThemeChoice, string> = {
-  system: "Системная",
-  light: "Светлая",
-  dark: "Тёмная",
-};
-
 export interface ThemeController {
   get(): ThemeChoice;
   set(choice: ThemeChoice): void;
-  /** Применяет текущий выбор к documentElement (data-theme). */
+  /** Применяет текущий выбор к documentElement (forced-dark: всегда "dark"). */
   apply(): void;
-  /** Переключатель для шапки: нативные radio в fieldset с легендой. */
-  control(): HTMLElement;
   dispose(): void;
 }
 
@@ -38,6 +35,7 @@ export function createThemePreference(win: Window = window): ThemeController {
   media?.addEventListener?.("change", onMediaChange);
 
   function apply(): void {
+    // Forced-dark: светлый путь недостижим — выбор персистится, но не применяется.
     win.document.documentElement.setAttribute("data-theme", "dark");
   }
 
@@ -65,33 +63,6 @@ export function createThemePreference(win: Window = window): ThemeController {
       apply();
     },
     apply,
-    control() {
-      const fieldset = win.document.createElement("fieldset");
-      fieldset.className = "lnt-theme-switch";
-      const legend = win.document.createElement("legend");
-      legend.className = "lnt-visually-hidden";
-      legend.textContent = "Тема оформления";
-      fieldset.append(legend);
-      for (const item of CHOICES) {
-        const radio = win.document.createElement("input");
-        radio.type = "radio";
-        radio.name = "lnt-theme-choice";
-        radio.value = item;
-        radio.id = `lnt-theme-${item}`;
-        radio.checked = choice === item;
-        radio.addEventListener("change", () => {
-          if (radio.checked) this.set(item);
-        });
-        const label = win.document.createElement("label");
-        label.htmlFor = radio.id;
-        label.className = "lnt-theme-option";
-        label.textContent = LABELS[item];
-        label.title = `Тема: ${LABELS[item]}`;
-        label.append(radio);
-        fieldset.append(label);
-      }
-      return fieldset;
-    },
     dispose() {
       media?.removeEventListener?.("change", onMediaChange);
     },
