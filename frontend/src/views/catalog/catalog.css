@@ -131,9 +131,12 @@
   gap: var(--lnt-space-2);
 }
 
+/* Активный таб: текст primary на selected (~8.7:1); акцент #5681ff на
+ * selected даёт лишь ~3:1 и не проходит axe color-contrast. */
 .lnt-cat-tab-active {
   background-color: var(--lnt-bg-selected);
-  color: var(--lnt-accent-a);
+  color: var(--lnt-fg-primary);
+  border-color: var(--lnt-accent-a);
 }
 
 .lnt-cat-session-summary {

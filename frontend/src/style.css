@@ -68,7 +68,7 @@ body {
 
 .btn-recovery {
   background-color: var(--lnt-accent-a);
-  color: var(--lnt-fg-primary);
+  color: var(--lnt-canvas);
   border: none;
   padding: var(--lnt-space-2) var(--lnt-space-4);
   border-radius: var(--lnt-radius-control);
