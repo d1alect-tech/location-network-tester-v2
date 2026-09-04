@@ -5,7 +5,9 @@
 import type { SpectrumPayload } from "../../api/types-plots";
 import { clearElement, el } from "../../components/primitives/dom";
 import type { MarkersPaintSource } from "./spectrumReadout";
-import { DB_REF_LABEL, deltaAt, readoutAt, ruDb, ruHz } from "./spectrumReadout";
+import { deltaAt, readoutAt, ruDb, ruHz } from "./spectrumReadout";
+import type { SpectrumDisplayUnit } from "./spectrumUnits";
+import { shiftLevelDb, unitRefLabel } from "./spectrumUnits";
 
 const MAX_HARMONIC_ORDER = 40;
 
@@ -75,6 +77,7 @@ function markerRow(
   frequencyHz: number,
   source: MarkersPaintSource,
   withDelta: boolean,
+  unit: SpectrumDisplayUnit,
 ): HTMLElement {
   const readout = readoutAt(source.payloadA, frequencyHz);
   const row = el("tr", {}, [
@@ -84,7 +87,10 @@ function markerRow(
       attrs: { class: "num" },
     }),
     el("td", {
-      text: readout === null ? "—" : `${ruDb.format(readout.levelDb)} ${DB_REF_LABEL}`,
+      text:
+        readout === null
+          ? "—"
+          : `${ruDb.format(shiftLevelDb(readout.levelDb, unit))} ${unitRefLabel(unit)}`,
       attrs: { class: "num" },
     }),
   ]);
@@ -100,7 +106,9 @@ function markerRow(
   return row;
 }
 
-export function createMarkersTable(): SpectrumMarkersTable {
+export function createMarkersTable(
+  unitOf: () => SpectrumDisplayUnit = () => "dbv",
+): SpectrumMarkersTable {
   const root = el("section", {
     className: "spectrum-markers",
     attrs: { "data-spectrum-markers": "", "aria-label": "Маркеры спектра" },
@@ -110,13 +118,14 @@ export function createMarkersTable(): SpectrumMarkersTable {
     root,
     paint(source) {
       clearElement(root);
+      const unit = unitOf();
       const withDelta = source.payloadB !== null;
       const table = el("table", { attrs: { "data-spectrum-markers-table": "" } });
       table.append(el("caption", { text: "Маркеры спектра" }));
       const header = el("tr", {}, [
         el("th", { text: "Маркер", attrs: { scope: "col" } }),
         el("th", { text: "Частота, Гц", attrs: { scope: "col" } }),
-        el("th", { text: `Уровень, ${DB_REF_LABEL}`, attrs: { scope: "col" } }),
+        el("th", { text: `Уровень, ${unitRefLabel(unit)}`, attrs: { scope: "col" } }),
       ]);
       if (withDelta) header.append(el("th", { text: "Δ A−B, дБ", attrs: { scope: "col" } }));
       table.append(header);
@@ -127,7 +136,7 @@ export function createMarkersTable(): SpectrumMarkersTable {
         );
       }
       peaks.forEach((peak, index) => {
-        table.append(markerRow(`Пик ${index + 1}`, peak.frequency_hz, source, withDelta));
+        table.append(markerRow(`Пик ${index + 1}`, peak.frequency_hz, source, withDelta, unit));
       });
       const fundamental = strongestPeak(peaks);
       if (fundamental !== null) {
@@ -139,7 +148,7 @@ export function createMarkersTable(): SpectrumMarkersTable {
           const harmonicHz = order * fundamental.frequency_hz;
           if (harmonicHz > last) break;
           if (readoutAt(source.payloadA, harmonicHz) === null) continue;
-          table.append(markerRow(`H${order}`, harmonicHz, source, withDelta));
+          table.append(markerRow(`H${order}`, harmonicHz, source, withDelta, unit));
         }
       }
       const bandRow = el("tr", {}, [

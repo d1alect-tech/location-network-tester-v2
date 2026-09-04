@@ -26,7 +26,9 @@ _GRANDFATHERED: Final[dict[str, int]] = {
     "src/lnt/_manifest_schema.py": 344,
     "src/lnt/analysis.py": 309,
     "src/lnt/cli.py": 307,
-    "src/lnt/acquire.py": 306,
+    # Очередь C3: масштаб raw→В переехал в lnt.adc_calibration (единый источник
+    # истины с поправкой); capture-сборка ужалась честным выделением.
+    "src/lnt/acquire.py": 300,
     # Волны 2/4/6: поведенческие контуры с собственными зелёными регрессиями;
     # разбиение допускается только отдельной задачей с сохранением контрактов.
     # Очередь A4: launcher.py ужался до 250 (канон в lnt.cli_spec) и снят с дедлайна.

@@ -30,6 +30,8 @@ Largest view: spectrum / spectrogram / v2 panels + pairbar + analysis band.
 - [Scope|Input] toggle: scope = raw CSV; input = input-referred excess.
 - Input unavailable -> silent fallback to scope, no error toast.
 - Compare deltas always B - A.
+- Units toggle (C3 DONE): display-only дБВ/дБмкВ/дБм(50 Ом) in markers table
+  (`spectrumUnits`), stored CSV stays V²/Hz, default дБВ/Hz; deltas unit-invariant.
 - Live poll: single in-flight request; drop, never queue.
 
 ## ANTI-PATTERNS

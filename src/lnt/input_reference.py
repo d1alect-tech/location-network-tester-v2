@@ -17,6 +17,7 @@ from lnt._input_reference_baseline import (
 from lnt._manifest_ch1_setup import FLOATING_KIND, model_kind
 from lnt.session_store import LoadedSession
 from lnt.spectrum import BandSpectrum, SpectrumPeak, find_qualified_peaks
+from lnt.swept_response import SweptResponse, swept_gain_at
 from lnt.types import (
     CH1_MANIFEST_SCHEMA_VERSION,
     FloatingDifferentialRcShunt,
@@ -68,8 +69,12 @@ class Ch1InputReference:
 def correction_for_frequencies(
     model: FloatingDifferentialRcShunt,
     frequencies_hz: Float64Array,
+    *,
+    swept: SweptResponse | None = None,
 ) -> Float64Array:
-    """Возвращает |H| для всех частот floating RC high-pass модели."""
+    """Возвращает |H|: измеренный swept поверх номинала; без swept — номинал."""
+    if swept is not None:
+        return swept_gain_at(swept, frequencies_hz)
     equivalent_capacitance_f = _equivalent_capacitance(model)
     angular = 2.0 * np.pi * frequencies_hz
     numerator = angular * model.resistance_ohm * equivalent_capacitance_f
@@ -80,6 +85,8 @@ def derive_input_reference(
     session_dir: Path,
     measurement: LoadedSession,
     measurement_spectrum: BandSpectrum,
+    *,
+    swept: SweptResponse | None = None,
 ) -> Ch1InputReference:
     """Квалифицирует baseline и выводит только явный excess PSD на входе схемы."""
     setup = measurement.manifest.ch1_setup
@@ -103,6 +110,7 @@ def derive_input_reference(
                 baseline_spectrum=baseline_spectrum,
                 setup=setup,
                 baseline_session_id=baseline_session.manifest.session_id,
+                swept=swept,
             )
 
 
@@ -112,11 +120,12 @@ def _derive_qualified_reference(
     baseline_spectrum: BandSpectrum,
     setup: FloatingDifferentialRcShunt,
     baseline_session_id: str,
+    swept: SweptResponse | None = None,
 ) -> Ch1InputReference:
     """Применяет excess PSD referral только к уже совместимому baseline."""
     qualified = measurement_spectrum.psd_v2_per_hz >= 2.0 * baseline_spectrum.psd_v2_per_hz
     excess = measurement_spectrum.psd_v2_per_hz - baseline_spectrum.psd_v2_per_hz
-    gains = correction_for_frequencies(setup, measurement_spectrum.frequencies_hz)
+    gains = correction_for_frequencies(setup, measurement_spectrum.frequencies_hz, swept=swept)
     input_excess = np.full_like(excess, np.nan)
     input_excess[qualified] = excess[qualified] / gains[qualified] ** 2
     return Ch1InputReference(
