@@ -18,6 +18,8 @@
 
 import type { CatalogSession } from "../../api/types";
 import { clearElement, el } from "../../components/primitives/dom";
+import type { RowNav } from "./catalogListNav";
+import { handleRowKeys as handleNavKeys, syncRowTabindex } from "./catalogListNav";
 import {
   dayKey,
   orderSessions,
@@ -188,53 +190,26 @@ export function createCatalogListView(options: CatalogListOptions): CatalogListH
     const session = orderSessions(items, sort, dir)[index];
     if (!session) return;
     activeIndex = index;
-    syncTabindex();
+    syncRowTabindex(tbody, activeIndex);
     options.onActivate(session);
   }
 
-  function syncTabindex(): void {
-    for (const node of tbody.querySelectorAll<HTMLElement>(".lnt-cat-row")) {
-      const index = Number(node.getAttribute("data-pos"));
-      node.tabIndex = index === activeIndex ? 0 : -1;
-    }
-  }
-
-  function ensureVisible(index: number): void {
-    const wrap = table.closest(".tbl-wrap");
-    const row = tbody.querySelector(`[data-pos="${index}"]`);
-    if (!(wrap instanceof HTMLElement) || !(row instanceof HTMLElement)) return;
-    const top = row.offsetTop;
-    if (top < wrap.scrollTop) wrap.scrollTop = top;
-    else if (top + row.offsetHeight > wrap.scrollTop + wrap.clientHeight) {
-      wrap.scrollTop = top + row.offsetHeight - wrap.clientHeight;
-    }
-  }
+  const nav: RowNav = {
+    body: tbody,
+    table,
+    count: () => items.length,
+    getActive: () => activeIndex,
+    setActive: (next) => {
+      activeIndex = next;
+    },
+    onActivate: activate,
+    // Близко к концу выдачи — заранее запросить следующую страницу.
+    onNearEnd: () => options.onLoadMore(),
+    nearEndArmed: () => !moreButton.hidden,
+  };
 
   function handleRowKeys(event: KeyboardEvent, index: number): void {
-    const next =
-      event.key === "ArrowDown"
-        ? Math.min(items.length - 1, index + 1)
-        : event.key === "ArrowUp"
-          ? Math.max(0, index - 1)
-          : event.key === "Home"
-            ? 0
-            : event.key === "End"
-              ? items.length - 1
-              : null;
-    if (next !== null) {
-      event.preventDefault();
-      activeIndex = next;
-      ensureVisible(next);
-      syncTabindex();
-      tbody.querySelector<HTMLElement>(`[data-pos="${activeIndex}"]`)?.focus();
-      // Близко к концу выдачи — заранее запросить следующую страницу.
-      if (items.length - next <= 8 && !moreButton.hidden) options.onLoadMore();
-      return;
-    }
-    if (event.key === "Enter") {
-      event.preventDefault();
-      activate(index);
-    }
+    handleNavKeys(event, index, nav);
   }
 
   render();
