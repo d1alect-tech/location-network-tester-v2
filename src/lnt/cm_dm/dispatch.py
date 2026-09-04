@@ -27,6 +27,7 @@ from lnt.cm_dm.analysis import (
 from lnt.errors import InputError
 from lnt.manifest import manifest_from_json
 from lnt.session_store import MANIFEST_FILENAME
+from lnt.spectrum_hold import write_hold_spectrum
 from lnt.types import SessionType
 
 if TYPE_CHECKING:
@@ -91,6 +92,7 @@ def write_and_render_analysis(session_dir: Path, result: AnalysisResult | CmDmAn
     match result:
         case AnalysisResult():
             metrics_path, spectrum_path = write_analysis(session_dir, result)
+            write_hold_spectrum(session_dir, result.spectrum)
             rendered = render_analysis(result)
             artifacts = f"{metrics_path.name}, {spectrum_path.name}"
             return f"{rendered}\nАртефакты: {artifacts}"

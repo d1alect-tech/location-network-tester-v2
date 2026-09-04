@@ -61,6 +61,9 @@ def build_overview(  # noqa: PLR0913 - compute boundary exposes explicit safety 
 
     Рёбра полос — геометрическая сетка между положительными low/high. DC и
     частоты ниже первого ребра исключаются; high является открытой границей.
+    Рядом с mean-тайлом ведёт max-hold тайл: максимум средней по полосе
+    мощности кадра внутри ячейки за один проход — те же единицы, что mean
+    (mean-агрегация бит-в-бит прежняя).
     """
     if not 1 <= max_time_bins <= MAX_OVERVIEW_TIME_BINS:
         raise InputError("спектрограмма: max_time_bins вне предела 1..2048")
@@ -80,15 +83,26 @@ def build_overview(  # noqa: PLR0913 - compute boundary exposes explicit safety 
     frequency_cells = np.searchsorted(edges, frequency, side="right") - 1
     sums = np.zeros((max_frequency_bands, time_bins), dtype=np.float64)
     coverage = np.zeros(sums.shape, dtype=np.uint32)
+    peak = np.full(sums.shape, -np.inf, dtype=np.float64)
+    valid_cells = frequency_cells[(frequency_cells >= 0) & (frequency_cells < max_frequency_bands)]
+    band_widths = np.bincount(valid_cells, minlength=max_frequency_bands).astype(np.float64)
     for chunk in stream_power(samples, sample_rate_hz, settings, cancellation):
         frame_indices = chunk.first_frame + np.arange(chunk.power.shape[1])
         time_cells = np.minimum(frame_indices * time_bins // frames, time_bins - 1)
+        frame_totals = np.zeros((max_frequency_bands, chunk.power.shape[1]), dtype=np.float64)
         for source_frequency, target_frequency in enumerate(frequency_cells):
             if 0 <= target_frequency < max_frequency_bands:
                 np.add.at(sums[target_frequency], time_cells, chunk.power[source_frequency])
                 np.add.at(coverage[target_frequency], time_cells, 1)
+                frame_totals[target_frequency] += chunk.power[source_frequency]
+        for column in range(chunk.power.shape[1]):
+            cell = int(time_cells[column])
+            np.maximum(peak[:, cell], frame_totals[:, column], out=peak[:, cell])
     linear = np.full(sums.shape, np.nan, dtype=np.float64)
     np.divide(sums, coverage, out=linear, where=coverage > 0)
+    populated = band_widths > 0
+    peak[populated] = peak[populated] / band_widths[populated, None]
+    peak[coverage == 0] = np.nan
     frame_time = (
         np.arange(frames) * settings.hop_samples + settings.segment_samples / 2
     ) / sample_rate_hz
@@ -106,6 +120,10 @@ def build_overview(  # noqa: PLR0913 - compute boundary exposes explicit safety 
             linear, DEFAULT_DB_REFERENCE, DEFAULT_FLOOR_DB, DEFAULT_CEILING_DB
         ),
         linear_power=linear,
+        max_hold_db=linear_power_to_db(
+            peak, DEFAULT_DB_REFERENCE, DEFAULT_FLOOR_DB, DEFAULT_CEILING_DB
+        ),
+        max_hold_linear=peak,
         coverage=coverage,
         time_s=time_axis,
         frequency_hz=np.sqrt(edges[:-1] * edges[1:]),

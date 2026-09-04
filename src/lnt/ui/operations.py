@@ -17,6 +17,7 @@ from lnt.compare import ComparisonResult, compare_analyses, ensure_comparable
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken, CancelledResult
 from lnt.selftest import SelftestResult, run_selftest
 from lnt.simulate import simulate_session
+from lnt.spectrum_hold import write_hold_spectrum
 from lnt.types import ChannelMode, SeriesPosition, SessionType
 from lnt.ui.analysis_v2_wire import AnalyzeWriteResult, run_v2_after_v1
 from lnt.ui.device import DeviceStatus, diagnose_device
@@ -139,6 +140,7 @@ class LntBackend:
             write_line_quality_analysis(session_dir, result)
             return AnalyzeWriteResult(analysis=result, branch_failures=())
         write_analysis(session_dir, result)
+        write_hold_spectrum(session_dir, result.spectrum)
         return AnalyzeWriteResult(
             analysis=result,
             branch_failures=run_v2_after_v1(session_dir),

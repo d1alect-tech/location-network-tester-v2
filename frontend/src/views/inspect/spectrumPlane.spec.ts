@@ -34,6 +34,8 @@ function spectrumPayload(): Record<string, unknown> {
     resolution_hz: 100,
     band_low_hz: 3000,
     band_high_hz: 1350000,
+    window: "hann",
+    enbw_hz: 150,
   };
 }
 
@@ -62,7 +64,14 @@ function detail(status: string | null): unknown {
         async_sync_ratio: null,
         cycles_analyzed: 120,
       },
-      spectrum: { peaks: [], band_low_hz: 3000, band_high_hz: 1350000, resolution_hz: 100 },
+      spectrum: {
+        peaks: [{ frequency_hz: 1000, level_db: -40, prominence_db: 12, q_factor: 8 }],
+        band_low_hz: 3000,
+        band_high_hz: 1350000,
+        resolution_hz: 100,
+        window: "hann",
+        enbw_hz: 150,
+      },
       ch1_input_reference:
         status === null ? null : { status, reason_code: status === "available" ? null : "no_rc" },
     },
@@ -125,6 +134,32 @@ test("тумблер плоскости и RBW ≈ 1.5×df", async ({ page }) =>
   await expect(scope).toHaveAttribute("aria-pressed", "false");
   await expect(panel.locator(".uplot")).toBeVisible();
   await expect(panel.locator("[data-spectrum-rbw]")).toHaveText("RBW ≈ 150 Гц");
+});
+
+test("селекторы RBW/окно и таблица маркеров", async ({ page }) => {
+  await mockSpectrum(page, { reference: "available" });
+  await page.goto(BASE);
+  const panel = page.locator(PANEL);
+  await expect(panel.locator(".uplot")).toBeVisible({ timeout: 15_000 });
+
+  await expect(panel.locator("[data-spectrum-rbW-select] option")).toHaveCount(5);
+  await expect(panel.locator("[data-spectrum-window-select] option")).toHaveCount(4);
+  await expect(panel.locator("[data-spectrum-window-select]")).toHaveValue("hann");
+  await expect(panel.locator("[data-spectrum-selector-meta]")).toHaveText(
+    "RBW ≈ 150 Гц · окно Ханн · ENBW 150 Гц",
+  );
+
+  const table = panel.locator("[data-spectrum-markers-table]");
+  await expect(table).toBeVisible();
+  await expect(table).toContainText("Пик 1");
+  await expect(table).toContainText("H2");
+  await expect(table).toContainText("СКЗ полосы");
+  await expect(table).toContainText("дБ (отн. 1 В²/Гц)");
+
+  await panel.locator("[data-spectrum-rbW-select]").selectOption("300");
+  await expect(panel.locator("[data-spectrum-selector-note]")).toContainText(
+    "при следующем анализе",
+  );
 });
 
 test("unavailable в detail отключает кнопку входа", async ({ page }) => {

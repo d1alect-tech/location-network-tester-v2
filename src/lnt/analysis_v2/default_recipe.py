@@ -17,6 +17,7 @@ _BUILTIN_MAPPING: Final[dict[str, JsonValue]] = {
         "detrend": "constant",
         "scaling": "density",
         "average": "mean",
+        "rbw_hz": 50.0,
     },
     "spectrogram": {"enabled": True, "segment_samples": 1024, "overlap_fraction": 0.25},
     "events": {"enabled": True, "threshold_sigma": 5.0},

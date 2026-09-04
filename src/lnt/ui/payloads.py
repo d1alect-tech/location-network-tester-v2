@@ -14,8 +14,9 @@ from lnt.analysis import (
 from lnt.errors import InputError
 from lnt.manifest import manifest_from_json
 from lnt.session_store import MANIFEST_FILENAME
+from lnt.spectrum_hold import matching_hold_spectrum, read_hold_spectrum
 from lnt.types import SessionManifest
-from lnt.ui.decimation import decimate_spectrum, decimate_waveform
+from lnt.ui.decimation import decimate_spectrum, decimate_spectrum_pair, decimate_waveform
 from lnt.ui.sessions import list_sessions, resolve_session_dir
 
 
@@ -99,18 +100,31 @@ def spectrum_payload(root: Path, name: str, *, max_points: int) -> dict[str, obj
         dtype=np.float64,
         ndmin=2,
     )
-    series = decimate_spectrum(
-        spectrum_table[:, 0],
-        spectrum_table[:, 1],
-        max_points=max_points,
-    )
+    hold = matching_hold_spectrum(spectrum_table, read_hold_spectrum(session_dir))
+    if hold is None:
+        series = decimate_spectrum(
+            spectrum_table[:, 0],
+            spectrum_table[:, 1],
+            max_points=max_points,
+        )
+        hold_values: list[float] | None = None
+    else:
+        series, hold_series = decimate_spectrum_pair(
+            spectrum_table[:, 0],
+            spectrum_table[:, 1],
+            hold,
+            max_points=max_points,
+        )
+        hold_values = list(hold_series.y)
     result: dict[str, object] = {
         "frequency_hz": list(series.x),
         "psd_v2_per_hz": list(series.y),
         "point_count": series.point_count,
     }
-    # RBW-контракт шкалы: только ADD ключей, старые клиенты целы.
+    # RBW-контракт шкалы и max-hold след: только ADD ключей, старые клиенты целы.
     result.update(_spectrum_meta(session_dir))
+    if hold_values is not None:
+        result["psd_max_hold_v2_per_hz"] = hold_values
     return result
 
 
@@ -169,6 +183,8 @@ def input_referred_spectrum_payload(
         "qualified_bin_count": reference_map.get("qualified_bin_count", 0),
         "total_bin_count": reference_map.get("total_bin_count", 0),
         "resolution_hz": spectrum_meta.get("resolution_hz"),
+        "window": spectrum_meta.get("window"),
+        "enbw_hz": spectrum_meta.get("enbw_hz"),
     }
 
 
@@ -231,16 +247,19 @@ def _read_analysis(session_dir: Path) -> dict[str, object]:
 
 
 def _spectrum_meta(session_dir: Path) -> dict[str, object]:
-    """Возвращает RBW-метаданные шкалы из metrics.json (только числовые ключи)."""
+    """Возвращает RBW-метаданные шкалы из metrics.json (только известные ключи)."""
     analysis = _read_analysis(session_dir)
     spectrum = analysis.get("spectrum")
     if not isinstance(spectrum, dict):
         return {}
     meta: dict[str, object] = {}
-    for key in ("resolution_hz", "band_low_hz", "band_high_hz"):
+    for key in ("resolution_hz", "band_low_hz", "band_high_hz", "enbw_hz"):
         value = spectrum.get(key)
         if isinstance(value, (int, float)):
             meta[key] = value
+    window = spectrum.get("window")
+    if isinstance(window, str):
+        meta["window"] = window
     return meta
 
 

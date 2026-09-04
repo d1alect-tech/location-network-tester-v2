@@ -7,11 +7,16 @@ export type SpectrumPlane = "scope" | "input-referred";
 export interface SpectrumPayload {
   frequency_hz: number[];
   psd_v2_per_hz: number[];
+  /** Max-hold след повторов/сегментов (ADD-ключ B2): та же сетка, что psd. */
+  psd_max_hold_v2_per_hz?: number[];
   point_count: number;
   /** RBW-контракт шкалы (ADD-ключи): df полной сетки и полоса анализа. */
   resolution_hz?: number | null;
   band_low_hz?: number | null;
   band_high_hz?: number | null;
+  /** B3: окно Welch и ENBW из анализа (ADD-ключи, старые клиенты целы). */
+  window?: string | null;
+  enbw_hz?: number | null;
 }
 
 /** GET /api/sessions/{name}/spectrum-input-referred: excess-PSD на входе CH1. */

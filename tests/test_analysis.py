@@ -87,10 +87,14 @@ class TestAnalysisPayload:
         assert isinstance(spectrum, dict)
         assert spectrum.keys() == {
             "resolution_hz",
+            "window",
+            "enbw_hz",
             "band_low_hz",
             "band_high_hz",
             "peaks",
         }
+        assert spectrum["window"] == "hann"
+        assert spectrum["enbw_hz"] == pytest.approx(1.5 * spectrum["resolution_hz"])
         assert payload["schema_version"] == 2
         assert payload["ch1_input_reference"] == {
             "status": "unavailable",

@@ -12,6 +12,8 @@ export interface SpectrogramLevel {
   timeS: Float64Array;
   frequencyHz: Float64Array;
   powerDb: Float32Array;
+  /** Max-hold уровень (ADD B2): та же раскладка, что powerDb; отсутствует у старых NPZ. */
+  powerMaxHoldDb?: Float32Array;
   timeBins: number;
   bands: number;
 }

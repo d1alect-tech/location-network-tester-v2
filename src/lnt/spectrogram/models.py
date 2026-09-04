@@ -91,10 +91,18 @@ class StftSettings:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class SpectrogramOverview:
-    """Ограниченный обзор; coverage=0 всегда означает явный NaN."""
+    """Ограниченный обзор; coverage=0 всегда означает явный NaN.
+
+    Рядом с mean-тайлами несёт max-hold тайлы: ``max_hold_linear`` — максимум
+    средней по полосе мощности кадра внутри ячейки (те же единицы, что mean),
+    ``max_hold_db`` — его dB-вид. Оба опциональны для прямой конструкции
+    (обзор из движка всегда несёт массивы; отсутствие = след недоступен).
+    """
 
     power_db: Float32Array
     linear_power: Float64Array
+    max_hold_db: Float32Array | None = None
+    max_hold_linear: Float64Array | None = None
     coverage: UInt32Array
     time_s: Float64Array
     frequency_hz: Float64Array

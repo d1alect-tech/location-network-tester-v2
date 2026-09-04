@@ -24,11 +24,12 @@ function meanThd(windows: readonly ThdWindow[]): number {
   return sum / windows.length;
 }
 
-export function thdVerdict(input: ThdVerdictInput): ThdVerdict {
+export function thdVerdict(input: ThdVerdictInput, limit: number = THD_V_LIMIT): ThdVerdict {
   const mean = input.windows === null || input.windows.length === 0 ? null : meanThd(input.windows);
   if (input.harmonicsFailed) return { kind: "hidden", meanThd: mean };
   if (mean === null) return { kind: "legacy", meanThd: null };
+  if (!Number.isFinite(limit) || limit <= 0) return { kind: "hidden", meanThd: mean };
   if (input.cyclesAnalyzed < 100) return { kind: "hidden", meanThd: mean };
-  if (mean > THD_V_LIMIT) return { kind: "fail", meanThd: mean };
+  if (mean > limit) return { kind: "fail", meanThd: mean };
   return { kind: "pass", meanThd: mean };
 }

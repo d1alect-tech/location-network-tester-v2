@@ -7,12 +7,27 @@ import { TILE_CELL_CAP } from "./spectrogramModel";
 import type { SpectrogramLevel, TileRequest } from "./spectrogramModel";
 import { TileError } from "./tileError";
 
-/** Разбор массивов NPZ-артефакта в уровень: power_db формы (полосы, время). */
+/** Разбор массивов NPZ-артефакта в уровень: power_db формы (полосы, время).
+ * Опциональный power_max_hold_db (B2) читается только при совпадении длины. */
 export function levelFromNpz(arrays: Map<string, { data: ArrayBuffer }>): SpectrogramLevel {
   const timeS = new Float64Array(arrays.get("time_s")?.data ?? new ArrayBuffer(0));
   const frequencyHz = new Float64Array(arrays.get("frequency_hz")?.data ?? new ArrayBuffer(0));
   const powerDb = new Float32Array(arrays.get("power_db")?.data ?? new ArrayBuffer(0));
-  return { timeS, frequencyHz, powerDb, timeBins: timeS.length, bands: frequencyHz.length };
+  const level: SpectrogramLevel = {
+    timeS,
+    frequencyHz,
+    powerDb,
+    timeBins: timeS.length,
+    bands: frequencyHz.length,
+  };
+  const holdRaw = arrays.get("power_max_hold_db")?.data;
+  if (holdRaw !== undefined) {
+    const powerMaxHoldDb = new Float32Array(holdRaw);
+    if (powerMaxHoldDb.length === powerDb.length) {
+      return { ...level, powerMaxHoldDb };
+    }
+  }
+  return level;
 }
 
 /** Стартовый тайл: весь уровень при ≤ капа, иначе все времена × доступные полосы.

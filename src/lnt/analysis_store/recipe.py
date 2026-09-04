@@ -17,6 +17,7 @@ from lnt.analysis_store.settings import (
     WelchSettings,
 )
 from lnt.context.json_codec import JsonValue, encode_canonical
+from lnt.psd.windows import DEFAULT_RBW_HZ
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -115,8 +116,13 @@ class AnalysisRecipe:
         band_grid = _group(
             value["band_grid"], "band_grid", frozenset({"low_hz", "high_hz", "grid_hz"})
         )
+        welch_raw = value["welch"]
+        if not isinstance(welch_raw, dict):
+            raise RecipeError("рецепт анализа: welch должен быть JSON-object")
+        # Миграция: старые рецепты без rbw_hz читаются как RBW 50 Гц (дефолтный тракт).
+        rbw_raw = welch_raw.get("rbw_hz", DEFAULT_RBW_HZ)
         welch = _group(
-            value["welch"],
+            {key: item for key, item in welch_raw.items() if key != "rbw_hz"},
             "welch",
             frozenset(
                 {"window", "segment_samples", "overlap_fraction", "detrend", "scaling", "average"}
@@ -154,6 +160,7 @@ class AnalysisRecipe:
                 detrend=_string(welch["detrend"], "welch.detrend"),
                 scaling=_string(welch["scaling"], "welch.scaling"),
                 average=_string(welch["average"], "welch.average"),
+                rbw_hz=_number(rbw_raw, "welch.rbw_hz"),
             ),
             spectrogram=SpectrogramSettings(
                 enabled=_boolean(spectrogram["enabled"], "spectrogram.enabled"),
@@ -203,6 +210,7 @@ class AnalysisRecipe:
                 "detrend": self.welch.detrend,
                 "scaling": self.welch.scaling,
                 "average": self.welch.average,
+                "rbw_hz": self.welch.rbw_hz,
             },
             "spectrogram": {
                 "enabled": self.spectrogram.enabled,

@@ -112,7 +112,7 @@ def analyze_session(session_dir: Path) -> AnalysisResult | LineQualityAnalysis:
             sample_rate_hz=manifest.sample_rate_hz,
             line_frequency_hz=manifest.line_frequency_hz,
         )
-    spectrum = compute_band_spectrum(loaded.ch1, sample_rate_hz=manifest.sample_rate_hz)
+    spectrum = compute_band_spectrum(loaded.ch1, sample_rate_hz=manifest.sample_rate_hz, hold=True)
     ch1_input_reference = derive_input_reference(session_dir, loaded, spectrum)
     return AnalysisResult(
         session_id=manifest.session_id,
@@ -269,14 +269,12 @@ def render_analysis(result: AnalysisResult) -> str:
     reference = result.ch1_input_reference
     match reference.status:
         case InputReferenceStatus.AVAILABLE:
-            qualified_count = reference.qualified_bin_count
-            total_count = reference.total_bin_count
             lines.append(
                 ", ".join(
                     (
                         "CH1 input-reference: model-based excess PSD",
                         "floating_host_unverified",
-                        f"qualified={qualified_count}/{total_count}",
+                        f"qualified={reference.qualified_bin_count}/{reference.total_bin_count}",
                     ),
                 ),
             )
@@ -299,6 +297,8 @@ def analysis_to_payload(result: AnalysisResult) -> dict[str, object]:
         "line_quality": None,
         "spectrum": {
             "resolution_hz": result.spectrum.resolution_hz,
+            "window": result.spectrum.window,
+            "enbw_hz": result.spectrum.enbw_hz,
             "band_low_hz": result.spectrum.band_low_hz,
             "band_high_hz": result.spectrum.band_high_hz,
             "peaks": [dataclasses.asdict(peak) for peak in result.spectrum.peaks],

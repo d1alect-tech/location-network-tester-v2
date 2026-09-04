@@ -10,10 +10,10 @@ from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import signal
 
 from lnt.psd.errors import PsdCancelledError, PsdDataError
 from lnt.psd.models import BandRms, PsdResult, PsdSettings
+from lnt.psd.windows import canonical_window_name, enbw_hz, get_window
 
 Float32Array = NDArray[np.float32]
 Float64Array = NDArray[np.float64]
@@ -42,20 +42,69 @@ def _validate_input(samples: InputArray, settings: PsdSettings) -> int:
     return sample_count
 
 
+def _initial_accumulator(detector: str, bins: int) -> Float64Array:
+    """Нейтральный аккумулятор детектора: нули для средних, ±inf для hold."""
+    if detector == "max-hold":
+        return np.full(bins, -np.inf, dtype=np.float64)
+    if detector == "min-hold":
+        return np.full(bins, np.inf, dtype=np.float64)
+    return np.zeros(bins, dtype=np.float64)
+
+
+def _fold_segment(
+    accumulated: Float64Array,
+    hold: Float64Array | None,
+    periodogram: Float64Array,
+    detector: str,
+) -> None:
+    """Складывает периодограмму сегмента в аккумулятор и max-hold след."""
+    if detector == "mean":
+        accumulated += periodogram
+    elif detector == "rms":
+        accumulated += periodogram * periodogram
+    elif detector == "max-hold":
+        np.maximum(accumulated, periodogram, out=accumulated)
+    else:
+        np.minimum(accumulated, periodogram, out=accumulated)
+    if hold is not None:
+        np.maximum(hold, periodogram, out=hold)
+
+
+def _finalize_psd(accumulated: Float64Array, detector: str, segment_count: int) -> Float64Array:
+    """Нормирует аккумулятор в PSD: среднее/СКО/экстремум."""
+    if detector == "mean":
+        return accumulated / segment_count
+    if detector == "rms":
+        return np.sqrt(accumulated / segment_count)
+    return accumulated
+
+
 def compute_welch(
     samples: InputArray,
     *,
     settings: PsdSettings,
     cancellation: CancellationToken | None = None,
 ) -> PsdResult:
-    """Считает Welch порциями, не материализуя всю запись как float64."""
+    """Считает Welch порциями, не материализуя всю запись как float64.
+
+    Детекторы усреднения сегментов по линейной мощности: ``mean`` — среднее
+    (дефолт, бит-в-бит прежний тракт), ``rms`` — корень из среднего квадрата
+    (верхняя оценка mean, громкие сегменты весомее), ``max-hold``/``min-hold`` —
+    поточечные экстремумы периодограмм сегментов. ``track_max_hold`` ведёт
+    max-hold след вторым аккумулятором за один проход рядом с основным выходом.
+    """
     sample_count = _validate_input(samples, settings)
-    step = settings.nperseg // 2
+    step = max(1, settings.nperseg - settings.noverlap)
     segment_count = 1 + (sample_count - settings.nperseg) // step
     segments_per_chunk = max(1, (settings.max_chunk_samples - settings.nperseg) // step + 1)
-    window = np.asarray(signal.get_window("hann", settings.nperseg, fftbins=True), dtype=np.float64)
+    window_name = canonical_window_name(settings.window)
+    window = get_window(window_name, settings.nperseg)
     scale = 1.0 / (settings.sample_rate_hz * float(np.sum(window * window)))
-    accumulated = np.zeros(settings.nperseg // 2 + 1, dtype=np.float64)
+    detector = settings.detector
+    bins = settings.nperseg // 2 + 1
+    accumulated = _initial_accumulator(detector, bins)
+    track_hold = settings.track_max_hold and detector != "max-hold"
+    hold = np.full(bins, -np.inf, dtype=np.float64) if track_hold else None
 
     for first_segment in range(0, segment_count, segments_per_chunk):
         if cancellation is not None and cancellation.cancelled:
@@ -77,9 +126,9 @@ def compute_welch(
                 periodogram[1:-1] *= 2.0
             else:
                 periodogram[1:] *= 2.0
-            accumulated += periodogram
+            _fold_segment(accumulated, hold, periodogram, detector)
 
-    psd = accumulated / segment_count
+    psd = _finalize_psd(accumulated, detector, segment_count)
     if not np.all(np.isfinite(psd)):
         raise PsdDataError("PSD: численное переполнение при накоплении")
     frequency = np.fft.rfftfreq(settings.nperseg, d=1.0 / settings.sample_rate_hz)
@@ -105,4 +154,8 @@ def compute_welch(
         level_db_v2_per_hz=level_db,
         band_rms=band_rms,
         segment_count=segment_count,
+        window=window_name,
+        enbw_hz=enbw_hz(window_name, settings.nperseg, settings.sample_rate_hz),
+        detector=detector,
+        psd_max_hold_v2_per_hz=psd if detector == "max-hold" else hold,
     )

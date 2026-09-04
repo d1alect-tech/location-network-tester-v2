@@ -77,6 +77,27 @@ export function spectrumToRequest(
   };
 }
 
+/** Max-hold значения под ось X готового запроса: та же фильтрация, что у mean.
+ * Возвращает null, когда следа нет в payload или сетка разошлась с запросом. */
+export function maxHoldValuesForRequest(
+  payload: SpectrumPayload,
+  requestX: readonly number[],
+  units: SpectrumUnits,
+  logY: boolean,
+): number[] | null {
+  const hold = payload.psd_max_hold_v2_per_hz;
+  if (hold === undefined || hold.length !== payload.frequency_hz.length) return null;
+  const yValues = units.kind === "asd" ? psdToAsd(hold) : [...hold];
+  const pairs = logY
+    ? filterLogSafePairs(payload.frequency_hz, yValues)
+    : { x: payload.frequency_hz, y: yValues };
+  if (pairs.x.length !== requestX.length) return null;
+  for (const [index, x] of pairs.x.entries()) {
+    if (x !== requestX[index]) return null;
+  }
+  return pairs.y;
+}
+
 export function waveformToRequest(
   payload: WaveformPayload,
   style: SeriesStyle,

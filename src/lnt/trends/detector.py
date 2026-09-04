@@ -10,6 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from lnt.errors import InputError
+from lnt.limits.masks import MaskVerdict, spc_limits, spc_verdict
 from lnt.trends.models import (
     TRENDS_VERSION,
     TrendChangePoint,
@@ -240,3 +241,19 @@ def compute_trends(
         eeprom_readback_hash=eeprom_hash,
         eeprom_verified=verified,
     )
+
+
+def trend_spc_limits(
+    values: FloatArray, *, k: float = 3.0
+) -> tuple[float, float, float, float] | None:
+    """SPC-лимиты поверх CUSUM: (center, sigma, ucl, lcl) либо None."""
+    return spc_limits(values, k=k)
+
+
+def trend_value_verdict(value: float, values: FloatArray, *, k: float = 3.0) -> MaskVerdict:
+    """Годен-негоден точки тренда против SPC-лимитов ряда."""
+    limits = spc_limits(values, k=k)
+    if limits is None:
+        return "unavailable"
+    center, sigma, _, _ = limits
+    return spc_verdict(value, center=center, sigma=sigma, k=k)

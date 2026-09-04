@@ -8,12 +8,13 @@ import type {
 } from "../../api/types-plots";
 import { createPeaksPlugin } from "../../components/charts/annotations";
 import { readChartTheme } from "../../components/charts/theme";
-import type { ChartHandle, ChartPeak, ChartRenderRequest } from "../../components/charts/types";
+import type { ChartHandle, ChartPeak } from "../../components/charts/types";
 import { createUplotView } from "../../components/charts/uplotView";
 import type { UplotViewOptions } from "../../components/charts/uplotView";
-import { peaksFromDetail, spectrumToRequest } from "../../components/charts/viewModels";
+import { peaksFromDetail } from "../../components/charts/viewModels";
 import type { SeriesStyle } from "../../components/charts/viewModels";
 import { el } from "../../components/primitives/dom";
+import { createSpectrumExtras } from "./spectrumExtras";
 import { createPlaneControl, planePayload } from "./spectrumPlaneControl";
 
 export type SpectrumView = "spectrum" | "gram";
@@ -57,7 +58,6 @@ export type SpectrumPanelHandle = {
 
 const DASH_B: readonly [number, number] = [6, 4];
 const SYNC_KEY = "lnt-inspect-spectrum-v6";
-const UNITS = { kind: "psd" } as const;
 
 function assertNever(value: never): never {
   throw new Error(`unhandled spectrum view ${String(value)}`);
@@ -72,6 +72,8 @@ function recordFromUnknown(value: unknown): Record<string, unknown> | null {
   return record;
 }
 
+import { overlayRequest } from "./spectrumHoldOverlay";
+
 function detailForPeaks(name: string, raw: { readonly analysis?: unknown }): SessionDetailPayload {
   return {
     name,
@@ -81,22 +83,6 @@ function detailForPeaks(name: string, raw: { readonly analysis?: unknown }): Ses
     waveform_available: false,
     ch2_available: false,
   };
-}
-
-function overlayRequest(
-  payloadA: SpectrumPayload,
-  payloadB: SpectrumPayload | null,
-  styleA: SeriesStyle,
-  styleB: SeriesStyle,
-  peaks: readonly ChartPeak[],
-): ChartRenderRequest {
-  const requestA = spectrumToRequest(payloadA, styleA, UNITS, true, peaks);
-  const series = [...requestA.series];
-  if (payloadB !== null) {
-    const requestB = spectrumToRequest(payloadB, styleB, UNITS, true, []);
-    series.push(...requestB.series);
-  }
-  return { ...requestA, xLabel: "", xLog: true, series };
 }
 
 export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHandle {
@@ -124,12 +110,14 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
   );
   let reloadPlane: () => void = () => undefined;
   const planeControl = createPlaneControl(() => reloadPlane());
+  const extras = createSpectrumExtras();
   const gramBar = el("div", { className: "gram-bar" });
   const header = el("div", { className: "panel-hd" }, [
     title,
     viewToggle,
     planeControl.toggle,
     planeControl.rbw,
+    extras.selects,
     gramBar,
   ]);
   const frame = el("div", { className: "frame" });
@@ -147,7 +135,7 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
     [statusText, retryButton],
   );
   status.hidden = true;
-  const body = el("div", { className: "panel-bd" }, [status, frame, gramHost]);
+  const body = el("div", { className: "panel-bd" }, [status, frame, gramHost, extras.markers]);
   const root = el("section", { className: "panel", attrs: { "data-showcase": "spectrum" } }, [
     header,
     body,
@@ -212,6 +200,7 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
       ]);
       planeControl.paintPlane(detail.analysis);
       planeControl.paintRbw(payloadA);
+      extras.paint({ payloadA, payloadB, analysis: detail.analysis });
       peaksA = peaksFromDetail(detailForPeaks(a, detail));
       const suffix = planeControl.plane() === "input-referred" ? " · вход" : "";
       const styleA: SeriesStyle = { color: theme.accentA, label: `${a}${suffix}` };

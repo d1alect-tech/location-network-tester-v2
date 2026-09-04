@@ -19,10 +19,11 @@ class EventKind(StrEnum):
 
 
 class Tolerance(StrEnum):
-    """Вердикт события относительно огибающей ITIC 2000."""
+    """Вердикт события относительно огибающей ITIC 2000/SEMI-F47."""
 
     IN_TOLERANCE = "in_tolerance"
     OUT_OF_TOLERANCE = "out_of_tolerance"
+    UNAVAILABLE = "unavailable"
 
 
 class IticRegion(StrEnum):

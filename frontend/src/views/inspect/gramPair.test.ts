@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/errors";
 import type { SpectrogramLevel } from "../../components/charts/spectrogramModel";
 import { createGramPair } from "./gramPair";
@@ -8,6 +8,7 @@ function makeLevel(
   timeS: readonly number[],
   frequencyHz: readonly number[],
   powerDb: readonly number[],
+  powerMaxHoldDb?: readonly number[],
 ): SpectrogramLevel {
   return {
     timeS: Float64Array.from(timeS),
@@ -15,6 +16,7 @@ function makeLevel(
     powerDb: Float32Array.from(powerDb),
     timeBins: timeS.length,
     bands: frequencyHz.length,
+    ...(powerMaxHoldDb === undefined ? {} : { powerMaxHoldDb: Float32Array.from(powerMaxHoldDb) }),
   };
 }
 
@@ -181,6 +183,81 @@ describe("createGramPair", () => {
     expect(pair.empty()).toBe(true);
     expect(pair.current().kind).toBe("mismatch");
     pair.dispose();
+  });
+
+  it("detector defaults to mean and switches to max-hold tiles", async () => {
+    // Given: уровень с max-hold следом рядом с mean
+    const level = makeLevel(TIME, FREQ, POWER_A, [9, 8, 7, 6]);
+    const pair = createGramPair({
+      client: STUB_CLIENT,
+      loadLevel: fakeLoadLevel(new Map([["sess-a", level]])),
+    });
+    await pair.load("sess-a", null);
+
+    // When / Then: дефолт mean, переключение на max-hold меняет значения
+    expect(pair.detector()).toBe("mean");
+    expect(Array.from(asTile(pair.current()).tile.values)).toEqual(Array.from(POWER_A));
+    pair.setDetector("max-hold");
+    expect(pair.detector()).toBe("max-hold");
+    expect(Array.from(asTile(pair.current()).tile.values)).toEqual([9, 8, 7, 6]);
+    pair.setDetector("mean");
+    expect(Array.from(asTile(pair.current()).tile.values)).toEqual(Array.from(POWER_A));
+    pair.dispose();
+  });
+
+  it("max-hold without a trace falls back to mean", async () => {
+    // Given: уровень без max-hold следа
+    const pair = createGramPair({
+      client: STUB_CLIENT,
+      loadLevel: fakeLoadLevel(new Map([["sess-a", LEVEL_A]])),
+    });
+    await pair.load("sess-a", null);
+
+    // When
+    pair.setDetector("max-hold");
+
+    // Then: откат на mean без смены детектора
+    expect(pair.detector()).toBe("mean");
+    expect(Array.from(asTile(pair.current()).tile.values)).toEqual(Array.from(POWER_A));
+    pair.dispose();
+  });
+
+  it("fetchLevel запрашивает power_max_hold_db и включает holdAvailable", async () => {
+    // Given: NPZ со следом; fetchLevel идёт дефолтным путём без инъекции
+    const entry = (data: ArrayBuffer): { data: ArrayBuffer; descr: string; shape: number[] } => ({
+      data,
+      descr: "<f8",
+      shape: [data.byteLength / 8],
+    });
+    const arrays = new Map([
+      ["time_s", entry(new Float64Array(TIME).buffer)],
+      ["frequency_hz", entry(new Float64Array(FREQ).buffer)],
+      ["power_db", entry(new Float32Array(POWER_A).buffer)],
+      ["power_max_hold_db", entry(new Float32Array([9, 8, 7, 6]).buffer)],
+    ]);
+    const npz = await import("../../components/charts/npz");
+    const spy = vi.spyOn(npz, "readNpzArrays");
+    spy.mockResolvedValue(arrays);
+    const pair = createGramPair({
+      client: {
+        analysis: {
+          artifactBytes: async (): Promise<ArrayBuffer> => new ArrayBuffer(0),
+        },
+        requestJson: async () => ({ artifact_key: "k" }),
+      },
+    });
+    try {
+      // When
+      await pair.load("sess-a", null);
+
+      // Then: след запрошен у NPZ и доступен в паре
+      expect(spy).toHaveBeenCalledOnce();
+      expect(spy.mock.calls[0]?.[1]).toContain("power_max_hold_db");
+      expect(pair.holdAvailable()).toBe(true);
+    } finally {
+      pair.dispose();
+      spy.mockRestore();
+    }
   });
 
   it("non-absence errors still propagate", async () => {
