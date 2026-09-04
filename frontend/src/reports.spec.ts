@@ -9,7 +9,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Page, expect, test } from "@playwright/test";
 import { injectAxe, seriousAxeViolations } from "./testkit/axe";
-import { MockResearchBackend, attachResearchBackend } from "./testkit/researchBackend";
+import { installMockBackend } from "./testkit/mockBackend";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -19,11 +19,8 @@ const EVIDENCE_DIR = resolve(
 );
 const BASE = "http://127.0.0.1:4101/static/v2/";
 
-let backend: MockResearchBackend;
-
 test.beforeEach(async ({ page }) => {
-  backend = new MockResearchBackend();
-  await attachResearchBackend(page, backend);
+  installMockBackend(page);
 });
 
 async function openReports(page: Page): Promise<void> {

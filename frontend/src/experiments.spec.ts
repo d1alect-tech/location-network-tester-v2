@@ -9,7 +9,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Page, expect, test } from "@playwright/test";
-import { MockResearchBackend, attachResearchBackend } from "./testkit/researchBackend";
+import { type MockLntBackend, installMockBackend } from "./testkit/mockBackend";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,11 +39,10 @@ declare global {
   }
 }
 
-let backend: MockResearchBackend;
+let backend: MockLntBackend;
 
 test.beforeEach(async ({ page }) => {
-  backend = new MockResearchBackend();
-  await attachResearchBackend(page, backend);
+  backend = installMockBackend(page);
 });
 
 async function openExperiments(page: Page): Promise<void> {

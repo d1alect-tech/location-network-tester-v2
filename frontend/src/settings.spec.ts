@@ -12,7 +12,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Page, expect, test } from "@playwright/test";
 import { injectAxe, seriousAxeViolations } from "./testkit/axe";
-import { MockResearchBackend, attachResearchBackend } from "./testkit/researchBackend";
+import { type MockLntBackend, installMockBackend } from "./testkit/mockBackend";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,11 +22,10 @@ const EVIDENCE_DIR = resolve(
 );
 const BASE = "http://127.0.0.1:4101/static/v2/";
 
-let backend: MockResearchBackend;
+let backend: MockLntBackend;
 
 test.beforeEach(async ({ page }) => {
-  backend = new MockResearchBackend();
-  await attachResearchBackend(page, backend);
+  backend = installMockBackend(page);
 });
 
 async function openSettings(page: Page): Promise<void> {
@@ -172,62 +171,30 @@ test("persona journey: prepare-redirect→capture→inspect→experiments→repo
   await expect(page.locator(".view-title, .placeholder-title").first()).toBeVisible();
 
   const personaId = "persona-001";
-  const json = (body: unknown): string => JSON.stringify(body);
-  await page.route("**/api/catalog/sessions**", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json({
-        items: [
-          {
-            id: personaId,
-            health: "ok",
-            created_utc: "2026-08-01T10:00:00Z",
-            source: "capture",
-            session_type: "capture",
-            profile: "quiet",
-            label: "персона",
-            storage_path: null,
-          },
-        ],
-        next_cursor: null,
-      }),
-    }),
-  );
-  await page.route(`**/api/sessions/${personaId}`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json({
-        name: personaId,
-        manifest: {},
-        analysis: null,
-        spectrum_available: true,
-        waveform_available: false,
-        ch2_available: false,
-      }),
-    }),
-  );
-  await page.route(`**/api/sessions/${personaId}/spectrum?*`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json({
-        frequency_hz: [10, 100, 1000],
-        psd_v2_per_hz: [1e-6, 1e-4, 1e-2],
-        point_count: 3,
-      }),
-    }),
-  );
-  await page.route(
-    `**/api/analysis/sessions/${personaId}/.lnt-default-analysis.json`,
-    (route) =>
-      route.fulfill({
-        status: 404,
-        contentType: "application/json",
-        body: json({ detail: "нет указателя" }),
-      }),
-  );
+  backend.seedCatalog([
+    {
+      id: personaId,
+      health: "ok",
+      created_utc: "2026-08-01T10:00:00Z",
+      source: "capture",
+      session_type: "capture",
+      profile: "quiet",
+      label: "персона",
+    },
+  ]);
+  backend.seedSessionDetail(personaId, {
+    name: personaId,
+    manifest: {},
+    analysis: null,
+    spectrum_available: true,
+    waveform_available: false,
+    ch2_available: false,
+  });
+  backend.seedSpectrum(personaId, {
+    frequency_hz: [10, 100, 1000],
+    psd_v2_per_hz: [1e-6, 1e-4, 1e-2],
+    point_count: 3,
+  });
 
   await page.goto(`${BASE}#/inspect`);
   await expect(page.locator(".app-v6")).toBeVisible();

@@ -4,14 +4,16 @@
 
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import type { CatalogSession } from "./api/types";
 import { buildSpectrogramNpz } from "./test-support/spectrogramNpz";
+import { type MockLntBackend, installMockBackend } from "./testkit/mockBackend";
 
 const INSPECT = "http://127.0.0.1:4101/static/v2/#/inspect";
 const GRAM_CANVAS = "[data-showcase='spectrum'] .gram canvas";
 const EMPTY_NOTE = "нет спектрограммы записи";
 const MISMATCH_NOTE = "сетки спектрограмм не совпадают";
 
-const CATALOG = {
+const CATALOG: { items: CatalogSession[]; next_cursor: null } = {
   items: [
     {
       id: "capture-001",
@@ -77,10 +79,6 @@ function level(
   return { timeS, frequencyHz, powerDb };
 }
 
-function json(body: unknown): string {
-  return JSON.stringify(body);
-}
-
 async function paintedRatio(page: Page, selector: string): Promise<number> {
   return page.evaluate((sel) => {
     const canvas = document.querySelector(sel);
@@ -94,60 +92,28 @@ async function paintedRatio(page: Page, selector: string): Promise<number> {
   }, selector);
 }
 
-async function mockPair(
-  page: Page,
-  opts?: { bPointer: "ok" | "404" },
-): Promise<void> {
+function mockPair(backend: MockLntBackend, opts?: { bPointer: "ok" | "404" }): void {
   const bPointer = opts?.bPointer ?? "ok";
-  await page.route("**/api/catalog/sessions**", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(CATALOG) }),
+  backend.seedCatalog(CATALOG.items);
+  backend.seedSessionDetail("capture-001", detail("capture-001"));
+  backend.seedSessionDetail("capture-002", detail("capture-002"));
+  backend.seedSpectrum("capture-001", SPECTRUM_A);
+  backend.seedSpectrum("capture-002", SPECTRUM_B);
+  backend.seedAnalysisPointer("capture-001", { artifact_key: "art-a" });
+  backend.seedAnalysisPointer("capture-002", bPointer === "404" ? null : { artifact_key: "art-b" });
+  backend.seedArtifact(
+    "capture-001",
+    "art-a",
+    "spectrogram.npz",
+    Buffer.from(buildSpectrogramNpz(level(16, 0))),
+    "application/octet-stream",
   );
-  await page.route("**/api/sessions/capture-001", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(detail("capture-001")) }),
-  );
-  await page.route("**/api/sessions/capture-002", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(detail("capture-002")) }),
-  );
-  await page.route("**/api/sessions/capture-001/spectrum?*", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(SPECTRUM_A) }),
-  );
-  await page.route("**/api/sessions/capture-002/spectrum?*", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(SPECTRUM_B) }),
-  );
-  await page.route("**/api/analysis/sessions/capture-001/.lnt-default-analysis.json", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json({ artifact_key: "art-a" }),
-    }),
-  );
-  await page.route("**/api/analysis/sessions/capture-002/.lnt-default-analysis.json", (route) => {
-    if (bPointer === "404") {
-      return route.fulfill({
-        status: 404,
-        contentType: "application/json",
-        body: json({ detail: "not found" }),
-      });
-    }
-    return route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json({ artifact_key: "art-b" }),
-    });
-  });
-  await page.route("**/api/analysis/sessions/capture-001/artifacts/art-a/spectrogram.npz", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/octet-stream",
-      body: Buffer.from(buildSpectrogramNpz(level(16, 0))),
-    }),
-  );
-  await page.route("**/api/analysis/sessions/capture-002/artifacts/art-b/spectrogram.npz", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/octet-stream",
-      body: Buffer.from(buildSpectrogramNpz(level(16, 5))),
-    }),
+  backend.seedArtifact(
+    "capture-002",
+    "art-b",
+    "spectrogram.npz",
+    Buffer.from(buildSpectrogramNpz(level(16, 5))),
+    "application/octet-stream",
   );
 }
 
@@ -161,7 +127,7 @@ async function openGram(page: Page): Promise<void> {
 }
 
 test("режимы А/Б/Δ рисуют тайлы", async ({ page }) => {
-  await mockPair(page);
+  mockPair(installMockBackend(page));
   await openGram(page);
   const panel = page.locator("[data-showcase='spectrum']");
   const modeA = panel.locator("[data-spectrogram-mode='a']");
@@ -192,7 +158,7 @@ test("режимы А/Б/Δ рисуют тайлы", async ({ page }) => {
 });
 
 test("отсутствие артефакта у Б не ломает базу", async ({ page }) => {
-  await mockPair(page, { bPointer: "404" });
+  mockPair(installMockBackend(page), { bPointer: "404" });
   await openGram(page);
   const panel = page.locator("[data-showcase='spectrum']");
   const modeA = panel.locator("[data-spectrogram-mode='a']");

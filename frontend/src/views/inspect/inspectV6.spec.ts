@@ -1,13 +1,15 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import type { CatalogSession } from "../../api/types";
 import { buildSpectrogramNpz } from "../../test-support/spectrogramNpz";
+import { type MockLntBackend, installMockBackend } from "../../testkit/mockBackend";
 
 /** Приёмочные сценарии V6 (ADR-0009): #/inspect — окно сравнения.
  *  Доказываем ОТРИСОВАННЫЙ результат (канвы, глифы, сетка), а не логи. */
 
 const BASE = "http://127.0.0.1:4101/static/v2/#/inspect";
 
-const CATALOG = {
+const CATALOG: { items: CatalogSession[]; next_cursor: null } = {
   items: [
     {
       id: "capture-001",
@@ -76,7 +78,10 @@ function detail(name: string, ch2: boolean): unknown {
   };
 }
 
-function level(timeBins: number, offsetDb: number): {
+function level(
+  timeBins: number,
+  offsetDb: number,
+): {
   timeS: number[];
   frequencyHz: number[];
   powerDb: Float32Array;
@@ -91,47 +96,30 @@ function level(timeBins: number, offsetDb: number): {
   return { timeS, frequencyHz, powerDb };
 }
 
-async function mockApi(page: Page, opts?: { bTimeBins?: number; ch2?: boolean }): Promise<void> {
+function mockApi(backend: MockLntBackend, opts?: { bTimeBins?: number; ch2?: boolean }): void {
   const ch2 = opts?.ch2 ?? true;
   const bTimeBins = opts?.bTimeBins ?? 16;
-  const json = (body: unknown): string => JSON.stringify(body);
-  await page.route("**/api/catalog/sessions**", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(CATALOG) }),
+  backend.seedCatalog(CATALOG.items);
+  backend.seedSessionDetail("capture-001", detail("capture-001", ch2));
+  backend.seedSessionDetail("capture-002", detail("capture-002", ch2));
+  backend.seedSpectrum("capture-001", SPECTRUM_A);
+  backend.seedSpectrum("capture-002", SPECTRUM_B);
+  backend.seedWaveform("capture-001", WAVEFORM);
+  backend.seedAnalysisPointer("capture-001", { artifact_key: "art-a" });
+  backend.seedAnalysisPointer("capture-002", { artifact_key: "art-b" });
+  backend.seedArtifact(
+    "capture-001",
+    "art-a",
+    "spectrogram.npz",
+    Buffer.from(buildSpectrogramNpz(level(16, 0))),
+    "application/octet-stream",
   );
-  await page.route("**/api/sessions/capture-001", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(detail("capture-001", ch2)) }),
-  );
-  await page.route("**/api/sessions/capture-002", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(detail("capture-002", ch2)) }),
-  );
-  await page.route("**/api/sessions/capture-001/spectrum?*", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(SPECTRUM_A) }),
-  );
-  await page.route("**/api/sessions/capture-002/spectrum?*", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(SPECTRUM_B) }),
-  );
-  await page.route("**/api/sessions/capture-001/waveform?*", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(WAVEFORM) }),
-  );
-  await page.route("**/api/analysis/sessions/capture-001/.lnt-default-analysis.json", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json({ artifact_key: "art-a" }) }),
-  );
-  await page.route("**/api/analysis/sessions/capture-002/.lnt-default-analysis.json", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json({ artifact_key: "art-b" }) }),
-  );
-  await page.route("**/api/analysis/sessions/capture-001/artifacts/art-a/spectrogram.npz", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/octet-stream",
-      body: Buffer.from(buildSpectrogramNpz(level(16, 0))),
-    }),
-  );
-  await page.route("**/api/analysis/sessions/capture-002/artifacts/art-b/spectrogram.npz", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/octet-stream",
-      body: Buffer.from(buildSpectrogramNpz(level(bTimeBins, 5))),
-    }),
+  backend.seedArtifact(
+    "capture-002",
+    "art-b",
+    "spectrogram.npz",
+    Buffer.from(buildSpectrogramNpz(level(bTimeBins, 5))),
+    "application/octet-stream",
   );
 }
 
@@ -149,7 +137,7 @@ async function paintedRatio(page: Page, selector: string): Promise<number> {
 }
 
 test("V6-P1: полная сетка сравнения, не стопка воркбенча", async ({ page }) => {
-  await mockApi(page);
+  mockApi(installMockBackend(page));
   await page.goto(BASE);
   await expect(page.locator(".app-v6")).toBeVisible();
   // Общая оболочка держит шапку; старой .app-header нет.
@@ -171,7 +159,7 @@ test("V6-P1: полная сетка сравнения, не стопка во�
 });
 
 test("V6-P2: одно окно — оверлей А/Б и спектрограмма по тумблеру", async ({ page }) => {
-  await mockApi(page);
+  mockApi(installMockBackend(page));
   await page.goto(BASE);
   const panel = page.locator("[data-showcase='spectrum']");
   await expect(panel).toBeVisible();
@@ -202,7 +190,7 @@ test("V6-P2: одно окно — оверлей А/Б и спектрогра�
 });
 
 test("V6-P3: каталог — группы, сортировка, поиск, клик в пару", async ({ page }) => {
-  await mockApi(page);
+  mockApi(installMockBackend(page));
   await page.goto(BASE);
   const cat = page.locator(".col-cat");
   await expect(cat.locator("[data-session]")).toHaveCount(2);
@@ -222,7 +210,7 @@ test("V6-P3: каталог — группы, сортировка, поиск, 
 });
 
 test("V6-P4: дельта пика из трасс, глиф направления", async ({ page }) => {
-  await mockApi(page);
+  mockApi(installMockBackend(page));
   await page.goto(BASE);
   const deltaCell = page.locator(".analysis-band [data-delta]").first();
   await expect(deltaCell).toBeVisible();
@@ -233,7 +221,7 @@ test("V6-P4: дельта пика из трасс, глиф направлен�
 });
 
 test("V6-P5: полный захват и возврат через таббар", async ({ page }) => {
-  await mockApi(page);
+  mockApi(installMockBackend(page));
   await page.goto(BASE);
   await expect(page.locator("header.hdr .tabbar a[href='#/inspect']")).toHaveAttribute(
     "aria-current",
@@ -247,7 +235,7 @@ test("V6-P5: полный захват и возврат через таббар
 });
 
 test("V6-P6: сворачиваемые панели осциллограммы и анализа", async ({ page }) => {
-  await mockApi(page);
+  mockApi(installMockBackend(page));
   await page.goto(BASE);
   const wave = page.locator(".v6-extras details[data-extra='waveform']");
   const w1 = page.locator(".v6-extras details[data-extra='w1']");
@@ -265,18 +253,18 @@ test("V6-P6: сворачиваемые панели осциллограммы 
 });
 
 test("V6-P7: показания базы, н/д для одноканальной сессии", async ({ page }) => {
-  await mockApi(page, { ch2: false });
+  mockApi(installMockBackend(page), { ch2: false });
   await page.goto(BASE);
   const readout = page.locator(".analysis-band .readout-value");
   await expect(readout).toHaveCount(7);
   // P_async/P_sync отсутствует в один канал → «н/д», не 0.
-  await expect(page.locator(".analysis-band .readout-cell").filter({ hasText: "P_async" })).toContainText(
-    "н/д",
-  );
+  await expect(
+    page.locator(".analysis-band .readout-cell").filter({ hasText: "P_async" }),
+  ).toContainText("н/д");
 });
 
 test("V6-P8: несовпадение сеток отключает дельту грама", async ({ page }) => {
-  await mockApi(page, { bTimeBins: 8 });
+  mockApi(installMockBackend(page), { bTimeBins: 8 });
   await page.goto(BASE);
   const panel = page.locator("[data-showcase='spectrum']");
   await panel.locator("[data-spectrum-view='gram']").click();

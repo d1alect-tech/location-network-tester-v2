@@ -3,14 +3,15 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { CatalogSession } from "../../api/types";
+import { type MockLntBackend, installMockBackend } from "../../testkit/mockBackend";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const BASE = "http://127.0.0.1:4101/static/v2/#/inspect";
 const PANEL = "[data-showcase='spectrum']";
 
-const CATALOG = {
+const CATALOG: { items: CatalogSession[]; next_cursor: null } = {
   items: [
     {
       id: "capture-001",
@@ -81,42 +82,22 @@ function detail(status: string | null): unknown {
   };
 }
 
-async function mockSpectrum(
-  page: Page,
+function mockSpectrum(
+  backend: MockLntBackend,
   opts: { reference: string | null; referredStatus?: number },
-): Promise<void> {
-  const json = (body: unknown): string => JSON.stringify(body);
-  await page.route("**/api/catalog/sessions**", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(CATALOG) }),
-  );
-  await page.route("**/api/sessions/capture-001", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json(detail(opts.reference)),
-    }),
-  );
-  await page.route("**/api/sessions/capture-001/spectrum?*", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(spectrumPayload()) }),
-  );
-  await page.route("**/api/sessions/capture-001/spectrum-input-referred?*", (route) => {
-    if (opts.referredStatus !== undefined) {
-      return route.fulfill({
-        status: opts.referredStatus,
-        contentType: "application/json",
-        body: json({}),
-      });
-    }
-    return route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json(referredPayload()),
-    });
-  });
+): void {
+  backend.seedCatalog(CATALOG.items);
+  backend.seedSessionDetail("capture-001", detail(opts.reference));
+  backend.seedSpectrum("capture-001", spectrumPayload());
+  if (opts.referredStatus !== undefined) {
+    backend.seedReferredSpectrum("capture-001", {}, opts.referredStatus);
+  } else {
+    backend.seedReferredSpectrum("capture-001", referredPayload());
+  }
 }
 
 test("тумблер плоскости и RBW ≈ 1.5×df", async ({ page }) => {
-  await mockSpectrum(page, { reference: "available" });
+  mockSpectrum(installMockBackend(page), { reference: "available" });
   await page.goto(BASE);
   const panel = page.locator(PANEL);
   await expect(panel.locator(".uplot")).toBeVisible({ timeout: 15_000 });
@@ -137,7 +118,7 @@ test("тумблер плоскости и RBW ≈ 1.5×df", async ({ page }) =>
 });
 
 test("селекторы RBW/окно и таблица маркеров", async ({ page }) => {
-  await mockSpectrum(page, { reference: "available" });
+  mockSpectrum(installMockBackend(page), { reference: "available" });
   await page.goto(BASE);
   const panel = page.locator(PANEL);
   await expect(panel.locator(".uplot")).toBeVisible({ timeout: 15_000 });
@@ -163,7 +144,7 @@ test("селекторы RBW/окно и таблица маркеров", async
 });
 
 test("unavailable в detail отключает кнопку входа", async ({ page }) => {
-  await mockSpectrum(page, { reference: "unavailable" });
+  mockSpectrum(installMockBackend(page), { reference: "unavailable" });
   await page.goto(BASE);
   const panel = page.locator(PANEL);
   await expect(panel.locator(".uplot")).toBeVisible({ timeout: 15_000 });
@@ -177,7 +158,7 @@ test("unavailable в detail отключает кнопку входа", async (
 });
 
 test("404 входа откатывается на скоп без баннера ошибки", async ({ page }) => {
-  await mockSpectrum(page, { reference: "available", referredStatus: 404 });
+  mockSpectrum(installMockBackend(page), { reference: "available", referredStatus: 404 });
   await page.goto(BASE);
   const panel = page.locator(PANEL);
   await expect(panel.locator(".uplot")).toBeVisible({ timeout: 15_000 });
@@ -191,7 +172,7 @@ test("404 входа откатывается на скоп без баннер�
 });
 
 test("axe: панель спектра без нарушений", async ({ page }) => {
-  await mockSpectrum(page, { reference: "available" });
+  mockSpectrum(installMockBackend(page), { reference: "available" });
   await page.goto(BASE);
   const panel = page.locator(PANEL);
   await expect(panel.locator(".uplot")).toBeVisible({ timeout: 15_000 });

@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { JobSnapshot } from "../api/types-jobs";
-import { snap } from "../test-support/mock-fixtures";
+import { snap } from "../testkit/mockJobStore";
 import { createSpectrogramLivePanel } from "./spectrogramLivePanel";
 import {
   LIVE_POLL_MS,

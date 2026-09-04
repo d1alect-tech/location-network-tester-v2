@@ -2,6 +2,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import type { CatalogSession } from "./api/types";
+import { type MockLntBackend, installMockBackend } from "./testkit/mockBackend";
 
 /** E2E графиков: оверлей A/B uPlot в полном захвате инспекции V6.
  * API подменяется маршрутами с фикстурами бэкенд-контрактов; проверяются
@@ -9,7 +11,7 @@ import type { Page } from "@playwright/test";
 
 const BASE = "http://127.0.0.1:4101/static/v2/#/inspect";
 
-const CATALOG = {
+const CATALOG: { items: CatalogSession[]; next_cursor: null } = {
   items: [
     {
       id: "capture-001",
@@ -64,29 +66,14 @@ function detail(name: string): unknown {
   };
 }
 
-async function mockApi(page: Page): Promise<void> {
-  const json = (body: unknown): string => JSON.stringify(body);
-  await page.route("**/api/catalog/sessions**", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(CATALOG) }),
-  );
-  await page.route("**/api/sessions/capture-001", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(detail("capture-001")) }),
-  );
-  await page.route("**/api/sessions/capture-002", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(detail("capture-002")) }),
-  );
-  await page.route("**/api/sessions/capture-001/spectrum?*", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(SPECTRUM_A) }),
-  );
-  await page.route("**/api/sessions/capture-002/spectrum?*", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(SPECTRUM_B) }),
-  );
-  await page.route("**/api/analysis/sessions/capture-001/.lnt-default-analysis.json", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json({ artifact_key: "art-a" }) }),
-  );
-  await page.route("**/api/analysis/sessions/capture-002/.lnt-default-analysis.json", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json({ artifact_key: "art-b" }) }),
-  );
+function mockApi(backend: MockLntBackend): void {
+  backend.seedCatalog(CATALOG.items);
+  backend.seedSessionDetail("capture-001", detail("capture-001"));
+  backend.seedSessionDetail("capture-002", detail("capture-002"));
+  backend.seedSpectrum("capture-001", SPECTRUM_A);
+  backend.seedSpectrum("capture-002", SPECTRUM_B);
+  backend.seedAnalysisPointer("capture-001", { artifact_key: "art-a" });
+  backend.seedAnalysisPointer("capture-002", { artifact_key: "art-b" });
 }
 
 async function paintedRatio(page: Page, selector: string): Promise<number> {
@@ -103,7 +90,7 @@ async function paintedRatio(page: Page, selector: string): Promise<number> {
 }
 
 test("оверлей А/Б", async ({ page }) => {
-  await mockApi(page);
+  mockApi(installMockBackend(page));
   await page.goto(BASE);
   await expect(page.locator(".app-v6")).toBeVisible();
 
@@ -114,7 +101,9 @@ test("оверлей А/Б", async ({ page }) => {
   await expect(legend).toContainText("capture-001");
   await expect(legend).toContainText("capture-002");
 
-  await expect.poll(async () => paintedRatio(page, ".frame"), { timeout: 10_000 }).toBeGreaterThan(0.05);
+  await expect
+    .poll(async () => paintedRatio(page, ".frame"), { timeout: 10_000 })
+    .toBeGreaterThan(0.05);
 
   const canvas = frame.locator("canvas").first();
   const box = await canvas.boundingBox();
@@ -130,7 +119,7 @@ test("оверлей А/Б", async ({ page }) => {
 });
 
 test("log-ось и дельта пиков", async ({ page }) => {
-  await mockApi(page);
+  mockApi(installMockBackend(page));
   await page.goto(BASE);
   await expect(page.locator(".app-v6")).toBeVisible();
 

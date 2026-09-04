@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { installMockBackend } from "./test-support/mock-lnt-backend";
+import { installMockBackend } from "./testkit/mockBackend";
 
 /** E2E честного командбара inspect (C1): значения формы едут deep-link
  * билетом в capture и предзаполняют форму; device-статус живой

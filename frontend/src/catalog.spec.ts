@@ -9,7 +9,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Page, expect, test } from "@playwright/test";
 import { generateSessions } from "./testkit/catalogFixture";
-import { MockLntBackend, attachMockBackend } from "./testkit/mockBackend";
+import { type MockLntBackend, installMockBackend } from "./testkit/mockBackend";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -43,8 +43,7 @@ declare global {
 let backend: MockLntBackend;
 
 test.beforeEach(async ({ page }) => {
-  backend = new MockLntBackend(FIXTURE_SIZE, 39);
-  await attachMockBackend(page, backend);
+  backend = installMockBackend(page, { catalogSize: FIXTURE_SIZE, catalogSeed: 39 });
 });
 
 async function openCatalog(page: Page): Promise<void> {
