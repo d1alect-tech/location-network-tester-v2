@@ -55,7 +55,9 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
   tagsInput.type = "text";
   tagsInput.className = "ctl";
   const userFieldsHost = el("div", { className: "form-grid" });
-  const conflictPanel = el("div", { className: "banner banner-inline is-warn lnt-cat-conflict" });
+  const conflictPanel = el("div", {
+    className: "banner banner-inline banner-warn lnt-cat-conflict",
+  });
   conflictPanel.hidden = true;
   const errorNote = el("p", { className: "banner banner-inline", attrs: { role: "alert" } });
   errorNote.hidden = true;

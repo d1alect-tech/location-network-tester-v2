@@ -92,25 +92,27 @@ describe("T12.1: warn/info-баннеры захвата и каталога", (
     }
   });
 
-  it("каталог: warn-баннер — .banner-inline.is-warn с ролью status", () => {
+  it("каталог: warn-баннер — .banner-inline.banner-warn с ролью status", () => {
     // Given / When
     const banner = renderErrorBanner("Конфликт ревизий.", () => undefined, "warn");
 
     // Then: тон-предупреждение T10, текст и глиф не только цветом
     expect(banner.classList.contains("banner")).toBe(true);
     expect(banner.classList.contains("banner-inline")).toBe(true);
-    expect(banner.classList.contains("is-warn")).toBe(true);
+    expect(banner.classList.contains("banner-warn")).toBe(true);
+    expect(banner.classList.contains("is-warn")).toBe(false);
     expect(banner.getAttribute("role")).toBe("status");
     expect(banner.textContent).toContain("Конфликт ревизий.");
   });
 
-  it("каталог: info-баннер — .banner-inline.is-info с ролью status", () => {
+  it("каталог: info-баннер — .banner-inline.banner-info с ролью status", () => {
     // Given / When
     const banner = renderErrorBanner("Список обновлён.", () => undefined, "info");
 
     // Then: тон-подсказка T10 на акценте
     expect(banner.classList.contains("banner-inline")).toBe(true);
-    expect(banner.classList.contains("is-info")).toBe(true);
+    expect(banner.classList.contains("banner-info")).toBe(true);
+    expect(banner.classList.contains("is-info")).toBe(false);
     expect(banner.getAttribute("role")).toBe("status");
     expect(banner.textContent).toContain("Список обновлён.");
   });

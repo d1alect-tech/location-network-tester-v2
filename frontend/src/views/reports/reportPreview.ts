@@ -83,12 +83,19 @@ function outcomeBlock(draft: ReportDraft): HTMLElement {
   }
   if (outcome.kind === "descriptive") {
     host.append(
-      el("div", { className: "banner lnt-rep-banner lnt-rep-banner-info" }, [
-        el("p", {
-          className: "banner-msg",
-          text: "Описательная оценка без доверительного интервала: не является статистической уверенностью.",
-        }),
-      ]),
+      el(
+        "div",
+        {
+          className: "banner lnt-rep-banner lnt-rep-banner-info",
+          attrs: { role: "status" },
+        },
+        [
+          el("p", {
+            className: "banner-msg",
+            text: "Описательная оценка без доверительного интервала: не является статистической уверенностью.",
+          }),
+        ],
+      ),
     );
   }
   host.append(readoutGrid(rows));

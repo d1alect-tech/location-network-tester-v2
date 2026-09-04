@@ -48,24 +48,24 @@
 }
 
 /* Тон-предупреждение: конфликт revision, восстановление без потери. */
-.lnt-cat-workspace .banner.is-warn {
+.lnt-cat-workspace .banner.banner-warn {
   border-color: rgb(230 134 25 / 0.35);
   border-left-color: var(--lnt-warn);
   background: var(--lnt-warn-bg, rgb(230 134 25 / 0.15));
 }
 
-.lnt-cat-workspace .banner-inline.is-warn {
+.lnt-cat-workspace .banner-inline.banner-warn {
   border-left-color: var(--lnt-warn);
 }
 
 /* Тон-подсказка: нейтральная полоса на акценте (токена info в витрине нет). */
-.lnt-cat-workspace .banner.is-info {
+.lnt-cat-workspace .banner.banner-info {
   border-color: rgb(86 129 255 / 0.35);
   border-left-color: var(--lnt-accent);
   background: rgb(86 129 255 / 0.12);
 }
 
-.lnt-cat-workspace .banner-inline.is-info {
+.lnt-cat-workspace .banner-inline.banner-info {
   border-left-color: var(--lnt-accent);
 }
 
@@ -77,13 +77,13 @@
   flex: none;
 }
 
-.lnt-cat-workspace .banner.is-warn .banner-glyph,
-.lnt-cat-workspace .banner-inline.is-warn .banner-glyph {
+.lnt-cat-workspace .banner.banner-warn .banner-glyph,
+.lnt-cat-workspace .banner-inline.banner-warn .banner-glyph {
   color: #f7c46c;
 }
 
-.lnt-cat-workspace .banner.is-info .banner-glyph,
-.lnt-cat-workspace .banner-inline.is-info .banner-glyph {
+.lnt-cat-workspace .banner.banner-info .banner-glyph,
+.lnt-cat-workspace .banner-inline.banner-info .banner-glyph {
   color: #a9c0ff;
 }
 

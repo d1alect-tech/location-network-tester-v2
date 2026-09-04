@@ -184,8 +184,8 @@ export type CatalogBannerTone = "error" | "warn" | "info";
 
 const BANNER_TONE: Record<CatalogBannerTone, { modifier: string; glyph: string }> = {
   error: { modifier: "", glyph: "✕" },
-  warn: { modifier: " is-warn", glyph: "▲" },
-  info: { modifier: " is-info", glyph: "●" },
+  warn: { modifier: " banner-warn", glyph: "▲" },
+  info: { modifier: " banner-info", glyph: "●" },
 };
 
 export function renderErrorBanner(

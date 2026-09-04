@@ -4,7 +4,7 @@
  * не касаемся). Зелёный пин: provenance и единицы в превью. */
 
 import { describe, expect, it } from "vitest";
-import type { ReportDraft } from "./views/reports/reportModel";
+import type { ReportDraft, ReportEffectNumbers } from "./views/reports/reportModel";
 import { composeReportMarkdown } from "./views/reports/reportModel";
 import { previewBlock } from "./views/reports/reportPreview";
 
@@ -84,6 +84,44 @@ describe("отчёты V6: md-блок", () => {
     const md = preview.querySelector(".md");
     expect(md, "V6-разрыв: в превью нет .md-блока с текстом выгрузки").not.toBeNull();
     expect(md?.textContent).toContain("exp.rep.demo");
+  });
+});
+
+describe("отчёты V6: тоны баннеров результата", () => {
+  it("descriptive — info-баннер с role=status", () => {
+    // Given: описательный исход без интервала
+    const data = {
+      ...draft(),
+      outcome: {
+        kind: "descriptive",
+        effect: (draft().outcome as { effect: ReportEffectNumbers }).effect,
+      },
+    } as ReportDraft;
+
+    // When
+    const preview = previewBlock(data);
+
+    // Then: инфо-тон объявлен статусом, не алёртом
+    const info = preview.querySelector(".lnt-rep-banner-info");
+    expect(info, "нет .lnt-rep-banner-info для descriptive-исхода").not.toBeNull();
+    expect(info?.getAttribute("role")).toBe("status");
+    expect(info?.textContent).toContain("Описательная оценка");
+  });
+
+  it("refusal — warn-баннер с role=alert", () => {
+    // Given: бэкенд заблокировал расчёт
+    const data = {
+      ...draft(),
+      outcome: { kind: "refusal", reason_code: "no_data" },
+    } as ReportDraft;
+
+    // When
+    const preview = previewBlock(data);
+
+    // Then: блокировка — алёрт
+    const warn = preview.querySelector(".lnt-rep-banner-warn");
+    expect(warn, "нет .lnt-rep-banner-warn для refusal-исхода").not.toBeNull();
+    expect(warn?.getAttribute("role")).toBe("alert");
   });
 });
 
