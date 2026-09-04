@@ -2,7 +2,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { JobSnapshot } from "./api/types-jobs";
-import { installMockBackend } from "./test-support/mock-lnt-backend";
+import { installMockBackend } from "./testkit/mockBackend";
 
 /** E2E рабочего процесса захвата (Todo 40): симулятор безопасен для
  * автоматизации; реальные пути устройства показывают диагностику, но запись

@@ -204,6 +204,7 @@ def run_capture(  # noqa: PLR0913 - backend contract keeps acquisition settings 
     sample_rate_hz: float,
     requested_samples: int,
     cancellation_token: CancellationToken = NEVER_CANCELLED,
+    calibration_used: bool = False,
 ) -> tuple[NDArray[np.uint8], NDArray[np.uint8], AcquisitionTelemetry] | CancelledResult:
     """Гонит поток до ``requested_samples``; возвращает raw-каналы и телеметрию.
 
@@ -218,6 +219,7 @@ def run_capture(  # noqa: PLR0913 - backend contract keeps acquisition settings 
             sample_rate_hz=sample_rate_hz,
             requested_samples=requested_samples,
             cancellation_token=cancellation_token,
+            calibration_used=calibration_used,
         )
     except Exception as exc:
         if type(exc).__module__.partition(".")[0] == "usb1":
@@ -233,6 +235,7 @@ def _stream_capture(  # noqa: PLR0913 - mirrors the public backend contract
     sample_rate_hz: float,
     requested_samples: int,
     cancellation_token: CancellationToken,
+    calibration_used: bool = False,
     sink: SpooledBlockCollector | None = None,
 ) -> tuple[NDArray[np.uint8], NDArray[np.uint8], AcquisitionTelemetry] | CancelledResult:
     if cancellation_token.is_cancelled():
@@ -286,7 +289,7 @@ def _stream_capture(  # noqa: PLR0913 - mirrors the public backend contract
         ch1_clip_high_count=ch1_clip_high,
         ch2_clip_low_count=ch2_clip_low,
         ch2_clip_high_count=ch2_clip_high,
-        calibration_used=False,
+        calibration_used=calibration_used,
     )
     return ch1, ch2, telemetry
 

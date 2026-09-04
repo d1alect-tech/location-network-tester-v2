@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { installMockBackend } from "./testkit/mockBackend";
 
 test("AppShell loads offline with zero non-loopback requests", async ({ page }) => {
   const nonLoopbackRequests: string[] = [];
+
+  // Единый мок-бэкенд: детерминированные ответы API вместо 404 dev-сервера.
+  installMockBackend(page);
 
   // Intercept all requests to verify they are only to loopback
   await page.route("**/*", async (route) => {

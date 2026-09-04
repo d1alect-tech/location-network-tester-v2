@@ -3,6 +3,8 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import type { CatalogSession } from "../../api/types";
+import { type MockLntBackend, installMockBackend } from "../../testkit/mockBackend";
 
 /** E2E Batch 2–6 progressive disclosure inside V6 extras: mount only when the artifact exists.
  * #/inspect mounts .app-v6; W1 lives in collapsed details[data-extra=w1].
@@ -26,7 +28,7 @@ function readFixture(rel: string): string {
   return fs.readFileSync(path.join(FIXTURES, rel), "utf8");
 }
 
-function catalog(id: string, sessionType: string): unknown {
+function catalog(id: string, sessionType: string): { items: CatalogSession[]; next_cursor: null } {
   return {
     items: [
       {
@@ -55,62 +57,27 @@ function detail(name: string, metricsJson: string): unknown {
   };
 }
 
-async function mockCatalog(page: Page, id: string, sessionType: string): Promise<void> {
-  await page.route("**/api/catalog/sessions**", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(catalog(id, sessionType)),
-    }),
-  );
+function mockCatalog(backend: MockLntBackend, id: string, sessionType: string): void {
+  backend.seedCatalog(catalog(id, sessionType).items);
 }
 
-async function mockSpectrum(page: Page, id: string): Promise<void> {
-  await page.route(`**/api/sessions/${id}/spectrum?*`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(SPECTRUM),
-    }),
-  );
+function mockSessionDetail(backend: MockLntBackend, id: string, metricsRel: string): void {
+  backend.seedSessionDetail(id, detail(id, readFixture(metricsRel)));
+  backend.seedSpectrum(id, SPECTRUM);
 }
 
-async function mockSessionDetail(page: Page, id: string, metricsRel: string): Promise<void> {
-  const body = JSON.stringify(detail(id, readFixture(metricsRel)));
-  await page.route(`**/api/sessions/${id}`, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body }),
-  );
-  await mockSpectrum(page, id);
+function mockPointer(backend: MockLntBackend, id: string): void {
+  backend.seedAnalysisPointer(id, { recipe_id: "default", artifact_key: ARTIFACT_KEY });
 }
 
-async function mockPointer(page: Page, id: string): Promise<void> {
-  await page.route(`**/api/analysis/sessions/${id}/.lnt-default-analysis.json`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ recipe_id: "default", artifact_key: ARTIFACT_KEY }),
-    }),
-  );
-}
-
-async function mockArtifacts(
-  page: Page,
+function mockArtifacts(
+  backend: MockLntBackend,
   id: string,
   files: Readonly<Record<string, string>>,
-): Promise<void> {
-  await page.route(`**/api/analysis/sessions/${id}/artifacts/${ARTIFACT_KEY}/**`, (route) =>
-    route.fulfill({
-      status: 404,
-      contentType: "application/json",
-      body: JSON.stringify({ detail: "not found" }),
-    }),
-  );
+): void {
+  // Единый мок по умолчанию отдаёт 404 на незасиженные артефакты.
   for (const [filename, body] of Object.entries(files)) {
-    const contentType = filename.endsWith(".csv") ? "text/csv" : "application/json";
-    await page.route(
-      `**/api/analysis/sessions/${id}/artifacts/${ARTIFACT_KEY}/${filename}`,
-      (route) => route.fulfill({ status: 200, contentType, body }),
-    );
+    backend.seedArtifact(id, ARTIFACT_KEY, filename, body);
   }
 }
 
@@ -134,10 +101,11 @@ test("measurement fixtures: Batch 2-6 disclosure present, ITIC and CM/DM absent,
   page,
 }) => {
   // Given: measurement artifacts, no power_quality.json, no cm_dm_spectrum.csv.
-  await mockCatalog(page, "t1-measurement", "measurement");
-  await mockSessionDetail(page, "t1-measurement", "measurement/metrics.json");
-  await mockPointer(page, "t1-measurement");
-  await mockArtifacts(page, "t1-measurement", {
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t1-measurement", "measurement");
+  mockSessionDetail(backend, "t1-measurement", "measurement/metrics.json");
+  mockPointer(backend, "t1-measurement");
+  mockArtifacts(backend, "t1-measurement", {
     "harmonics.json": readFixture("measurement/harmonics.json"),
     "notching.json": readFixture("measurement/notching.json"),
     "apd.json": readFixture("measurement/apd.json"),
@@ -169,10 +137,11 @@ test("measurement fixtures: Batch 2-6 disclosure present, ITIC and CM/DM absent,
 
 test("line_quality fixtures: ITIC disclosure present", async ({ page }) => {
   // Given: line_quality session with power_quality.json only.
-  await mockCatalog(page, "t1-line-quality", "line_quality");
-  await mockSessionDetail(page, "t1-line-quality", "measurement/metrics.json");
-  await mockPointer(page, "t1-line-quality");
-  await mockArtifacts(page, "t1-line-quality", {
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t1-line-quality", "line_quality");
+  mockSessionDetail(backend, "t1-line-quality", "measurement/metrics.json");
+  mockPointer(backend, "t1-line-quality");
+  mockArtifacts(backend, "t1-line-quality", {
     "power_quality.json": readFixture("line_quality/power_quality.json"),
   });
 
@@ -188,10 +157,11 @@ test("line_quality fixtures: ITIC disclosure present", async ({ page }) => {
 
 test("cm_dm fixtures: CM/DM disclosure present", async ({ page }) => {
   // Given: cm_dm session with cm_dm_spectrum.csv only.
-  await mockCatalog(page, "t1-cm-dm", "cm_dm");
-  await mockSessionDetail(page, "t1-cm-dm", "measurement/metrics.json");
-  await mockPointer(page, "t1-cm-dm");
-  await mockArtifacts(page, "t1-cm-dm", {
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t1-cm-dm", "cm_dm");
+  mockSessionDetail(backend, "t1-cm-dm", "measurement/metrics.json");
+  mockPointer(backend, "t1-cm-dm");
+  mockArtifacts(backend, "t1-cm-dm", {
     "cm_dm_spectrum.csv": readFixture("cm_dm/cm_dm_spectrum.csv"),
   });
 
@@ -207,22 +177,9 @@ test("cm_dm fixtures: CM/DM disclosure present", async ({ page }) => {
 
 test("v1-only: T6 banner still, no hollow panels", async ({ page }) => {
   // Given: no pointer, every artifact 404.
-  await mockCatalog(page, "t1-v1-only", "measurement");
-  await mockSessionDetail(page, "t1-v1-only", "v1-only/metrics.json");
-  await page.route("**/api/analysis/sessions/t1-v1-only/.lnt-default-analysis.json", (route) =>
-    route.fulfill({
-      status: 404,
-      contentType: "application/json",
-      body: JSON.stringify({ detail: "not found" }),
-    }),
-  );
-  await page.route("**/api/analysis/sessions/t1-v1-only/artifacts/**", (route) =>
-    route.fulfill({
-      status: 404,
-      contentType: "application/json",
-      body: JSON.stringify({ detail: "not found" }),
-    }),
-  );
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t1-v1-only", "measurement");
+  mockSessionDetail(backend, "t1-v1-only", "v1-only/metrics.json");
 
   // When
   await openInspect(page, "t1-v1-only");

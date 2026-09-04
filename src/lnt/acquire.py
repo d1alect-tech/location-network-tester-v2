@@ -1,8 +1,7 @@
 """Сборка device-сессии: валидация входа, манифест, масштабирование raw -> В.
 
-I/O с устройством (протокол драйвера, цикл захвата, телеметрия) — в
-``scope_io``. Калибровочная поправка не применяется
-(``calibration_used=False``): протокол LNT сравнивает дельты, не абсолюты.
+I/O с устройством — в ``scope_io``; масштаб и поправка АЦП — в
+``adc_calibration``. Без таблицы ``calibration_used=False``.
 """
 
 import math
@@ -12,9 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import overload
 
-import numpy as np
-from numpy.typing import NDArray
-
+from lnt.adc_calibration import AdcCalibration, apply_adc_calibration
 from lnt.errors import InputError
 from lnt.manifest import validated_label
 from lnt.metadata_collector import AcquisitionSettings, MetadataCollector
@@ -48,16 +45,12 @@ from lnt.types import (
     TransformerLineProbe,
 )
 
-Float32Array = NDArray[np.float32]
-
 DEFAULT_SAMPLE_RATE_HZ = 8_000_000.0
 MAX_DUAL_RATE_MHZ = 15
 MEGA = 1_000_000
 DEFAULT_RANGE_V = 5.0
 # Номинал диапазона CH1 (В) -> код гейна драйвера; полная шкала = +-5.12/код В.
 RANGE_CODES: dict[float, int] = {5.0: 1, 1.0: 5, 0.5: 10}
-ADC_CENTER = 128.0
-VOLTS_SCALE = 5.12
 FRONT_END_CH1 = "x2-probe 2x10nF+100R"
 FRONT_END_CH2 = "transformer 230:6"
 LINE_FREQUENCY_HZ = 50.0
@@ -81,6 +74,7 @@ def capture_session(
     ch1_setup: Ch1Setup | None = None,
     baseline_session: str | None = None,
     channel_mode: ChannelMode = ChannelMode.DUAL,
+    adc_calibration: AdcCalibration | None = None,
 ) -> Path: ...
 
 
@@ -99,6 +93,7 @@ def capture_session(
     ch1_setup: Ch1Setup | None = None,
     baseline_session: str | None = None,
     channel_mode: ChannelMode = ChannelMode.DUAL,
+    adc_calibration: AdcCalibration | None = None,
 ) -> Path | CancelledResult: ...
 
 
@@ -116,15 +111,15 @@ def capture_session(  # noqa: C901, PLR0913 -- capture assembly boundary
     baseline_session: str | None = None,
     channel_mode: ChannelMode = ChannelMode.DUAL,
     cancellation_token: CancellationToken = NEVER_CANCELLED,
+    adc_calibration: AdcCalibration | None = None,
 ) -> Path | CancelledResult:
     """Захватывает сессию и атомарно пишет её в ``out_dir``.
 
     ``ch1_range_v`` — номинал диапазона ВЧ-канала (5/1/0.5 В); CH2 всегда
     остаётся на +-5 В (трансформатор 230:6 даёт ~8.5 Vpk).
-
-    ``channel_mode=CH1_ONLY`` — однокональный режим (один пробник):
-    устройство стримит оба канала, но CH2 не сохраняется, а анализ
-    идёт по номинальным окнам сети без фазовой привязки.
+    ``channel_mode=CH1_ONLY`` — один пробник: CH2 не сохраняется, анализ
+    по номинальным окнам без фазовой привязки.
+    ``adc_calibration=None`` — без поправки, ``calibration_used=False``.
     """
     rate_code = _rate_code(sample_rate_hz)
     ch1_range_code = _range_code(ch1_range_v)
@@ -157,6 +152,7 @@ def capture_session(  # noqa: C901, PLR0913 -- capture assembly boundary
         sample_rate_hz=sample_rate_hz,
         requested_samples=requested_samples,
         cancellation_token=cancellation_token,
+        calibration_used=adc_calibration is not None,
     )
     if isinstance(capture, CancelledResult):
         return capture
@@ -215,13 +211,16 @@ def capture_session(  # noqa: C901, PLR0913 -- capture assembly boundary
         return write_session(
             session_dir=out_dir,
             manifest=manifest,
-            ch1=_scale_raw(
+            ch1=apply_adc_calibration(
                 ch1_raw,
                 range_code=ch1_range_code,
                 probe_multiplier=_ch1_probe_multiplier(setup),
+                calibration=adc_calibration,
             ),
             ch2=(
-                _scale_raw(ch2_raw, range_code=RANGE_CODE_5V)
+                apply_adc_calibration(
+                    ch2_raw, range_code=RANGE_CODE_5V, calibration=adc_calibration
+                )
                 if channel_mode is ChannelMode.DUAL
                 else None
             ),
@@ -330,13 +329,3 @@ def _range_code(range_v: float) -> int:
         supported = "/".join(f"{value:g}" for value in RANGE_CODES)
         raise InputError(f"диапазон {range_v:g} В не поддерживается: допустимы {supported} В")
     return code
-
-
-def _scale_raw(
-    raw: NDArray[np.uint8],
-    *,
-    range_code: int,
-    probe_multiplier: float = 1.0,
-) -> Float32Array:
-    scale = VOLTS_SCALE * probe_multiplier / float(range_code << 7)
-    return ((raw.astype(np.float32) - ADC_CENTER) * scale).astype(np.float32)

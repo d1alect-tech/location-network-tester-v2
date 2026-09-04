@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { type MockLntBackend, installMockBackend } from "./testkit/mockBackend";
 
 /** Контракт общей V6-оболочки (раскатка дизайна витрины на всё приложение):
  *  единые шапка (.hdr с таббаром .snav-item) и статус-бар (.statusbar) на ВСЕХ
@@ -12,53 +13,31 @@ const TABS = 6; // Каталог, Захват, Инспекция, Экспе�
 
 const ROUTES = ["catalog", "capture", "inspect", "experiments", "reports", "settings"] as const;
 
-async function mockInspectApi(page: Page): Promise<void> {
-  const json = (body: unknown): string => JSON.stringify(body);
-  await page.route("**/api/catalog/sessions**", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json({
-        items: [
-          {
-            id: "capture-001",
-            health: "ok",
-            created_utc: "2026-08-02T10:00:00Z",
-            source: "capture",
-            session_type: "capture",
-            profile: "bad",
-            label: "стенд-А",
-            storage_path: null,
-          },
-        ],
-        next_cursor: null,
-      }),
-    }),
-  );
-  await page.route("**/api/sessions/capture-001", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json({
-        name: "capture-001",
-        manifest: {},
-        analysis: null,
-        spectrum_available: true,
-        waveform_available: false,
-        ch2_available: false,
-      }),
-    }),
-  );
-  await page.route("**/api/sessions/capture-001/spectrum?*", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json({ frequency_hz: [10, 100, 1000], psd_v2_per_hz: [1e-6, 1e-4, 1e-2], point_count: 3 }),
-    }),
-  );
-  await page.route("**/api/analysis/sessions/capture-001/.lnt-default-analysis.json", (route) =>
-    route.fulfill({ status: 404, contentType: "application/json", body: json({ detail: "not found" }) }),
-  );
+function mockInspectApi(backend: MockLntBackend): void {
+  backend.seedCatalog([
+    {
+      id: "capture-001",
+      health: "ok",
+      created_utc: "2026-08-02T10:00:00Z",
+      source: "capture",
+      session_type: "capture",
+      profile: "bad",
+      label: "стенд-А",
+    },
+  ]);
+  backend.seedSessionDetail("capture-001", {
+    name: "capture-001",
+    manifest: {},
+    analysis: null,
+    spectrum_available: true,
+    waveform_available: false,
+    ch2_available: false,
+  });
+  backend.seedSpectrum("capture-001", {
+    frequency_hz: [10, 100, 1000],
+    psd_v2_per_hz: [1e-6, 1e-4, 1e-2],
+    point_count: 3,
+  });
 }
 
 async function noHorizontalOverflow(page: Page): Promise<void> {
@@ -70,7 +49,7 @@ async function noHorizontalOverflow(page: Page): Promise<void> {
 }
 
 test("S1: общая V6-шапка и статус-бар на всех маршрутах, старой шапки нет", async ({ page }) => {
-  await mockInspectApi(page);
+  mockInspectApi(installMockBackend(page));
   for (const route of ROUTES) {
     await page.goto(`${BASE}#/${route}`);
     // Единая шапка витрины: бренд, таббар из 6 вкладок, статус устройства.
@@ -92,7 +71,7 @@ test("S1: общая V6-шапка и статус-бар на всех марш
 });
 
 test("S1b: убитый legacy-маршрут prepare редиректит на capture (A3)", async ({ page }) => {
-  await mockInspectApi(page);
+  mockInspectApi(installMockBackend(page));
   await page.goto(`${BASE}#/prepare`);
   await expect(page).toHaveURL(/#\/capture/);
   const header = page.locator("header.hdr");
@@ -105,8 +84,10 @@ test("S1b: убитый legacy-маршрут prepare редиректит на 
   await noHorizontalOverflow(page);
 });
 
-test("S2: инспект под общей оболочкой — окно сравнения без дублирования шелла", async ({ page }) => {
-  await mockInspectApi(page);
+test("S2: инспект под общей оболочкой — окно сравнения без дублирования шелла", async ({
+  page,
+}) => {
+  mockInspectApi(installMockBackend(page));
   await page.goto(`${BASE}#/inspect`);
   // Окно сравнения на месте: полоса пары, каталог, сигнальное окно, лента анализа.
   await expect(page.locator(".pairbar")).toBeVisible();
@@ -126,7 +107,7 @@ test("S2: инспект под общей оболочкой — окно ср�
 
 test("S2b: персона 375px — общая оболочка без горизонтальной прокрутки", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await mockInspectApi(page);
+  mockInspectApi(installMockBackend(page));
   for (const route of ["catalog", "inspect", "settings"] as const) {
     await page.goto(`${BASE}#/${route}`);
     await expect(page.locator("header.hdr")).toBeVisible();

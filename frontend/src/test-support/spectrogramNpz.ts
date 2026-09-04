@@ -7,6 +7,9 @@ export interface SpectrogramNpzInput {
   frequencyHz: readonly number[];
   /** Плоский массив длиной bands*timeBins (f * timeBins + t). */
   powerDb: Float32Array;
+  /** Max-hold след той же формы; по умолчанию — копия powerDb (движок
+   * всегда пишет power_max_hold_db, продуктовый fetchLevel его требует). */
+  powerMaxHoldDb?: Float32Array;
 }
 
 function crc32(bytes: Uint8Array): number {
@@ -112,14 +115,21 @@ function npy(
   return bytes;
 }
 
-/** Собирает spectrogram.npz (STORED-записи, детерминированный порядок). */
+/** Собирает spectrogram.npz (STORED-записи, детерминированный порядок).
+ * Всегда включает power_max_hold_db.npy — как движок (engine_spectrogram):
+ * без него продуктовый readNpzArrays падает corrupt_payload и пара не грузится. */
 export function buildSpectrogramNpz(input: SpectrogramNpzInput): ArrayBuffer {
+  const shape = [input.frequencyHz.length, input.timeS.length] as const;
   const entries: Array<{ name: string; body: Uint8Array }> = [
     { name: "time_s.npy", body: npyF64(input.timeS) },
     { name: "frequency_hz.npy", body: npyF64(input.frequencyHz) },
     {
       name: "power_db.npy",
-      body: npyF32(input.powerDb, [input.frequencyHz.length, input.timeS.length]),
+      body: npyF32(input.powerDb, shape),
+    },
+    {
+      name: "power_max_hold_db.npy",
+      body: npyF32(input.powerMaxHoldDb ?? input.powerDb, shape),
     },
   ];
   const writer = new ByteWriter();

@@ -4,10 +4,9 @@
 
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { installMockBackend } from "./test-support/mock-lnt-backend";
 import { injectAxe } from "./testkit/axe";
 import type { AxeSeriousSummary } from "./testkit/axe";
-import { MockResearchBackend, attachResearchBackend } from "./testkit/researchBackend";
+import { installMockBackend } from "./testkit/mockBackend";
 
 /** Axe по поддереву фичи: чужие узлы страницы (оверлей/таймлайн) — не предмет T12. */
 async function seriousAxeViolationsIn(page: Page, selector: string): Promise<AxeSeriousSummary[]> {
@@ -98,7 +97,7 @@ test("T12.1: занятый захват — warn-полоса, axe чист", a
 
 test.describe("T12.2/T12.3 поверх research-мока", () => {
   test.beforeEach(async ({ page }) => {
-    await attachResearchBackend(page, new MockResearchBackend());
+    installMockBackend(page);
   });
 
   test("T12.2: pairbar показывает условия A/B/A с N, axe чист", async ({ page }) => {

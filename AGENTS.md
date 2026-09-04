@@ -60,3 +60,22 @@ node --test "tests/js/*.test.mjs"
 - Vite builds INTO `src/lnt/ui/static/v2` (base `/static/v2/`); byte-stable rebuild required by `build-check.js`.
 - Offline: vendored uPlot 1.6.32 + IBM Plex; server binds 127.0.0.1 only, Swagger/ReDoc off.
 - Hantek dep pinned to git `e65d52b` (GPL); private-use build must never leave the machine.
+
+## ГРАНИЦА v1/v2 (очередь C4)
+
+- v1 `analysis.py` — тонкий фасад: типы (`analysis_types`), пейлоады
+  (`analysis_payload`), рендер (`analysis_render`), запись (`analysis_write`);
+  движок `analyze_session` без изменений. Потребители v1: `cli.py`
+  (`_cmd_analyze`), `cli_compare.py` (артефакты + откат на `analyze_session`),
+  `cm_dm/dispatch.py` (маршрутизация v1 vs CM/DM), `ui/operations.py`
+  (`LntBackend.analyze_and_write/compare`), `ui/payloads.py` (имена файлов).
+- v2 `analysis_v2/engine*.py` — оркестрация веток ПОВЕРХ v1-движков
+  (`cm_dm.analysis`, `line_quality` via `line_quality_v2`, `psd`/welch,
+  events/features); математику не дублировать — переиспользовать v1.
+- `line_quality.py`/`needles.py`/`spectrum.py` — движки v1, фасадами над v2
+  не накрывать (дорого, риск дрейфа golden): граница задокументирована
+  здесь вместо рефакторинга.
+- `lnt compare` читает `metrics.json`+`spectrum.csv` (откат на полный
+  анализ при отсутствии/порче); перед сравнением нужен `lnt analyze`.
+  `spectrum.csv` хранит PSD в `%.9g` — дельты сходятся на точности рендера
+  (0.1 дБ), не побитово.

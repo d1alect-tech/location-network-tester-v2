@@ -1,298 +1,345 @@
-/** ТЕСТОВЫЙ in-memory бэкенд (только e2e/spec): повторяет контракты
- * routes_catalog.py / routes_context.py / routes_profiles.py — включая
- * keyset-пейджинг, casefold-подстроку метки, оптимистичную блокировку
- * revision (409) и nonce-заголовок мутаций. Используется через page.route. */
+/** Единый мок-бэкенд LNT для e2e (только e2e/spec, не продукт).
+ * Слит из трёх расходившихся моков: test-support/mock-lnt-backend.ts
+ * (задачи + SSE pump), testkit/mockBackend.ts (каталог/контекст/профили),
+ * testkit/researchBackend.ts (эксперименты/статистика/тренды). Числа —
+ * только canned-золото mockGolden (корпус tests/science/corpus.py),
+ * семантика aba.py в TS не дублируется.
+ *
+ * Предикат — startsWith(/api/) (glob **\/api/** ломал модули vite);
+ * мутации требуют x-lnt-mutation-nonce из /api/config; темп SSE задаёт
+ * тест через pump()/pumpAll(). Продуктовый бэкенд не меняется. */
 
-import type {
-  CatalogPage,
-  CatalogSession,
-  ContextResponse,
-  ContextUpdateRequest,
-  ProfileRevision,
-} from "../api/types";
-import { contextFor, defaultProfiles, generateSessions } from "./catalogFixture";
+import type { Page, Route } from "@playwright/test";
+import type { CatalogSession } from "../api/types";
+import type { DeviceStateValue } from "../api/types-device";
+import type { JobSnapshot } from "../api/types-jobs";
+import { CatalogStore, handleCatalog } from "./mockCatalogStore";
+import { buildPreflight, devicePayload } from "./mockDevice";
+import { BUILD_ID, type FixtureSession, NONCE, researchSessions } from "./mockGolden";
+import { type MockHttpReply, type MockHttpRequest, isApiPath, stripStaticPrefix } from "./mockHttp";
+import { JobStore, handleJobs } from "./mockJobStore";
+import { ResearchStore, handleResearch } from "./mockResearchStore";
 
-const NONCE = "test-nonce-t39";
+export interface MockBackendOptions {
+  deviceState?: DeviceStateValue;
+  /** Задача, уже существующая на сервере при монтировании (восстановление). */
+  existingJob?: JobSnapshot;
+  /** Размер генерируемого каталога (0 — только research-сессии). */
+  catalogSize?: number;
+  catalogSeed?: number;
+}
 
-export interface CatalogFilters {
-  health?: string;
-  session_type?: string;
-  profile?: string;
-  label?: string;
-  tag?: string;
-  created_from?: string;
-  created_to?: string;
+interface ArtifactSeed {
+  body: string | Buffer;
+  contentType: string;
+}
+
+function defaultSpectrum(): Record<string, unknown> {
+  const points = Array.from({ length: 32 }, (_, i) => 1000 * 2 ** (i / 4));
+  return {
+    frequency_hz: points,
+    psd_v2_per_hz: points.map((f) => 1e-8 / (f / 1000)),
+    point_count: points.length,
+  };
 }
 
 export class MockLntBackend {
-  readonly sessions: CatalogSession[];
-  private readonly storagePaths = new Map<string, string>();
-  private contexts = new Map<string, ContextResponse>();
-  private profilesStore: ProfileRevision[];
-  /** Сессии, для которых следующий PUT вернёт 409 (конкурентная правка). */
-  readonly conflictQueue = new Set<string>();
+  readonly catalog = new CatalogStore(0);
+  readonly jobs = new JobStore();
+  readonly research = new ResearchStore();
+  deviceState: DeviceStateValue = "ready";
+  readonly preflightRequests: Record<string, unknown>[] = [];
+  private readonly researchSessions: FixtureSession[];
+  private readonly details = new Map<string, unknown>();
+  private readonly spectra = new Map<string, unknown>();
+  private readonly referred = new Map<string, { status: number; body: unknown }>();
+  private readonly waveforms = new Map<string, unknown>();
+  private readonly pointers = new Map<
+    string,
+    { recipe_id?: string; artifact_key: string } | null
+  >();
+  private readonly artifacts = new Map<string, ArtifactSeed>();
 
-  constructor(size: number, seed = 39) {
-    this.sessions = generateSessions({ size, seed });
-    for (const session of this.sessions) {
-      this.storagePaths.set(session.id, `/sessions/${session.id}`);
-      this.contexts.set(session.id, contextFor(session));
+  constructor(options: MockBackendOptions = {}) {
+    this.deviceState = options.deviceState ?? "ready";
+    if (options.existingJob) this.jobs.existingJob = options.existingJob;
+    const size = options.catalogSize ?? 0;
+    if (size > 0) {
+      const generated = new CatalogStore(size, options.catalogSeed ?? 39);
+      this.catalog.seedCatalog([...generated.sessions]);
     }
-    this.profilesStore = defaultProfiles();
+    this.researchSessions = researchSessions();
   }
 
-  /** Имитирует чужую правку: меняет заметки и инкрементирует revision. */
+  // ---- хуки спек (имена сохранены от трёх старых моков) ----
+  get startedRequests(): Record<string, unknown>[] {
+    return this.jobs.startedRequests;
+  }
+  get cancelRequests(): string[] {
+    return this.jobs.cancelRequests;
+  }
+  get plans(): JobStore["plans"] {
+    return this.jobs.plans;
+  }
+  get sessionCounter(): number {
+    return this.jobs.sessionCounter;
+  }
+  get conflictQueue(): Set<string> {
+    return this.catalog.conflictQueue;
+  }
+  get conflictNextHypothesis(): boolean {
+    return this.research.conflictNextHypothesis;
+  }
+  set conflictNextHypothesis(value: boolean) {
+    this.research.conflictNextHypothesis = value;
+  }
+  get mixedTypeSessions(): Set<string> {
+    return this.research.mixedTypeSessions;
+  }
+  pump(jobId?: string): void {
+    this.jobs.pump(jobId);
+  }
+  pumpAll(): void {
+    this.jobs.pumpAll();
+  }
+  getContext(sessionId: string): ReturnType<CatalogStore["getContext"]> {
+    return this.catalog.getContext(sessionId);
+  }
   concurrentEdit(sessionId: string): void {
-    const context = this.contexts.get(sessionId);
-    if (!context) return;
-    this.contexts.set(sessionId, {
-      ...context,
-      revision: context.revision + 1,
-      notes: `Чужая правка в ${sessionId}`,
-      tags: [...context.tags, "конкурент"],
-    });
-    this.conflictQueue.add(sessionId);
+    this.catalog.concurrentEdit(sessionId);
+  }
+
+  // ---- сиды inspect-фикстур спек (данные живут в спеках, не в мокe) ----
+  seedCatalog(items: CatalogSession[]): void {
+    this.catalog.seedCatalog(items);
+  }
+  seedSessionDetail(id: string, payload: unknown): void {
+    this.details.set(id, payload);
+  }
+  seedSpectrum(id: string, payload: unknown): void {
+    this.spectra.set(id, payload);
+  }
+  seedReferredSpectrum(id: string, payload: unknown, status = 200): void {
+    this.referred.set(id, { status, body: payload });
+  }
+  seedWaveform(id: string, payload: unknown): void {
+    this.waveforms.set(id, payload);
+  }
+  seedAnalysisPointer(
+    sessionId: string,
+    pointer: { recipe_id?: string; artifact_key: string } | null,
+  ): void {
+    this.pointers.set(sessionId, pointer);
+  }
+  seedArtifact(
+    sessionId: string,
+    key: string,
+    filename: string,
+    body: string | Buffer,
+    contentType?: string,
+  ): void {
+    const resolvedType =
+      contentType ?? (filename.endsWith(".csv") ? "text/csv" : "application/json");
+    this.artifacts.set(`${sessionId}/${key}/${filename}`, { body, contentType: resolvedType });
   }
 
   configPayload(): Record<string, unknown> {
     return {
       root: "C:\\lnt-sessions-test",
-      profiles: ["loft-main"],
+      profiles: ["bad", "bad-damped", "quiet", "sync-only", "async-heavy"],
       defaults: {
-        simulate: {
-          duration_s: 2.4,
-          sample_rate_hz: 20_000_000,
-          seed: 1,
-          repeat: 3,
-          interval_s: 5,
-        },
-        capture: {
-          duration_s: 2.4,
-          sample_rate_hz: 20_000_000,
-          range_v: 5,
-          repeat: 3,
-          interval_s: 5,
-        },
-        ranges: [0.5, 1, 5],
+        simulate: { duration_s: 2.4, sample_rate_hz: 500000, seed: 6022, repeat: 1, interval_s: 0 },
+        capture: { duration_s: 2.4, sample_rate_hz: 8000000, range_v: 5, repeat: 1, interval_s: 0 },
+        ranges: [5, 1, 0.5],
       },
-      build_id: "t39-build",
+      build_id: BUILD_ID,
       mutation_nonce: NONCE,
-      static_asset_hash: "test",
+      static_asset_hash: "c2",
       static_assets: {},
     };
   }
 
-  catalog(searchParams: URLSearchParams): CatalogPage {
-    const pageSize = Math.min(Number(searchParams.get("page_size") ?? "50") || 50, 200);
-    const filters: CatalogFilters = {
-      health: searchParams.get("health") ?? undefined,
-      session_type: searchParams.get("session_type") ?? undefined,
-      profile: searchParams.get("profile") ?? undefined,
-      label: searchParams.get("label") ?? undefined,
-      tag: searchParams.get("tag") ?? undefined,
-      created_from: searchParams.get("created_from") ?? undefined,
-      created_to: searchParams.get("created_to") ?? undefined,
-    };
-    const matched = this.sessions.filter((session) => {
-      if (filters.health && session.health !== filters.health) return false;
-      if (filters.session_type && session.session_type !== filters.session_type) return false;
-      if (filters.profile && session.profile !== filters.profile) return false;
-      if (
-        filters.label &&
-        !(session.label ?? "").toLowerCase().includes(filters.label.toLowerCase())
-      ) {
-        return false;
-      }
-      if (filters.tag) {
-        const tags = this.contexts.get(session.id)?.tags ?? [];
-        if (!tags.includes(filters.tag)) return false;
-      }
-      if (filters.created_from && (session.created_utc ?? "") < filters.created_from) return false;
-      if (filters.created_to && (session.created_utc ?? "") > `${filters.created_to}T23:59:59Z`) {
-        return false;
-      }
-      return true;
-    });
-
-    // Keyset: created_utc DESC, session_id ASC; cursor после последней строки страницы.
-    let start = 0;
-    const cursorRaw = searchParams.get("cursor");
-    if (cursorRaw) {
-      const [createdUtc, sessionId, storagePath] = decodeCursor(cursorRaw);
-      start = matched.findIndex((session) => {
-        const path = this.storagePaths.get(session.id) ?? "";
-        const afterCursor =
-          (session.created_utc ?? "") < (createdUtc || "") ||
-          ((session.created_utc ?? "") === (createdUtc || "") &&
-            (session.id > sessionId || (session.id === sessionId && path > storagePath)));
-        return afterCursor;
-      });
-      if (start === -1) start = 0;
-    }
-    const items = matched.slice(start, start + pageSize);
-    const last = items.at(-1);
-    const hasMore = start + pageSize < matched.length;
-    return {
-      items,
-      next_cursor:
-        hasMore && last
-          ? encodeCursor(last.created_utc, last.id, this.storagePaths.get(last.id) ?? "/")
-          : null,
-    };
-  }
-
-  getContext(sessionId: string): ContextResponse | null {
-    return this.contexts.get(sessionId) ?? null;
-  }
-
-  updateContext(
-    sessionId: string,
-    request: ContextUpdateRequest,
-  ): { status: number; body?: ContextResponse | Record<string, unknown> } {
-    const current = this.contexts.get(sessionId);
-    if (!current) return { status: 404, body: { detail: "сессия не найдена" } };
-    if (request.expected_revision !== current.revision || this.conflictQueue.has(sessionId)) {
-      this.conflictQueue.delete(sessionId);
+  private sessionDetail(id: string): unknown | null {
+    const seeded = this.details.get(id);
+    if (seeded !== undefined) return seeded;
+    const research = this.researchSessions.find((item) => item.id === id);
+    if (research) {
       return {
-        status: 409,
-        body: {
-          detail: {
-            detail: `конфликт revision контекста: ожидалась ${request.expected_revision}, текущая ${current.revision}`,
-            current_revision: current.revision,
-          },
+        name: research.id,
+        manifest: {},
+        analysis: {
+          metrics: { band_mid_total: research.metric },
+          ch1_input_reference:
+            research.health === "ok"
+              ? { status: "available", model_kind: "rc_shunt_v1" }
+              : { status: "unavailable", reason_code: "analysis_unavailable" },
         },
+        spectrum_available: true,
+        waveform_available: false,
+        ch2_available: false,
       };
     }
-    const updated: ContextResponse = {
-      ...current,
-      revision: current.revision + 1,
-      fields: request.fields ?? current.fields,
-      tags: request.tags ?? current.tags,
-      notes: request.notes ?? current.notes,
-    };
-    this.contexts.set(sessionId, updated);
-    return { status: 200, body: updated };
-  }
-
-  profiles(): ProfileRevision[] {
-    return [...this.profilesStore];
-  }
-
-  upsertProfile(profileId: string, kind: string, data: unknown): { status: number; body: unknown } {
-    const existingIndex = this.profilesStore.findIndex((item) => item.profile_id === profileId);
-    if (existingIndex === -1) {
-      const created: ProfileRevision = {
-        profile_id: profileId,
-        kind: kind as ProfileRevision["kind"],
-        revision: 1,
-        captured_at: "2026-08-01T00:00:00Z",
-        data: data as ProfileRevision["data"],
+    const catalogItem = this.catalog.sessions.find((item) => item.id === id);
+    if (catalogItem) {
+      return {
+        name: catalogItem.id,
+        manifest: {},
+        analysis: {
+          metrics: { band_mid_total: 0 },
+          ch1_input_reference:
+            catalogItem.health === "ok"
+              ? { status: "available", model_kind: "rc_shunt_v1" }
+              : { status: "unavailable", reason_code: "analysis_unavailable" },
+        },
+        spectrum_available: true,
+        waveform_available: false,
+        ch2_available: false,
       };
-      this.profilesStore.push(created);
-      return { status: 201, body: created };
     }
-    const previous = this.profilesStore[existingIndex];
-    if (!previous) return { status: 404, body: { detail: "профиль не найден" } };
-    const updated: ProfileRevision = {
-      ...previous,
-      revision: previous.revision + 1,
-      captured_at: "2026-08-02T00:00:00Z",
-      data: data as ProfileRevision["data"],
+    return null;
+  }
+
+  handleRequest(request: MockHttpRequest): MockHttpReply | null {
+    const { method, path } = request;
+    if (path === "/api/config" && method === "GET")
+      return { status: 200, body: this.configPayload() };
+    if (path === "/api/health" && method === "GET") {
+      return { status: 200, body: { status: "ok", build_id: BUILD_ID } };
+    }
+    if (path === "/api/device/state" && method === "GET") {
+      return { status: 200, body: devicePayload(this.deviceState) };
+    }
+    if (path === "/api/capture/preflight" && method === "POST") {
+      const body = request.bodyJson<Record<string, unknown>>();
+      this.preflightRequests.push(body);
+      return { status: 200, body: buildPreflight(this.deviceState, body) };
+    }
+    const jobsReply = handleJobs(this.jobs, request);
+    if (jobsReply) return jobsReply;
+    if (path === "/api/catalog/sessions" && method === "GET") {
+      if (this.catalog.sessions.length > 0)
+        return { status: 200, body: this.catalog.catalog(request.searchParams) };
+      return { status: 200, body: { items: this.researchSessions, next_cursor: null } };
+    }
+    const catalogReply = handleCatalog(this.catalog, request);
+    if (catalogReply) return catalogReply;
+    const researchReply = handleResearch(this.research, request);
+    if (researchReply) return researchReply;
+    return this.inspect(request);
+  }
+
+  private inspect(request: MockHttpRequest): MockHttpReply | null {
+    const { method, path } = request;
+    const sessionMatch = /^\/api\/sessions\/([^/]+)(\/.*)?$/.exec(path);
+    if (sessionMatch) {
+      const id = decodeURIComponent(sessionMatch[1] ?? "");
+      const suffix = sessionMatch[2] ?? "";
+      if (suffix === "" && method === "GET") {
+        const detail = this.sessionDetail(id);
+        return detail
+          ? { status: 200, body: detail }
+          : { status: 404, body: { detail: "сессия не найдена" } };
+      }
+      if (suffix === "/spectrum" && method === "GET") {
+        return { status: 200, body: this.spectra.get(id) ?? defaultSpectrum() };
+      }
+      if (suffix === "/spectrum-input-referred" && method === "GET") {
+        const seeded = this.referred.get(id);
+        if (!seeded) return { status: 404, body: {} };
+        return { status: seeded.status, body: seeded.body };
+      }
+      if (suffix === "/waveform" && method === "GET") {
+        const wave = this.waveforms.get(id);
+        return wave !== undefined
+          ? { status: 200, body: wave }
+          : { status: 404, body: { detail: "нет данных" } };
+      }
+      return null;
+    }
+    const pointerMatch = /^\/api\/analysis\/sessions\/([^/]+)\/\.lnt-default-analysis\.json$/.exec(
+      path,
+    );
+    if (pointerMatch && method === "GET") {
+      const id = decodeURIComponent(pointerMatch[1] ?? "");
+      const pointer = this.pointers.get(id) ?? null;
+      if (!pointer) return { status: 404, body: { detail: "нет указателя" } };
+      return {
+        status: 200,
+        body: { recipe_id: pointer.recipe_id ?? "default", artifact_key: pointer.artifact_key },
+      };
+    }
+    const artifactMatch = /^\/api\/analysis\/sessions\/([^/]+)\/artifacts\/([^/]+)\/(.+)$/.exec(
+      path,
+    );
+    if (artifactMatch && method === "GET") {
+      const key = `${decodeURIComponent(artifactMatch[1] ?? "")}/${decodeURIComponent(artifactMatch[2] ?? "")}/${decodeURIComponent(artifactMatch[3] ?? "")}`;
+      const seed = this.artifacts.get(key);
+      if (!seed) return { status: 404, body: { detail: "not found" } };
+      return { status: 200, contentType: seed.contentType, body: seed.body };
+    }
+    return null;
+  }
+
+  async handle(route: Route): Promise<void> {
+    const url = new URL(route.request().url());
+    const path = stripStaticPrefix(url.pathname);
+    const method = route.request().method();
+    const request: MockHttpRequest = {
+      method,
+      path,
+      searchParams: url.searchParams,
+      nonceOk: route.request().headers()["x-lnt-mutation-nonce"] === NONCE,
+      bodyJson<T>(): T {
+        try {
+          return (route.request().postDataJSON() ?? {}) as T;
+        } catch {
+          return {} as T;
+        }
+      },
     };
-    this.profilesStore[existingIndex] = updated;
-    return { status: 200, body: updated };
-  }
-
-  deleteProfile(profileId: string): number {
-    const existingIndex = this.profilesStore.findIndex((item) => item.profile_id === profileId);
-    if (existingIndex === -1) return 404;
-    this.profilesStore.splice(existingIndex, 1);
-    return 204;
-  }
-}
-
-export function encodeCursor(
-  createdUtc: string | null,
-  sessionId: string,
-  storagePath: string,
-): string {
-  const raw = JSON.stringify([createdUtc, sessionId, storagePath]);
-  return btoa(raw).replace(/=+$/, "");
-}
-
-function decodeCursor(raw: string): [string | null, string, string] {
-  const padded = raw + "=".repeat((4 - (raw.length % 4)) % 4);
-  const values = JSON.parse(atob(padded)) as unknown[];
-  return [(values[0] as string | null) ?? null, String(values[1]), String(values[2])];
-}
-
-/** Подключает бэкенд к Playwright page: перехват ТОЛЬКО настоящих API-путей
- * (pathname начинается с /api/), чтобы не задеть модули сборки вида
- * /static/v2/src/api/client.ts. */
-export async function attachMockBackend(
-  page: import("@playwright/test").Page,
-  backend: MockLntBackend,
-): Promise<void> {
-  await page.route(
-    (url) => url.pathname.startsWith("/api/") || url.pathname.includes("!/api/"),
-    async (route) => {
-      const url = new URL(route.request().url());
-      const path = url.pathname.replace(/^\/static\/v2/, "");
-      const method = route.request().method();
-      const json = (status: number, body?: unknown): Promise<void> =>
-        route.fulfill({
-          status,
+    const reply = this.handleRequest(request);
+    if (!reply) {
+      if (method === "GET") {
+        await route.fulfill({
+          status: 200,
           contentType: "application/json",
-          body: body === undefined ? "" : JSON.stringify(body),
+          body: JSON.stringify({}),
         });
+        return;
+      }
+      await route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: `нет мока: ${method} ${path}` }),
+      });
+      return;
+    }
+    await route.fulfill(toFulfill(reply));
+  }
+}
 
-      if (path === "/api/config" && method === "GET") return json(200, backend.configPayload());
-      if (path === "/api/health" && method === "GET") {
-        return json(200, { status: "ok", build_id: "t39-build" });
-      }
-      if (path === "/api/catalog/sessions" && method === "GET") {
-        return json(200, backend.catalog(url.searchParams));
-      }
-      const contextMatch = /^\/api\/context\/(.+)$/.exec(path);
-      if (contextMatch) {
-        const sessionId = decodeURIComponent(contextMatch[1] ?? "");
-        if (method === "GET") {
-          const payload = backend.getContext(sessionId);
-          return payload ? json(200, payload) : json(404, { detail: "сессия не найдена" });
-        }
-        if (method === "PUT") {
-          if (route.request().headers()["x-lnt-mutation-nonce"] !== NONCE) {
-            return json(403, { code: "mutation_nonce_invalid", detail: "нет nonce" });
-          }
-          const result = backend.updateContext(
-            sessionId,
-            route.request().postDataJSON() as ContextUpdateRequest,
-          );
-          return result.body === undefined ? json(result.status) : json(result.status, result.body);
-        }
-      }
-      if (path === "/api/profiles" && method === "GET") {
-        return json(200, { items: backend.profiles() });
-      }
-      const profileMatch = /^\/api\/profiles\/(.+)$/.exec(path);
-      if (profileMatch) {
-        const profileId = decodeURIComponent(profileMatch[1] ?? "");
-        if (method === "DELETE") {
-          if (route.request().headers()["x-lnt-mutation-nonce"] !== NONCE) {
-            return json(403, { code: "mutation_nonce_invalid", detail: "нет nonce" });
-          }
-          return json(backend.deleteProfile(profileId));
-        }
-        if (method === "POST" || method === "PUT") {
-          if (route.request().headers()["x-lnt-mutation-nonce"] !== NONCE) {
-            return json(403, { code: "mutation_nonce_invalid", detail: "нет nonce" });
-          }
-          const payload = route.request().postDataJSON() as { kind: string; data: unknown };
-          const result = backend.upsertProfile(profileId, payload.kind, payload.data);
-          return json(result.status, result.body);
-        }
-      }
-      return json(404, { detail: `нет мока: ${method} ${path}` });
-    },
+function toFulfill(reply: MockHttpReply): Parameters<Route["fulfill"]>[0] {
+  if (typeof reply.body === "string" || Buffer.isBuffer(reply.body)) {
+    return {
+      status: reply.status,
+      contentType: reply.contentType ?? "text/event-stream",
+      body: reply.body,
+    };
+  }
+  return {
+    status: reply.status,
+    contentType: reply.contentType ?? "application/json",
+    body: reply.body === undefined ? "" : JSON.stringify(reply.body),
+  };
+}
+
+/** Подключает единый бэкенд к Playwright page. Синхронный (как раньше):
+ * спеки зовут без await и сразу пользуются backend.pumpAll(). */
+export function installMockBackend(page: Page, options: MockBackendOptions = {}): MockLntBackend {
+  const backend = new MockLntBackend(options);
+  void page.route(
+    (url) => isApiPath(url.pathname),
+    (route) => void backend.handle(route),
   );
+  return backend;
 }

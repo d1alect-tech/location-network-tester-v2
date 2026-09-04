@@ -3,6 +3,8 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import type { CatalogSession } from "../../api/types";
+import { type MockLntBackend, installMockBackend } from "../../testkit/mockBackend";
 
 /** E2E W1 inspect chrome inside V6 extras: measurement artifacts vs v1-only banner.
  * #/inspect mounts .app-v6; W1 lives in collapsed details[data-extra=w1].
@@ -25,7 +27,7 @@ function readFixture(rel: string): string {
   return fs.readFileSync(path.join(FIXTURES, rel), "utf8");
 }
 
-function catalog(id: string): unknown {
+function catalog(id: string): { items: CatalogSession[]; next_cursor: null } {
   return {
     items: [
       {
@@ -54,32 +56,13 @@ function detail(name: string, metricsJson: string): unknown {
   };
 }
 
-async function mockCatalog(page: Page, id: string): Promise<void> {
-  await page.route("**/api/catalog/sessions**", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(catalog(id)),
-    }),
-  );
+function mockCatalog(backend: MockLntBackend, id: string): void {
+  backend.seedCatalog(catalog(id).items);
 }
 
-async function mockSessionDetail(page: Page, id: string, metricsRel: string): Promise<void> {
-  const body = JSON.stringify(detail(id, readFixture(metricsRel)));
-  await page.route(`**/api/sessions/${id}`, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body }),
-  );
-  await mockSpectrum(page, id);
-}
-
-async function mockSpectrum(page: Page, id: string): Promise<void> {
-  await page.route(`**/api/sessions/${id}/spectrum?*`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(SPECTRUM),
-    }),
-  );
+function mockSessionDetail(backend: MockLntBackend, id: string, metricsRel: string): void {
+  backend.seedSessionDetail(id, detail(id, readFixture(metricsRel)));
+  backend.seedSpectrum(id, SPECTRUM);
 }
 
 async function openW1Chrome(page: Page, id: string): Promise<void> {
@@ -98,24 +81,13 @@ test("measurement fixtures: THD verdict and four scalars, no banner, no eight pa
   page,
 }) => {
   // Given: Batch 2–6 artifacts + v1 metrics for t1-measurement.
-  await mockCatalog(page, "t1-measurement");
-  await mockSessionDetail(page, "t1-measurement", "measurement/metrics.json");
-  await page.route("**/api/analysis/sessions/t1-measurement/.lnt-default-analysis.json", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ recipe_id: "default", artifact_key: ARTIFACT_KEY }),
-    }),
-  );
-  await page.route(
-    `**/api/analysis/sessions/t1-measurement/artifacts/${ARTIFACT_KEY}/**`,
-    (route) =>
-      route.fulfill({
-        status: 404,
-        contentType: "application/json",
-        body: JSON.stringify({ detail: "not found" }),
-      }),
-  );
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t1-measurement");
+  mockSessionDetail(backend, "t1-measurement", "measurement/metrics.json");
+  backend.seedAnalysisPointer("t1-measurement", {
+    recipe_id: "default",
+    artifact_key: ARTIFACT_KEY,
+  });
   const files = {
     "harmonics.json": readFixture("measurement/harmonics.json"),
     "notching.json": readFixture("measurement/notching.json"),
@@ -123,10 +95,7 @@ test("measurement fixtures: THD verdict and four scalars, no banner, no eight pa
     "metrics.json": readFixture("measurement/metrics.json"),
   } as const;
   for (const [filename, body] of Object.entries(files)) {
-    await page.route(
-      `**/api/analysis/sessions/t1-measurement/artifacts/${ARTIFACT_KEY}/${filename}`,
-      (route) => route.fulfill({ status: 200, contentType: "application/json", body }),
-    );
+    backend.seedArtifact("t1-measurement", ARTIFACT_KEY, filename, body);
   }
 
   // When
@@ -147,22 +116,9 @@ test("measurement fixtures: THD verdict and four scalars, no banner, no eight pa
 
 test("v1-only: exact Russian banner and CTA, no fake 0 scalars", async ({ page }) => {
   // Given: v1 metrics/spectrum only — no pointer, no Batch 2–6 artifacts.
-  await mockCatalog(page, "t1-v1-only");
-  await mockSessionDetail(page, "t1-v1-only", "v1-only/metrics.json");
-  await page.route("**/api/analysis/sessions/t1-v1-only/.lnt-default-analysis.json", (route) =>
-    route.fulfill({
-      status: 404,
-      contentType: "application/json",
-      body: JSON.stringify({ detail: "not found" }),
-    }),
-  );
-  await page.route("**/api/analysis/sessions/t1-v1-only/artifacts/**", (route) =>
-    route.fulfill({
-      status: 404,
-      contentType: "application/json",
-      body: JSON.stringify({ detail: "not found" }),
-    }),
-  );
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t1-v1-only");
+  mockSessionDetail(backend, "t1-v1-only", "v1-only/metrics.json");
 
   // When
   await openW1Chrome(page, "t1-v1-only");

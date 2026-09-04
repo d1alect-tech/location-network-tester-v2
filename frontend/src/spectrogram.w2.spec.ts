@@ -4,15 +4,17 @@
 
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import type { CatalogSession } from "./api/types";
 import { TILE_CELL_CAP } from "./components/charts/spectrogramModel";
 import { buildSpectrogramNpz } from "./test-support/spectrogramNpz";
+import { type MockLntBackend, installMockBackend } from "./testkit/mockBackend";
 
 const LABEL = "спектрограмма записи";
 const INSPECT = "http://127.0.0.1:4101/static/v2/#/inspect";
 const GRAM_CANVAS = "[data-showcase='spectrum'] .gram canvas";
 const EMPTY_NOTE = "нет спектрограммы записи";
 
-const SESSION_A = {
+const SESSION_A: CatalogSession = {
   id: "capture-001",
   health: "ok",
   created_utc: "2026-08-01T10:00:00Z",
@@ -21,7 +23,7 @@ const SESSION_A = {
   profile: "bad",
   label: "стенд-А",
   storage_path: null,
-} as const;
+};
 
 const SPECTRUM = {
   frequency_hz: [10, 100, 1000, 10_000],
@@ -58,10 +60,6 @@ function overCapLevel(): { timeS: number[]; frequencyHz: number[]; powerDb: Floa
   return { timeS, frequencyHz, powerDb };
 }
 
-function json(body: unknown): string {
-  return JSON.stringify(body);
-}
-
 async function paintedRatio(page: Page, selector: string): Promise<number> {
   return page.evaluate((sel) => {
     const canvas = document.querySelector(sel);
@@ -75,56 +73,32 @@ async function paintedRatio(page: Page, selector: string): Promise<number> {
   }, selector);
 }
 
-async function mockSession(
-  page: Page,
+function mockSession(
+  backend: MockLntBackend,
   sessionId: string,
   artifactKey: string,
   npz: ArrayBuffer | "404",
-): Promise<void> {
-  await page.route(`**/api/sessions/${sessionId}`, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(detail(sessionId)) }),
-  );
-  await page.route(`**/api/sessions/${sessionId}/spectrum?*`, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: json(SPECTRUM) }),
-  );
-  await page.route(`**/api/analysis/sessions/${sessionId}/.lnt-default-analysis.json`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json({ artifact_key: artifactKey }),
-    }),
-  );
-  await page.route(
-    `**/api/analysis/sessions/${sessionId}/artifacts/${artifactKey}/spectrogram.npz`,
-    (route) => {
-      if (npz === "404") {
-        return route.fulfill({
-          status: 404,
-          contentType: "application/json",
-          body: json({ detail: "not found" }),
-        });
-      }
-      return route.fulfill({
-        status: 200,
-        contentType: "application/octet-stream",
-        body: Buffer.from(npz),
-      });
-    },
-  );
+): void {
+  backend.seedSessionDetail(sessionId, detail(sessionId));
+  backend.seedSpectrum(sessionId, SPECTRUM);
+  backend.seedAnalysisPointer(sessionId, { artifact_key: artifactKey });
+  if (npz !== "404") {
+    backend.seedArtifact(
+      sessionId,
+      artifactKey,
+      "spectrogram.npz",
+      Buffer.from(npz),
+      "application/octet-stream",
+    );
+  }
 }
 
-async function mockInspect(
-  page: Page,
+function mockInspect(
+  backend: MockLntBackend,
   opts: { artifactKey: string; npz: ArrayBuffer | "404" },
-): Promise<void> {
-  await page.route("**/api/catalog/sessions**", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: json({ items: [SESSION_A], next_cursor: null }),
-    }),
-  );
-  await mockSession(page, SESSION_A.id, opts.artifactKey, opts.npz);
+): void {
+  backend.seedCatalog([SESSION_A]);
+  mockSession(backend, SESSION_A.id, opts.artifactKey, opts.npz);
 }
 
 async function openGram(page: Page): Promise<void> {
@@ -137,7 +111,7 @@ async function openGram(page: Page): Promise<void> {
 }
 
 test("inspect spectrogram is a recording spectrogram with no realtime copy", async ({ page }) => {
-  await mockInspect(page, {
+  mockInspect(installMockBackend(page), {
     artifactKey: "art-small",
     npz: buildSpectrogramNpz(smallLevel()),
   });
@@ -154,7 +128,7 @@ test("inspect spectrogram is a recording spectrogram with no realtime copy", asy
 });
 
 test("built recording spectrogram stays inside the 524000 cell cap", async ({ page }) => {
-  await mockInspect(page, {
+  mockInspect(installMockBackend(page), {
     artifactKey: "art-big",
     npz: buildSpectrogramNpz(overCapLevel()),
   });
@@ -172,7 +146,7 @@ test("built recording spectrogram stays inside the 524000 cell cap", async ({ pa
 });
 
 test("missing npz 404 keeps empty recording spectrogram state", async ({ page }) => {
-  await mockInspect(page, { artifactKey: "art-missing", npz: "404" });
+  mockInspect(installMockBackend(page), { artifactKey: "art-missing", npz: "404" });
   await openGram(page);
   await expect(page.locator("[data-showcase='spectrum'] .gram-scale")).toHaveText(EMPTY_NOTE);
   const modes = page.locator("[data-spectrogram-mode]");
