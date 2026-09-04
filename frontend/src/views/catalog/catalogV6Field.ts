@@ -16,10 +16,7 @@ export function v6Field(labelText: string, control: HTMLElement, hintText?: stri
     const hint = el("p", { className: "t-compact", text: hintText, attrs: { id: hintId } });
     label.append(hint);
     const describedBy = control.getAttribute("aria-describedby");
-    control.setAttribute(
-      "aria-describedby",
-      describedBy ? `${describedBy} ${hintId}` : hintId,
-    );
+    control.setAttribute("aria-describedby", describedBy ? `${describedBy} ${hintId}` : hintId);
   }
   return label;
 }

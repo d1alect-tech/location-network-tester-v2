@@ -11,8 +11,8 @@ import { createField } from "../../components/primitives/forms";
 import type { RouteStore } from "../../state/routeState";
 import { FILTER_PARAMS, HEALTH_LABELS, sessionTypeLabel } from "./catalogModel";
 import { filtersFromParams } from "./catalogModel";
-import { type SavedView, loadSavedViews, saveSavedViews } from "./savedViews";
 import { v6Field } from "./catalogV6Field";
+import { type SavedView, loadSavedViews, saveSavedViews } from "./savedViews";
 
 export interface CatalogFilterPanelOptions {
   store: RouteStore;

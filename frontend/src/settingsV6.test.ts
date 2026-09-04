@@ -37,10 +37,9 @@ describe("настройки V6: панельная система", () => {
     const section = buildPrivacySection();
 
     // Then
-    expect(
-      section.classList.contains("panel"),
-      "V6-разрыв: приватность без section.panel",
-    ).toBe(true);
+    expect(section.classList.contains("panel"), "V6-разрыв: приватность без section.panel").toBe(
+      true,
+    );
     expect(
       section.querySelector(".panel-title"),
       "V6-разрыв: у панели приватности нет .panel-title",
@@ -82,10 +81,7 @@ describe("настройки V6: панельная система", () => {
     const error = errorBlock("Недопустимые символы в заметке.");
 
     // Then
-    expect(
-      report.classList.contains("panel"),
-      "V6-разрыв: preflight без .panel",
-    ).toBe(true);
+    expect(report.classList.contains("panel"), "V6-разрыв: preflight без .panel").toBe(true);
     expect(
       error.classList.contains("banner") && error.classList.contains("banner-inline"),
       "V6-разрыв: ошибка без .banner.banner-inline (сейчас p.lnt-set-error)",

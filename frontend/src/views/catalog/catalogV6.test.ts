@@ -100,10 +100,7 @@ describe("каталог V6: сортировка, группы дней, рол
         root.querySelector(".cat-role-a"),
         "V6-разрыв: нет .cat-role-a (роль не связывает строку с полосой пары)",
       ).not.toBeNull();
-      expect(
-        root.querySelector(".cat-role-b"),
-        "V6-разрыв: нет .cat-role-b",
-      ).not.toBeNull();
+      expect(root.querySelector(".cat-role-b"), "V6-разрыв: нет .cat-role-b").not.toBeNull();
     } finally {
       dispose();
     }
@@ -119,10 +116,7 @@ describe("каталог V6: тулбар и инлайн-баннер", () => {
     try {
       // Then: тулбар V6 (§2.3: инпут 32px, цель §6 ≥ 28px)
       const tools = host.querySelector(".cat-tools");
-      expect(
-        tools,
-        "V6-разрыв: нет .cat-tools над таблицей каталога",
-      ).not.toBeNull();
+      expect(tools, "V6-разрыв: нет .cat-tools над таблицей каталога").not.toBeNull();
       expect(
         tools?.querySelector("input.ctl, select.ctl"),
         "V6-разрыв: в .cat-tools нет контрола .ctl",
@@ -147,10 +141,7 @@ describe("каталог V6: тулбар и инлайн-баннер", () => {
     try {
       // Then: V6-полоса ошибки 32px (variantV6.css .banner-inline)
       const banner = list.root.querySelector(".banner.banner-inline");
-      expect(
-        banner,
-        "V6-разрыв: нет .banner.banner-inline для ошибки списка",
-      ).not.toBeNull();
+      expect(banner, "V6-разрыв: нет .banner.banner-inline для ошибки списка").not.toBeNull();
       expect(banner?.getAttribute("role")).toBe("alert");
     } finally {
       host.remove();

@@ -50,16 +50,20 @@ function outcomeBlock(draft: ReportDraft): HTMLElement {
   const outcome = draft.outcome;
   if (outcome.kind === "refusal") {
     host.append(
-      el("div", {
-        className: "banner lnt-rep-banner lnt-rep-banner-warn",
-        attrs: { role: "alert" },
-      }, [
-        el("h3", { className: "banner-title", text: "Расчёт заблокирован бэкендом" }),
-        el("p", {
-          className: "banner-msg",
-          text: `Точная причина: ${outcome.reason_code}. Числовые эффекты не выдаются.`,
-        }),
-      ]),
+      el(
+        "div",
+        {
+          className: "banner lnt-rep-banner lnt-rep-banner-warn",
+          attrs: { role: "alert" },
+        },
+        [
+          el("h3", { className: "banner-title", text: "Расчёт заблокирован бэкендом" }),
+          el("p", {
+            className: "banner-msg",
+            text: `Точная причина: ${outcome.reason_code}. Числовые эффекты не выдаются.`,
+          }),
+        ],
+      ),
     );
     return host;
   }

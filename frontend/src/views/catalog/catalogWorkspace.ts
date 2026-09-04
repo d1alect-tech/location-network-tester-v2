@@ -147,11 +147,7 @@ export function mountCatalogWorkspace(
     { className: "tabbar", attrs: { role: "tablist", "aria-label": "Правая панель" } },
     [inspectorTab, profilesTab],
   );
-  const rightPane = el("div", { className: "col-main" }, [
-    tabBar,
-    inspectorPanel,
-    profilesPanel,
-  ]);
+  const rightPane = el("div", { className: "col-main" }, [tabBar, inspectorPanel, profilesPanel]);
   // Левая колонка — панель каталога целиком (hd + тулбар + таблица);
   // тулбар фильтров монтируется в слот панели списка.
   list.toolsSlot.append(filterPanel.root);

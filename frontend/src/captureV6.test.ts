@@ -26,9 +26,7 @@ describe("захват V6: radio-card D1=A (пин, уже зелёный)", () 
     // Then: контракт D1=A radio-card — селекторы пинятся, портирование их хранит
     const radios = form.root.querySelectorAll('input[name="capture-mode"]');
     expect(radios).toHaveLength(4);
-    const checked = form.root.querySelector<HTMLInputElement>(
-      'input[name="capture-mode"]:checked',
-    );
+    const checked = form.root.querySelector<HTMLInputElement>('input[name="capture-mode"]:checked');
     expect(checked?.value).toBe("rc_measurement");
   });
 });
@@ -73,10 +71,9 @@ describe("захват V6: форма .field/.ctl", () => {
       "V6-разрыв: нет .field (сейчас lnt-* обёртки)",
     ).not.toBeNull();
     const controls = form.root.querySelectorAll("input.ctl, select.ctl");
-    expect(
-      controls.length > 0,
-      "V6-разрыв: нет input.ctl/select.ctl (сейчас lnt-input)",
-    ).toBe(true);
+    expect(controls.length > 0, "V6-разрыв: нет input.ctl/select.ctl (сейчас lnt-input)").toBe(
+      true,
+    );
   });
 });
 

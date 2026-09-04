@@ -9,8 +9,8 @@ import type { LntApiClient } from "./api/client";
 import type { StatisticsMetadata } from "./api/types-research";
 import { RouteStore } from "./state/routeState";
 import { ComparisonView } from "./views/experiments/comparisonView";
-import { mountExperimentsWorkspace } from "./views/experiments/experimentsWorkspace";
 import { ExperimentWizard } from "./views/experiments/experimentWizard";
+import { mountExperimentsWorkspace } from "./views/experiments/experimentsWorkspace";
 import { renderResultPanel } from "./views/experiments/resultPanel";
 
 function stubClient(): LntApiClient {
@@ -59,10 +59,7 @@ describe("эксперименты V6: таббар и ленивые панел
         "V6-разрыв: tablist без .tabbar (сейчас .lnt-cat-tabs)",
       ).toBe(true);
       const tabs = tablist?.querySelectorAll('[role="tab"].snav-item') ?? [];
-      expect(
-        tabs.length,
-        "V6-разрыв: табы без .snav-item (сейчас .lnt-btn.lnt-cat-tab)",
-      ).toBe(4);
+      expect(tabs.length, "V6-разрыв: табы без .snav-item (сейчас .lnt-btn.lnt-cat-tab)").toBe(4);
     } finally {
       dispose();
     }
@@ -126,10 +123,7 @@ describe("эксперименты V6: сравнение — cmdbar, gate, pair
 
     // Then: полоса пары — главный объект V6 (variantV6.css .pairbar 40px)
     const pairbar = root.querySelector(".pairbar");
-    expect(
-      pairbar,
-      "V6-разрыв: сравнение без .pairbar (полоса пары А—Б)",
-    ).not.toBeNull();
+    expect(pairbar, "V6-разрыв: сравнение без .pairbar (полоса пары А—Б)").not.toBeNull();
     expect(pairbar?.querySelector(".pair-slot")).not.toBeNull();
   });
 });

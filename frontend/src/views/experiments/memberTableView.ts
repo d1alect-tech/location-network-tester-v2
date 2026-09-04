@@ -142,9 +142,11 @@ export class MemberTableView {
       text: GLYPHS[row.verdict.tone],
       attrs: { "aria-hidden": "true" },
     });
-    const verdictPill = el("span", { className: `lnt-status-pill lnt-tone-${row.verdict.tone} glyph` }, [
-      glyph,
-    ]);
+    const verdictPill = el(
+      "span",
+      { className: `lnt-status-pill lnt-tone-${row.verdict.tone} glyph` },
+      [glyph],
+    );
     verdictPill.append(
       document.createTextNode(
         `${row.verdict.label}${row.verdict.reason_code === null ? "" : ` (${row.verdict.reason_code})`}`,
@@ -162,7 +164,10 @@ export class MemberTableView {
     const stateCell = el("td", { text: stateText });
 
     const actions = el("td");
-    const detailsButton = el("button", { className: "lnt-btn lnt-btn-small btn-quiet", text: "Аудит" });
+    const detailsButton = el("button", {
+      className: "lnt-btn lnt-btn-small btn-quiet",
+      text: "Аудит",
+    });
     detailsButton.addEventListener("click", () => this.showAudit(row));
     actions.append(detailsButton);
     if (currentState(inclusion) !== "excluded") {

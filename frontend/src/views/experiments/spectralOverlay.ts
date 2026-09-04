@@ -50,7 +50,10 @@ export class SpectralOverlay {
     this.handle = factory({ container: this.shell.body, syncKey: SYNC_KEY });
     // V6-сигнальное окно (variantV6.css): панель спектра с рамкой графика
     // и легендой трасс (различие А/Б — маркером, не только цветом).
-    this.legendHost = el("div", { className: "spectrum-legend", attrs: { role: "group", "aria-label": "Условия наложения" } });
+    this.legendHost = el("div", {
+      className: "spectrum-legend",
+      attrs: { role: "group", "aria-label": "Условия наложения" },
+    });
     this.root = el(
       "section",
       {

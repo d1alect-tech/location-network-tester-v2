@@ -13,6 +13,7 @@ import { el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { createMutation, createResourceLoader } from "../../state/resource";
 import { HEALTH_LABELS } from "./catalogModel";
+import { v6Field } from "./catalogV6Field";
 import { createFieldsTable, createRecoveryPanel } from "./contextFieldsView";
 import {
   type RevisionConflict,
@@ -21,7 +22,6 @@ import {
   mergeDraftOntoFresh,
   userEditableFields,
 } from "./inspectorConflict";
-import { v6Field } from "./catalogV6Field";
 
 export interface ContextInspectorOptions {
   client: LntApiClient;
@@ -186,7 +186,11 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     const health = HEALTH_LABELS[context.health as keyof typeof HEALTH_LABELS];
     while (summary.firstChild) summary.removeChild(summary.firstChild);
     summary.append(
-      el("p", { className: "t-mono", text: context.session_id, attrs: { title: "Идентификатор сессии" } }),
+      el("p", {
+        className: "t-mono",
+        text: context.session_id,
+        attrs: { title: "Идентификатор сессии" },
+      }),
       el("p", {
         className: "t-compact",
         text: health ? `Состояние: ${health.label}` : `Состояние: ${context.health}`,

@@ -82,10 +82,7 @@ describe("отчёты V6: md-блок", () => {
 
     // Then: V6 md-блок — превью показывает ровно тот текст, что уйдёт в .md
     const md = preview.querySelector(".md");
-    expect(
-      md,
-      "V6-разрыв: в превью нет .md-блока с текстом выгрузки",
-    ).not.toBeNull();
+    expect(md, "V6-разрыв: в превью нет .md-блока с текстом выгрузки").not.toBeNull();
     expect(md?.textContent).toContain("exp.rep.demo");
   });
 });

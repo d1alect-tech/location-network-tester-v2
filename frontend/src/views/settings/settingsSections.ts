@@ -103,18 +103,22 @@ export function renderPreflight(report: PreflightReportLike): HTMLElement {
   for (const finding of report.findings) {
     const blocked = finding.severity === "block";
     findings.append(
-      el("li", {
-        className: `glyph ${blocked ? "glyph-err lnt-set-finding-block" : "glyph-warn lnt-set-finding-warn"}`,
-      }, [
-        el("span", {
-          className: "banner-glyph",
-          text: blocked ? "✕" : "▲",
-          attrs: { "aria-hidden": "true" },
-        }),
-        el("span", {
-          text: `${blocked ? "Блокирует" : "Предупреждение"} · ${finding.code}: ${finding.message_ru} Что делать: ${finding.recovery_action_ru}`,
-        }),
-      ]),
+      el(
+        "li",
+        {
+          className: `glyph ${blocked ? "glyph-err lnt-set-finding-block" : "glyph-warn lnt-set-finding-warn"}`,
+        },
+        [
+          el("span", {
+            className: "banner-glyph",
+            text: blocked ? "✕" : "▲",
+            attrs: { "aria-hidden": "true" },
+          }),
+          el("span", {
+            text: `${blocked ? "Блокирует" : "Предупреждение"} · ${finding.code}: ${finding.message_ru} Что делать: ${finding.recovery_action_ru}`,
+          }),
+        ],
+      ),
     );
   }
   if (report.findings.length === 0) {
