@@ -25,6 +25,8 @@ import { createModeForm } from "./modeForm";
 import type { ModeFormHandle } from "./modeForm";
 import { buildJobRequest, validateCaptureForm } from "./modes";
 import { renderProfilePreview } from "./profilePreview";
+import { createSpectrogramLivePanel } from "./spectrogramLivePanel";
+import type { LivePanelHandle } from "./spectrogramLivePanel";
 import { watchJobEvents } from "./sse";
 import type { WatchHandle } from "./sse";
 
@@ -42,6 +44,7 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
   const device = createDeviceApi(client);
   const form: ModeFormHandle = createModeForm();
   const devicePanel: DevicePanelHandle = createDevicePanel();
+  const liveGram: LivePanelHandle = createSpectrogramLivePanel({ plots: client.plots });
   const timeline: TimelineViewHandle = createJobTimelineView({
     onCancel: (jobId) => void cancelJob(jobId),
     onRetry: () => void startJob(lastRequest),
@@ -89,6 +92,7 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
   const applySnapshotToTimeline = (snapshot: JobSnapshot): void => {
     timelineState = applySnapshot(timelineState, snapshot);
     timeline.update(timelineState);
+    liveGram.onSnapshot(snapshot);
   };
 
   function attachStream(snapshot: JobSnapshot): void {
@@ -201,6 +205,8 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
     try {
       const page = await client.jobs.list(1, 0);
       const latest = page.items[0];
+      // Live-панель в idle показывает последнюю завершённую сессию post-hoc.
+      if (latest !== undefined) liveGram.onSnapshot(latest);
       if (
         latest === undefined ||
         (!needsRecoveryPrompt({ ...initialTimeline, latest }) && latest.status === "succeeded")
@@ -254,7 +260,11 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
           deviceRefreshButton,
         ]),
       ]),
-      el("div", { className: "capture-side-column" }, [previewContainer, devicePanel.root]),
+      el("div", { className: "capture-side-column" }, [
+        previewContainer,
+        devicePanel.root,
+        liveGram.root,
+      ]),
     ]),
     timeline.root,
   ]);
@@ -268,6 +278,7 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
       disposed = true;
       stream?.close();
       stream = null;
+      liveGram.dispose();
     },
   };
 }
