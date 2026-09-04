@@ -24,8 +24,9 @@ _LIMIT: Final = 250
 _GRANDFATHERED: Final[dict[str, int]] = {
     # Recovered baseline (исходное дерево LNT, перенос без рефакторинга).
     "src/lnt/_manifest_schema.py": 344,
-    "src/lnt/analysis.py": 309,
-    "src/lnt/cli.py": 307,
+    # Очередь C4: cli.py разбит на cli_simulate/cli_capture/cli_compare
+    # (compare читает metrics.json+spectrum.csv с откатом на analyze_session);
+    # analysis.py разбит на analysis_types/payload/render/write, фасад тонкий.
     # Очередь C3: масштаб raw→В переехал в lnt.adc_calibration (единый источник
     # истины с поправкой); capture-сборка ужалась честным выделением.
     "src/lnt/acquire.py": 300,

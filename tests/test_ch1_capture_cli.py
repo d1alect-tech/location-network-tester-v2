@@ -124,7 +124,7 @@ def test_capture_rc_triplet_without_basis_records_operator_measured(
         captured_setups.append(setup)
         return out_dir
 
-    monkeypatch.setattr("lnt.cli.capture_session", record_capture)
+    monkeypatch.setattr("lnt.cli_capture.capture_session", record_capture)
 
     # When: the public CLI builds a measurement capture request.
     code = main(
@@ -161,7 +161,7 @@ def test_capture_without_rc_overrides_records_nominal_defaults(
         captured_setups.append(setup)
         return out_dir
 
-    monkeypatch.setattr("lnt.cli.capture_session", record_capture)
+    monkeypatch.setattr("lnt.cli_capture.capture_session", record_capture)
 
     # When: the public CLI builds the default measurement capture request.
     code = main(["capture", "--out", str(tmp_path / "measurement")])
@@ -194,7 +194,7 @@ def test_capture_channels_flag_maps_to_channel_mode(
         captured_modes.append(kwargs["channel_mode"])
         return out_dir
 
-    monkeypatch.setattr("lnt.cli.capture_session", record_capture)
+    monkeypatch.setattr("lnt.cli_capture.capture_session", record_capture)
 
     # When: the public CLI builds the capture request.
     code = main(["capture", "--out", str(tmp_path / "measurement"), *channel_args])

@@ -111,6 +111,9 @@ ignore = [
 ]
 # print — продуктовая поверхность CLI (консольный отчёт), не отладка.
 "src/lnt/cli.py" = ["T201"]
+"src/lnt/cli_simulate.py" = ["T201"]
+"src/lnt/cli_capture.py" = ["T201"]
+"src/lnt/cli_compare.py" = ["T201"]
 # Стабы ScopeProtocol зеркалят API драйвера Hantek6022API: докстринги на
 # каждый `...`-метод дублировали бы чужую документацию без пользы.
 "src/lnt/scope_io.py" = ["D102"]

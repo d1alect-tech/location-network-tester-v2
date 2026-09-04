@@ -3,21 +3,21 @@
 Коды выхода: 0 — успех; 2 — некорректный вход/данные (InputError, AnalysisError);
 3 — устройство недоступно (DeviceNotFoundError); 1 — провал selftest.
 Пользовательские ошибки печатаются одной строкой в stderr, без traceback.
+
+Команды simulate/capture/compare живут в ``lnt.cli_simulate``,
+``lnt.cli_capture`` и ``lnt.cli_compare``; здесь — парсер, analyze/ui/support-bundle/selftest.
 """
 
 import argparse
 import math
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Never, cast, override
 
-from lnt._cli_capture import CaptureSetupOptions, add_capture_arguments, build_capture_setup
-from lnt.acquire import capture_session
+from lnt._cli_capture import add_capture_arguments
 from lnt.analysis import (
     LineQualityAnalysis,
-    analyze_session,
     render_line_quality_analysis,
     write_line_quality_analysis,
 )
@@ -26,18 +26,17 @@ from lnt.archive import ArchiveError
 from lnt.archive.cli import configure_archive_parser
 from lnt.catalog.automation_cli import configure_automation_parsers
 from lnt.catalog.cli import configure_catalog_parser
+from lnt.cli_capture import cmd_capture as _cmd_capture
+from lnt.cli_compare import cmd_compare as _cmd_compare
 from lnt.cli_experiments import configure_research_parsers
+from lnt.cli_simulate import cmd_simulate as _cmd_simulate
 from lnt.cm_dm.dispatch import (
     analyze_routed_session,
     write_and_render_analysis,
 )
-from lnt.compare import compare_analyses, ensure_comparable, render_comparison
 from lnt.errors import AnalysisError, DeviceNotFoundError, InputError
 from lnt.selftest import run_selftest
-from lnt.series import run_series, series_dirs
 from lnt.signals import PROFILES
-from lnt.simulate import simulate_session
-from lnt.types import ChannelMode, SeriesPosition, SessionType
 
 EXIT_OK = 0
 EXIT_SELFTEST_FAIL = 1
@@ -51,14 +50,6 @@ CAPTURE_DEFAULT_RATE_HZ = 8_000_000.0
 DEFAULT_SEED = 6022
 
 Handler = Callable[[argparse.Namespace], int]
-_SessionWriter = Callable[[Path, SeriesPosition, SeriesPosition | None], Path]
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _SeriesRun:
-    out_dir: Path
-    repeat: int
-    interval_s: float
 
 
 class _InputArgumentParser(argparse.ArgumentParser):
@@ -193,10 +184,6 @@ def _add_channels_argument(command: argparse.ArgumentParser) -> None:
     )
 
 
-def _channel_mode(args: argparse.Namespace) -> ChannelMode:
-    return ChannelMode.CH1_ONLY if cast("int", args.channels) == 1 else ChannelMode.DUAL
-
-
 def _add_label_argument(command: argparse.ArgumentParser) -> None:
     command.add_argument(
         "--label",
@@ -221,102 +208,6 @@ def _add_series_arguments(command: argparse.ArgumentParser) -> None:
     )
 
 
-def _run_session_series(run: _SeriesRun, write_session: _SessionWriter) -> int:
-    dirs = series_dirs(run.out_dir, run.repeat)
-
-    def start(position: SeriesPosition) -> Path:
-        series = position if run.repeat > 1 else None
-        path = write_session(dirs[position.index - 1], position, series)
-        print(f"Сессия записана: {path}")
-        return path
-
-    run_series(repeat=run.repeat, interval_s=run.interval_s, start_session=start)
-    return EXIT_OK
-
-
-def _cmd_simulate(args: argparse.Namespace) -> int:
-    run = _SeriesRun(
-        out_dir=Path(cast("str", args.out)),
-        repeat=cast("int", args.repeat),
-        interval_s=cast("float", args.interval_s),
-    )
-
-    def write_session(
-        out_dir: Path,
-        position: SeriesPosition,
-        series: SeriesPosition | None,
-    ) -> Path:
-        return simulate_session(
-            out_dir=out_dir,
-            profile=cast("str", args.profile),
-            duration_s=cast("float", args.duration),
-            sample_rate_hz=cast("float", args.rate),
-            seed=cast("int", args.seed) + position.index - 1,
-            label=cast("str | None", args.label),
-            series=series,
-            channel_mode=_channel_mode(args),
-        )
-
-    return _run_session_series(run, write_session)
-
-
-def _cmd_capture(args: argparse.Namespace) -> int:
-    session_type = _capture_session_type(args)
-    setup = build_capture_setup(
-        session_type=session_type,
-        options=CaptureSetupOptions(
-            baseline_session=cast("str | None", args.baseline),
-            resistance_ohm=cast("float | None", args.rc_r_ohm),
-            c1_nf=cast("float | None", args.rc_c1_nf),
-            c2_nf=cast("float | None", args.rc_c2_nf),
-            component_values_basis=cast("str | None", args.component_values_basis),
-            termination_ohm=cast("float | None", args.termination_ohm),
-            probe_multiplier=cast("float | None", args.probe_multiplier),
-        ),
-    )
-    run = _SeriesRun(
-        out_dir=Path(cast("str", args.out)),
-        repeat=cast("int", args.repeat),
-        interval_s=cast("float", args.interval_s),
-    )
-
-    def write_session(
-        out_dir: Path,
-        _position: SeriesPosition,
-        series: SeriesPosition | None,
-    ) -> Path:
-        return capture_session(
-            out_dir=out_dir,
-            duration_s=cast("float", args.duration),
-            sample_rate_hz=cast("float", args.rate),
-            session_type=session_type,
-            ch1_range_v=cast("float", args.range_v),
-            label=cast("str | None", args.label),
-            series=series,
-            ch1_setup=setup,
-            baseline_session=cast("str | None", args.baseline),
-            channel_mode=(
-                ChannelMode.CH1_ONLY
-                if session_type is SessionType.LINE_QUALITY
-                else _channel_mode(args)
-            ),
-        )
-
-    return _run_session_series(run, write_session)
-
-
-def _capture_session_type(args: argparse.Namespace) -> SessionType:
-    self_noise = CaptureSetupOptions.validate_mode_flags(args)
-    line_quality = cast("bool", args.line_quality)
-    if self_noise and line_quality:
-        raise InputError("--self-noise и --line-quality взаимоисключающие")
-    if line_quality:
-        return SessionType.LINE_QUALITY
-    if self_noise:
-        return SessionType.SELF_NOISE
-    return CaptureSetupOptions.probe_pair_session_type(args)
-
-
 def _cmd_analyze(args: argparse.Namespace) -> int:
     session_dir = Path(cast("str", args.session))
     result = analyze_routed_session(session_dir)
@@ -326,13 +217,6 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
         print(f"Артефакты: {metrics_path.name}")
         return EXIT_OK
     print(write_and_render_analysis(session_dir, result))
-    return EXIT_OK
-
-
-def _cmd_compare(args: argparse.Namespace) -> int:
-    result_a = ensure_comparable(analyze_session(Path(cast("str", args.session_a))))
-    result_b = ensure_comparable(analyze_session(Path(cast("str", args.session_b))))
-    print(render_comparison(compare_analyses(result_a, result_b)))
     return EXIT_OK
 
 

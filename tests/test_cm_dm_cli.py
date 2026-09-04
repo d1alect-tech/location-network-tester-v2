@@ -29,7 +29,7 @@ def test_probe_pair_resolves_cm_dm_session_type(
         recorded.append((kwargs["session_type"], kwargs["channel_mode"]))
         return _record_capture(**kwargs)
 
-    monkeypatch.setattr("lnt.cli.capture_session", record_capture)
+    monkeypatch.setattr("lnt.cli_capture.capture_session", record_capture)
 
     # When: the public CLI parses and dispatches the capture request.
     code = main(["capture", "--out", str(tmp_path / "cm-dm"), *_PROBE_PAIR])
@@ -50,7 +50,7 @@ def test_probe_pair_calibrate_resolves_calibration_session_type(
         recorded.append(kwargs["session_type"])
         return _record_capture(**kwargs)
 
-    monkeypatch.setattr("lnt.cli.capture_session", record_capture)
+    monkeypatch.setattr("lnt.cli_capture.capture_session", record_capture)
 
     # When: the calibration flag accompanies --probe-pair.
     code = main(
@@ -169,7 +169,7 @@ def test_measurement_flow_unaffected(
         recorded.append((kwargs["session_type"], kwargs["channel_mode"]))
         return _record_capture(**kwargs)
 
-    monkeypatch.setattr("lnt.cli.capture_session", record_capture)
+    monkeypatch.setattr("lnt.cli_capture.capture_session", record_capture)
 
     # When: the plain measurement flow runs through the same routing seam.
     code = main(["capture", "--out", str(tmp_path / "measurement")])
