@@ -6,7 +6,7 @@ import type { InputReferredSpectrumPayload, SpectrumPayload } from "../../api/ty
 import type { ChartHandle, ChartRenderRequest } from "../../components/charts/types";
 import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { createSpectrumPanel } from "./spectrumPanelV6";
-import { formatRbw, inputReferenceOf } from "./spectrumPanelV6";
+import { formatRbw, inputReferenceOf } from "./spectrumPlaneControl";
 
 const SCOPE_A: SpectrumPayload = {
   frequency_hz: [100, 1000, 10_000],
