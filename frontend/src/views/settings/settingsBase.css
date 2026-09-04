@@ -1,0 +1,199 @@
+/* Рабочая область «Настройки» (#/settings): база (T11: выделено из settings.css).
+ * kit.css витрины в бандл панели не входит, поэтому канонические классы
+ * (.panel/.btn/.field/...) получают стили здесь, скоупленные под
+ * .lnt-set-workspace — за пределы раздела ничего не протекает.
+ * Токены: рантайм v2-tokens.css; kit-имена без рантайм-эквивалента
+ * (--lnt-err-bg/--lnt-ok-bg/--lnt-warn-bg/--lnt-accent-press) алиасятся ниже. */
+
+.lnt-set-workspace {
+  --lnt-err-bg: var(--lnt-status-error-bg);
+  --lnt-ok-bg: var(--lnt-status-ok-bg);
+  --lnt-warn-bg: var(--lnt-status-warn-bg);
+  --lnt-accent-press: var(--lnt-accent);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 980px;
+  min-width: 0;
+}
+
+.lnt-set-workspace :focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: 2px;
+}
+
+/* ── Типографика (роли tokens.css §2.2) ─────────────────────────────────── */
+
+.lnt-set-workspace .t-page {
+  font: 700 24px / 32px var(--lnt-ui);
+  margin: 0;
+}
+
+.lnt-set-workspace .t-sub {
+  font: 600 14px / 18px var(--lnt-ui);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lnt-set-workspace .t-body {
+  font: 400 14px / 20px var(--lnt-ui);
+  margin: 0;
+  color: var(--lnt-text);
+}
+
+.lnt-set-workspace .t-compact {
+  font: 400 12px / 16px var(--lnt-ui);
+  font-variant-numeric: tabular-nums lining-nums;
+  margin: 0;
+  color: var(--lnt-text-sec);
+}
+
+.lnt-set-workspace .t-mono {
+  font: 400 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  margin: 0;
+}
+
+/* ── Панели (kit.css §5.2: фон панели, hairline-стыки) ───────────────────── */
+
+.lnt-set-workspace .panel {
+  background: var(--lnt-panel);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lnt-set-workspace .panel-hd {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: var(--lnt-panel-hd, rgb(0 0 0 / 0.18));
+  border-bottom: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl) var(--lnt-r-ctl) 0 0;
+}
+
+.lnt-set-workspace .panel-title {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  margin: 0;
+}
+
+.lnt-set-workspace .panel-bd {
+  padding: 12px;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lnt-set-workspace .panel-bd > p,
+.lnt-set-workspace .panel-bd > pre,
+.lnt-set-workspace .panel-bd > ul,
+.lnt-set-workspace .panel-bd > dl {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* ── Кнопки (kit.css §2.3) ──────────────────────────────────────────────── */
+
+.lnt-set-workspace .btn {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-accent);
+  color: var(--lnt-canvas);
+  font: 600 14px / 20px var(--lnt-ui);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: background var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-set-workspace .btn:hover {
+  background: var(--lnt-accent-press);
+}
+
+.lnt-set-workspace .btn:active {
+  background: var(--lnt-accent-press);
+}
+
+.lnt-set-workspace .btn-secondary {
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+  border: 1px solid var(--lnt-line-struct);
+}
+
+.lnt-set-workspace .btn-secondary:hover {
+  /* kit.css §2.3 даёт hover-фон --lnt-line-hot (#707070): пара с --lnt-text
+  * (#ebebeb) держит лишь 4.15:1 — курсор остаётся на кнопке после клика
+  * (preflight-тест) и axe видит hover-стиль. Затемняем миксом до ~#5a5a5a
+  * (≈5.8:1), ховер-отклик сохраняется. */
+  background: color-mix(in srgb, var(--lnt-line-hot) 55%, var(--lnt-elev));
+  border-color: var(--lnt-line-hot);
+}
+
+/* ── Формы (kit.css §2.3: контрол 32px, рамка, фон ступенью темнее) ──────── */
+
+.lnt-set-workspace .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
+  min-width: 0;
+}
+
+.lnt-set-workspace .form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.lnt-set-workspace .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lnt-set-workspace .field-label {
+  font: 400 12px / 16px var(--lnt-ui);
+  font-weight: 600;
+  color: var(--lnt-text-sec);
+}
+
+.lnt-set-workspace .ctl {
+  height: 32px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-field, var(--lnt-chrome));
+  color: var(--lnt-text);
+  font: 400 14px / 20px var(--lnt-ui);
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-set-workspace .ctl:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-set-workspace .ctl:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -1px;
+  border-color: var(--lnt-line-hot);
+}

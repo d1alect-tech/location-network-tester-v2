@@ -1,0 +1,148 @@
+/* T11: глифы, disclosure, превью — выделено из capture.css. */
+/* ── Глифы состояний (kit §6): символ дублирует цвет ───────────────────── */
+
+.capture-view .glyph {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.capture-view .glyph::before {
+  content: "●";
+  font-size: 10px;
+  flex: none;
+}
+
+/* Мелкий текст в тонах — нужен 4.5:1: осветлённые варианты (сырые тона
+ * дают ~2.7–3.7:1 на тёмной подложке, замер axe ≥ 5:1). */
+.capture-view .glyph-ok {
+  color: #7fe0b8;
+}
+
+.capture-view .glyph-warn {
+  color: #f7c46c;
+}
+
+.capture-view .glyph-err {
+  color: #ffc4c6;
+}
+
+/* Текст пилюль/строк поверх глифа наследует тон — читаемость без цвета. */
+.capture-view .lnt-status-pill {
+  overflow-wrap: anywhere;
+}
+
+/* ── Disclosure «Серия и протокол» (kit .disc-*) ───────────────────────── */
+
+.capture-view .disc-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 6px 0;
+  color: var(--lnt-text-sec);
+  font: 600 13px / 16px var(--lnt-ui);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.capture-view .disc-toggle:hover {
+  color: var(--lnt-text);
+}
+
+.capture-view .disc-toggle::before {
+  content: "▸";
+  font-size: 11px;
+  flex: none;
+  transition: transform var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.capture-view .disc-toggle[aria-expanded="true"]::before {
+  transform: rotate(90deg);
+}
+
+.capture-view .disc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 0;
+  min-width: 0;
+}
+
+.capture-view .lnt-disclosure {
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.capture-view .lnt-disclosure-body {
+  padding-top: 8px;
+}
+
+/* ── Превью профиля: сетка показаний (variantV6 .readout-*) ────────────── */
+
+.capture-view .readout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.capture-view .readout-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--lnt-line);
+}
+
+.capture-view .readout-label {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.capture-view .readout-value {
+  font: 600 14px / 18px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--lnt-text);
+  text-align: left;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Совместимость старого превью-dl (e2e-пин .capture-preview-list). */
+.capture-view .capture-preview-list {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: none;
+}
+
+.capture-view .capture-preview-row {
+  gap: 12px;
+}
+
+.capture-view .capture-preview-term {
+  color: var(--lnt-text-sec);
+}
+
+.capture-view .capture-preview-value {
+  margin: 0;
+  text-align: left;
+}
+
+.capture-view .capture-preview-request {
+  font-family: var(--lnt-mono);
+  font-size: 12px;
+  color: var(--lnt-text-sec);
+  margin: 0;
+}

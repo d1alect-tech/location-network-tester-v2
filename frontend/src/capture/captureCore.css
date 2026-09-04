@@ -1,0 +1,175 @@
+/* T11: ядро захвата (корень, раскладка, панели) — выделено из capture.css. */
+/* Раздел «Захват» на V6-идиомах (T6): kit.css §2.3/§5.2/§6 + variantV6.css.
+ * Все правила scoped под .capture-view — глобальный неймспейс не трогаем
+ * (другие разделы портят teammates). Старые capture-* и lnt-* классы остаются
+ * в DOM как e2e-пины capture.spec.ts; V6-классы добавлены дуал-классом.
+ * Токены — только V6 (шоукейс-алиасы из v2-tokens.css). */
+
+/* Атрибут hidden сильнее раскладочных display (disclosure, kit §1.5). */
+[hidden] {
+  display: none !important;
+}
+
+/* Недостающие V6-алиасы — локально на корне раздела. */
+.capture-view,
+.capture-view *,
+.capture-view *::before,
+.capture-view *::after {
+  box-sizing: border-box;
+}
+.capture-view {
+  --lnt-accent-press: #7396ff;
+  --lnt-err-bg: rgb(236 91 98 / 0.15);
+  --lnt-warn-bg: rgb(230 134 25 / 0.15);
+  --lnt-ok-bg: rgb(45 157 120 / 0.15);
+  max-width: 1480px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+/* Корень-страница: .t-page — fluid-контейнер (RED-пин), типографика сброшена
+ * до body — 24px/700 живут только на заголовке h2.view-title.t-page. */
+.capture-view.t-page {
+  font: 400 14px / 20px var(--lnt-ui);
+  color: var(--lnt-text);
+}
+
+.capture-view h2.view-title.t-page {
+  font: 700 24px / 32px var(--lnt-ui);
+  color: var(--lnt-text);
+  margin: 0 0 12px;
+}
+
+/* Компактная типографика статусных строк (токены §2.2 .t-compact). */
+.capture-view .t-compact {
+  font: 400 12px / 16px var(--lnt-ui);
+  font-variant-numeric: tabular-nums lining-nums;
+  margin: 0;
+  color: var(--lnt-text-sec);
+}
+
+/* Длинные пути/имена сессий: перенос внутри, без горизонтального overflow. */
+.capture-view .cell-wrap {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ── Раскладка ─────────────────────────────────────────────────────────── */
+
+.capture-view .capture-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.capture-view .capture-form-column {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+.capture-view .capture-side-column {
+  flex: 0 1 380px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.capture-view .capture-form {
+  min-width: 0;
+}
+
+/* ── Панели: фон панели, hairline-стыки (kit §5.2) ─────────────────────── */
+
+.capture-view .panel {
+  background: var(--lnt-panel);
+  border: 0;
+  border-radius: var(--lnt-r-ctl);
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.capture-view .panel-hd {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl) var(--lnt-r-ctl) 0 0;
+}
+
+.capture-view .panel-title {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  margin: 0;
+}
+
+.capture-view h3.capture-section-title.panel-title {
+  margin: 0;
+}
+
+.capture-view .panel-bd {
+  padding: 12px;
+  min-height: 0;
+}
+
+/* Плоские панели (превью, таймлайн): отступы и ритм без panel-bd. */
+.capture-view .capture-preview.panel,
+.capture-view .capture-timeline.panel {
+  gap: 8px;
+  padding: 12px;
+}
+
+.capture-view .capture-timeline {
+  margin-top: 24px;
+}
+
+/* Футер панели таймлайна: полоса действий как statusbar 32px (kit §5.5). */
+.capture-view .capture-job-actions.statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 8px 12px;
+  margin: 8px -12px -12px;
+  background: var(--lnt-chrome);
+  border-top: 1px solid var(--lnt-line);
+  border-radius: 0 0 var(--lnt-r-ctl) var(--lnt-r-ctl);
+  color: var(--lnt-text-sec);
+  font-size: 12px;
+}
+
+/* Mobile 375px (DESIGN.md §2.3): одна колонка, без горизонтального скролла. */
+@media (max-width: 767px) {
+  .capture-view .capture-layout {
+    flex-direction: column;
+  }
+
+  .capture-view .capture-form-column,
+  .capture-view .capture-side-column {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .capture-view .capture-settings-grid,
+  .capture-view .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .capture-view .readout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .capture-view .capture-start-row {
+    align-items: stretch;
+  }
+}

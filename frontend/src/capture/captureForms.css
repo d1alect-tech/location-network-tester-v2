@@ -1,0 +1,278 @@
+/* T11: кнопки, формы, radio-card — выделено из capture.css. */
+/* ── Кнопки (kit §2.3): primary — тёмный текст канвы на акценте ─────────── */
+
+.capture-view .btn {
+  min-height: 32px;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-accent);
+  /* Тёмный текст на акценте: белый даёт лишь ~3.5:1, канва — 4.7:1 (§4, §6). */
+  color: var(--lnt-canvas);
+  font: 600 14px / 20px var(--lnt-ui);
+  cursor: pointer;
+  transition: background var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.capture-view .btn:hover {
+  background: var(--lnt-accent-press);
+}
+
+.capture-view .btn:active {
+  background: var(--lnt-accent-press);
+}
+
+.capture-view .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.capture-view .btn-secondary {
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+  border: 1px solid var(--lnt-line-struct);
+}
+
+.capture-view .btn-secondary:hover {
+  background: var(--lnt-line-hot);
+  border-color: var(--lnt-line-hot);
+}
+
+/* Quiet-кнопка: 28px, без рамки. */
+.capture-view .btn-quiet {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--lnt-r-ctl);
+  background: transparent;
+  color: var(--lnt-text-sec);
+  font: 600 13px / 16px var(--lnt-ui);
+  cursor: pointer;
+  transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.capture-view .btn-quiet:hover {
+  color: var(--lnt-text);
+  background: var(--lnt-elev);
+}
+
+.capture-view .btn-quiet:disabled,
+.capture-view .btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Совместимость: старые lnt-кнопки внутри захвата красятся V6-токенами. */
+.capture-view .lnt-btn {
+  border-color: var(--lnt-line-struct);
+  background-color: var(--lnt-elev);
+  color: var(--lnt-text);
+}
+
+.capture-view .lnt-btn-primary {
+  background-color: var(--lnt-accent);
+  border-color: var(--lnt-accent);
+  color: var(--lnt-canvas);
+}
+
+/* ── Формы (kit §2.3): инпут/селект 32px ───────────────────────────────── */
+
+.capture-view .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.capture-view .field-label {
+  font: 600 12px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+}
+
+.capture-view .ctl {
+  height: 32px;
+  min-height: 32px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  color: var(--lnt-text);
+  font: 400 14px / 20px var(--lnt-ui);
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.capture-view .ctl:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.capture-view .ctl:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -1px;
+  border-color: var(--lnt-line-hot);
+}
+
+.capture-view select.ctl {
+  appearance: none;
+  padding-inline-end: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23D1D1D1' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+
+/* Совместимость: старые lnt-контролы внутри захвата — V6-геометрия. */
+.capture-view .lnt-input,
+.capture-view .lnt-select {
+  border-color: var(--lnt-line-struct);
+  background-color: var(--lnt-chrome);
+  color: var(--lnt-text);
+}
+
+.capture-view .lnt-label {
+  color: var(--lnt-text-sec);
+}
+
+.capture-view .lnt-hint {
+  color: var(--lnt-text-sec);
+}
+
+.capture-view .lnt-error-text {
+  color: #ffc4c6;
+}
+
+/* Сетка полей формы (kit .form-grid, в две колонки — вариант V3). */
+.capture-view .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0 16px;
+}
+
+.capture-view .capture-settings-grid {
+  column-gap: 16px;
+}
+
+/* Футер формы: стартовая полоса действий. */
+.capture-view .capture-start-row.form-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 16px;
+}
+
+/* ── Radio-card (D1=A, новый V6-компонент): карточная стилистика поверх
+ * input[name=capture-mode] — селекторы и поведение untouched. ──────────── */
+
+.capture-view .capture-mode-group,
+.capture-view .capture-source-group {
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-panel);
+  padding: 12px;
+  margin: 0 0 16px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.capture-view .capture-mode-group legend,
+.capture-view .capture-source-group legend {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  /* dim (#909090) даёт ~3:1 на хроме — мелкому тексту нужен sec (≥4.5:1). */
+  color: var(--lnt-text-sec);
+  padding: 0 4px;
+}
+
+.capture-view .radio-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  align-items: start;
+  min-height: 32px;
+  padding: 8px 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  cursor: pointer;
+  min-width: 0;
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease), background var(--lnt-t-fast)
+    var(--lnt-ease);
+}
+
+.capture-view .radio-card:hover {
+  background: var(--lnt-elev);
+  border-color: var(--lnt-line-hot);
+}
+
+.capture-view .radio-card:has(input:checked) {
+  border-color: var(--lnt-accent);
+  background: var(--lnt-elev);
+}
+
+.capture-view .radio-card:has(input:focus-visible) {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: 2px;
+}
+
+.capture-view .radio-card input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--lnt-accent);
+  flex: none;
+}
+
+.capture-view .radio-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lnt-text);
+  min-width: 0;
+}
+
+.capture-view .radio-card-desc {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--lnt-text-sec);
+  min-width: 0;
+}
+
+/* Совместимость старых имён карточек (e2e-пины label[for]). */
+.capture-view .capture-mode-card {
+  min-width: 0;
+}
+
+.capture-view .capture-mode-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.capture-view .capture-mode-desc {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--lnt-text-sec);
+}
+
+.capture-view .capture-radio-input {
+  accent-color: var(--lnt-accent);
+}
+
+/* Строка каналов — глиф-подтверждение конфигурации (§6: не только цвет). */
+.capture-view .capture-channels-value {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px dashed var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  font-size: 13px;
+  color: var(--lnt-text-sec);
+  align-self: end;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,94 @@
+/* T11: выделено из catalog.css. */
+/* ── Таблицы ─────────────────────────────────────────────────────────── */
+
+.lnt-cat-workspace .tbl-wrap {
+  overflow: auto;
+  min-width: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.lnt-cat-workspace .tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 12px / 16px var(--lnt-ui);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.lnt-cat-workspace .tbl th {
+  height: 30px;
+  padding: 0 8px;
+  text-align: left;
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  background: #1d1d1d;
+  border-bottom: 1px solid var(--lnt-line);
+  white-space: nowrap;
+}
+
+.lnt-cat-workspace .tbl td {
+  height: var(--lnt-row-h);
+  padding: 0 8px;
+  border-bottom: 1px solid var(--lnt-line);
+  color: var(--lnt-text);
+  vertical-align: middle;
+}
+
+.lnt-cat-workspace .tbl tbody tr {
+  transition: background var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-cat-workspace .tbl tbody tr:hover {
+  background: var(--lnt-elev);
+}
+
+.lnt-cat-workspace .tbl .is-selected {
+  background: var(--lnt-elev);
+}
+
+.lnt-cat-workspace .tbl .num {
+  font-family: var(--lnt-mono);
+  white-space: nowrap;
+}
+
+.lnt-cat-workspace .tbl-tight td,
+.lnt-cat-workspace .tbl-tight th {
+  padding: 0 4px;
+}
+
+.lnt-cat-workspace .cell-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Здоровье — текстовой пилюлей, не только цветом (a11y §6, хук e2e). */
+.lnt-cat-workspace .lnt-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--lnt-r-pill);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Токены --lnt-ok/--lnt-warn/--lnt-err (#2d9d78/#e68619/#ec5b62) на тонированной
+ * подложке дают 2.7–3.7:1 — мелкий текст пилюль (12px) требует 4.5:1,
+ * поэтому здесь осветлённые варианты того же тона (замер axe ≥ 5:1). */
+.lnt-cat-workspace .lnt-tone-ok {
+  background-color: var(--lnt-ok-bg, rgb(45 157 120 / 0.15));
+  color: #7fe0b8;
+}
+
+.lnt-cat-workspace .lnt-tone-warn {
+  background-color: var(--lnt-warn-bg, rgb(230 134 25 / 0.15));
+  color: #f7c46c;
+}
+
+.lnt-cat-workspace .lnt-tone-error {
+  background-color: var(--lnt-err-bg, rgb(236 91 98 / 0.15));
+  color: #ffc4c6;
+}

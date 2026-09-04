@@ -1,11 +1,14 @@
 /** Тренды и продольные ряды (todo 43): описательный запрос /trends/query,
  * uPlot-график наблюдений, панели смешивающих факторов и пропусков.
- * Результат сервера — descriptive_exploratory: причинность исключена. */
+ * Результат сервера — descriptive_exploratory: причинность исключена.
+ * T11: панели смешивающих факторов и маркировки — в trendPanels. */
 
 import type { LntApiClient } from "../../api/client";
 import type { ObservationInput, TrendAnalysisResult } from "../../api/types-research";
 import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
+import type { ConfoundItem } from "./trendPanels";
+import { renderConfoundPanel, renderLimitationsPanel } from "./trendPanels";
 
 export interface TrendOptions {
   client: Pick<LntApiClient, "research">;
@@ -64,7 +67,10 @@ export class TrendView {
       el("div", { className: "lnt-exp-actions cmdbar" }, [
         el("div", { className: "cmd-fields" }, [
           el("label", { className: "lnt-field-inline field cmd-field" }, [
-            el("span", { className: "lnt-label-text field-label cmd-label", text: "Минимальный N" }),
+            el("span", {
+              className: "lnt-label-text field-label cmd-label",
+              text: "Минимальный N",
+            }),
             this.minNInput,
           ]),
         ]),
@@ -209,63 +215,19 @@ export class TrendView {
       grid,
       el("h3", { className: "lnt-exp-subtitle", text: "Средние по группам (описательные)" }),
       trendsList,
-      this.confoundPanel(),
-      this.limitationsPanel(meta),
+      renderConfoundPanel([]),
+      renderLimitationsPanel(meta),
     );
   }
 
   /** Панель смешивающих факторов из confound_checklist эксперимента. */
-  renderConfoundChecklist(
-    checklist: { key: string; checked: boolean; note?: string | null }[],
-  ): void {
+  renderConfoundChecklist(checklist: ConfoundItem[]): void {
     const host = this.root.querySelector(".lnt-exp-confound-host");
     host?.remove();
     if (checklist.length === 0) {
       return;
     }
-    this.root.append(this.confoundPanel(checklist));
-  }
-
-  private confoundPanel(
-    checklist?: { key: string; checked: boolean; note?: string | null }[],
-  ): HTMLElement {
-    const items = checklist ?? this.readConfoundFromRoot();
-    const panel = el("section", { className: "lnt-exp-confound lnt-exp-confound-host panel" });
-    panel.append(el("h3", { className: "lnt-exp-subtitle", text: "Смешивающие факторы" }));
-    if (items.length === 0) {
-      panel.append(
-        el("p", { className: "lnt-helper-text", text: "Чек-лист смешивающих факторов пуст." }),
-      );
-      return panel;
-    }
-    const list = el("ul", { className: "lnt-exp-limitations" });
-    for (const item of items) {
-      list.append(
-        el("li", {
-          text: `${item.key}: ${item.checked ? "проверен" : "НЕ проверен"}${item.note ? ` — ${item.note}` : ""}${item.checked ? "" : " · неконтролируемый смешивающий фактор делает связь неинтерпретируемой"}`,
-        }),
-      );
-    }
-    panel.append(list);
-    return panel;
-  }
-
-  private readConfoundFromRoot(): { key: string; checked: boolean; note?: string | null }[] {
-    return [];
-  }
-
-  private limitationsPanel(meta: TrendAnalysisResult["metadata"]): HTMLElement {
-    return el("div", { className: "lnt-exp-provenance" }, [
-      el("h4", { className: "lnt-exp-provenance-title", text: "Маркировка результата" }),
-      el("p", {
-        className: "lnt-exp-meta-line",
-        text: `Описательный разведочный анализ (exploratory). Единицы: ${meta.units} · N=${String(meta.n)}. Ранговые связи — корреляции, НЕ причинные эффекты.`,
-      }),
-      el("p", {
-        className: "lnt-exp-meta-line",
-        text: "Недостающие данные показаны как «недоступно» с кодом причины и никогда не восполняются вымыслом.",
-      }),
-    ]);
+    this.root.append(renderConfoundPanel(checklist));
   }
 
   private showBanner(message: string, tone: "ok" | "warn" | "error"): void {

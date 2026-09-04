@@ -3,19 +3,20 @@
  * .banner.banner-inline. CRUD локаций, оборудования, фронтенда, трансформатора
  * и условий измерения + выбор комбинации для предпросмотра снимка захвата.
  * Мутации идут через api-клиент (nonce), состояния pending/success/failure
- * блокируют кнопки; ошибки — русские тексты, не console. */
+ * блокируют кнопки; ошибки — русские тексты, не console.
+ * T11: поля форм — в profileFormView, диалоги — в profileDialogs; здесь
+ * каркас, состояние комбинации и список. */
 
 import type { LntApiClient } from "../../api/client";
 import { normalizeThrown } from "../../api/errors";
-import type { ProfileData, ProfileKind, ProfileRevision } from "../../api/types";
-import { openDialog } from "../../components/primitives/dialog";
+import type { ProfileRevision } from "../../api/types";
 import { el } from "../../components/primitives/dom";
-import { createField } from "../../components/primitives/forms";
 import { createResourceLoader } from "../../state/resource";
-import { PROFILE_KIND_LABELS, collectProfileData } from "./profileForms";
+import type { ProfileDialogContext } from "./profileDialogs";
+import { openCreateDialog, openEditDialog } from "./profileDialogs";
+import { KINDS } from "./profileFormView";
+import { PROFILE_KIND_LABELS } from "./profileForms";
 import type { ProfileCombination } from "./profilePreview";
-
-const KINDS: ProfileKind[] = ["location", "equipment", "front_end", "transformer", "conditions"];
 
 export interface ProfileManagerOptions {
   client: LntApiClient;
@@ -25,67 +26,6 @@ export interface ProfileManagerOptions {
 export interface ProfileManagerHandle {
   root: HTMLElement;
   reload(): Promise<void>;
-}
-
-function input(name: string, label: string, value = ""): HTMLElement {
-  const control = document.createElement("input");
-  control.type = "text";
-  control.name = name;
-  control.className = "lnt-input";
-  if (value !== "") control.value = value;
-  return createField({ label, control }).root;
-}
-
-function quantityInputs(prefix: string, label: string): HTMLElement {
-  const wrap = el("div", { className: "lnt-cat-quantity" });
-  wrap.append(
-    input(`${prefix}_value`, `${label} — значение`),
-    input(`${prefix}_unit`, `${label} — единица`),
-  );
-  return wrap;
-}
-
-/** Динамические поля формы под вид профиля (контракт data каждого вида). */
-function formFieldsFor(kind: ProfileKind): HTMLElement[] {
-  switch (kind) {
-    case "location":
-      return [
-        input("alias", "Псевдоним локации"),
-        input("outlet", "Розетка"),
-        input("circuit", "Автомат/цепь"),
-      ];
-    case "equipment":
-      return [input("alias", "Псевдоним оборудования"), input("model", "Модель")];
-    case "front_end":
-      return [
-        quantityInputs("resistance", "Сопротивление"),
-        quantityInputs("c1", "C1"),
-        quantityInputs("c2", "C2"),
-      ];
-    case "transformer":
-      return [
-        quantityInputs("primary", "Первичная обмотка"),
-        quantityInputs("secondary", "Вторичная обмотка"),
-      ];
-    case "conditions": {
-      const select = document.createElement("select");
-      select.name = "damper_state";
-      select.className = "lnt-select";
-      for (const [value, labelText] of [
-        ["unknown", "Неизвестно"],
-        ["on", "Включён"],
-        ["off", "Выключен"],
-      ] as const) {
-        const option = document.createElement("option");
-        option.value = value;
-        option.textContent = labelText;
-        select.append(option);
-      }
-      const damper = createField({ label: "Демпфер", control: select }).root;
-      const loads = input("nearby_load_states", "Нагрузки рядом (через запятую)");
-      return [damper, loads];
-    }
-  }
 }
 
 export function createProfileManager(options: ProfileManagerOptions): ProfileManagerHandle {
@@ -128,135 +68,21 @@ export function createProfileManager(options: ProfileManagerOptions): ProfileMan
     }
   }
 
-  function openEditDialog(existing: ProfileRevision): void {
-    const kindSelect = document.createElement("select");
-    kindSelect.name = "__kind";
-    kindSelect.className = "lnt-select";
-    kindSelect.disabled = true;
-    const option = document.createElement("option");
-    option.value = existing.kind;
-    option.textContent = PROFILE_KIND_LABELS[existing.kind];
-    kindSelect.append(option);
-    kindSelect.value = existing.kind;
+  const dialogContext: ProfileDialogContext = {
+    client,
+    combination,
+    mutate,
+    notify,
+    setError,
+  };
 
-    const fieldsHost = el("div", {});
-    fieldsHost.append(...formFieldsFor(existing.kind));
-    fillExisting(fieldsHost, existing.data);
-
-    const form = document.createElement("form");
-    form.append(createField({ label: "Вид профиля", control: kindSelect }).root, fieldsHost);
-    form.addEventListener("submit", (event) => event.preventDefault());
-
-    const dialog = openDialog({
-      title: `Новая revision: ${existing.profile_id}`,
-      content: form,
-      actions: [
-        {
-          label: "Сохранить revision",
-          kind: "primary",
-          onClick: (close) => {
-            void (async () => {
-              try {
-                const { data } = collectProfileData(existing.kind, form);
-                await mutate(
-                  () =>
-                    client.profilesApi.update(existing.profile_id, { kind: existing.kind, data }),
-                  dialog.root,
-                );
-                close();
-              } catch (validationError) {
-                setError(validationError instanceof Error ? validationError.message : "");
-              }
-            })();
-          },
-        },
-      ],
-    });
-  }
-
-  function fillExisting(host: HTMLElement, data: ProfileData): void {
-    const flat: Record<string, string> = {};
-    for (const [key, value] of Object.entries(data)) {
-      if (typeof value === "string") flat[key] = value;
-      else if (value && typeof value === "object" && "value" in value && "unit" in value) {
-        flat[`${key}_value`] = String(value.value);
-        flat[`${key}_unit`] = String(value.unit);
-      }
-    }
-    for (const [name, value] of Object.entries(flat)) {
-      const node = host.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${name}"]`);
-      if (node) node.value = value;
-    }
-    if ("nearby_load_states" in data && Array.isArray(data.nearby_load_states)) {
-      const node = host.querySelector<HTMLInputElement>('[name="nearby_load_states"]');
-      if (node) node.value = data.nearby_load_states.join(", ");
-    }
+  function handleEdit(existing: ProfileRevision): void {
+    openEditDialog(dialogContext, existing);
   }
 
   createButton.addEventListener("click", () => {
-    openCreateDialog();
+    openCreateDialog(dialogContext);
   });
-
-  function openCreateDialog(): void {
-    const idInput = document.createElement("input");
-    idInput.type = "text";
-    idInput.className = "lnt-input";
-    const kindSelect = document.createElement("select");
-    kindSelect.name = "__kind";
-    kindSelect.className = "lnt-select";
-    for (const kind of KINDS) {
-      const option = document.createElement("option");
-      option.value = kind;
-      option.textContent = PROFILE_KIND_LABELS[kind];
-      kindSelect.append(option);
-    }
-    const fieldsHost = el("div", {});
-    fieldsHost.append(...formFieldsFor(kindSelect.value as ProfileKind));
-    kindSelect.addEventListener("change", () => {
-      while (fieldsHost.firstChild) fieldsHost.removeChild(fieldsHost.firstChild);
-      fieldsHost.append(...formFieldsFor(kindSelect.value as ProfileKind));
-    });
-
-    const form = document.createElement("form");
-    form.append(
-      createField({ label: "Идентификатор профиля", control: idInput }).root,
-      createField({ label: "Вид профиля", control: kindSelect }).root,
-      fieldsHost,
-    );
-    form.addEventListener("submit", (event) => event.preventDefault());
-
-    const dialog = openDialog({
-      title: "Новый профиль",
-      content: form,
-      actions: [
-        {
-          label: "Создать",
-          kind: "primary",
-          onClick: (close) => {
-            void (async () => {
-              const profileId = idInput.value.trim();
-              if (profileId === "") {
-                idInput.setAttribute("aria-invalid", "true");
-                return;
-              }
-              try {
-                const kind = kindSelect.value as ProfileKind;
-                const { data } = collectProfileData(kind, form);
-                await mutate(
-                  () => client.profilesApi.create(profileId, { kind, data }),
-                  dialog.root,
-                );
-                combination[kind] = undefined;
-                close();
-              } catch (validationError) {
-                setError(validationError instanceof Error ? validationError.message : "");
-              }
-            })();
-          },
-        },
-      ],
-    });
-  }
 
   function renderList(items: ProfileRevision[]): void {
     while (listHost.firstChild) listHost.removeChild(listHost.firstChild);
@@ -306,7 +132,7 @@ export function createProfileManager(options: ProfileManagerOptions): ProfileMan
       text: "Изменить",
       attrs: { type: "button" },
     });
-    editButton.addEventListener("click", () => openEditDialog(item));
+    editButton.addEventListener("click", () => handleEdit(item));
     const deleteButton = el("button", {
       className: "btn-quiet",
       text: "Удалить",
@@ -330,9 +156,7 @@ export function createProfileManager(options: ProfileManagerOptions): ProfileMan
   });
 
   const root = el("section", { className: "panel lnt-cat-profiles" }, [
-    el("div", { className: "panel-hd" }, [
-      el("h2", { className: "panel-title", text: "Профили" }),
-    ]),
+    el("div", { className: "panel-hd" }, [el("h2", { className: "panel-title", text: "Профили" })]),
     el("div", { className: "panel-bd" }, [createButton, listHost, errorNote]),
   ]);
 

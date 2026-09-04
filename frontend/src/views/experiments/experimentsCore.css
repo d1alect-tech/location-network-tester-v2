@@ -1,0 +1,176 @@
+/* T11: ядро экспериментов (панели, формы, раскладка) — выделено из experiments.css. */
+/* Рабочая область «Эксперименты» (todo 43, V6-порт T8): раскладка, таймлайн,
+ * участники, баннеры-квалификаторы.
+ *
+ * Токены — showcase-round2/tokens.css (V6-набор: --lnt-panel/--lnt-line/
+ * --lnt-text-*, --lnt-accent/--lnt-ok/--lnt-warn/--lnt-err, --lnt-mono,
+ * --lnt-r-ctl/--lnt-r-modal, --lnt-t-fast/--lnt-ease); доступны глобально
+ * через v2-tokens.css. Легаси-токены (--lnt-space-*, --lnt-border,
+ * --lnt-surface, --lnt-text-muted, --lnt-font-mono) больше не используются.
+ * Легаси-классы lnt-exp-* сохранены рядом с V6 для e2e experiments.spec.ts.
+ * Математика и тексты goldens (1.9625/[1.6000; 2.3125]) не тронуты. */
+
+/* ── V6-панели (kit.css §5.2: фон панели, hairline-стыки) ─────────────────── */
+
+.panel {
+  background: var(--lnt-panel);
+  border: 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-hd {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-line);
+}
+
+.panel-title {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+}
+
+.panel-bd {
+  padding: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.panel-bd.is-bare {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ── V6-формы (kit.css §2.3: контрол 32px, рамка, фон ступенью темнее) ─────── */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field-label {
+  font: 400 12px / 16px var(--lnt-ui);
+  font-weight: 600;
+  color: var(--lnt-text-sec);
+}
+
+.ctl {
+  height: 32px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  color: var(--lnt-text);
+  font: 400 14px / 20px var(--lnt-ui);
+}
+
+.ctl:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.ctl:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -1px;
+  border-color: var(--lnt-line-hot);
+}
+
+select.ctl {
+  appearance: none;
+  padding-inline-end: 26px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
+}
+
+.form-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Рабочая область: двухколоночный app-body ─────────────────────────────── */
+
+.lnt-exp-workspace {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.lnt-exp-left,
+.lnt-exp-right {
+  min-width: 0;
+}
+
+.lnt-exp-left {
+  flex: 0 0 320px;
+}
+
+.lnt-exp-right {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lnt-exp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lnt-exp-list-item .lnt-exp-open {
+  width: 100%;
+  text-align: left;
+}
+
+.lnt-exp-actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+
+.lnt-exp-subtitle {
+  font-size: 1rem;
+  margin: 12px 0 6px;
+}
+
+/* Todo 44: мобильный фокус-режим — панели в одну колонку, 375px без обрезки. */
+@media (max-width: 767px) {
+  .lnt-exp-workspace {
+    flex-direction: column;
+  }
+
+  .lnt-exp-left {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .wizard-modal.modal {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
+
+  .cmd-fields {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

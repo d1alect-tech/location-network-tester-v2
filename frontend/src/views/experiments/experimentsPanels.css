@@ -1,0 +1,254 @@
+/* T11: pairbar, таймлайн, участники, мастер — выделено из experiments.css. */
+/* ── Полоса пары А—Б (variantV6.css .pairbar, высота 40px) ─────────────────── */
+
+.pairbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 4px 12px;
+  background: rgb(0 0 0 / 0.18);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+
+.pair-slot {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-panel);
+}
+
+.pair-role {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  flex: none;
+}
+
+.pair-name {
+  font: 600 13px / 16px var(--lnt-ui);
+  color: var(--lnt-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.pair-meta {
+  font: 400 12px / 16px var(--lnt-mono);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+  flex: none;
+}
+
+.pair-delta {
+  font: 600 14px / 18px var(--lnt-mono);
+  color: var(--lnt-text);
+  flex: none;
+}
+
+/* Таймлайн протокола */
+.lnt-exp-timeline {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  position: relative;
+}
+
+.lnt-exp-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  margin-bottom: 6px;
+  background: var(--lnt-chrome);
+}
+
+.lnt-exp-step-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--lnt-line-struct);
+  color: var(--lnt-text);
+  font-weight: 600;
+  font-size: 0.85rem;
+  flex: none;
+}
+
+.lnt-exp-step-condition {
+  font-family: var(--lnt-mono);
+  font-size: 0.85rem;
+  color: var(--lnt-text-sec);
+}
+
+.lnt-exp-step-instruction {
+  color: var(--lnt-text);
+}
+
+/* Участники и исключения */
+.lnt-exp-member-table td,
+.lnt-exp-member-table th {
+  text-align: left;
+  vertical-align: top;
+}
+
+tr.lnt-exp-excluded .lnt-exp-member-session,
+tr.lnt-exp-excluded td:first-child {
+  text-decoration: line-through;
+}
+
+tr.lnt-exp-excluded {
+  opacity: 0.85;
+}
+
+.lnt-exp-audit {
+  border: 1px dashed var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px 12px;
+  margin-top: 8px;
+  color: var(--lnt-text-sec);
+}
+
+.lnt-exp-audit ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+/* Баннеры-квалификаторы: текст + рамка, не только цвет */
+.lnt-exp-banner {
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  padding: 10px 12px;
+  margin: 10px 0;
+  color: var(--lnt-text);
+}
+
+.lnt-exp-banner-info {
+  border-left: 3px solid var(--lnt-accent);
+  background: var(--lnt-chrome);
+}
+
+.lnt-exp-banner-info::before {
+  content: "ℹ ";
+}
+
+.lnt-exp-banner-warn {
+  border-style: solid;
+  border-width: 1px;
+  border-left: 3px solid var(--lnt-warn);
+  background: var(--lnt-warn-bg);
+}
+
+.lnt-exp-banner-warn::before {
+  content: "▲ Внимание: ";
+  font-weight: 600;
+}
+
+.lnt-exp-banner-error {
+  border-left: 3px solid var(--lnt-err);
+  background: var(--lnt-err-bg);
+}
+
+.lnt-exp-banner-error::before {
+  content: "✕ Ошибка: ";
+  font-weight: 600;
+}
+
+.lnt-exp-result-grid {
+  margin: 8px 0;
+}
+
+.lnt-exp-provenance {
+  border-top: 1px solid var(--lnt-line);
+  margin-top: 12px;
+  padding-top: 8px;
+  color: var(--lnt-text-sec);
+}
+
+.lnt-exp-limitations {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.lnt-exp-meta-line {
+  margin: 4px 0;
+  font-size: 0.9rem;
+  color: var(--lnt-text-sec);
+}
+
+/* Мастер создания: V6-модалка поверх рабочей области */
+.wizard-modal.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  z-index: 50;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-modal);
+  padding: 12px 16px;
+  margin: 0;
+  background: var(--lnt-chrome);
+  color: var(--lnt-text);
+  box-shadow: var(--lnt-shadow-modal);
+}
+
+.lnt-exp-wizard-form .lnt-field {
+  margin: 8px 0;
+}
+
+.lnt-field-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.lnt-exp-wizard-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+/* Оверлей спектра — только просмотр: курсор uPlot не должен перекрывать
+ * кнопки управления сравнением. */
+.lnt-exp-overlay .u-over {
+  pointer-events: none;
+}
+
+.lnt-exp-overlay.panel[data-showcase="spectrum"] {
+  background: var(--lnt-panel);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+}
+
+.lnt-exp-overlay .panel-bd {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Конфаунды трендов — V6-панель */
+.lnt-exp-confound.panel {
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px 12px;
+  margin-top: 12px;
+}

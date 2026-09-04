@@ -11,6 +11,7 @@ import { createDeviceApi } from "../../api/client-device";
 import { clearElement, el } from "../../components/primitives/dom";
 import { createField } from "../../components/primitives/forms";
 import { announcePolite } from "../../components/primitives/status";
+import { refreshProfiles, refreshRecipes } from "./settingsLists";
 import { ROOT_NOTE_MAX_LENGTH, validateRootNote } from "./settingsModel";
 import {
   buildBundleSection,
@@ -188,9 +189,7 @@ export function mountSettingsWorkspace(
 
   async function runPreflight(): Promise<void> {
     clearElement(preflightHost);
-    preflightHost.append(
-      el("p", { className: "t-compact", text: "Проверка готовности захвата…" }),
-    );
+    preflightHost.append(el("p", { className: "t-compact", text: "Проверка готовности захвата…" }));
     try {
       const report = await device.preflight({
         kind: "capture",
@@ -217,53 +216,6 @@ export function mountSettingsWorkspace(
     }
   }
 
-  async function refreshProfiles(): Promise<void> {
-    try {
-      const list = await client.profiles();
-      profilesHost.textContent = `Зарегистрированных профилей: ${String(list.items.length)}.`;
-    } catch {
-      profilesHost.textContent = "Список профилей недоступен (сервер не отвечает).";
-    }
-  }
-
-  async function refreshRecipes(): Promise<void> {
-    clearElement(recipesHost);
-    recipesHost.append(el("p", { className: "t-compact", text: "Загрузка рецептов…" }));
-    try {
-      const items = await client.analysis.recipes();
-      clearElement(recipesHost);
-      if (items.length === 0) {
-        recipesHost.append(
-          el("p", { className: "t-body", text: "Рецепты не зарегистрированы." }),
-        );
-        return;
-      }
-      const list = el("ul", {
-        className: "lnt-set-recipes",
-        attrs: { "aria-label": "Рецепты анализа" },
-      });
-      for (const recipe of items) {
-        list.append(
-          el("li", { className: "t-body" }, [
-            el("span", { text: `${recipe.name} ` }),
-            el("code", {
-              className: "t-mono",
-              text: `${recipe.recipe_id} · sha256 ${recipe.sha256}`,
-            }),
-          ]),
-        );
-      }
-      recipesHost.append(list);
-    } catch (error) {
-      clearElement(recipesHost);
-      recipesHost.append(
-        errorBlock(
-          `Список рецептов недоступен: ${error instanceof Error ? error.message : String(error)}`,
-        ),
-      );
-    }
-  }
-
   void client.ensureReady().then(async () => {
     try {
       const config = await client.bootstrap();
@@ -271,8 +223,8 @@ export function mountSettingsWorkspace(
     } catch {
       rootValue.textContent = "недоступно (сервер не отвечает)";
     }
-    void refreshProfiles();
-    void refreshRecipes();
+    void refreshProfiles(client, profilesHost);
+    void refreshRecipes(client, recipesHost);
     void refreshDevice();
   });
 

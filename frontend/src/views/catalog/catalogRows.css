@@ -1,0 +1,258 @@
+/* T11: выделено из catalog.css. */
+/* ── Каталог: плотная таблица 28px ───────────────────────────────────── */
+
+.lnt-cat-workspace .cat-v6 .panel-hd {
+  justify-content: space-between;
+}
+
+.lnt-cat-workspace .cat-found {
+  font: 400 11px / 14px var(--lnt-mono);
+  color: var(--lnt-text-dim);
+  flex: none;
+}
+
+/* Слот тулбара: прозрачная обёртка, чтобы form.cat-tools была flex-ребёнком. */
+.lnt-cat-workspace .cat-tools-host {
+  display: contents;
+}
+
+.lnt-cat-workspace .cat-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-line);
+  flex: none;
+}
+
+.lnt-cat-workspace .lnt-cat-saved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.lnt-cat-workspace .cat-v6 .tbl-cat tbody td {
+  height: 28px;
+  padding: 0 8px;
+}
+
+/* Фиксированная раскладка: состояние и тип получают своё, остаток — метке.
+ * Метка — имя (узнаётся по началу, режется); тип — словарь (нельзя). */
+.lnt-cat-workspace .cat-v6 .tbl-cat {
+  table-layout: fixed;
+  width: 100%;
+}
+
+/* Пилюля «Повреждён манифест» — самый длинный текст состояния (~150px). */
+.lnt-cat-workspace .cat-v6 .tbl-cat tr > :first-child {
+  width: 158px;
+}
+
+/* Самый длинный тип «Качество сети» (~104px, измерено в витрине). */
+.lnt-cat-workspace .cat-v6 .tbl-cat tr > :nth-child(3) {
+  width: 104px;
+}
+
+.lnt-cat-workspace .cat-v6 .tbl-cat tr > :nth-child(4) {
+  width: 64px;
+}
+
+/* Без групп в колонке полная дата — ширины под «14:30» ей мало. */
+.lnt-cat-workspace .cat-v6 .tbl-cat.is-flat tr > :nth-child(4) {
+  width: 96px;
+}
+
+/* Заголовок дня — единственная ячейка строки, ширины её не касаются. */
+.lnt-cat-workspace .cat-group > th {
+  width: auto;
+}
+
+.lnt-cat-workspace .cat-label-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lnt-cat-workspace .cat-label-cell .cell-ellipsis {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Роль связывает строку с полосой пары А—Б (цвет усиливает, читается буква). */
+.lnt-cat-workspace .cat-role {
+  flex: none;
+  min-width: 16px;
+  padding: 0 4px;
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  border: 1px solid currentcolor;
+  border-radius: var(--lnt-r-ctl);
+}
+
+.lnt-cat-workspace .cat-role-a {
+  color: #9db4ff;
+}
+
+.lnt-cat-workspace .cat-role-b {
+  color: #f0a95c;
+}
+
+.lnt-cat-workspace .cat-empty {
+  height: 48px;
+  padding: 0 8px;
+  font: 400 12px / 48px var(--lnt-ui);
+  color: var(--lnt-text-dim);
+  text-align: center;
+}
+
+.lnt-cat-workspace .cat-loading {
+  padding: 12px;
+}
+
+.lnt-cat-workspace .cat-more {
+  margin: 8px 12px;
+  align-self: flex-start;
+  flex: none;
+}
+
+/* Строки фокусируемы (roving tabindex): видимый фокус §6. */
+.lnt-cat-workspace .lnt-cat-row {
+  cursor: pointer;
+}
+
+.lnt-cat-workspace .lnt-cat-row:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -2px;
+}
+
+.lnt-cat-workspace .lnt-cat-row-selected,
+.lnt-cat-workspace .lnt-cat-row-selected:hover {
+  background: var(--lnt-elev);
+}
+
+/* Заголовок колонки — настоящая кнопка: сортировка с клавиатуры (§6). */
+.lnt-cat-workspace .cat-th {
+  padding: 0;
+}
+
+.lnt-cat-workspace .cat-sort {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0 8px;
+  font: 600 11px / 30px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lnt-cat-workspace .cat-sort:hover {
+  color: var(--lnt-text);
+}
+
+.lnt-cat-workspace .cat-th[aria-sort="ascending"] .cat-sort-mark::after {
+  content: "▲";
+}
+
+.lnt-cat-workspace .cat-th[aria-sort="descending"] .cat-sort-mark::after {
+  content: "▼";
+}
+
+.lnt-cat-workspace .cat-th[aria-sort="ascending"] .cat-sort,
+.lnt-cat-workspace .cat-th[aria-sort="descending"] .cat-sort {
+  color: var(--lnt-text);
+}
+
+.lnt-cat-workspace .cat-sort-mark {
+  color: var(--lnt-accent);
+}
+
+/* Заголовок дня отделяет один выезд от другого. Ячейка остаётся table-cell,
+ * иначе colspan перестаёт действовать (находка витрины V6). */
+.lnt-cat-workspace .cat-group th {
+  height: 24px;
+  padding: 0 8px;
+  font: 600 11px / 24px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  color: var(--lnt-text-sec);
+  background: var(--lnt-panel-hd, rgb(0 0 0 / 0.18));
+  border-top: 1px solid var(--lnt-line-struct);
+  border-bottom: 1px solid var(--lnt-line);
+}
+
+.lnt-cat-workspace .cat-group-in {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lnt-cat-workspace .cat-group-count {
+  font: 400 11px / 24px var(--lnt-mono);
+  color: var(--lnt-text-dim);
+}
+
+/* ── Табы правой панели ──────────────────────────────────────────────── */
+
+.lnt-cat-workspace .tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-height: 32px;
+  flex: none;
+  padding: 0 8px;
+  background: var(--lnt-chrome);
+}
+
+.lnt-cat-workspace .snav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  min-height: 32px;
+  font: 500 13px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-cat-workspace .snav-item:hover {
+  color: var(--lnt-text);
+  background: var(--lnt-elev);
+}
+
+.lnt-cat-workspace .snav-item.is-active {
+  color: var(--lnt-text);
+  background: var(--lnt-panel);
+}
+
+/* Активный таб — акцентная полоса 2px снизу (пин T2, kit.css). */
+.lnt-cat-workspace .snav-item.is-active::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: var(--lnt-accent);
+}
+
+.lnt-cat-workspace .snav-item:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -2px;
+}
