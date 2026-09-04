@@ -149,7 +149,7 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
         text:
           `Окно: ${format(summary.tStartS)}–${format(summary.tEndS)} с · ` +
           `${format(summary.fLowHz)}–${format(summary.fHighHz)} Гц · ячеек ${summary.cells} · ` +
-          `дБ ${format(summary.minDb)}…${format(summary.maxDb)} · среднее ${format(summary.meanDb)} дБ · ` +
+          `дБВ/Гц ${format(summary.minDb)}…${format(summary.maxDb)} (отн. 1 В²/Гц) · среднее ${format(summary.meanDb)} дБВ/Гц · ` +
           `без покрытия ${summary.nanShare.toFixed(4)} · событий ${summary.eventCount}`,
       }),
     );

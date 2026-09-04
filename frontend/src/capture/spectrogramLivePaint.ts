@@ -14,10 +14,10 @@ import {
   TIME_BINS,
 } from "./spectrogramLiveStore";
 
-/** Подпись шкалы дБ в формате витрины. */
+/** Подпись шкалы в формате витрины: уровень — дБВ/Гц с опорой, дельта — дБ. */
 export function gramScaleText(mode: LiveGramMode, range: { low: number; high: number }): string {
   if (mode === "delta") return `−${DELTA_SPAN_DB} … +${DELTA_SPAN_DB} дБ`;
-  return `${Math.round(range.low)} … ${Math.round(range.high)} дБ`;
+  return `${Math.round(range.low)} … ${Math.round(range.high)} дБВ/Гц (отн. 1 В²/Гц)`;
 }
 
 function pixelRatio(): number {

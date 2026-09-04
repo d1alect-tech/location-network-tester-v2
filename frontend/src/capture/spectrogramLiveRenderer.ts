@@ -180,7 +180,8 @@ export function buildSpectrogramLiveRenderer(secondsPerColumn = 1.5): Spectrogra
     const value = store.valueAt(bin, row, mode);
     const seconds = (k * secondsPerColumn).toFixed(2);
     const sign = mode === "delta" && value > 0 ? "+" : "";
-    readout.textContent = `${formatHzRu(freq)} · ${seconds} с · ${sign}${value.toFixed(1)} дБ`;
+    const unit = mode === "delta" ? "дБ" : "дБВ/Гц";
+    readout.textContent = `${formatHzRu(freq)} · ${seconds} с · ${sign}${value.toFixed(1)} ${unit}`;
   });
   canvas.addEventListener("mouseleave", () => {
     readout.textContent = "наведите на полотно";

@@ -42,16 +42,22 @@ function formatDb(value: number): string {
   return String(Math.round(value));
 }
 
-function scaleText(mode: GramMode, tile: GramPairTile): string {
+/** Подпись шкалы: уровень — дБВ/Гц с опорой 1 В²/Гц, дельта — честный min/max в дБ. */
+export function scaleText(mode: GramMode, tile: GramPairTile): string {
   switch (mode) {
     case "delta":
-      return `−${formatDb(tile.maxDb)} … +${formatDb(tile.maxDb)} дБ`;
+      return `${signedDb(tile.minDb)} … ${signedDb(tile.maxDb)} дБ`;
     case "a":
     case "b":
-      return `${formatDb(tile.minDb)} … ${formatDb(tile.maxDb)} дБ`;
+      return `${formatDb(tile.minDb)} … ${formatDb(tile.maxDb)} дБВ/Гц (отн. 1 В²/Гц)`;
     default:
       return assertNever(mode);
   }
+}
+
+function signedDb(value: number): string {
+  const rounded = Math.round(value);
+  return rounded < 0 ? `−${formatDb(-rounded)}` : `+${formatDb(rounded)}`;
 }
 
 export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle {
