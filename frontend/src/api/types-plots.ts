@@ -12,6 +12,9 @@ export interface SpectrumPayload {
   resolution_hz?: number | null;
   band_low_hz?: number | null;
   band_high_hz?: number | null;
+  /** B3: окно Welch и ENBW из анализа (ADD-ключи, старые клиенты целы). */
+  window?: string | null;
+  enbw_hz?: number | null;
 }
 
 /** GET /api/sessions/{name}/spectrum-input-referred: excess-PSD на входе CH1. */

@@ -14,6 +14,7 @@ import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { peaksFromDetail, spectrumToRequest } from "../../components/charts/viewModels";
 import type { SeriesStyle } from "../../components/charts/viewModels";
 import { el } from "../../components/primitives/dom";
+import { createSpectrumExtras } from "./spectrumExtras";
 import { createPlaneControl, planePayload } from "./spectrumPlaneControl";
 
 export type SpectrumView = "spectrum" | "gram";
@@ -124,12 +125,14 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
   );
   let reloadPlane: () => void = () => undefined;
   const planeControl = createPlaneControl(() => reloadPlane());
+  const extras = createSpectrumExtras();
   const gramBar = el("div", { className: "gram-bar" });
   const header = el("div", { className: "panel-hd" }, [
     title,
     viewToggle,
     planeControl.toggle,
     planeControl.rbw,
+    extras.selects,
     gramBar,
   ]);
   const frame = el("div", { className: "frame" });
@@ -147,7 +150,7 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
     [statusText, retryButton],
   );
   status.hidden = true;
-  const body = el("div", { className: "panel-bd" }, [status, frame, gramHost]);
+  const body = el("div", { className: "panel-bd" }, [status, frame, gramHost, extras.markers]);
   const root = el("section", { className: "panel", attrs: { "data-showcase": "spectrum" } }, [
     header,
     body,
@@ -212,6 +215,7 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
       ]);
       planeControl.paintPlane(detail.analysis);
       planeControl.paintRbw(payloadA);
+      extras.paint({ payloadA, payloadB, analysis: detail.analysis });
       peaksA = peaksFromDetail(detailForPeaks(a, detail));
       const suffix = planeControl.plane() === "input-referred" ? " · вход" : "";
       const styleA: SeriesStyle = { color: theme.accentA, label: `${a}${suffix}` };

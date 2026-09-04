@@ -19,6 +19,7 @@ from numpy.typing import NDArray
 from scipy import signal
 
 from lnt.errors import InputError
+from lnt.markers import refined_frequency_hz, refined_level_db
 from lnt.psd import FrequencyBand, PsdSettings, compute_welch
 from lnt.psd.errors import PsdSettingsError
 from lnt.psd.models import DEFAULT_MAX_CHUNK_SAMPLES
@@ -136,9 +137,13 @@ def compute_band_spectrum(  # noqa: PLR0913 - RBW/окно это отдельн
 
 
 def level_at_db(spectrum: BandSpectrum, frequency_hz: float) -> float:
-    """Уровень PSD (дБ отн. 1 В²/Гц) в ближайшем к частоте бине."""
-    index = int(np.argmin(np.abs(spectrum.frequencies_hz - frequency_hz)))
-    return float(10.0 * np.log10(spectrum.psd_v2_per_hz[index]))
+    """Уровень PSD (дБ отн. 1 В²/Гц) с параболической поправкой вершины."""
+    return refined_level_db(spectrum.frequencies_hz, spectrum.psd_v2_per_hz, frequency_hz)
+
+
+def frequency_at(spectrum: BandSpectrum, frequency_hz: float) -> float:
+    """Уточнённая частота вершины рядом с заданной (поправка ±0.5 бина)."""
+    return refined_frequency_hz(spectrum.frequencies_hz, spectrum.psd_v2_per_hz, frequency_hz)
 
 
 def find_qualified_peaks(
