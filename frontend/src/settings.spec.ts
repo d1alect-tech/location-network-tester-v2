@@ -4,7 +4,8 @@
  * штатное типизированное состояние); preflight-замечания; честная инструкция
  * сборника поддержки (без выдуманной кнопки); сводка приватности; рецепты;
  * axe без serious/critical; снимки 375/768/1280; путь персон
- * Подготовка→Захват→Инспекция→Эксперименты→Отчёты→Настройки на 375px. */
+ * Захват→Инспекция→Эксперименты→Отчёты→Настройки на 375px (A3: prepare убит,
+ * legacy-ссылка #/prepare редиректит на #/capture). */
 
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -158,13 +159,14 @@ test("axe reports no serious or critical violations on the settings workspace", 
   expect(summary, `axe serious/critical: ${JSON.stringify(summary)}`).toEqual([]);
 });
 
-test("persona journey: prepare→capture→inspect→experiments→reports→settings at 375px", async ({
+test("persona journey: prepare-redirect→capture→inspect→experiments→reports→settings at 375px", async ({
   page,
 }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto(`${BASE}#/prepare`);
-  await expect(page.locator(".placeholder-title")).toHaveText("Подготовка");
+  await expect(page).toHaveURL(/#\/capture/);
+  await expect(page.locator(".capture-view")).toBeVisible();
 
   await page.goto(`${BASE}#/capture`);
   await expect(page.locator(".view-title, .placeholder-title").first()).toBeVisible();

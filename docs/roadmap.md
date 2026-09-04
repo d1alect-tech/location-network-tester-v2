@@ -9,7 +9,7 @@
 |---|-----|--------|
 | A1 | Пустые/loading/error-состояния + retry (Experiments/Reports/Capture-timeline, скелетон спектра, CTA «Пересчитать анализ») | TODO |
 | A2 | A11y-унификация табов (WAI-ARIA один паттерн), aria-live readout/scale/statusbar, label-for в командбаре | TODO |
-| A3 | Мёртвый маршрут «Подготовка»: убить или реализовать; вернуть theme-переключатель в inspect | TODO |
+| A3 | Мёртвый маршрут «Подготовка»: убить или реализовать; вернуть theme-переключатель в inspect | DONE (shell-a3: prepare убит + legacy-алиас на capture; таббар унифицирован is-active + aria-current, inspect под общей шапкой без is-inspect-v6) |
 | A4 | Единый источник `CLI_SUBCOMMANDS` (генерация из парсера) + `scripts/pin_vendor.py` для золотых пинов | TODO |
 
 ## Очередь B — Приборные фичи (M, 1–2 недели)

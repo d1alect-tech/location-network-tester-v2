@@ -13,20 +13,9 @@ import { type V6ShellHeader, createV6ShellHeader, createV6ShellStatusbar } from 
 import { mountInspectV6 } from "./views/inspect/inspectV6";
 
 // Simple Hash Router
-export type Route =
-  | "prepare"
-  | "catalog"
-  | "capture"
-  | "inspect"
-  | "experiments"
-  | "reports"
-  | "settings";
+export type Route = "catalog" | "capture" | "inspect" | "experiments" | "reports" | "settings";
 
 export const ROUTES: Record<Route, { title: string; desc: string }> = {
-  prepare: {
-    title: "Подготовка",
-    desc: "Выбор профилей оборудования, калибровки, параметров входа CH1/CH2.",
-  },
   capture: {
     title: "Захват",
     desc: "Запуск одиночных или серийных измерений, отображение активной задачи.",
