@@ -29,7 +29,7 @@ _GRANDFATHERED: Final[dict[str, int]] = {
     "src/lnt/acquire.py": 306,
     # Волны 2/4/6: поведенческие контуры с собственными зелёными регрессиями;
     # разбиение допускается только отдельной задачей с сохранением контрактов.
-    "src/lnt/launcher.py": 268,
+    # Очередь A4: launcher.py ужался до 250 (канон в lnt.cli_spec) и снят с дедлайна.
     "src/lnt/runtime/store.py": 261,
     "src/lnt/experiments/runner.py": 257,
     # Фронтенд Todo 44 (замороженные экраны после visual-QA).
