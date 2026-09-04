@@ -52,6 +52,14 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
     text: "Задач пока нет. Запустите захват — здесь появятся стадия, серия и записанные сессии.",
     attrs: { role: "status", "data-timeline-onboarding": "" },
   });
+  // Пояснение границы отмены: переживает мимолётный статус cancelling,
+  // иначе e2e-ожидание пропадает раньше опроса Playwright (флап 173-й строки).
+  const cancelNote = el("p", {
+    className: "capture-job-cancel-note t-compact",
+    text: "Отмена запланирована после текущей сессии",
+    attrs: { role: "status", "data-timeline-cancel-note": "" },
+  });
+  cancelNote.hidden = true;
 
   const cancelButton = el("button", {
     className: "lnt-btn btn-secondary",
@@ -70,6 +78,9 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
     connection: "idle",
     cancelRequested: false,
   };
+  // Задача, отмену которой подтвердил оператор: для неё пояснение границы
+  // остаётся видимым и после терминального cancelled (рядом со статусом).
+  let cancelConfirmedJob: string | null = null;
 
   cancelButton.addEventListener("click", () => {
     const jobId = latestState.latest?.job_id;
@@ -85,6 +96,7 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
           kind: "primary",
           onClick: (close) => {
             close();
+            cancelConfirmedJob = jobId;
             deps.onCancel(jobId);
           },
         },
@@ -110,6 +122,7 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
       statusLine,
       stageLine,
       seriesLine,
+      cancelNote,
       progress.root,
       writtenWrap,
       el("div", { className: "capture-job-actions statusbar" }, [cancelButton, retryButton]),
@@ -124,12 +137,14 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
       const snapshot = state.latest;
       if (snapshot === null) {
         root.hidden = false;
-        onboarding.hidden = false;
+        // Онбординг — только когда задача ни разу не запускалась.
+        onboarding.hidden = state.history.length > 0;
         statusLine.textContent = "";
         stageLine.textContent = "";
         seriesLine.hidden = true;
         connectionLine.hidden = true;
         recoveryBanner.hidden = true;
+        cancelNote.hidden = true;
         cancelButton.disabled = true;
         retryButton.disabled = true;
         return;
@@ -158,6 +173,14 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
       // Связь: reconnecting/stale показывают ожидание восстановления.
       const degraded = state.connection === "reconnecting" || state.connection === "stale";
       connectionLine.hidden = !degraded || terminal;
+
+      // Новая задача сбрасывает пояснение чужой отмены (например после повтора).
+      if (cancelConfirmedJob !== null && snapshot.job_id !== cancelConfirmedJob) {
+        cancelConfirmedJob = null;
+      }
+      // Пояснение границы: при cancelling и после подтверждённой отмены.
+      const cancelDone = snapshot.status === "cancelled" && snapshot.job_id === cancelConfirmedJob;
+      cancelNote.hidden = !(cancelAtBoundary(state) || cancelDone);
 
       // Отмена: доступна до подтверждения cancelling; после — пояснение границы.
       cancelButton.disabled = !canCancel(state);
