@@ -18,7 +18,13 @@ from typing import TYPE_CHECKING, Final
 import numpy as np
 
 from lnt.errors import InputError
-from lnt.power_quality.constants import ITIC_ENVELOPE, ITIC_STEADY_BAND, POWER_QUALITY_VERSION
+from lnt.power_quality.constants import (
+    ITIC_ENVELOPE,
+    ITIC_STEADY_BAND,
+    POWER_QUALITY_VERSION,
+    SEMI_F47_ENVELOPE,
+    SEMI_F47_STEADY_BAND,
+)
 from lnt.power_quality.models import (
     EventKind,
     HalfCycleSummaryDict,
@@ -160,6 +166,27 @@ def _envelope(duration_s: float) -> tuple[float, float]:
         if duration_s <= duration_limit + EPSILON:
             return (low_frac, high_frac)
     return ITIC_STEADY_BAND
+
+
+def semi_f47_envelope(duration_s: float) -> tuple[float, float]:
+    """Огибающая SEMI-F47: допуски (нижний, верхний) для данной длительности."""
+    for duration_limit, low_frac, high_frac in SEMI_F47_ENVELOPE:
+        if duration_s <= duration_limit + EPSILON:
+            return (low_frac, high_frac)
+    return SEMI_F47_STEADY_BAND
+
+
+def evaluate_tolerance(duration_s: float, ratio: float, *, curve: str = "itic") -> Tolerance:
+    """Вердикт по кривой ITIC/SEMI-F47; при нехватке данных — unavailable."""
+    if not math.isfinite(duration_s) or not math.isfinite(ratio):
+        return Tolerance.UNAVAILABLE
+    if duration_s < 0.0:
+        return Tolerance.UNAVAILABLE
+    if curve not in ("itic", "semi_f47"):
+        return Tolerance.UNAVAILABLE
+    low, high = semi_f47_envelope(duration_s) if curve == "semi_f47" else _envelope(duration_s)
+    tolerated = low - EPSILON <= ratio <= high + EPSILON
+    return Tolerance.IN_TOLERANCE if tolerated else Tolerance.OUT_OF_TOLERANCE
 
 
 def _detect_rvc(

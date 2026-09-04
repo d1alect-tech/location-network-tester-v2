@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from lnt.limits.masks import (
     LimitMask,
     LimitPoint,
     evaluate_mask,
+    load_masks,
+    save_masks,
     spc_verdict,
     thd_limit_verdict,
 )
 from lnt.power_quality.detector import evaluate_tolerance
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.mark.parametrize(
@@ -64,7 +71,9 @@ def test_mask_pass_fail_and_unavailable() -> None:
     assert evaluate_mask(10.0, -30.0, mask) == "fail"
     assert evaluate_mask(5.0, -60.0, mask) == "unavailable"
     assert evaluate_mask(10.0, float("nan"), mask) == "unavailable"
-    assert evaluate_mask(10.0, -50.0, LimitMask(name="empty", unit="db", points=())) == "unavailable"
+    assert (
+        evaluate_mask(10.0, -50.0, LimitMask(name="empty", unit="db", points=())) == "unavailable"
+    )
 
 
 def test_spc_and_thd_verdicts_are_honest() -> None:
@@ -77,9 +86,7 @@ def test_spc_and_thd_verdicts_are_honest() -> None:
     assert thd_limit_verdict(None, limit=0.08, cycles_analyzed=120) == "unavailable"
 
 
-def test_mask_round_trip_outside_session(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    from lnt.limits.masks import load_masks, save_masks
-
+def test_mask_round_trip_outside_session(tmp_path: Path) -> None:
     path = tmp_path / "limits.json"
     masks = (
         LimitMask(

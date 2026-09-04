@@ -55,5 +55,6 @@ export function renderTrends(body: HTMLElement, payload: unknown): void {
   row(dl, "discard_samples", String(view.discardSamples));
   row(dl, "eeprom_verified", String(view.eepromVerified));
   row(dl, "change_points", String(view.changePoints));
+  row(dl, "spc_limits", "N/A (mask not configured)");
   body.append(dl);
 }
