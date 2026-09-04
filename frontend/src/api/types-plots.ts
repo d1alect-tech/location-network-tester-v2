@@ -1,10 +1,29 @@
 /** Доменные типы графиков и деталей сессии: контракты src/lnt/ui/payloads.py.
  * Сервер применяет min/max-децимацию; исходные данные сессии не меняются. */
 
+/** Плоскость спектра: scope (осциллограф) либо input-referred (вход CH1). */
+export type SpectrumPlane = "scope" | "input-referred";
+
 export interface SpectrumPayload {
   frequency_hz: number[];
   psd_v2_per_hz: number[];
   point_count: number;
+  /** RBW-контракт шкалы (ADD-ключи): df полной сетки и полоса анализа. */
+  resolution_hz?: number | null;
+  band_low_hz?: number | null;
+  band_high_hz?: number | null;
+}
+
+/** GET /api/sessions/{name}/spectrum-input-referred: excess-PSD на входе CH1. */
+export interface InputReferredSpectrumPayload {
+  frequency_hz: number[];
+  input_referred_excess_psd_v2_per_hz: number[];
+  point_count: number;
+  status: string | null;
+  reason_code: string | null;
+  qualified_bin_count: number;
+  total_bin_count: number;
+  resolution_hz: number | null;
 }
 
 export type WaveformChannel = "ch1" | "ch2";

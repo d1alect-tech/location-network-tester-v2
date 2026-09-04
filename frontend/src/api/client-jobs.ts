@@ -5,9 +5,15 @@
 import type { LntApiClient, RequestOptions } from "./client";
 import { ApiError } from "./errors";
 import { isJobListPayload, isJobSnapshot } from "./guards-jobs";
-import { isSessionDetailPayload, isSpectrumPayload, isWaveformPayload } from "./guards-plots";
+import {
+  isInputReferredSpectrumPayload,
+  isSessionDetailPayload,
+  isSpectrumPayload,
+  isWaveformPayload,
+} from "./guards-plots";
 import type { JobHistoryPayload, JobListPayload, JobRequest, JobSnapshot } from "./types-jobs";
 import type {
+  InputReferredSpectrumPayload,
   SessionDetailPayload,
   SpectrumPayload,
   WaveformChannel,
@@ -80,6 +86,11 @@ export function createJobsApi(client: LntApiClient): JobsApi {
 export interface PlotsApi {
   detail(name: string, options?: RequestOptions): Promise<SessionDetailPayload>;
   spectrum(name: string, maxPoints?: number, options?: RequestOptions): Promise<SpectrumPayload>;
+  spectrumInputReferred(
+    name: string,
+    maxPoints?: number,
+    options?: RequestOptions,
+  ): Promise<InputReferredSpectrumPayload>;
   waveform(
     name: string,
     channel?: WaveformChannel,
@@ -106,6 +117,17 @@ export function createPlotsApi(client: LntApiClient): PlotsApi {
         options,
       );
       if (!isSpectrumPayload(payload)) throw new ApiError("parse");
+      return payload;
+    },
+    spectrumInputReferred: async (name, maxPoints = 5_000, options = {}) => {
+      const params = new URLSearchParams({ max_points: String(maxPoints) });
+      const payload = await client.requestJson(
+        "GET",
+        `${sessionPath(name, "/spectrum-input-referred")}?${params}`,
+        undefined,
+        options,
+      );
+      if (!isInputReferredSpectrumPayload(payload)) throw new ApiError("parse");
       return payload;
     },
     waveform: async (name, channel = "ch1", maxPoints = 4_000, options = {}) => {

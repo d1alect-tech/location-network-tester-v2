@@ -153,6 +153,27 @@ describe("PlotsApi", () => {
     expect(calls[1]?.url).toBe("/api/sessions/s1/spectrum?max_points=2000");
   });
 
+  it("spectrumInputReferred hits the input-referred endpoint with guards", async () => {
+    const referred = {
+      frequency_hz: [1],
+      input_referred_excess_psd_v2_per_hz: [2],
+      point_count: 1,
+      status: "available",
+      reason_code: null,
+      qualified_bin_count: 1,
+      total_bin_count: 1,
+      resolution_hz: 100,
+    };
+    const { client, calls } = await bootstrappedClient((url) =>
+      url === "/api/sessions/s1/spectrum-input-referred?max_points=2000"
+        ? jsonResponse(referred)
+        : new Response("{}", { status: 404 }),
+    );
+    const payload = await client.plots.spectrumInputReferred("s1", 2_000);
+    expect(calls[1]?.url).toBe("/api/sessions/s1/spectrum-input-referred?max_points=2000");
+    expect(payload.resolution_hz).toBe(100);
+  });
+
   it("waveform defaults to ch1 with the server default window", async () => {
     const waveform = { channel: "ch1", time_s: [0], voltage_v: [0], point_count: 1 };
     const { client, calls } = await bootstrappedClient((url) =>
