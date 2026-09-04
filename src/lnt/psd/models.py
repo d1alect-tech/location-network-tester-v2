@@ -10,6 +10,13 @@ import numpy as np
 from numpy.typing import NDArray
 
 from lnt.psd.errors import PsdSettingsError
+from lnt.psd.windows import (
+    DEFAULT_WINDOW,
+    KNOWN_WINDOWS,
+    canonical_window_name,
+    coherent_gain,
+    enbw_hz,
+)
 
 if TYPE_CHECKING:
     from lnt.analysis_store.settings import WelchSettings
@@ -51,11 +58,17 @@ class PsdSettings:
     nperseg: int
     max_chunk_samples: int
     bands: tuple[FrequencyBand, ...]
+    window: str = DEFAULT_WINDOW
+    overlap_fraction: float = 0.5
 
     def __post_init__(self) -> None:
-        """Проверяет частоту, размер порции и границы Найквиста."""
+        """Проверяет частоту, размер порции, окно, перекрытие и границы Найквиста."""
         if not math.isfinite(self.sample_rate_hz) or self.sample_rate_hz <= 0:
             raise PsdSettingsError("PSD: частота дискретизации должна быть конечной и > 0")
+        if self.window not in KNOWN_WINDOWS:
+            raise PsdSettingsError(f"PSD: неизвестное окно {self.window!r}")
+        if not math.isfinite(self.overlap_fraction) or not 0 <= self.overlap_fraction < 1:
+            raise PsdSettingsError("PSD: overlap_fraction должен быть в [0, 1)")
         if self.nperseg < MIN_NPERSEG:
             raise PsdSettingsError("PSD: nperseg должен быть >= 2")
         if self.max_chunk_samples < self.nperseg:
@@ -76,23 +89,18 @@ class PsdSettings:
         max_chunk_samples: int = DEFAULT_MAX_CHUNK_SAMPLES,
     ) -> PsdSettings:
         """Строит контракт из группы ``AnalysisRecipe.welch``."""
-        expected = ("hann_periodic", 0.5, "constant", "density", "mean")
-        actual = (
-            welch.window,
-            welch.overlap_fraction,
-            welch.detrend,
-            welch.scaling,
-            welch.average,
-        )
+        expected = ("constant", "density", "mean")
+        actual = (welch.detrend, welch.scaling, welch.average)
         if actual != expected:
-            raise PsdSettingsError(
-                "PSD: поддерживаются periodic Hann, overlap=0.5, constant, density, mean"
-            )
+            raise PsdSettingsError("PSD: поддерживаются только constant, density, mean")
+        canonical_window_name(welch.window)
         return cls(
             sample_rate_hz=sample_rate_hz,
             nperseg=welch.segment_samples,
             max_chunk_samples=max(max_chunk_samples, welch.segment_samples),
             bands=bands,
+            window=welch.window,
+            overlap_fraction=welch.overlap_fraction,
         )
 
     @classmethod
@@ -111,6 +119,21 @@ class PsdSettings:
     def resolution_hz(self) -> float:
         """Возвращает точный шаг ``fs / nperseg``."""
         return self.sample_rate_hz / self.nperseg
+
+    @property
+    def window_enbw_hz(self) -> float:
+        """Возвращает ENBW выбранного окна в герцах."""
+        return enbw_hz(self.window, self.nperseg, self.sample_rate_hz)
+
+    @property
+    def window_coherent_gain(self) -> float:
+        """Возвращает когерентное усиление выбранного окна."""
+        return coherent_gain(self.window, self.nperseg)
+
+    @property
+    def noverlap(self) -> int:
+        """Возвращает перекрытие сегментов в отсчётах."""
+        return min(round(self.nperseg * self.overlap_fraction), self.nperseg - 1)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -132,6 +155,8 @@ class PsdResult:
     level_db_v2_per_hz: Float64Array
     band_rms: tuple[BandRms, ...]
     segment_count: int
+    window: str = DEFAULT_WINDOW
+    enbw_hz: float = 0.0
     psd_unit: str = "V²/Hz"
     asd_unit: str = "V/√Hz"
     level_unit: str = "dB re 1 V²/Hz"

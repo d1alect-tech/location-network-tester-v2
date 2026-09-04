@@ -10,10 +10,10 @@ from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import signal
 
 from lnt.psd.errors import PsdCancelledError, PsdDataError
 from lnt.psd.models import BandRms, PsdResult, PsdSettings
+from lnt.psd.windows import canonical_window_name, enbw_hz, get_window
 
 Float32Array = NDArray[np.float32]
 Float64Array = NDArray[np.float64]
@@ -50,10 +50,11 @@ def compute_welch(
 ) -> PsdResult:
     """Считает Welch порциями, не материализуя всю запись как float64."""
     sample_count = _validate_input(samples, settings)
-    step = settings.nperseg // 2
+    step = max(1, settings.nperseg - settings.noverlap)
     segment_count = 1 + (sample_count - settings.nperseg) // step
     segments_per_chunk = max(1, (settings.max_chunk_samples - settings.nperseg) // step + 1)
-    window = np.asarray(signal.get_window("hann", settings.nperseg, fftbins=True), dtype=np.float64)
+    window_name = canonical_window_name(settings.window)
+    window = get_window(window_name, settings.nperseg)
     scale = 1.0 / (settings.sample_rate_hz * float(np.sum(window * window)))
     accumulated = np.zeros(settings.nperseg // 2 + 1, dtype=np.float64)
 
@@ -105,4 +106,6 @@ def compute_welch(
         level_db_v2_per_hz=level_db,
         band_rms=band_rms,
         segment_count=segment_count,
+        window=window_name,
+        enbw_hz=enbw_hz(window_name, settings.nperseg, settings.sample_rate_hz),
     )

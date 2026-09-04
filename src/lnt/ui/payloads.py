@@ -169,6 +169,8 @@ def input_referred_spectrum_payload(
         "qualified_bin_count": reference_map.get("qualified_bin_count", 0),
         "total_bin_count": reference_map.get("total_bin_count", 0),
         "resolution_hz": spectrum_meta.get("resolution_hz"),
+        "window": spectrum_meta.get("window"),
+        "enbw_hz": spectrum_meta.get("enbw_hz"),
     }
 
 
@@ -231,16 +233,19 @@ def _read_analysis(session_dir: Path) -> dict[str, object]:
 
 
 def _spectrum_meta(session_dir: Path) -> dict[str, object]:
-    """Возвращает RBW-метаданные шкалы из metrics.json (только числовые ключи)."""
+    """Возвращает RBW-метаданные шкалы из metrics.json (только известные ключи)."""
     analysis = _read_analysis(session_dir)
     spectrum = analysis.get("spectrum")
     if not isinstance(spectrum, dict):
         return {}
     meta: dict[str, object] = {}
-    for key in ("resolution_hz", "band_low_hz", "band_high_hz"):
+    for key in ("resolution_hz", "band_low_hz", "band_high_hz", "enbw_hz"):
         value = spectrum.get(key)
         if isinstance(value, (int, float)):
             meta[key] = value
+    window = spectrum.get("window")
+    if isinstance(window, str):
+        meta["window"] = window
     return meta
 
 

@@ -20,7 +20,15 @@ from scipy import signal
 
 from lnt.errors import InputError
 from lnt.psd import FrequencyBand, PsdSettings, compute_welch
+from lnt.psd.errors import PsdSettingsError
 from lnt.psd.models import DEFAULT_MAX_CHUNK_SAMPLES
+from lnt.psd.windows import (
+    DEFAULT_RBW_HZ,
+    DEFAULT_WINDOW,
+    canonical_window_name,
+    enbw_hz,
+    validate_rbw_hz,
+)
 
 Float32Array = NDArray[np.float32]
 Float64Array = NDArray[np.float64]
@@ -28,7 +36,7 @@ BoolArray = NDArray[np.bool_]
 
 DEFAULT_BAND_LOW_HZ = 3_000.0
 DEFAULT_BAND_HIGH_HZ = 3_000_000.0
-TARGET_RESOLUTION_HZ = 50.0
+TARGET_RESOLUTION_HZ = DEFAULT_RBW_HZ
 MIN_NPERSEG = 1_024
 MIN_BAND_BINS = 8
 MIN_PROMINENCE_DB = 6.0
@@ -58,27 +66,36 @@ class BandSpectrum:
     band_low_hz: float
     band_high_hz: float
     peaks: tuple[SpectrumPeak, ...]
+    window: str = DEFAULT_WINDOW
+    enbw_hz: float = 0.0
 
 
-def compute_band_spectrum(
+def compute_band_spectrum(  # noqa: PLR0913 - RBW/окно это отдельные контракты селектора
     samples: Float32Array,
     *,
     sample_rate_hz: float,
     band_low_hz: float = DEFAULT_BAND_LOW_HZ,
     band_high_hz: float = DEFAULT_BAND_HIGH_HZ,
     max_peaks: int = DEFAULT_MAX_PEAKS,
+    rbw_hz: float = DEFAULT_RBW_HZ,
+    window: str = DEFAULT_WINDOW,
 ) -> BandSpectrum:
     """Считает Welch-PSD в полосе и находит пики; вход в вольтах."""
     if samples.size < MIN_NPERSEG:
         raise InputError(
             f"слишком мало отсчётов для спектра: {samples.size}, нужно >= {MIN_NPERSEG}",
         )
+    try:
+        resolved_rbw_hz = validate_rbw_hz(rbw_hz)
+        window_name = canonical_window_name(window)
+    except PsdSettingsError as error:
+        raise InputError(str(error)) from error
     effective_high = min(band_high_hz, NYQUIST_FRACTION * sample_rate_hz)
     if band_low_hz >= effective_high:
         raise InputError(
             f"пустая полоса анализа: {band_low_hz:.0f}..{effective_high:.0f} Гц",
         )
-    nperseg = _choose_nperseg(samples.size, sample_rate_hz)
+    nperseg = _choose_nperseg(samples.size, sample_rate_hz, resolved_rbw_hz)
     result = compute_welch(
         np.asarray(samples),
         settings=PsdSettings(
@@ -86,6 +103,8 @@ def compute_band_spectrum(
             nperseg=nperseg,
             max_chunk_samples=max(DEFAULT_MAX_CHUNK_SAMPLES, nperseg),
             bands=(FrequencyBand(name="full", low_hz=0.0, high_hz=sample_rate_hz / 2.0),),
+            window=window_name,
+            overlap_fraction=0.5,
         ),
     )
     freqs = result.frequency_hz
@@ -111,6 +130,8 @@ def compute_band_spectrum(
         band_low_hz=band_low_hz,
         band_high_hz=effective_high,
         peaks=peaks,
+        window=window_name,
+        enbw_hz=enbw_hz(window_name, nperseg, sample_rate_hz),
     )
 
 
@@ -150,8 +171,10 @@ def find_qualified_peaks(
     return tuple(sorted(found, key=lambda peak: peak.prominence_db, reverse=True)[:max_peaks])
 
 
-def _choose_nperseg(sample_count: int, sample_rate_hz: float) -> int:
-    target = sample_rate_hz / TARGET_RESOLUTION_HZ
+def _choose_nperseg(
+    sample_count: int, sample_rate_hz: float, rbw_hz: float = DEFAULT_RBW_HZ
+) -> int:
+    target = sample_rate_hz / rbw_hz
     power = int(np.floor(np.log2(max(target, MIN_NPERSEG))))
     nperseg = 2**power
     while nperseg > sample_count:

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from lnt.analysis_store.errors import RecipeError
+from lnt.psd.windows import DEFAULT_RBW_HZ, KNOWN_WINDOWS, RBW_OPTIONS_HZ
 
 MIN_SEGMENT_SAMPLES: Final = 2
 
@@ -46,16 +47,22 @@ class WelchSettings:
     detrend: str
     scaling: str
     average: str
+    rbw_hz: float = DEFAULT_RBW_HZ
 
     def __post_init__(self) -> None:
-        """Проверяет параметры Welch."""
+        """Проверяет параметры Welch, включая RBW-селектор и окно."""
         _finite("welch.overlap_fraction", self.overlap_fraction)
+        _finite("welch.rbw_hz", self.rbw_hz)
         if (
-            not self.window
+            self.window not in KNOWN_WINDOWS
             or self.segment_samples < MIN_SEGMENT_SAMPLES
             or not 0 <= self.overlap_fraction < 1
         ):
             raise RecipeError("рецепт анализа: некорректные настройки Welch")
+        if float(self.rbw_hz) not in RBW_OPTIONS_HZ:
+            raise RecipeError(
+                f"рецепт анализа: welch.rbw_hz должен быть одним из {list(RBW_OPTIONS_HZ)}"
+            )
         if not self.detrend or not self.scaling or not self.average:
             raise RecipeError("рецепт анализа: строковые настройки Welch не должны быть пустыми")
 
