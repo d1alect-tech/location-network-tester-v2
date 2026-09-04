@@ -1,5 +1,6 @@
 import "./v6.css";
 import { LntApiClient } from "../../api/client";
+import { createDeviceApi } from "../../api/client-device";
 import type { CatalogQuery, CatalogSession } from "../../api/types";
 import type { ChartHandle } from "../../components/charts/types";
 import type { UplotViewOptions } from "../../components/charts/uplotView";
@@ -8,14 +9,16 @@ import type { RouteStore } from "../../state/routeState";
 import { createAnalysisBand } from "./analysisBand";
 import { createCatalogColumn } from "./catalogColumn";
 import type { GramPairClient } from "./gramPair";
+import { ticketToCaptureParams } from "./inspectTicket";
 import { wireInspectV6Gram } from "./inspectV6Gram";
 import type { AnalysisBandClient } from "./inspectV6Load";
 import { loadAnalysisBand } from "./inspectV6Load";
-import { createPairbar } from "./pairbarV6";
 import { createPairState } from "./pairState";
+import { createPairbar } from "./pairbarV6";
 import type { SpectrumPanelClient } from "./spectrumPanelV6";
 import { createSpectrumPanel } from "./spectrumPanelV6";
 import { createV6Chrome } from "./v6Chrome";
+import { wireInspectDeviceStatus } from "./v6DeviceStatus";
 import type { V6ExtrasClient } from "./v6Extras";
 import { createV6Extras } from "./v6Extras";
 
@@ -52,10 +55,14 @@ export async function mountInspectV6(
   const sessionMap = new Map<string, CatalogSession>();
   const pair = createPairState();
   const chrome = createV6Chrome({
-    onCapture: () => {
-      routes.navigate({ route: "capture", params: {} });
+    onCapture: (ticket) => {
+      routes.navigate({ route: "capture", params: ticketToCaptureParams(ticket) });
     },
   });
+  const stopDeviceStatus = wireInspectDeviceStatus(
+    chrome,
+    client instanceof LntApiClient ? createDeviceApi(client) : undefined,
+  );
   const pairbar = createPairbar({ onSwap: () => pair.swap() });
   const catalogColumn = createCatalogColumn({
     client,
@@ -155,6 +162,7 @@ export async function mountInspectV6(
 
   return () => {
     disposed = true;
+    stopDeviceStatus();
     unsubscribe();
     gram.dispose();
     spectrumPanel.destroy();

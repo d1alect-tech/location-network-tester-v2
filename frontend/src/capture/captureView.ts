@@ -10,6 +10,8 @@ import { el } from "../components/primitives/dom";
 import { announcePolite } from "../components/primitives/status";
 import { createCaptureAlert } from "./captureAlerts";
 import type { CaptureAlertHandle } from "./captureAlerts";
+import { applyCapturePrefill } from "./captureDeepLink";
+import type { CapturePrefill } from "./captureDeepLink";
 import { createDevicePanel } from "./devicePanel";
 import type { DevicePanelHandle } from "./devicePanel";
 import {
@@ -37,11 +39,20 @@ export interface CaptureViewHandle {
   dispose(): void;
 }
 
+export interface CaptureViewOptions {
+  /** Префилл из deep-link билета (C1): мусор уже отсеян captureParamsToPrefill. */
+  readonly initial?: CapturePrefill;
+}
+
 export type { CaptureAlertTone } from "./captureAlerts";
 
-export function createCaptureView(client: LntApiClient): CaptureViewHandle {
+export function createCaptureView(
+  client: LntApiClient,
+  opts: CaptureViewOptions = {},
+): CaptureViewHandle {
   const device = createDeviceApi(client);
   const form: ModeFormHandle = createModeForm();
+  if (opts.initial !== undefined) applyCapturePrefill(form.root, opts.initial);
   const devicePanel: DevicePanelHandle = createDevicePanel();
   const timeline: TimelineViewHandle = createJobTimelineView({
     onCancel: (jobId) => void cancelJob(jobId),

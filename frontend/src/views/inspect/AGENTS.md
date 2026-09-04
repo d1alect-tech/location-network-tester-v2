@@ -34,8 +34,12 @@ Largest view: spectrum / spectrogram / v2 panels + pairbar + analysis band.
 
 ## ANTI-PATTERNS
 
-- Commandbar is navigation, not capture: values discarded on apply.
-- Deep-link ticket C1 open: do not wire commandbar into capture params.
+- Commandbar is a deep-link ticket (C1 DONE): values travel to capture via
+  route query (`inspectTicket.ticketToCaptureParams`) and prefill the form
+  (`capture/captureDeepLink`); never discard user input on apply.
+- Device status in the commandbar is live (C1 DONE): `v6DeviceStatus` wires
+  GET /api/device/state into `v6Chrome.setDeviceStatus` with backend
+  recovery_action_ru; empty/error states stay honest (no last-known-as-live).
 - On fetch throw: `showError` only; never leave stale chart on screen.
 - No synthetic PSD fill: missing bins stay missing, never zero-filled.
 - Pairbar slots need keyboard access: tab/enter operable, visible focus.

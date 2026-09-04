@@ -1,7 +1,19 @@
-import { el } from "../../components/primitives/dom";
+import type { DeviceStatePayload } from "../../api/types-device";
+import { clearElement, el } from "../../components/primitives/dom";
+
+/** Сырые значения командбара inspect: билет в capture (C1).
+ * Маппинг в нативные параметры capture — в inspectTicket.ticketToCaptureParams. */
+export interface InspectCaptureTicket {
+  readonly mode: string;
+  readonly source: string;
+  readonly duration: string;
+  readonly rate: string;
+  readonly range: string;
+  readonly label: string;
+}
 
 export type V6ChromeOpts = {
-  readonly onCapture: () => void;
+  readonly onCapture: (ticket: InspectCaptureTicket) => void;
 };
 
 export type V6Chrome = {
@@ -9,6 +21,9 @@ export type V6Chrome = {
   readonly errorBand: HTMLElement;
   showError(msg: string): void;
   hideError(): void;
+  /** Живой статус устройства (C1): payload — как есть с бэкенда,
+   * null без ошибки — честное «нет данных», null с ошибкой — обрыв связи. */
+  setDeviceStatus(payload: DeviceStatePayload | null, error?: string): void;
 };
 
 type SelectItem = {
@@ -49,42 +64,99 @@ function inputField(spec: {
   );
 }
 
-function buildCommandbar(onCapture: () => void): HTMLFormElement {
+function readTicket(form: HTMLFormElement): InspectCaptureTicket {
+  const data = new FormData(form);
+  const text = (name: string): string => String(data.get(name) ?? "").trim();
+  return {
+    mode: text("mode"),
+    source: text("source"),
+    duration: text("duration"),
+    rate: text("rate"),
+    range: text("range"),
+    label: text("label"),
+  };
+}
+
+function buildDeviceStatus(): HTMLParagraphElement {
+  return el("p", {
+    className: "cmd-device",
+    text: "Устройство: проверка…",
+    attrs: { "data-device-status": "", role: "status" },
+  }) as HTMLParagraphElement;
+}
+
+function renderDeviceStatus(
+  node: HTMLParagraphElement,
+  payload: DeviceStatePayload | null,
+  error?: string,
+): void {
+  clearElement(node);
+  if (payload === null) {
+    node.append(
+      el("span", {
+        className: "lnt-status-pill lnt-tone-warn glyph glyph-warn",
+        text: error === undefined ? "Устройство: нет данных" : "Устройство недоступно",
+      }),
+    );
+    if (error !== undefined) {
+      node.append(el("span", { className: "cmd-device-desc", text: `: ${error}` }));
+    }
+    return;
+  }
+  const ready = payload.state === "ready";
+  node.append(
+    el("span", {
+      className: ready
+        ? "lnt-status-pill lnt-tone-ok glyph glyph-ok"
+        : "lnt-status-pill lnt-tone-warn glyph glyph-warn",
+      text: ready ? "Устройство готово" : "Устройство не готово",
+    }),
+    el("span", { className: "cmd-device-desc", text: `: ${payload.description_ru}` }),
+    el("span", {
+      className: "cmd-device-action",
+      text: ` Следующее действие: ${payload.recovery_action_ru}`,
+    }),
+  );
+}
+
+function buildCommandbar(
+  onCapture: (ticket: InspectCaptureTicket) => void,
+  deviceStatus: HTMLParagraphElement,
+): HTMLFormElement {
   const submit = el("button", {
     className: "btn",
     text: "Запустить захват",
     attrs: { type: "submit" },
   });
+  const commit = (form: HTMLFormElement): void => onCapture(readTicket(form));
   submit.addEventListener("click", (event) => {
     event.preventDefault();
-    onCapture();
+    const form = submit.closest("form");
+    if (form instanceof HTMLFormElement) commit(form);
   });
-  const form = el(
-    "form",
-    { className: "cmdbar", attrs: { "data-showcase": "capture-form" } },
-    [
-      el("div", { className: "cmd-fields" }, [
-        selectField("Режим", "mode", [
-          { id: "2ch", title: "2 канала" },
-          { id: "1ch", title: "1 канал" },
-        ]),
-        selectField("Источник", "source", [
-          { id: "device", title: "устройство" },
-          { id: "sim", title: "симуляция" },
-        ]),
-        inputField({ label: "Длительность с", name: "duration", value: "2.4", type: "number" }),
-        inputField({ label: "Частота Гц", name: "rate", value: "48000000", type: "number" }),
-        selectField("Диапазон CH1", "range", [
-          { id: "2v", title: "±2 В" },
-          { id: "5v", title: "±5 В" },
-        ]),
-        inputField({ label: "Метка", name: "label", value: "", type: "text" }),
+  const form = el("form", { className: "cmdbar", attrs: { "data-showcase": "capture-form" } }, [
+    el("div", { className: "cmd-fields" }, [
+      selectField("Режим", "mode", [
+        { id: "2ch", title: "2 канала" },
+        { id: "1ch", title: "1 канал" },
       ]),
-      el("div", { className: "cmd-actions" }, [submit]),
-    ],
-  );
+      selectField("Источник", "source", [
+        { id: "device", title: "устройство" },
+        { id: "sim", title: "симуляция" },
+      ]),
+      inputField({ label: "Длительность с", name: "duration", value: "2.4", type: "number" }),
+      inputField({ label: "Частота Гц", name: "rate", value: "48000000", type: "number" }),
+      selectField("Диапазон CH1", "range", [
+        { id: "2v", title: "±2 В" },
+        { id: "5v", title: "±5 В" },
+      ]),
+      inputField({ label: "Метка", name: "label", value: "", type: "text" }),
+    ]),
+    el("div", { className: "cmd-actions" }, [submit, deviceStatus]),
+  ]);
   form.addEventListener("submit", (event) => {
     event.preventDefault();
+    commit(form);
   });
   return form;
 }
@@ -95,8 +167,9 @@ export function createV6Chrome(opts: V6ChromeOpts): V6Chrome {
     attrs: { "data-inspect-error": "", role: "alert" },
   });
   errorBand.hidden = true;
+  const deviceStatus = buildDeviceStatus();
   return {
-    commandbar: buildCommandbar(opts.onCapture),
+    commandbar: buildCommandbar(opts.onCapture, deviceStatus),
     errorBand,
     showError(msg: string): void {
       errorBand.textContent = msg;
@@ -104,6 +177,9 @@ export function createV6Chrome(opts: V6ChromeOpts): V6Chrome {
     },
     hideError(): void {
       errorBand.hidden = true;
+    },
+    setDeviceStatus(payload, error): void {
+      renderDeviceStatus(deviceStatus, payload, error);
     },
   };
 }

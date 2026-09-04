@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { LntApiClient } from "./api/client";
+import { captureParamsToPrefill } from "./capture/captureDeepLink";
 import { createCaptureView } from "./capture/captureView";
 import { createDisclosure } from "./capture/disclosure";
 import { createModeForm } from "./capture/modeForm";
@@ -107,6 +108,62 @@ describe("захват V6: глифы и сетка показаний", () => {
         view.root.querySelector(".glyph"),
         "V6-разрыв: нет .glyph для кодирования состояния",
       ).not.toBeNull();
+    } finally {
+      view.dispose();
+      view.root.remove();
+    }
+  });
+});
+
+describe("захват V6: deep-link билет из inspect (C1) предзаполняет форму", () => {
+  it("query #/capture предзаполняет режим/источник/числа/метку, мусор отсеян", () => {
+    // Given: билет командбара inspect после ticketToCaptureParams
+    const initial = captureParamsToPrefill({
+      mode: "single_channel",
+      source: "device",
+      duration_s: "1.5",
+      sample_rate_hz: "8000000",
+      range_v: "1",
+      label: "точка-7",
+    });
+
+    // When
+    const view = createCaptureView(stubClient(), { initial });
+    try {
+      // Then: форма предзаполнена, старт валиден без ручного ввода
+      expect(
+        view.root.querySelector<HTMLInputElement>(
+          'input[name="capture-mode"][value="single_channel"]',
+        )?.checked,
+      ).toBe(true);
+      expect(
+        view.root.querySelector<HTMLInputElement>('input[name="capture-source"][value="device"]')
+          ?.checked,
+      ).toBe(true);
+      expect(view.root.querySelector<HTMLInputElement>('input[name="duration_s"]')?.value).toBe(
+        "1.5",
+      );
+      expect(view.root.querySelector<HTMLSelectElement>('select[name="range_v"]')?.value).toBe("1");
+      expect(view.root.querySelector<HTMLInputElement>('input[name="label"]')?.value).toBe(
+        "точка-7",
+      );
+    } finally {
+      view.dispose();
+      view.root.remove();
+    }
+  });
+
+  it("без initial форма показывает дефолты (прямой заход на #/capture)", () => {
+    // Given / When
+    const view = createCaptureView(stubClient());
+    try {
+      // Then
+      expect(
+        view.root.querySelector<HTMLInputElement>('input[name="capture-mode"]:checked')?.value,
+      ).toBe("rc_measurement");
+      expect(view.root.querySelector<HTMLInputElement>('input[name="duration_s"]')?.value).toBe(
+        "2.4",
+      );
     } finally {
       view.dispose();
       view.root.remove();

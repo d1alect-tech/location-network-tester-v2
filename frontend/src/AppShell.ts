@@ -1,5 +1,6 @@
 import "./style.css";
 import { LntApiClient } from "./api/client";
+import { captureParamsToPrefill } from "./capture/captureDeepLink";
 // BEGIN Todo 40: регистрация рабочего процесса захвата (аддитивно, один блок).
 import { createCaptureView } from "./capture/captureView";
 import type { CaptureViewHandle } from "./capture/captureView";
@@ -214,7 +215,9 @@ export class AppShell {
 
     // BEGIN Todo 40
     if (this.currentRoute === "capture") {
-      const view = createCaptureView(shellClient);
+      const view = createCaptureView(shellClient, {
+        initial: captureParamsToPrefill(this.routes.get().params),
+      });
       this.captureView = view;
       clearElement(viewContainer);
       viewContainer.append(view.root);
