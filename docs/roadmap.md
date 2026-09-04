@@ -26,9 +26,9 @@
 | # | Что | Статус |
 |---|-----|--------|
 | C1 | Честный командбар inspect (deep-link билет в capture / мини-префлайт + живой device-статус) | DONE (queue-c1: билет inspectTicket→captureDeepLink с предзаполнением формы, живой device-статус v6DeviceStatus с recovery_action_ru, пины vitest+e2e) |
-| C2 | Единый мок-бэкенд фронта (один `MockLntBackend`, golden из `tests/science/corpus.py`) | TODO |
-| C3 | Калибровки: ADC cal + probe/RC swept-FR + de-embedding + dBV/dBuV/dBm | TODO |
-| C4 | Расслоение `_GRANDFATHERED`-модулей + граница v1/v2 анализ-трактов | TODO |
+| C2 | Единый мок-бэкенд фронта (один `MockLntBackend`, golden из `tests/science/corpus.py`) | DONE (queue-c2: единый мок в testkit/, три мока удалены, e2e 193) |
+| C3 | Калибровки: ADC cal + probe/RC swept-FR + de-embedding + dBV/dBuV/dBm | DONE (queue-c3: ADC-таблицы опционально, swept-FR, display-тумблер, дефолт бит-в-бит) |
+| C4 | Расслоение `_GRANDFATHERED`-модулей + граница v1/v2 анализ-трактов | DONE ЧАСТИЧНО (queue-c4: cli 307→210, analysis 309→89, compare по артефактам; acquire/manifest/store/runner/фронтенд — следующим заходом) |
 
 ## Дисциплина исполнения (каждый пункт)
 
