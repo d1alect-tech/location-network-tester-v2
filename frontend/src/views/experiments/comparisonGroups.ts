@@ -53,15 +53,27 @@ export function renderPairbarSlots(
   const included = groupIncludedByCondition(rows);
   for (const [index, conditionId] of orderConditions(detail).entries()) {
     const count = (included.get(conditionId) ?? []).length;
+    const role = PAIR_SLOT_LABELS[index] ?? `Слот ${String(index + 1)}`;
     host.append(
-      el("div", { className: "pair-slot" }, [
-        el("span", {
-          className: "pair-role",
-          text: PAIR_SLOT_LABELS[index] ?? `Слот ${String(index + 1)}`,
-        }),
-        el("span", { className: "pair-name", text: conditionId }),
-        el("span", { className: "pair-meta", text: `N=${String(count)}` }),
-      ]),
+      el(
+        "div",
+        {
+          className: "pair-slot",
+          attrs: {
+            "data-condition": conditionId,
+            title: `${role}: ${conditionId}, N=${String(count)}`,
+          },
+        },
+        [
+          el("span", { className: "pair-role", text: role }),
+          el("span", {
+            className: "pair-name",
+            text: conditionId,
+            attrs: { title: conditionId },
+          }),
+          el("span", { className: "pair-meta", text: `N=${String(count)}` }),
+        ],
+      ),
     );
   }
   host.append(el("span", { className: "pair-delta", text: "Δ —" }));

@@ -11,6 +11,7 @@ import { announcePolite } from "../../components/primitives/status";
 import type { RouteStore } from "../../state/routeState";
 import { protocolLabel } from "../experiments/experimentModel";
 import type { ExperimentDetail } from "../experiments/experimentsStore";
+import { REPORT_EXPORT_FORMAT, buildReportFilename, downloadMarkdown } from "./reportExport";
 import { previewBlock } from "./reportPreview";
 import { ReportsStore } from "./reportsStore";
 import "./reports.css";
@@ -40,7 +41,12 @@ export function mountReportsWorkspace(
   const downloadButton = el("button", {
     className: "btn btn-secondary lnt-btn",
     text: "Скачать отчёт (.md)",
-    attrs: { type: "button", id: "lnt-rep-download", disabled: "disabled" },
+    attrs: {
+      type: "button",
+      id: "lnt-rep-download",
+      disabled: "disabled",
+      "data-export-format": REPORT_EXPORT_FORMAT,
+    },
   });
   const statusHost = el("p", {
     className: "t-compact lnt-helper-text",
@@ -195,14 +201,7 @@ export function mountReportsWorkspace(
   function download(): void {
     if (currentMarkdown === null || currentDetail === null) return;
     const experimentId = String(currentDetail.experiment.experiment_id);
-    const blob = new Blob([currentMarkdown], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = el("a", { attrs: { href: url, download: `report-${experimentId}.md` } });
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-    announcePolite("Файл отчёта скачан");
+    downloadMarkdown(currentMarkdown, buildReportFilename(experimentId));
   }
 
   async function refreshList(): Promise<void> {

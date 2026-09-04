@@ -34,6 +34,10 @@ export interface CaptureViewHandle {
   dispose(): void;
 }
 
+/** Тон алёрта захвата на тонах T10: err — блокирующая ошибка (role=alert),
+ * warn — осознанная блокировка с причиной, info — подсказка (role=status). */
+export type CaptureAlertTone = "err" | "warn" | "info";
+
 export function createCaptureView(client: LntApiClient): CaptureViewHandle {
   const device = createDeviceApi(client);
   const form: ModeFormHandle = createModeForm();
@@ -66,7 +70,9 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
     attrs: { type: "button" },
   }) as HTMLButtonElement;
 
-  const showAlert = (message: string): void => {
+  const showAlert = (message: string, tone: CaptureAlertTone = "err"): void => {
+    alertLine.className = `capture-alert banner banner-inline banner-${tone}`;
+    alertLine.setAttribute("role", tone === "err" ? "alert" : "status");
     alertLine.textContent = message;
     alertLine.hidden = false;
     announcePolite(message);
@@ -120,12 +126,14 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
       if (state.state !== "ready") {
         showAlert(
           "Запуск невозможен: устройство не готово. Выполните указанное диагностикой действие.",
+          "warn",
         );
         return false;
       }
       if (!report.ready) {
         showAlert(
           "Запуск невозможен: preflight нашёл блокирующие замечания — см. панель устройства.",
+          "warn",
         );
         return false;
       }
@@ -156,7 +164,7 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
     }
     if (isActive(timelineState)) {
       // Осознанная блокировка с объявленной причиной — никогда не молчаливая.
-      showAlert(busyReasonRu(timelineState) ?? "Задача ещё выполняется.");
+      showAlert(busyReasonRu(timelineState) ?? "Задача ещё выполняется.", "warn");
       return;
     }
     if (request === null) return;

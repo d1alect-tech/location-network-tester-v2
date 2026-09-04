@@ -179,13 +179,31 @@ export function renderEmpty(message: string): HTMLElement {
   ]);
 }
 
-export function renderErrorBanner(message: string, onRetry: () => void): HTMLElement {
+/** Тон баннера каталога на тонах T10: error — role=alert, warn/info — role=status. */
+export type CatalogBannerTone = "error" | "warn" | "info";
+
+const BANNER_TONE: Record<CatalogBannerTone, { modifier: string; glyph: string }> = {
+  error: { modifier: "", glyph: "✕" },
+  warn: { modifier: " is-warn", glyph: "▲" },
+  info: { modifier: " is-info", glyph: "●" },
+};
+
+export function renderErrorBanner(
+  message: string,
+  onRetry: () => void,
+  tone: CatalogBannerTone = "error",
+): HTMLElement {
+  const config = BANNER_TONE[tone];
   const banner = el("div", {
-    className: "banner banner-inline lnt-cat-error",
-    attrs: { role: "alert" },
+    className: `banner banner-inline lnt-cat-error${config.modifier}`,
+    attrs: tone === "error" ? { role: "alert" } : { role: "status" },
   });
   banner.append(
-    el("span", { className: "banner-glyph", text: "✕", attrs: { "aria-hidden": "true" } }),
+    el("span", {
+      className: "banner-glyph",
+      text: config.glyph,
+      attrs: { "aria-hidden": "true" },
+    }),
     el("p", { className: "banner-msg", text: message }),
     el("button", { className: "btn btn-secondary", text: "Повторить", attrs: { type: "button" } }),
   );

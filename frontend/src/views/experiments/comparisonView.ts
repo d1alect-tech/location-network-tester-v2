@@ -18,6 +18,7 @@ import {
   renderComparabilityOutcome,
   renderComparisonEnvelope,
 } from "./comparisonRunner";
+import { protocolLabel } from "./experimentModel";
 import type { ExperimentDetail } from "./experimentsStore";
 import type { MemberRow } from "./memberTableView";
 import type { EffectView } from "./resultPanel";
@@ -138,6 +139,8 @@ export class ComparisonView {
   setContext(detail: ExperimentDetail, rows: MemberRow[]): void {
     this.detail = detail;
     this.rows = rows;
+    const plan = protocolLabel(String(detail.experiment.protocol.kind));
+    this.pairbarHost.setAttribute("aria-label", `Пара условий: ${plan}`);
     if (this.featureInput.value === "") {
       this.featureInput.value = String(detail.experiment.primary_estimands?.[0]?.feature_key ?? "");
     }
