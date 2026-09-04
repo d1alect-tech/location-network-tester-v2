@@ -110,7 +110,7 @@ export class MemberTableView {
   }
 
   private render(): void {
-    const table = el("table", { className: "lnt-table lnt-exp-member-table" });
+    const table = el("table", { className: "lnt-table lnt-exp-member-table tbl tbl-tight" });
     const thead = el("thead");
     const headRow = el("tr");
     for (const header of ["Сессия", "Условие", "Порядок", "QC-вердикт", "Состояние", "Действия"]) {
@@ -122,7 +122,8 @@ export class MemberTableView {
       tbody.append(this.rowElement(row));
     }
     table.append(thead, tbody);
-    this.body.replaceChildren(table);
+    const wrap = el("div", { className: "tbl-wrap" }, [table]);
+    this.body.replaceChildren(wrap);
   }
 
   private rowElement(row: MemberRow): HTMLElement {
@@ -137,13 +138,15 @@ export class MemberTableView {
     const orderCell = el("td", { text: String(row.order) });
 
     const glyph = el("span", {
-      className: "lnt-status-glyph",
+      className: `lnt-status-glyph glyph glyph-${row.verdict.tone === "error" ? "err" : row.verdict.tone}`,
       text: GLYPHS[row.verdict.tone],
       attrs: { "aria-hidden": "true" },
     });
-    const verdictPill = el("span", { className: `lnt-status-pill lnt-tone-${row.verdict.tone}` }, [
-      glyph,
-    ]);
+    const verdictPill = el(
+      "span",
+      { className: `lnt-status-pill lnt-tone-${row.verdict.tone} glyph` },
+      [glyph],
+    );
     verdictPill.append(
       document.createTextNode(
         `${row.verdict.label}${row.verdict.reason_code === null ? "" : ` (${row.verdict.reason_code})`}`,
@@ -161,12 +164,15 @@ export class MemberTableView {
     const stateCell = el("td", { text: stateText });
 
     const actions = el("td");
-    const detailsButton = el("button", { className: "lnt-btn lnt-btn-small", text: "Аудит" });
+    const detailsButton = el("button", {
+      className: "lnt-btn lnt-btn-small btn-quiet",
+      text: "Аудит",
+    });
     detailsButton.addEventListener("click", () => this.showAudit(row));
     actions.append(detailsButton);
     if (currentState(inclusion) !== "excluded") {
       const excludeButton = el("button", {
-        className: "lnt-btn lnt-btn-small",
+        className: "lnt-btn lnt-btn-small btn-quiet",
         text: "Исключить…",
         attrs: { "aria-label": `Исключить участника ${row.sessionId}` },
       });
@@ -174,7 +180,7 @@ export class MemberTableView {
       actions.append(excludeButton);
     } else {
       const undoButton = el("button", {
-        className: "lnt-btn lnt-btn-small",
+        className: "lnt-btn lnt-btn-small btn-quiet",
         text: "Отменить исключение",
         attrs: { "aria-label": `Отменить исключение участника ${row.sessionId}` },
       });

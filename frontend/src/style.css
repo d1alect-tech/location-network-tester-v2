@@ -1,5 +1,7 @@
 /* Import design tokens from T36 */
 @import "../../src/lnt/ui/static/v2-tokens.css";
+@import "@fontsource-variable/source-code-pro";
+@import "@fontsource-variable/golos-text";
 @import "./components/primitives/primitives.css";
 @import "./capture/capture.css";
 
@@ -17,60 +19,6 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-}
-
-/* App Header */
-.app-header {
-  height: var(--lnt-header-height);
-  background-color: var(--lnt-bg-panel);
-  border-bottom: var(--lnt-border-width) solid var(--lnt-border-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--lnt-space-4);
-  box-sizing: border-box;
-}
-
-.app-title {
-  font-size: 22px;
-  font-weight: var(--lnt-weight-semibold);
-  margin: 0;
-}
-
-/* Navigation */
-.app-nav {
-  display: flex;
-  gap: var(--lnt-space-2);
-}
-
-.nav-link {
-  color: var(--lnt-fg-secondary);
-  text-decoration: none;
-  padding: var(--lnt-space-2) var(--lnt-space-4);
-  border-radius: var(--lnt-radius-control);
-  font-size: 15px;
-  font-weight: var(--lnt-weight-medium);
-  transition: background-color var(--lnt-motion-fast) var(--lnt-ease-standard), color
-    var(--lnt-motion-fast) var(--lnt-ease-standard);
-  min-height: var(--lnt-control-height);
-  display: inline-flex;
-  align-items: center;
-  box-sizing: border-box;
-}
-
-.nav-link:hover {
-  background-color: var(--lnt-bg-raised);
-  color: var(--lnt-fg-primary);
-}
-
-.nav-link.active {
-  background-color: var(--lnt-bg-selected);
-  color: var(--lnt-accent-a);
-}
-
-.nav-link:focus-visible {
-  outline: var(--lnt-focus-width) solid var(--lnt-accent-a);
-  outline-offset: var(--lnt-focus-offset);
 }
 
 /* Main Content */
@@ -120,7 +68,7 @@ body {
 
 .btn-recovery {
   background-color: var(--lnt-accent-a);
-  color: white;
+  color: var(--lnt-canvas);
   border: none;
   padding: var(--lnt-space-2) var(--lnt-space-4);
   border-radius: var(--lnt-radius-control);
@@ -167,22 +115,9 @@ body {
   }
 }
 
-/* ===== BEGIN Todo 44: адаптивность шапки и мобильный фокус-режим =====
- * Планшет (768–1279): шапка переносится, навигация не переполняет документ.
+/* ===== BEGIN Todo 44: мобильный фокус-режим =====
  * Мобильный (≤767, DESIGN.md §2.3): документ владеет прокруткой; панели
  * складываются в одну колонку. Горизонтальная прокрутка документа запрещена. */
-@media (max-width: 1279px) {
-  .app-header {
-    flex-wrap: wrap;
-    height: auto;
-    min-height: var(--lnt-header-height);
-  }
-
-  .app-nav {
-    flex-wrap: wrap;
-  }
-}
-
 @media (max-width: 767px) {
   body {
     overflow: hidden auto;
@@ -193,15 +128,6 @@ body {
   #app {
     height: auto;
     min-height: 100vh;
-  }
-
-  .app-header {
-    padding: var(--lnt-space-2) var(--lnt-space-3);
-    row-gap: var(--lnt-space-1);
-  }
-
-  .nav-link {
-    padding: var(--lnt-space-2) var(--lnt-space-3);
   }
 
   .app-main {

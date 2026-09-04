@@ -1,7 +1,7 @@
-/** Панель фильтров каталога: health, метка, тип, диапазон дат, профиль, тег.
- * Значения живут в параметрах маршрута (routeState) — перезагрузка и «назад»
- * восстанавливают набор фильтров. Плюс сохранённые представления (localStorage):
- * именованные наборы фильтров применяются одним действием. */
+/** Панель фильтров каталога V6: форма .cat-tools из полей .field с
+ * контролами .ctl, поиск по метке — .cat-search. Логика без изменений:
+ * значения живут в параметрах маршрута (routeState), плюс сохранённые
+ * представления (localStorage). Обёртка .lnt-cat-saved сохранена для e2e. */
 
 import type { SessionHealth } from "../../api/types";
 import { SESSION_HEALTH_VALUES } from "../../api/types";
@@ -11,6 +11,7 @@ import { createField } from "../../components/primitives/forms";
 import type { RouteStore } from "../../state/routeState";
 import { FILTER_PARAMS, HEALTH_LABELS, sessionTypeLabel } from "./catalogModel";
 import { filtersFromParams } from "./catalogModel";
+import { v6Field } from "./catalogV6Field";
 import { type SavedView, loadSavedViews, saveSavedViews } from "./savedViews";
 
 export interface CatalogFilterPanelOptions {
@@ -28,31 +29,33 @@ function healthOption(value: SessionHealth): { value: string; label: string } {
   return { value, label: HEALTH_LABELS[value].label };
 }
 
+function makeSelect(className: string): HTMLSelectElement {
+  const node = document.createElement("select");
+  node.className = className;
+  return node;
+}
+
+function makeInput(className: string, type: string, placeholder = ""): HTMLInputElement {
+  const node = document.createElement("input");
+  node.type = type;
+  node.className = className;
+  if (placeholder !== "") node.placeholder = placeholder;
+  return node;
+}
+
 export function createCatalogFilterPanel(
   options: CatalogFilterPanelOptions,
 ): CatalogFilterPanelHandle {
   const { store, storage } = options;
 
-  const health = document.createElement("select");
-  health.className = "lnt-select";
-  const typeSelect = document.createElement("select");
-  typeSelect.className = "lnt-select";
-  const labelInput = document.createElement("input");
-  labelInput.type = "text";
-  labelInput.className = "lnt-input";
-  labelInput.placeholder = "стенд-А";
-  const profileInput = document.createElement("input");
-  profileInput.type = "text";
-  profileInput.className = "lnt-input";
-  const tagInput = document.createElement("input");
-  tagInput.type = "text";
-  tagInput.className = "lnt-input";
-  const dateFrom = document.createElement("input");
-  dateFrom.type = "date";
-  dateFrom.className = "lnt-input";
-  const dateTo = document.createElement("input");
-  dateTo.type = "date";
-  dateTo.className = "lnt-input";
+  const health = makeSelect("ctl");
+  const typeSelect = makeSelect("ctl");
+  const labelInput = makeInput("ctl cat-search", "search", "стенд-А");
+  labelInput.setAttribute("aria-label", "Метка");
+  const profileInput = makeInput("ctl", "text");
+  const tagInput = makeInput("ctl", "text");
+  const dateFrom = makeInput("ctl", "date");
+  const dateTo = makeInput("ctl", "date");
 
   for (const node of [health, typeSelect]) {
     const empty = document.createElement("option");
@@ -121,8 +124,7 @@ export function createCatalogFilterPanel(
   }
 
   // --- Сохранённые представления -------------------------------------------
-  const viewSelect = document.createElement("select");
-  viewSelect.className = "lnt-select";
+  const viewSelect = makeSelect("ctl");
 
   function refreshViewOptions(views: SavedView[], selectedName?: string): void {
     clearChildren(viewSelect);
@@ -154,7 +156,7 @@ export function createCatalogFilterPanel(
   });
 
   const saveButton = el("button", {
-    className: "lnt-btn",
+    className: "btn btn-secondary",
     text: "Сохранить фильтры…",
     attrs: { type: "button" },
   });
@@ -191,7 +193,7 @@ export function createCatalogFilterPanel(
   });
 
   const deleteButton = el("button", {
-    className: "lnt-btn",
+    className: "btn-quiet",
     text: "Удалить представление",
     attrs: { type: "button" },
   });
@@ -203,28 +205,28 @@ export function createCatalogFilterPanel(
   });
 
   const resetButton = el("button", {
-    className: "lnt-btn",
+    className: "btn-quiet",
     text: "Сбросить",
-    attrs: { type: "button" },
+    attrs: { type: "button", "data-cat-clear": "" },
   });
   resetButton.addEventListener("click", () => {
     store.navigate({ route: "catalog", params: {} });
   });
 
   const savedRow = el("div", { className: "lnt-cat-saved" }, [
-    createField({ label: "Сохранённые представления", control: viewSelect }).root,
+    v6Field("Сохранённые представления", viewSelect),
     saveButton,
     deleteButton,
   ]);
 
-  const root = el("form", { className: "lnt-filter-bar lnt-cat-filters" }, [
-    createField({ label: "Состояние (health)", control: health }).root,
-    createField({ label: "Метка", control: labelInput }).root,
-    createField({ label: "Тип сессии", control: typeSelect }).root,
-    createField({ label: "Дата с", control: dateFrom }).root,
-    createField({ label: "Дата по", control: dateTo }).root,
-    createField({ label: "Профиль", control: profileInput }).root,
-    createField({ label: "Тег", control: tagInput }).root,
+  const root = el("form", { className: "cat-tools" }, [
+    v6Field("Состояние (health)", health),
+    v6Field("Метка", labelInput),
+    v6Field("Тип сессии", typeSelect),
+    v6Field("Дата с", dateFrom),
+    v6Field("Дата по", dateTo),
+    v6Field("Профиль", profileInput),
+    v6Field("Тег", tagInput),
     savedRow,
     resetButton,
   ]);

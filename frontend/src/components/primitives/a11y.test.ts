@@ -7,10 +7,22 @@ import { type TableColumn, createDataTable } from "./table";
 interface Row {
   id: string;
   label: string;
+  health: "ok" | "warn" | "error";
 }
 
 const columns: TableColumn<Row>[] = [
-  { key: "label", header: "Метка", sortable: true, value: (r) => r.label },
+  {
+    key: "label",
+    header: "Метка",
+    sortable: true,
+    value: (r) => r.label,
+    status: (r) =>
+      r.health === "ok"
+        ? { tone: "ok", label: "Готов" }
+        : r.health === "warn"
+          ? { tone: "warn", label: "Деградация" }
+          : { tone: "error", label: "Авария" },
+  },
 ];
 
 /** axe-проверка собранного примитива (jsdom: контраст недоступен — исключён). */
@@ -45,8 +57,23 @@ describe("axe accessibility", () => {
 
   it("data table in data state has no violations", async () => {
     const table = createDataTable<Row>(columns);
-    table.setState({ kind: "data", rows: [{ id: "a", label: "Первая" }] });
+    table.setState({ kind: "data", rows: [{ id: "a", label: "Первая", health: "ok" }] });
     fixture.append(table.root);
+    await expectNoViolations();
+  });
+
+  it("status pills with warn/error tones have no violations", async () => {
+    const table = createDataTable<Row>(columns);
+    table.setState({
+      kind: "data",
+      rows: [
+        { id: "a", label: "Первая", health: "warn" },
+        { id: "b", label: "Вторая", health: "error" },
+      ],
+    });
+    fixture.append(table.root);
+    expect(fixture.querySelector(".lnt-tone-warn")?.textContent).toContain("Деградация");
+    expect(fixture.querySelector(".lnt-tone-error")?.textContent).toContain("Авария");
     await expectNoViolations();
   });
 

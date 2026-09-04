@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { AppShell, ROUTES } from "./AppShell";
+import { AppShell } from "./AppShell";
 
 describe("AppShell Router & Error Boundary", () => {
   let container: HTMLElement;
@@ -16,8 +16,8 @@ describe("AppShell Router & Error Boundary", () => {
     appShell.init();
     const nav = container.querySelector("nav");
     expect(nav).not.toBeNull();
-    const links = container.querySelectorAll(".nav-link");
-    expect(links.length).toBe(Object.keys(ROUTES).length);
+    const links = container.querySelectorAll(".snav-item");
+    expect(links.length).toBe(6);
   });
 
   it("should render error boundary when an error is thrown", () => {

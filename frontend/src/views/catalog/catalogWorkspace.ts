@@ -1,7 +1,10 @@
-/** Рабочая область каталога (Todo 39): слева панель фильтров и виртуализованный
- * список, справа вкладки «Инспектор контекста» / «Профили». Фильтры живут в
- * параметрах маршрута; запросы обрываются при смене фильтров; выбор сессии
- * тоже отражается в URL и переживает перезагрузку. */
+/** Рабочая область каталога V6 (Todo 39): слева панель .panel.cat-v6
+ * (тулбар фильтров .cat-tools + плотная таблица .tbl.tbl-cat), справа
+ * вкладки-табы .tabbar «Инспектор контекста» / «Профили».
+ * Фильтры живут в параметрах маршрута; запросы обрываются при смене
+ * фильтров; выбор сессии тоже отражается в URL и переживает перезагрузку.
+ * Хук .lnt-cat-workspace сохранён для e2e; spill чинится overflow:clip
+ * на .col-cat (см. catalog.css). */
 
 import type { LntApiClient } from "../../api/client";
 import { el } from "../../components/primitives/dom";
@@ -75,26 +78,37 @@ export function mountCatalogWorkspace(
   const inspector: ContextInspectorHandle = createContextInspector({ client });
   const preview = createProfilePreview();
 
-  // Вкладки правой панели.
+  // Вкладки правой панели: таббар V6 (.tabbar/.snav-item.is-active, полоса 2px).
+  const inspectorPanelId = "cat-tabpanel-inspector";
+  const profilesPanelId = "cat-tabpanel-profiles";
   const inspectorPanel = el(
     "div",
-    { attrs: { role: "tabpanel", "aria-label": "Инспектор контекста" } },
+    {
+      attrs: {
+        role: "tabpanel",
+        id: inspectorPanelId,
+        "aria-label": "Инспектор контекста",
+      },
+    },
     [inspector.root],
   );
   const profilesHost = el("div", {});
   const profilesPanel = el(
     "div",
-    { attrs: { role: "tabpanel", "aria-label": "Профили" }, className: "lnt-cat-profiles-panel" },
+    {
+      attrs: { role: "tabpanel", id: profilesPanelId, "aria-label": "Профили" },
+      className: "lnt-cat-profiles-panel",
+    },
     [profilesHost, preview.root],
   );
   profilesPanel.hidden = true;
 
   const tabButtons: HTMLButtonElement[] = [];
-  function makeTab(labelText: string): HTMLButtonElement {
+  function makeTab(labelText: string, panelId: string): HTMLButtonElement {
     const button = el("button", {
-      className: "lnt-btn lnt-cat-tab",
+      className: "snav-item",
       text: labelText,
-      attrs: { type: "button", role: "tab" },
+      attrs: { type: "button", role: "tab", "aria-controls": panelId },
     });
     button.addEventListener("click", () => selectTab(button));
     button.addEventListener("keydown", (event) => {
@@ -110,13 +124,13 @@ export function mountCatalogWorkspace(
     tabButtons.push(button);
     return button;
   }
-  const inspectorTab = makeTab("Инспектор");
-  const profilesTab = makeTab("Профили");
+  const inspectorTab = makeTab("Инспектор", inspectorPanelId);
+  const profilesTab = makeTab("Профили", profilesPanelId);
   function selectTab(active: HTMLButtonElement): void {
     for (const button of tabButtons) {
       const isActive = button === active;
       button.setAttribute("aria-selected", isActive ? "true" : "false");
-      button.classList.toggle("lnt-cat-tab-active", isActive);
+      button.classList.toggle("is-active", isActive);
     }
     inspectorPanel.hidden = active !== inspectorTab;
     profilesPanel.hidden = active !== profilesTab;
@@ -130,20 +144,15 @@ export function mountCatalogWorkspace(
 
   const tabBar = el(
     "div",
-    { className: "lnt-cat-tabs", attrs: { role: "tablist", "aria-label": "Правая панель" } },
+    { className: "tabbar", attrs: { role: "tablist", "aria-label": "Правая панель" } },
     [inspectorTab, profilesTab],
   );
-  const rightPane = el("div", { className: "lnt-cat-right" }, [
-    tabBar,
-    inspectorPanel,
-    profilesPanel,
-  ]);
-  const leftPane = el("div", { className: "lnt-cat-left" }, [
-    el("h2", { className: "placeholder-title", text: "Каталог" }),
-    filterPanel.root,
-    list.root,
-  ]);
-  const root = el("div", { className: "lnt-cat-workspace" }, [leftPane, rightPane]);
+  const rightPane = el("div", { className: "col-main" }, [tabBar, inspectorPanel, profilesPanel]);
+  // Левая колонка — панель каталога целиком (hd + тулбар + таблица);
+  // тулбар фильтров монтируется в слот панели списка.
+  list.toolsSlot.append(filterPanel.root);
+  const leftPane = el("div", { className: "col-cat" }, [list.root]);
+  const root = el("div", { className: "lnt-cat-workspace app-body" }, [leftPane, rightPane]);
   container.append(root);
 
   async function activate(sessionId: string): Promise<void> {

@@ -5,10 +5,11 @@
 
 import type { LntApiClient } from "../api/client";
 import { createDeviceApi } from "../api/client-device";
-import { ApiError } from "../api/errors";
 import type { JobRequest, JobSnapshot } from "../api/types-jobs";
 import { el } from "../components/primitives/dom";
 import { announcePolite } from "../components/primitives/status";
+import { createCaptureAlert } from "./captureAlerts";
+import type { CaptureAlertHandle } from "./captureAlerts";
 import { createDevicePanel } from "./devicePanel";
 import type { DevicePanelHandle } from "./devicePanel";
 import {
@@ -25,6 +26,8 @@ import { createModeForm } from "./modeForm";
 import type { ModeFormHandle } from "./modeForm";
 import { buildJobRequest, validateCaptureForm } from "./modes";
 import { renderProfilePreview } from "./profilePreview";
+import { createSpectrogramLivePanel } from "./spectrogramLivePanel";
+import type { LivePanelHandle } from "./spectrogramLivePanel";
 import { watchJobEvents } from "./sse";
 import type { WatchHandle } from "./sse";
 
@@ -33,6 +36,8 @@ export interface CaptureViewHandle {
   /** Закрывает SSE и обрывает незавершённые запросы (уход с маршрута). */
   dispose(): void;
 }
+
+export type { CaptureAlertTone } from "./captureAlerts";
 
 export function createCaptureView(client: LntApiClient): CaptureViewHandle {
   const device = createDeviceApi(client);
@@ -49,40 +54,29 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
   let disposed = false;
   let bootstrapPromise: Promise<void> | null = null;
 
-  const alertLine = el("p", {
-    className: "capture-alert",
-    attrs: { role: "alert" },
-  });
-  alertLine.hidden = true;
+  const alert: CaptureAlertHandle = createCaptureAlert();
+  const liveGram: LivePanelHandle = createSpectrogramLivePanel({ plots: client.plots });
 
   const startButton = el("button", {
-    className: "lnt-btn lnt-btn-primary",
+    className: "lnt-btn lnt-btn-primary btn",
     text: "Запустить запись",
     attrs: { type: "button" },
   }) as HTMLButtonElement;
   const deviceRefreshButton = el("button", {
-    className: "lnt-btn",
+    className: "lnt-btn btn-quiet",
     text: "Проверить устройство",
     attrs: { type: "button" },
   }) as HTMLButtonElement;
 
-  const showAlert = (message: string): void => {
-    alertLine.textContent = message;
-    alertLine.hidden = false;
-    announcePolite(message);
-  };
-  const hideAlert = (): void => {
-    alertLine.hidden = true;
-  };
-
   const refreshPreview = (): void => {
-    hideAlert();
+    alert.hide();
     renderProfilePreview(previewContainer, form.getMode(), form.values(), form.getSource());
   };
 
   const applySnapshotToTimeline = (snapshot: JobSnapshot): void => {
     timelineState = applySnapshot(timelineState, snapshot);
     timeline.update(timelineState);
+    liveGram.onSnapshot(snapshot);
   };
 
   function attachStream(snapshot: JobSnapshot): void {
@@ -118,45 +112,36 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
       const report = await device.preflight(request as Parameters<typeof device.preflight>[0]);
       devicePanel.renderPreflight(report);
       if (state.state !== "ready") {
-        showAlert(
+        alert.show(
           "Запуск невозможен: устройство не готово. Выполните указанное диагностикой действие.",
+          "warn",
         );
         return false;
       }
       if (!report.ready) {
-        showAlert(
+        alert.show(
           "Запуск невозможен: preflight нашёл блокирующие замечания — см. панель устройства.",
+          "warn",
         );
         return false;
       }
       return true;
     } catch (error) {
-      showApiError(error);
+      alert.showApiError(error, disposed);
       return false;
     }
   }
 
-  function showApiError(error: unknown): void {
-    if (disposed) return;
-    if (error instanceof ApiError && error.kind === "conflict") {
-      showAlert("Сервер сообщил конфликт: уже выполняется другая задача (HTTP 409).");
-      return;
-    }
-    showAlert(
-      error instanceof Error ? `Операция не выполнена: ${error.message}` : "Операция не выполнена.",
-    );
-  }
-
   async function startJob(request: JobRequest | null): Promise<void> {
     if (disposed) return;
-    hideAlert();
+    alert.hide();
     if (!(await ensureBootstrap())) {
-      showAlert("Нет связи с сервером: панель не инициализирована. Повторите попытку.");
+      alert.show("Нет связи с сервером: панель не инициализирована. Повторите попытку.");
       return;
     }
     if (isActive(timelineState)) {
       // Осознанная блокировка с объявленной причиной — никогда не молчаливая.
-      showAlert(busyReasonRu(timelineState) ?? "Задача ещё выполняется.");
+      alert.show(busyReasonRu(timelineState) ?? "Задача ещё выполняется.", "warn");
       return;
     }
     if (request === null) return;
@@ -172,19 +157,19 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
       applySnapshotToTimeline(snapshot);
       attachStream(snapshot);
     } catch (error) {
-      showApiError(error);
+      alert.showApiError(error, disposed);
     } finally {
       startButton.disabled = false;
     }
   }
 
   async function cancelJob(jobId: string): Promise<void> {
-    hideAlert();
+    alert.hide();
     try {
       const snapshot = await client.jobs.cancel(jobId);
       applySnapshotToTimeline(snapshot);
     } catch (error) {
-      showApiError(error);
+      alert.showApiError(error, disposed);
     }
   }
 
@@ -193,6 +178,8 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
     try {
       const page = await client.jobs.list(1, 0);
       const latest = page.items[0];
+      // Live-панель в idle показывает последнюю завершённую сессию post-hoc.
+      if (latest !== undefined) liveGram.onSnapshot(latest);
       if (
         latest === undefined ||
         (!needsRecoveryPrompt({ ...initialTimeline, latest }) && latest.status === "succeeded")
@@ -225,25 +212,32 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
       try {
         devicePanel.renderState(await device.state());
       } catch (error) {
-        showApiError(error);
+        alert.showApiError(error, disposed);
       }
     });
   });
   form.onChange(refreshPreview);
 
   const previewContainer = el("aside", {
-    className: "capture-preview",
+    className: "capture-preview panel",
     attrs: { "aria-label": "Профиль записи" },
   });
-  const root = el("section", { className: "capture-view" }, [
-    el("h2", { className: "view-title", text: "Захват" }),
+  const root = el("section", { className: "capture-view t-page" }, [
+    el("h2", { className: "view-title t-page", text: "Захват" }),
     el("div", { className: "capture-layout" }, [
       el("div", { className: "capture-form-column" }, [
         form.root,
-        alertLine,
-        el("div", { className: "capture-start-row" }, [startButton, deviceRefreshButton]),
+        alert.line,
+        el("div", { className: "capture-start-row form-actions" }, [
+          startButton,
+          deviceRefreshButton,
+        ]),
       ]),
-      el("div", { className: "capture-side-column" }, [previewContainer, devicePanel.root]),
+      el("div", { className: "capture-side-column" }, [
+        previewContainer,
+        devicePanel.root,
+        liveGram.root,
+      ]),
     ]),
     timeline.root,
   ]);
@@ -257,6 +251,7 @@ export function createCaptureView(client: LntApiClient): CaptureViewHandle {
       disposed = true;
       stream?.close();
       stream = null;
+      liveGram.dispose();
     },
   };
 }

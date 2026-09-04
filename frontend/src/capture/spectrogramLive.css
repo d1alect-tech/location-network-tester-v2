@@ -1,0 +1,124 @@
+/* Live-спектрограмма захвата: V6-панель, полотно и шкалы в токенах раздела.
+ * Все правила scoped под .capture-view, глобальный неймспейс не трогаем.
+ * Персона 375px: панель не шире колонки, полотно тянется, скролла нет. */
+
+.capture-view .capture-livegram {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.capture-view .capture-livegram .panel-hd {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.capture-view .capture-livegram .gram-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.capture-view .capture-livegram .gram-modes {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+
+.capture-view .capture-livegram .gram-mode {
+  min-height: 28px;
+}
+
+.capture-view .capture-livegram .gram-mode[aria-pressed="true"] {
+  color: var(--lnt-text);
+  background: rgb(0 0 0 / 0.18);
+}
+
+.capture-view .capture-livegram .gram-readout,
+.capture-view .capture-livegram .gram-scale {
+  font-family: var(--lnt-mono);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+}
+
+.capture-view .capture-livegram .gram-readout {
+  color: var(--lnt-text);
+}
+
+.capture-view .capture-livegram .gram-canvas-wrap {
+  display: flex;
+  min-width: 0;
+  min-height: 200px;
+  overflow: hidden;
+}
+
+.capture-view .capture-livegram .gram-canvas {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 220px;
+}
+
+.capture-view .capture-livegram .gram-axis {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 44px;
+  padding: 1px 4px 1px 0;
+  border-right: 1px solid var(--lnt-line);
+}
+
+.capture-view .capture-livegram .gram-tick {
+  font-family: var(--lnt-mono);
+  font-size: 11px;
+  line-height: 12px;
+  color: var(--lnt-text-sec);
+}
+
+.capture-view .capture-livegram .gram {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.capture-view .capture-livegram .gram-freq-ticks {
+  position: relative;
+  min-height: 16px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.capture-view .capture-livegram .gram-freq-tick {
+  position: absolute;
+  top: 0;
+  max-width: 25%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  font-family: var(--lnt-mono);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+}
+
+.capture-view .capture-livegram .gram-freq-tick[data-hz="1000"] {
+  transform: none;
+}
+
+.capture-view .capture-livegram .gram-freq-tick[data-hz="10000000"] {
+  transform: translateX(-100%);
+}
+
+.capture-view .capture-livegram .livegram-empty,
+.capture-view .capture-livegram .livegram-session {
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+}

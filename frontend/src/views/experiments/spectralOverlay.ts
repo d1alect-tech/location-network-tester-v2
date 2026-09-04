@@ -37,6 +37,7 @@ function meanSeries(payloads: SpectrumPayload[]): { x: number[]; y: number[] } |
 
 export class SpectralOverlay {
   readonly root: HTMLElement;
+  private readonly legendHost: HTMLElement;
   private readonly shell: ChartShellHandle;
   private readonly handle: ChartHandle;
   private readonly fetcher: SpectrumFetcher;
@@ -47,14 +48,32 @@ export class SpectralOverlay {
     const factory = createView ?? createUplotView;
     this.shell = createChartShell({ title: "Спектральное наложение условий" });
     this.handle = factory({ container: this.shell.body, syncKey: SYNC_KEY });
-    this.root = el("section", { className: "lnt-exp-overlay" }, [
-      el("h3", { className: "lnt-exp-subtitle", text: "Спектр/полосы/гармоники" }),
-      el("p", {
-        className: "lnt-helper-text",
-        text: "Средние сырые PSD (scope-plane) участников каждого условия; приведение ко входу не применяется.",
-      }),
-      this.shell.root,
-    ]);
+    // V6-сигнальное окно (variantV6.css): панель спектра с рамкой графика
+    // и легендой трасс (различие А/Б — маркером, не только цветом).
+    this.legendHost = el("div", {
+      className: "spectrum-legend",
+      attrs: { role: "group", "aria-label": "Условия наложения" },
+    });
+    this.root = el(
+      "section",
+      {
+        className: "lnt-exp-overlay panel",
+        attrs: { "data-showcase": "spectrum" },
+      },
+      [
+        el("div", { className: "panel-hd" }, [
+          el("h3", { className: "lnt-exp-subtitle panel-title", text: "Спектр/полосы/гармоники" }),
+        ]),
+        el("div", { className: "panel-bd" }, [
+          el("p", {
+            className: "lnt-helper-text",
+            text: "Средние сырые PSD (scope-plane) участников каждого условия; приведение ко входу не применяется.",
+          }),
+          el("div", { className: "frame spectrum-plot" }, [this.shell.root]),
+          this.legendHost,
+        ]),
+      ],
+    );
     void theme;
   }
 
@@ -95,8 +114,10 @@ export class SpectralOverlay {
     }
     if (sharedX === null || series.length === 0) {
       this.shell.setEmpty("Нет спектров для наложения: данные недоступны.");
+      this.renderLegend([]);
       return;
     }
+    this.renderLegend(series.map((s) => s.label));
     const filtered = series.map((s) => filterLogSafePairs(sharedX ?? [], s.values));
     const first = filtered[0];
     if (!first) return;
@@ -118,6 +139,20 @@ export class SpectralOverlay {
         };
       }),
     });
+  }
+
+  /** Легенда трасс: маркер серии читается без цвета (§4 kit.css). */
+  private renderLegend(labels: string[]): void {
+    this.legendHost.replaceChildren();
+    const keys = ["a", "b"];
+    for (const [index, label] of labels.entries()) {
+      this.legendHost.append(
+        el("span", {
+          text: label,
+          attrs: { "data-series": keys[index] ?? "a" },
+        }),
+      );
+    }
   }
 
   destroy(): void {

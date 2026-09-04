@@ -1,10 +1,13 @@
 import * as os from "node:os";
 import * as path from "node:path";
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
-/** E2E графиков todo 41: связанные курсором uPlot-вью на маршруте Инспекция.
+/** E2E графиков: оверлей A/B uPlot в полном захвате инспекции V6.
  * API подменяется маршрутами с фикстурами бэкенд-контрактов; проверяются
- * ОТРИСОВАННЫЕ данные (легенда/сводка/канвы), а не консольные логи. */
+ * ОТРИСОВАННЫЕ данные (легенда/дельта/канва), а не консольные логи. */
+
+const BASE = "http://127.0.0.1:4101/static/v2/#/inspect";
 
 const CATALOG = {
   items: [
@@ -45,13 +48,6 @@ const SPECTRUM_B = {
   point_count: 4,
 };
 
-const WAVEFORM = {
-  channel: "ch1",
-  time_s: [0, 0.25, 0.5, 0.75],
-  voltage_v: [0.05, -0.15, 0.2, -0.1],
-  point_count: 4,
-};
-
 function detail(name: string): unknown {
   return {
     name,
@@ -68,85 +64,89 @@ function detail(name: string): unknown {
   };
 }
 
-async function mockApi(page: import("@playwright/test").Page): Promise<void> {
+async function mockApi(page: Page): Promise<void> {
   const json = (body: unknown): string => JSON.stringify(body);
   await page.route("**/api/catalog/sessions**", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: json(CATALOG) }),
   );
-  for (const name of ["capture-001", "capture-002"]) {
-    await page.route(`**/api/sessions/${name}`, (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: json(detail(name)) }),
-    );
-    await page.route(`**/api/sessions/${name}/waveform?*`, (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: json(WAVEFORM) }),
-    );
-  }
+  await page.route("**/api/sessions/capture-001", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: json(detail("capture-001")) }),
+  );
+  await page.route("**/api/sessions/capture-002", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: json(detail("capture-002")) }),
+  );
   await page.route("**/api/sessions/capture-001/spectrum?*", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: json(SPECTRUM_A) }),
   );
   await page.route("**/api/sessions/capture-002/spectrum?*", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: json(SPECTRUM_B) }),
   );
+  await page.route("**/api/analysis/sessions/capture-001/.lnt-default-analysis.json", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: json({ artifact_key: "art-a" }) }),
+  );
+  await page.route("**/api/analysis/sessions/capture-002/.lnt-default-analysis.json", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: json({ artifact_key: "art-b" }) }),
+  );
 }
 
-test("uPlot-workbench: связанные графики, паритет данных, log-оси, CSV", async ({ page }) => {
+async function paintedRatio(page: Page, selector: string): Promise<number> {
+  return page.evaluate((sel) => {
+    const canvas = document.querySelector(`${sel} canvas`);
+    if (!(canvas instanceof HTMLCanvasElement)) return -1;
+    const ctx = canvas.getContext("2d");
+    if (ctx === null || canvas.width === 0 || canvas.height === 0) return -1;
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let opaque = 0;
+    for (let i = 3; i < data.length; i += 4) if ((data[i] ?? 0) > 0) opaque += 1;
+    return opaque / (data.length / 4);
+  }, selector);
+}
+
+test("оверлей А/Б", async ({ page }) => {
   await mockApi(page);
-  await page.goto("http://127.0.0.1:4101/static/v2/#/inspect");
-  await expect(page.locator(".lnt-workbench")).toBeVisible();
+  await page.goto(BASE);
+  await expect(page.locator(".app-v6")).toBeVisible();
 
-  // Открытие сессии А через клавиатурно-доступный селект.
-  await page.selectOption('select[aria-label="Сессия А"]', "capture-001");
+  const frame = page.locator(".frame");
+  await expect(frame.locator(".uplot")).toHaveCount(1);
 
-  // Отрисованные канвы uPlot: спектр А + осциллограмма.
-  const uplots = page.locator(".lnt-chart .uplot");
-  await expect(uplots).toHaveCount(2);
+  const legend = frame.locator(".u-legend");
+  await expect(legend).toContainText("capture-001");
+  await expect(legend).toContainText("capture-002");
 
-  // Паритет: легенда спектра показывает значения фикстуры под курсором —
-  // двигаем мышь в центр первой канвы и читаем сводку «Значение под курсором».
-  const firstCanvas = page.locator(".lnt-chart .uplot canvas").first();
-  const box = await firstCanvas.boundingBox();
+  await expect.poll(async () => paintedRatio(page, ".frame"), { timeout: 10_000 }).toBeGreaterThan(0.05);
+
+  const canvas = frame.locator("canvas").first();
+  const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
   if (box === null) throw new Error("канва не отрисована");
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.locator(".lnt-readout-table td").first()).not.toHaveText("—");
+  const liveValue = frame.locator(".u-legend .u-value").first();
+  await expect(liveValue).not.toHaveText("—");
+  await expect(liveValue).not.toHaveText("--");
 
-  // Связанный курсор: у обоих графиков появляется вертикаль курсора.
-  const cursors = page.locator(".uplot .u-cursor-x");
-  await expect(cursors).toHaveCount(2);
+  // Пики аннотируются на канве (createPeaksPlugin) и в таблице анализа — DOM .peak-mark нет.
+  await expect(page.locator(".analysis-band tbody")).toContainText(/1[\u00a0 ]?000/);
+});
 
-  // Подписи осей uPlot рисует на канве — доказываем отрисовку пикселями
-  // (log-log спектр действительно нарисован, а не пустая канва).
-  const paintedSamples = await page.evaluate(() => {
-    const canvas = document.querySelector(".lnt-chart .uplot canvas");
-    if (!(canvas instanceof HTMLCanvasElement)) return -1;
-    const ctx = canvas.getContext("2d");
-    if (ctx === null) return -1;
-    const image = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    let count = 0;
-    for (let i = 3; i < image.length; i += 4 * 53) {
-      const alpha = image[i];
-      if (alpha !== undefined && alpha > 0) count += 1;
-    }
-    return count;
-  });
-  expect(paintedSamples).toBeGreaterThan(0);
+test("log-ось и дельта пиков", async ({ page }) => {
+  await mockApi(page);
+  await page.goto(BASE);
+  await expect(page.locator(".app-v6")).toBeVisible();
 
-  // Аннотации пиков из analysis + доступная таблица (ru-RU даёт неразрывный пробел).
-  await expect(page.locator(".lnt-peaks-summary")).toContainText(/1[\u00a0 ]?000/);
+  const band = page.locator(".analysis-band");
+  await expect(band).toContainText(/1[\u00a0 ]?000/);
 
-  // Сравнение Б: пунктирный янтарный ряд во второй оболочке.
-  await page.selectOption('select[aria-label="Сессия Б для сравнения"]', "capture-002");
-  await expect(uplots).toHaveCount(3);
-  await expect(page.locator(".lnt-chart").nth(1).locator(".u-legend")).toContainText("■ Сессия Б");
+  const deltaCell = band.locator("[data-delta]").first();
+  await expect(deltaCell).toBeVisible();
+  // 10*log10(8e-3/1e-2) ≈ -0.969 → минус, глиф ▼.
+  const value = Number(await deltaCell.getAttribute("data-delta"));
+  expect(Math.abs(value - -0.969)).toBeLessThan(0.05);
+  await expect(deltaCell).toContainText("▼");
 
-  // Скриншот связанного multi-chart вида — во временную директорию
-  // (evidence-шаг копирует его за пределы репозитория).
-  const screenshotPath = path.join(os.tmpdir(), "lnt-t41-linked-charts.png");
+  await page.locator("[data-pair-swap]").click();
+  await expect(page.locator(".pairbar [data-pair='a']")).toContainText("стенд-Б");
+
+  const screenshotPath = path.join(os.tmpdir(), "lnt-v6-overlay-charts.png");
   await page.screenshot({ path: screenshotPath, fullPage: true });
-
-  // CSV-альтернатива: клик по кнопке не ломает страницу (файл уходит в загрузки).
-  const downloadPromise = page.waitForEvent("download", { timeout: 5_000 });
-  await page.locator('button:has-text("Скачать CSV")').first().click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toContain("spectrum-a-4.csv");
 });

@@ -11,6 +11,7 @@ import { announcePolite } from "../../components/primitives/status";
 import type { RouteStore } from "../../state/routeState";
 import { protocolLabel } from "../experiments/experimentModel";
 import type { ExperimentDetail } from "../experiments/experimentsStore";
+import { REPORT_EXPORT_FORMAT, buildReportFilename, downloadMarkdown } from "./reportExport";
 import { previewBlock } from "./reportPreview";
 import { ReportsStore } from "./reportsStore";
 import "./reports.css";
@@ -29,20 +30,28 @@ export function mountReportsWorkspace(
   const listHost = el("div", {});
   const detailHost = el("div", { className: "lnt-rep-detail" });
   const unitsInput = el("input", {
-    className: "lnt-input",
+    className: "ctl lnt-input",
     attrs: { type: "text", id: "lnt-rep-units", value: "В²/Гц", "aria-label": "Единицы измерения" },
   });
   const buildButton = el("button", {
-    className: "lnt-btn lnt-btn-primary",
+    className: "btn lnt-btn lnt-btn-primary",
     text: "Собрать отчёт",
     attrs: { type: "button", id: "lnt-rep-build", disabled: "disabled" },
   });
   const downloadButton = el("button", {
-    className: "lnt-btn",
+    className: "btn btn-secondary lnt-btn",
     text: "Скачать отчёт (.md)",
-    attrs: { type: "button", id: "lnt-rep-download", disabled: "disabled" },
+    attrs: {
+      type: "button",
+      id: "lnt-rep-download",
+      disabled: "disabled",
+      "data-export-format": REPORT_EXPORT_FORMAT,
+    },
   });
-  const statusHost = el("p", { className: "lnt-helper-text", attrs: { role: "status" } });
+  const statusHost = el("p", {
+    className: "t-compact lnt-helper-text",
+    attrs: { role: "status" },
+  });
 
   const leftPane = el("div", { className: "lnt-rep-left" }, [
     el("h2", { className: "placeholder-title", text: "Отчёты" }),
@@ -52,7 +61,7 @@ export function mountReportsWorkspace(
     }),
     el("div", { className: "lnt-exp-actions" }, [
       el("button", {
-        className: "lnt-btn",
+        className: "btn btn-secondary lnt-btn",
         text: "Обновить",
         attrs: { type: "button", id: "lnt-rep-refresh" },
       }),
@@ -113,7 +122,7 @@ export function mountReportsWorkspace(
       const title = String(item.title ?? id);
       const li = el("li", { className: "lnt-exp-list-item" });
       const open = el("button", {
-        className: "lnt-btn lnt-exp-open",
+        className: "btn btn-secondary lnt-btn lnt-exp-open",
         text: `${title} (${id})`,
         attrs: { type: "button", "data-experiment-id": id },
       });
@@ -156,8 +165,8 @@ export function mountReportsWorkspace(
         text: `План: ${protocolLabel(String((experiment.protocol as OpenRecord | undefined)?.kind ?? ""))} · участников: ${String(state.value.members.length)}`,
       }),
       el("div", { className: "lnt-exp-actions" }, [
-        el("label", { className: "lnt-field-inline" }, [
-          el("span", { className: "lnt-label-text", text: "Единицы" }),
+        el("label", { className: "field lnt-field-inline" }, [
+          el("span", { className: "field-label lnt-label-text", text: "Единицы" }),
           unitsInput,
         ]),
         buildButton,
@@ -192,14 +201,7 @@ export function mountReportsWorkspace(
   function download(): void {
     if (currentMarkdown === null || currentDetail === null) return;
     const experimentId = String(currentDetail.experiment.experiment_id);
-    const blob = new Blob([currentMarkdown], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = el("a", { attrs: { href: url, download: `report-${experimentId}.md` } });
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-    announcePolite("Файл отчёта скачан");
+    downloadMarkdown(currentMarkdown, buildReportFilename(experimentId));
   }
 
   async function refreshList(): Promise<void> {

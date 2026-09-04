@@ -158,7 +158,7 @@ describe("createChartsWorkbench", () => {
     const request = spectrumB.renders.at(-1) as ChartRenderRequest;
     expect(request.series[0]?.dash).toEqual([6, 4]);
     expect(request.series[0]?.marker).toBe("■");
-    const amberApplied = /#ffb000|#b25e00/.test(String(request.series[0]?.color));
+    const amberApplied = /#e68619|#ffb000|#b25e00/.test(String(request.series[0]?.color));
     expect(amberApplied).toBe(true);
   });
 

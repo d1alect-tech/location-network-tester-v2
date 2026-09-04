@@ -26,9 +26,9 @@ export function createProtocolTimeline(): ProtocolTimelineHandle {
     className: "lnt-exp-timeline",
     attrs: { "aria-label": "Шаги протокола" },
   });
-  const heading = el("h3", { className: "lnt-exp-subtitle", text: "Протокол" });
-  const kindBadge = el("span", { className: "lnt-exp-kind-badge", text: "" });
-  const header = el("div", { className: "lnt-exp-timeline-header" }, [heading, kindBadge]);
+  const heading = el("h3", { className: "lnt-exp-subtitle panel-title", text: "Протокол" });
+  const kindBadge = el("span", { className: "lnt-exp-kind-badge chip", text: "" });
+  const header = el("div", { className: "lnt-exp-timeline-header panel-hd" }, [heading, kindBadge]);
   const status = el("p", { className: "lnt-helper-text", attrs: { role: "status" } });
   const root = el("section", { className: "lnt-exp-timeline-section" }, [header, status, list]);
 

@@ -1,0 +1,179 @@
+/* T11: выделено из catalog.css. */
+/* ── Баннеры: восстановление .banner, конфликт/ошибка .banner-inline ──── */
+
+.lnt-cat-workspace .banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgb(236 91 98 / 0.35);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-err-bg, rgb(236 91 98 / 0.15));
+}
+
+.lnt-cat-workspace .banner-title {
+  font: 600 14px / 18px var(--lnt-ui);
+  color: var(--lnt-text);
+  margin: 0;
+}
+
+.lnt-cat-workspace .banner-msg {
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  margin: 0;
+}
+
+.lnt-cat-workspace .banner-list {
+  margin: 0;
+  padding-left: 20px;
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+}
+
+/* Инлайн-полоса по витрине (variantV6.css): без фона, только верхняя линия
+ * и тон-полоса 3px слева. Кнопки внутри переносятся — min-height вместо 32px. */
+.lnt-cat-workspace .banner-inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 32px;
+  gap: 8px;
+  padding: 4px 12px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--lnt-line);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: 0;
+}
+
+/* Тон-предупреждение: конфликт revision, восстановление без потери. */
+.lnt-cat-workspace .banner.banner-warn {
+  border-color: rgb(230 134 25 / 0.35);
+  border-left-color: var(--lnt-warn);
+  background: var(--lnt-warn-bg, rgb(230 134 25 / 0.15));
+}
+
+.lnt-cat-workspace .banner-inline.banner-warn {
+  border-left-color: var(--lnt-warn);
+}
+
+/* Тон-подсказка: нейтральная полоса на акценте (токена info в витрине нет). */
+.lnt-cat-workspace .banner.banner-info {
+  border-color: rgb(86 129 255 / 0.35);
+  border-left-color: var(--lnt-accent);
+  background: rgb(86 129 255 / 0.12);
+}
+
+.lnt-cat-workspace .banner-inline.banner-info {
+  border-left-color: var(--lnt-accent);
+}
+
+/* Глифы 12px semibold — мелкий текст, нужен 4.5:1: осветлённые тона
+ * (сырые --lnt-err/--lnt-warn дают ~2.7–3.7:1, замер axe ≥ 5:1). */
+.lnt-cat-workspace .banner-glyph {
+  color: #ffc4c6;
+  font: 600 12px / 16px var(--lnt-ui);
+  flex: none;
+}
+
+.lnt-cat-workspace .banner.banner-warn .banner-glyph,
+.lnt-cat-workspace .banner-inline.banner-warn .banner-glyph {
+  color: #f7c46c;
+}
+
+.lnt-cat-workspace .banner.banner-info .banner-glyph,
+.lnt-cat-workspace .banner-inline.banner-info .banner-glyph {
+  color: #a9c0ff;
+}
+
+.lnt-cat-workspace .banner-inline .banner-msg {
+  flex: 1;
+  min-width: 200px;
+  color: var(--lnt-text);
+}
+
+/* ── Профили: disclosure + frame ─────────────────────────────────────── */
+
+.lnt-cat-workspace .disc-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  padding: 6px 0;
+  color: var(--lnt-text-sec);
+  font: 600 13px / 16px var(--lnt-ui);
+  cursor: pointer;
+}
+
+.lnt-cat-workspace .disc-toggle:hover {
+  color: var(--lnt-text);
+}
+
+.lnt-cat-workspace .disc-toggle::before {
+  content: "▸";
+  font-size: 11px;
+  transition: transform var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-cat-workspace .disc-toggle[aria-expanded="true"]::before {
+  transform: rotate(90deg);
+}
+
+.lnt-cat-workspace .disc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 8px 16px;
+}
+
+.lnt-cat-workspace .cat-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.lnt-cat-workspace .cat-profile-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 12px / 16px var(--lnt-mono);
+  color: var(--lnt-text);
+  cursor: pointer;
+}
+
+.lnt-cat-workspace .frame {
+  background: var(--lnt-canvas);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lnt-cat-workspace .cat-preview-json {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--lnt-elev);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px;
+}
+
+/* Таб-панели правой колонки: контент тянется, прокрутка у колонки. */
+.lnt-cat-workspace .col-main [role="tabpanel"] {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.lnt-cat-workspace .col-main [role="tabpanel"] > .panel {
+  flex: 1;
+  min-height: 0;
+}

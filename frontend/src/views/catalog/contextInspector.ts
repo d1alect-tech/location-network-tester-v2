@@ -1,15 +1,19 @@
-/** Инспектор контекста сессии: поля с источником/доступностью, правка заметок,
+/** Инспектор контекста сессии V6: панель .panel (hd + bd), сводка
+ * .readout-grid, таблица полей .tbl, редакторы .form-grid с .ctl,
+ * восстановление .banner, конфликт revision .banner.banner-inline.
+ * Логика без изменений: поля с источником/доступностью, правка заметок,
  * тегов и пользовательских полей, сохранение через PUT с оптимистичной
- * блокировкой. Конфликт revision показывается как типизированное состояние
- * с потоком «перечитать и объединить» — чужие правки не затираются молча. */
+ * блокировкой; конфликт revision — типизированное состояние с потоком
+ * «перечитать и объединить». Хук .lnt-cat-inspector и связки e2e
+ * (.lnt-cat-session-summary, .lnt-cat-notes, .lnt-btn-primary) сохранены. */
 
 import type { LntApiClient } from "../../api/client";
 import type { ContextResponse, ContextUpdateRequest } from "../../api/types";
 import { el } from "../../components/primitives/dom";
-import { createField } from "../../components/primitives/forms";
 import { announcePolite } from "../../components/primitives/status";
 import { createMutation, createResourceLoader } from "../../state/resource";
 import { HEALTH_LABELS } from "./catalogModel";
+import { v6Field } from "./catalogV6Field";
 import { createFieldsTable, createRecoveryPanel } from "./contextFieldsView";
 import {
   type RevisionConflict,
@@ -41,24 +45,32 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     return client.updateContext(currentSessionId, request);
   });
 
-  const title = el("h3", { className: "lnt-cat-inspector-title", text: "Инспектор контекста" });
-  const summary = el("div", { className: "lnt-cat-session-summary" });
+  const summary = el("div", { className: "lnt-cat-session-summary readout-grid" });
   const recovery = el("div", {});
   const fieldsHost = el("div", {});
   const notesArea = document.createElement("textarea");
-  notesArea.className = "lnt-input lnt-cat-notes";
+  notesArea.className = "ctl lnt-cat-notes";
   notesArea.rows = 4;
   const tagsInput = document.createElement("input");
   tagsInput.type = "text";
-  tagsInput.className = "lnt-input";
-  const userFieldsHost = el("div", {});
-  const conflictPanel = el("div", { className: "lnt-cat-conflict" });
-  const errorNote = el("p", { className: "lnt-error-text", attrs: { role: "alert" } });
+  tagsInput.className = "ctl";
+  const userFieldsHost = el("div", { className: "form-grid" });
+  const conflictPanel = el("div", {
+    className: "banner banner-inline banner-warn lnt-cat-conflict",
+  });
+  conflictPanel.hidden = true;
+  const errorNote = el("p", { className: "banner banner-inline", attrs: { role: "alert" } });
+  errorNote.hidden = true;
   const saveButton = el("button", {
-    className: "lnt-btn lnt-btn-primary",
+    className: "btn lnt-btn lnt-btn-primary",
     text: "Сохранить",
     attrs: { type: "button" },
   });
+
+  function setError(message: string): void {
+    errorNote.textContent = message;
+    errorNote.hidden = message === "";
+  }
 
   function draftTags(): string[] {
     return tagsInput.value
@@ -89,7 +101,7 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
   async function runSave(): Promise<void> {
     const state = loader.get();
     if (state.kind !== "ready") return;
-    errorNote.textContent = "";
+    setError("");
     try {
       await client.ensureReady();
       await saveMutation.run(buildRequest(state.value));
@@ -103,8 +115,7 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
         renderConflict();
         announcePolite("Конфликт версий: контекст изменён другим процессом");
       } else {
-        errorNote.textContent =
-          error instanceof Error ? error.message : "Не удалось сохранить изменения.";
+        setError(error instanceof Error ? error.message : "Не удалось сохранить изменения.");
       }
     }
   }
@@ -119,7 +130,7 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     }
     conflictPanel.hidden = false;
     conflictPanel.append(
-      el("p", { className: "lnt-cat-conflict-title", text: conflict.message }),
+      el("p", { className: "banner-msg", text: conflict.message }),
       buildMergeButton(),
       buildDiscardButton(),
     );
@@ -127,7 +138,7 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
 
   function buildMergeButton(): HTMLElement {
     const button = el("button", {
-      className: "lnt-btn lnt-btn-primary",
+      className: "btn",
       text: "Перечитать и объединить",
       attrs: { type: "button" },
     });
@@ -149,8 +160,9 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
           await loader.load(fresh.value.session_id);
           announcePolite("Изменения применены поверх актуальной версии");
         } catch (retryError) {
-          errorNote.textContent =
-            retryError instanceof Error ? retryError.message : "Повторное сохранение не удалось.";
+          setError(
+            retryError instanceof Error ? retryError.message : "Повторное сохранение не удалось.",
+          );
         }
       })();
     });
@@ -159,7 +171,7 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
 
   function buildDiscardButton(): HTMLElement {
     const button = el("button", {
-      className: "lnt-btn",
+      className: "btn btn-secondary",
       text: "Отбросить мои правки и перечитать",
       attrs: { type: "button" },
     });
@@ -176,10 +188,15 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     const health = HEALTH_LABELS[context.health as keyof typeof HEALTH_LABELS];
     while (summary.firstChild) summary.removeChild(summary.firstChild);
     summary.append(
-      el("p", { className: "lnt-mono lnt-cat-session-id", text: context.session_id }),
-      health
-        ? el("p", { text: `Состояние: ${health.label}` })
-        : el("p", { text: `Состояние: ${context.health}` }),
+      el("p", {
+        className: "t-mono",
+        text: context.session_id,
+        attrs: { title: "Идентификатор сессии" },
+      }),
+      el("p", {
+        className: "t-compact",
+        text: health ? `Состояние: ${health.label}` : `Состояние: ${context.health}`,
+      }),
     );
     while (recovery.firstChild) recovery.removeChild(recovery.firstChild);
     if (context.health !== "ok" || context.reason_codes.length > 0) {
@@ -193,10 +210,10 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     for (const [key, value] of Object.entries(userEditableFields(context))) {
       const input = document.createElement("input");
       input.type = "text";
-      input.className = "lnt-input";
+      input.className = "ctl";
       input.value = value;
       input.setAttribute("data-field", key);
-      userFieldsHost.append(createField({ label: key, control: input }).root);
+      userFieldsHost.append(v6Field(key, input));
     }
     notesArea.value = context.notes ?? "";
     tagsInput.value = context.tags.join(", ");
@@ -209,10 +226,10 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
       renderReady(state.value);
     } else if (state.kind === "loading") {
       saveButton.disabled = true;
-      errorNote.textContent = "";
+      setError("");
     } else if (state.kind === "error") {
       saveButton.disabled = true;
-      errorNote.textContent = `${state.error.message} Выберите другую сессию или повторите.`;
+      setError(`${state.error.message} Выберите другую сессию или повторите.`);
     }
   });
 
@@ -221,23 +238,23 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     saveButton.textContent = state.kind === "pending" ? "Сохранение…" : "Сохранить";
   });
 
-  const root = el("section", { className: "lnt-cat-inspector" }, [
-    title,
-    summary,
-    recovery,
-    fieldsHost,
-    el("div", { className: "lnt-cat-editors" }, [
-      createField({ label: "Заметки", control: notesArea }).root,
-      createField({
-        label: "Теги",
-        control: tagsInput,
-        hintText: "Через запятую, например: самошум, стенд-А",
-      }).root,
-      userFieldsHost,
+  const root = el("section", { className: "panel lnt-cat-inspector" }, [
+    el("div", { className: "panel-hd" }, [
+      el("h2", { className: "panel-title", text: "Инспектор контекста" }),
     ]),
-    conflictPanel,
-    errorNote,
-    saveButton,
+    el("div", { className: "panel-bd" }, [
+      summary,
+      recovery,
+      fieldsHost,
+      el("div", { className: "form-grid" }, [
+        v6Field("Заметки", notesArea),
+        v6Field("Теги", tagsInput, "Через запятую, например: самошум, стенд-А"),
+      ]),
+      userFieldsHost,
+      conflictPanel,
+      errorNote,
+      el("div", { className: "form-actions" }, [saveButton]),
+    ]),
   ]);
 
   return {

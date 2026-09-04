@@ -1,14 +1,36 @@
-/** Виртуализованный список каталога: рендерится только видимое окно строк,
- * поэтому 10 000 строк прокручиваются без деградации. Клавиатура: стрелки,
- * Home/End, Enter открывает инспектор; бейджи health текстовые (не только цвет).
- * Повреждённые сессии остаются в списке и помечаются кодом причины. */
+/** Каталог V6: плотная таблица table.tbl.tbl-tight.tbl-cat (строки 28px),
+ * группы дней tr.cat-group со счётчиком, сортировка кнопками .cat-sort
+ * с aria-sort, счётчик выдачи .cat-found, роли А/Б .cat-role-a/.cat-role-b.
+ * Структура повторяет эталон showcase-round2/catalogV6.ts (только чтение).
+ *
+ * Роли без пары: в каталоге нет слотов сравнения, поэтому чипы помечают
+ * активную сессию (А, слот базы) и первого отличного от неё кандидата (Б);
+ * без выбора — первые две строки выдачи. Чистая индикация, не состояние.
+ *
+ * Совместимость e2e (catalog.spec): строки несут .lnt-cat-row +
+ * data-session-id, здоровье — текстовой пилюлей .lnt-status-pill (не только
+ * цвет), пусто — .lnt-cat-empty, навигация — roving tabindex + Enter.
+ * Виртуализация снята: сервер отдаёт страницы по 200 (keyset), рендерятся все
+ * загруженные строки — 10k гоняются серверным фильтром, а не окном.
+ *
+ * T11: строки/группы/сортировка/роли — в catalogListRows; здесь каркас,
+ * состояние и навигация. */
 
 import type { CatalogSession } from "../../api/types";
 import { clearElement, el } from "../../components/primitives/dom";
-import { HEALTH_LABELS, sessionTypeLabel } from "./catalogModel";
-
-const ROW_HEIGHT = 44;
-const OVERSCAN = 4;
+import type { RowNav } from "./catalogListNav";
+import { handleRowKeys as handleNavKeys, syncRowTabindex } from "./catalogListNav";
+import {
+  dayKey,
+  orderSessions,
+  paintSelection,
+  renderEmpty,
+  renderErrorBanner,
+  renderGroup,
+  renderRow,
+  roleOfSession,
+} from "./catalogListRows";
+import type { SortDir, SortKey } from "./catalogListRows";
 
 export interface CatalogListOptions {
   onActivate: (session: CatalogSession) => void;
@@ -18,6 +40,8 @@ export interface CatalogListOptions {
 
 export interface CatalogListHandle {
   root: HTMLElement;
+  /** Слот панели под тулбар фильтров (.cat-tools) — монтирует workspace. */
+  toolsSlot: HTMLElement;
   setItems(items: CatalogSession[], options?: { resetScroll?: boolean }): void;
   setNotice(kind: "loading" | "empty" | "error", message: string): void;
   clearNotice(): void;
@@ -30,201 +54,211 @@ export function createCatalogListView(options: CatalogListOptions): CatalogListH
   let selectedId: string | null = null;
   let activeIndex = 0;
   let firstRender = true;
+  let hasMore = false;
+  let sort: SortKey = "date";
+  let dir: SortDir = "descending";
 
-  const viewport = el("div", {
-    className: "lnt-cat-viewport",
-    attrs: { role: "listbox", "aria-label": "Список сессий каталога" },
+  const found = el("span", { className: "cat-found", attrs: { "data-cat-found": "" } });
+  const toolsSlot = el("div", {
+    className: "cat-tools-host",
+    attrs: { "data-cat-tools-host": "" },
   });
-  const sizer = el("div", { className: "lnt-cat-sizer", attrs: { role: "presentation" } });
-  const windowEl = el("div", { className: "lnt-cat-window", attrs: { role: "presentation" } });
-  viewport.append(sizer, windowEl);
+  const noticeHost = el("div", { className: "cat-notice-host" });
+  const tbody = el("tbody");
+  const table = el("table", { className: "tbl tbl-tight tbl-cat" });
 
-  // Состояния (загрузка/пусто/ошибка) живут ВНЕ listbox: его содержимое —
-  // только опции и presentation-обёртки (aria-required-children).
-  const noticeHost = el("div", { className: "lnt-cat-notice-host" });
+  const headRow = el("tr", {}, [el("th", { attrs: { scope: "col", "aria-label": "Состояние" } })]);
+  const heads = new Map<SortKey, HTMLElement>();
+  const dateTitleNodes = new Map<SortKey, Text>();
+  const columns: ReadonlyArray<{ key: SortKey; title: string }> = [
+    { key: "label", title: "Метка" },
+    { key: "type", title: "Тип" },
+    { key: "date", title: "Дата" },
+  ];
+  for (const column of columns) {
+    const title = document.createTextNode(column.title);
+    if (column.key === "date") dateTitleNodes.set(column.key, title);
+    const sortButton = el("button", {
+      className: "cat-sort",
+      attrs: { type: "button" },
+    });
+    sortButton.append(
+      title,
+      el("span", { className: "cat-sort-mark", attrs: { "aria-hidden": "true" } }),
+    );
+    sortButton.addEventListener("click", () => {
+      if (sort === column.key) {
+        dir = dir === "ascending" ? "descending" : "ascending";
+      } else {
+        sort = column.key;
+        dir = "ascending";
+      }
+      render();
+    });
+    const cell = el(
+      "th",
+      {
+        className: "cat-th",
+        attrs: { scope: "col", "data-cat-sort": column.key, "aria-sort": "none" },
+      },
+      [sortButton],
+    );
+    heads.set(column.key, cell);
+    headRow.append(cell);
+  }
+  table.append(el("thead", {}, [headRow]), tbody);
 
   const moreButton = el("button", {
-    className: "lnt-btn lnt-cat-more",
+    className: "btn btn-secondary cat-more",
     text: "Показать ещё",
     attrs: { type: "button" },
   });
   moreButton.hidden = true;
   moreButton.addEventListener("click", () => options.onLoadMore());
 
-  const root = el("div", { className: "lnt-cat-list" }, [viewport, noticeHost, moreButton]);
+  const root = el("section", { className: "panel cat-v6 lnt-cat-list" }, [
+    el("div", { className: "panel-hd" }, [
+      el("h2", { className: "panel-title", text: "Каталог" }),
+      found,
+    ]),
+    toolsSlot,
+    el("div", { className: "panel-bd is-bare" }, [
+      noticeHost,
+      el("div", { className: "tbl-wrap" }, [table]),
+      moreButton,
+    ]),
+  ]);
 
-  viewport.addEventListener("scroll", () => renderWindow(), { passive: true });
-
-  function visibleCount(): number {
-    return Math.ceil(viewport.clientHeight / ROW_HEIGHT) + OVERSCAN * 2 + 1;
+  function roleOf(sessionId: string): "a" | "b" | null {
+    return roleOfSession(items, selectedId, sessionId);
   }
 
-  function renderWindow(): void {
-    if (items.length === 0) {
-      sizer.style.height = "0px";
-      clearElement(windowEl);
-      return;
+  function render(): void {
+    for (const [key, cell] of heads) {
+      cell.setAttribute("aria-sort", sort === key ? dir : "none");
     }
-    const start = Math.max(0, Math.floor(viewport.scrollTop / ROW_HEIGHT) - OVERSCAN);
-    const end = Math.min(items.length, start + visibleCount());
-    sizer.style.height = `${items.length * ROW_HEIGHT}px`;
-    windowEl.style.transform = `translateY(${start * ROW_HEIGHT}px)`;
-    clearElement(windowEl);
-    for (let index = start; index < end; index += 1) {
-      const session = items[index];
-      if (!session) continue;
-      windowEl.append(renderRow(session, index));
+    // В группах колонка показывает время — заголовок «Дата» врёт.
+    const dateTitle = dateTitleNodes.get("date");
+    if (dateTitle) dateTitle.data = sort === "date" ? "Время" : "Дата";
+    // Без групп в колонке полная дата — ширины под «14:30» ей мало.
+    table.classList.toggle("is-flat", sort !== "date");
+
+    clearElement(tbody);
+    const ordered = orderSessions(items, sort, dir);
+    const ctx = {
+      activeIndex,
+      selectedId,
+      grouped: sort === "date",
+      roleOf,
+      onActivate: activate,
+      onRowKeys: handleRowKeys,
+    };
+    if (sort === "date") {
+      let day = "";
+      let groupRows: HTMLElement[] = [];
+      const flushGroup = (): void => {
+        if (groupRows.length === 0) return;
+        tbody.append(renderGroup(day, groupRows.length));
+        for (const row of groupRows) tbody.append(row);
+        groupRows = [];
+      };
+      ordered.forEach((session, position) => {
+        const sessionDay = dayKey(session.created_utc);
+        if (sessionDay !== day) {
+          flushGroup();
+          day = sessionDay;
+        }
+        groupRows.push(renderRow(session, position, { ...ctx, activeIndex }));
+      });
+      flushGroup();
+    } else {
+      ordered.forEach((session, position) => {
+        tbody.append(renderRow(session, position, { ...ctx, activeIndex }));
+      });
     }
+    syncFound();
   }
 
-  function renderRow(session: CatalogSession, index: number): HTMLElement {
-    const health = HEALTH_LABELS[session.health];
-    const row = el("div", {
-      className: `lnt-cat-row${session.id === selectedId ? " lnt-cat-row-selected" : ""}`,
-      attrs: {
-        role: "option",
-        "aria-selected": session.id === selectedId ? "true" : "false",
-        "aria-posinset": String(index + 1),
-        "aria-setsize": String(items.length),
-        "data-session-id": session.id,
-      },
-    });
-    row.tabIndex = index === activeIndex ? 0 : -1;
-
-    const idCell = el("span", {
-      className: "lnt-cat-cell lnt-cat-id lnt-mono",
-      text: session.id,
-      attrs: { title: `Идентификатор сессии: ${session.id}` },
-    });
-    const labelCell = el("span", {
-      className: "lnt-cat-cell",
-      text: session.label ?? "",
-      attrs: { title: session.label ? `Метка: ${session.label}` : "" },
-    });
-    const pill = el("span", { className: `lnt-status-pill lnt-tone-${health.tone}` });
-    const glyph = el("span", { className: "lnt-status-glyph", attrs: { "aria-hidden": "true" } });
-    glyph.textContent = health.tone === "ok" ? "●" : health.tone === "warn" ? "▲" : "✕";
-    pill.append(glyph, document.createTextNode(health.label));
-    const healthCell = el("span", { className: "lnt-cat-cell lnt-cat-health" }, [pill]);
-    const metaCell = el("span", {
-      className: "lnt-cat-cell lnt-cat-meta",
-      text: formatMeta(session),
-    });
-    row.append(idCell, labelCell, healthCell, metaCell);
-
-    row.addEventListener("click", () => activate(index));
-    row.addEventListener("keydown", (event) => handleRowKeys(event, index));
-    return row;
-  }
-
-  function formatMeta(session: CatalogSession): string {
-    const type = session.session_type ? sessionTypeLabel(session.session_type) : "";
-    const date = session.created_utc ? session.created_utc.slice(0, 10) : "";
-    return [type, date].filter(Boolean).join(" · ");
+  function syncFound(): void {
+    found.textContent = hasMore ? `${items.length}+` : String(items.length);
+    found.title = hasMore
+      ? `Загружено ${items.length}, есть ещё — нажмите «Показать ещё»`
+      : `Загружено сессий: ${items.length}`;
   }
 
   function activate(index: number): void {
-    const session = items[index];
+    const session = orderSessions(items, sort, dir)[index];
     if (!session) return;
     activeIndex = index;
-    syncTabindex();
+    syncRowTabindex(tbody, activeIndex);
     options.onActivate(session);
   }
 
-  function syncTabindex(): void {
-    for (const node of windowEl.querySelectorAll<HTMLElement>(".lnt-cat-row")) {
-      const index = Number(node.getAttribute("aria-posinset")) - 1;
-      node.tabIndex = index === activeIndex ? 0 : -1;
-    }
-  }
-
-  function ensureVisible(index: number): void {
-    const top = index * ROW_HEIGHT;
-    if (top < viewport.scrollTop) viewport.scrollTop = top;
-    else if (top + ROW_HEIGHT > viewport.scrollTop + viewport.clientHeight) {
-      viewport.scrollTop = top + ROW_HEIGHT - viewport.clientHeight;
-    }
-  }
+  const nav: RowNav = {
+    body: tbody,
+    table,
+    count: () => items.length,
+    getActive: () => activeIndex,
+    setActive: (next) => {
+      activeIndex = next;
+    },
+    onActivate: activate,
+    // Близко к концу выдачи — заранее запросить следующую страницу.
+    onNearEnd: () => options.onLoadMore(),
+    nearEndArmed: () => !moreButton.hidden,
+  };
 
   function handleRowKeys(event: KeyboardEvent, index: number): void {
-    const next =
-      event.key === "ArrowDown"
-        ? Math.min(items.length - 1, index + 1)
-        : event.key === "ArrowUp"
-          ? Math.max(0, index - 1)
-          : event.key === "Home"
-            ? 0
-            : event.key === "End"
-              ? items.length - 1
-              : null;
-    if (next !== null) {
-      event.preventDefault();
-      activeIndex = next;
-      ensureVisible(next);
-      renderWindow();
-      focusedRow()?.focus();
-      // Близко к концу списка — заранее запросим следующую страницу.
-      if (items.length - next <= OVERSCAN * 2 && !moreButton.hidden) options.onLoadMore();
-      return;
-    }
-    if (event.key === "Enter") {
-      event.preventDefault();
-      activate(index);
-    }
+    handleNavKeys(event, index, nav);
   }
 
-  function focusedRow(): HTMLElement | null {
-    return windowEl.querySelector<HTMLElement>(`[aria-posinset="${activeIndex + 1}"]`);
-  }
+  render();
 
   return {
     root,
+    toolsSlot,
     setItems: (next, opts = {}) => {
       items = next;
       if (opts.resetScroll || firstRender) {
-        viewport.scrollTop = 0;
         activeIndex = 0;
         firstRender = false;
       }
       if (activeIndex >= items.length) activeIndex = Math.max(0, items.length - 1);
-      renderWindow();
+      render();
     },
     setNotice: (kind, message) => {
-      viewport.hidden = true;
-      moreButton.hidden = true;
       while (noticeHost.firstChild) noticeHost.removeChild(noticeHost.firstChild);
-      const note = el("p", {
-        className:
-          kind === "error" ? "lnt-table-note lnt-cat-error" : "lnt-table-note lnt-cat-empty",
-        text: message,
-        attrs: kind === "error" ? { role: "alert" } : {},
-      });
-      noticeHost.append(note);
-      if (kind === "error") {
-        const retry = el("button", {
-          className: "lnt-btn",
-          text: "Повторить",
-          attrs: { type: "button" },
-        });
-        retry.addEventListener("click", () => options.onRetry());
-        noticeHost.append(retry);
+      if (kind === "empty") {
+        table.hidden = false;
+        moreButton.hidden = true;
+        clearElement(tbody);
+        tbody.append(renderEmpty(message));
+        syncFound();
+        return;
       }
+      table.hidden = true;
+      moreButton.hidden = true;
+      if (kind === "error") {
+        noticeHost.append(renderErrorBanner(message, () => options.onRetry()));
+        return;
+      }
+      noticeHost.append(
+        el("p", { className: "cat-loading t-compact", text: message, attrs: { role: "status" } }),
+      );
     },
     clearNotice: () => {
       while (noticeHost.firstChild) noticeHost.removeChild(noticeHost.firstChild);
-      viewport.hidden = false;
-      renderWindow();
+      table.hidden = false;
+      render();
     },
-    setHasMore: (hasMore) => {
+    setHasMore: (nextHasMore) => {
+      hasMore = nextHasMore;
       moreButton.hidden = !hasMore || items.length === 0;
+      syncFound();
     },
     setSelected: (id) => {
       selectedId = id;
-      for (const node of windowEl.querySelectorAll<HTMLElement>(".lnt-cat-row")) {
-        const isSelected = node.getAttribute("data-session-id") === id;
-        node.classList.toggle("lnt-cat-row-selected", isSelected);
-        node.setAttribute("aria-selected", isSelected ? "true" : "false");
-      }
+      paintSelection(tbody, selectedId, roleOf);
     },
   };
 }

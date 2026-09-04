@@ -1,0 +1,193 @@
+/* T11: таблицы, метрики, баннеры, сигнал — выделено из experiments.css. */
+/* ── V6-таблицы (kit.css §2.3) и глифы состояний (§6: не только цвет) ──────── */
+
+.tbl-wrap {
+  overflow: auto;
+  min-width: 0;
+}
+
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 12px / 16px var(--lnt-ui);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.tbl th {
+  height: 30px;
+  padding: 0 8px;
+  text-align: left;
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-line);
+  white-space: nowrap;
+}
+
+.tbl td {
+  height: var(--lnt-row-h);
+  padding: 0 8px;
+  border-bottom: 1px solid var(--lnt-line);
+  color: var(--lnt-text);
+  vertical-align: middle;
+}
+
+.tbl tbody tr:hover {
+  background: var(--lnt-elev);
+}
+
+.tbl-tight td,
+.tbl-tight th {
+  padding: 0 4px;
+}
+
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.glyph-ok {
+  color: var(--lnt-ok);
+}
+
+.glyph-warn {
+  color: var(--lnt-warn);
+}
+
+.glyph-err {
+  color: var(--lnt-err);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-panel);
+  color: var(--lnt-text-sec);
+  font: 600 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.02em;
+}
+
+/* ── V6-метрики: meter-grid + kpi-плитки (kit.css, не слитная полоса) ──────── */
+
+.meter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.meter-label {
+  font: 400 12px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meter-value {
+  font: 600 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--lnt-text);
+  white-space: nowrap;
+}
+
+.kpi {
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+dl.meter-grid {
+  padding: 0;
+}
+
+dl.meter-grid .kpi dt {
+  font-weight: 400;
+}
+
+dl.meter-grid .kpi dd {
+  margin: 0;
+}
+
+/* ── V6-баннеры (kit.css §1.6, §4): текст + рамка, не только цвет ──────────── */
+
+.banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgb(236 91 98 / 0.35);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-err-bg);
+}
+
+.banner-title {
+  font: 600 14px / 18px var(--lnt-ui);
+  color: var(--lnt-text);
+  margin: 0;
+}
+
+.banner-msg {
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  margin: 0;
+}
+
+/* Однострочные статусы сравнения/трендов — компактная полоса без потери текста. */
+.banner-inline {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── V6-сигнал: канва, рамка, легенда трасс (kit.css §5.1) ─────────────────── */
+
+.frame {
+  background: var(--lnt-canvas);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px;
+  min-width: 0;
+}
+
+.spectrum-plot {
+  min-width: 0;
+}
+
+.spectrum-legend {
+  display: flex;
+  gap: 16px;
+  padding: 8px 4px 0;
+  font: 400 12px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  flex-wrap: wrap;
+}
+
+.spectrum-legend [data-series="a"]::before {
+  content: "●";
+  color: var(--lnt-accent);
+  margin-inline-end: 6px;
+}
+
+.spectrum-legend [data-series="b"]::before {
+  content: "■";
+  color: var(--lnt-warn);
+  margin-inline-end: 6px;
+}

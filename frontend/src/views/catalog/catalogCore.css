@@ -1,0 +1,177 @@
+/* Каталог V6 — ядро: каркас, колонки, панели, типографика (T11: выделено из catalog.css).
+ * Идиомы showcase-round2/kit.css + variantV6.css (только чтение), перенесённые
+ * в продукт на V6-токенах (--lnt-chrome/--lnt-panel/--lnt-line…).
+ * Scope — .lnt-cat-workspace, наружу ничего не течёт (MUST NOT: другие разделы).
+ * Хуки e2e (.lnt-cat-row, .lnt-status-pill, .lnt-cat-empty, .lnt-cat-saved,
+ * .lnt-cat-inspector, .lnt-cat-notes, .lnt-cat-conflict, .lnt-cat-recovery)
+ * сохранены как классы и оформлены здесь же по V6.
+ *
+ * Раскладка: .app-body [ .col-cat (.panel.cat-v6: hd + .cat-tools + таблица)
+ * | .col-main (.tabbar + панели) ]. Spill чинится overflow:clip на .col-cat. */
+
+.lnt-cat-workspace {
+  display: grid;
+  grid-template-columns: minmax(380px, 480px) minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+  background: var(--lnt-chrome);
+  color: var(--lnt-text);
+  font: 400 14px / 20px var(--lnt-ui);
+}
+
+/* Вид-контейнер под каталогом: без отступов, прокрутка внутри колонок. */
+.view-container.lnt-cat-view-container {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Атрибут hidden сильнее раскладочных display внутри каталога. */
+.lnt-cat-workspace [hidden] {
+  display: none !important;
+}
+
+/* ── Колонки ─────────────────────────────────────────────────────────── */
+
+.lnt-cat-workspace .col-cat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  /* Spill: содержимое таблицы (fixed-раскладка, длинные метки) не должно
+   * распирать колонку и выталкивать соседнюю — отсекаем, скролл внутри. */
+  overflow: clip;
+  border-right: 1px solid var(--lnt-line);
+}
+
+.lnt-cat-workspace .col-cat > .panel {
+  flex: 1;
+  min-height: 0;
+  background: var(--lnt-chrome);
+}
+
+.lnt-cat-workspace .col-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.lnt-cat-workspace .col-main > * + * {
+  border-top: 1px solid var(--lnt-line);
+}
+
+/* ── Панели ──────────────────────────────────────────────────────────── */
+
+.lnt-cat-workspace .panel {
+  background: var(--lnt-panel);
+  border: 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lnt-cat-workspace .panel-hd {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-line);
+  flex: none;
+}
+
+.lnt-cat-workspace .panel-title {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  margin: 0;
+}
+
+.lnt-cat-workspace .panel-bd {
+  padding: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lnt-cat-workspace .panel-bd.is-bare {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* ── Типографика .t-* (шкала showcase tokens.css, scope каталога) ─────── */
+
+.lnt-cat-workspace .t-sub {
+  font: 600 14px / 18px var(--lnt-ui);
+  margin: 0;
+  color: var(--lnt-text);
+}
+
+.lnt-cat-workspace .t-body {
+  font: 400 14px / 20px var(--lnt-ui);
+  margin: 0;
+  color: var(--lnt-text);
+}
+
+.lnt-cat-workspace .t-compact {
+  font: 400 12px / 16px var(--lnt-ui);
+  font-variant-numeric: tabular-nums lining-nums;
+  margin: 0;
+  color: var(--lnt-text-sec);
+}
+
+.lnt-cat-workspace .t-mono {
+  font: 400 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  margin: 0;
+  color: var(--lnt-text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 1000px) {
+  .lnt-cat-workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(320px, 1fr) auto;
+    overflow-y: auto;
+  }
+
+  .lnt-cat-workspace .col-cat {
+    border-right: 0;
+    border-bottom: 1px solid var(--lnt-line);
+    /* overflow-clip держим и в стопке: таблица скроллится внутри .tbl-wrap,
+     * иначе длинные метки выталкивают соседнюю колонку (spill T5). */
+    overflow: clip;
+  }
+}
+
+/* Узкий вьюпорт (375px → колонка ~336px): фиксированные 158+104+64 душат
+ * метку до ~10px. Таблица едет горизонтально внутри .tbl-wrap, страница
+ * не скроллится. */
+@media (max-width: 520px) {
+  .lnt-cat-workspace .cat-v6 .tbl-cat {
+    table-layout: auto;
+    min-width: 480px;
+  }
+
+  .lnt-cat-workspace .cat-v6 .tbl-cat tr > :first-child,
+  .lnt-cat-workspace .cat-v6 .tbl-cat tr > :nth-child(3),
+  .lnt-cat-workspace .cat-v6 .tbl-cat tr > :nth-child(4) {
+    width: auto;
+  }
+}
+
+/* Диалоги (overlay в body, вне scope): только сетка величин формы. */
+.lnt-cat-quantity {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}

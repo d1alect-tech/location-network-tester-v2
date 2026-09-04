@@ -1,0 +1,230 @@
+/* Рабочая область «Настройки» (#/settings): блоки (T11: выделено из settings.css).
+ * Баннеры и глифы, тон-полосы диагностики, кадр команды сборника, сетка
+ * приватности, вложенные панели и узкие экраны. Скоуп — .lnt-set-workspace. */
+
+/* ── Баннеры и глифы (kit.css §1.6/§4/§6) ───────────────────────────────── */
+
+.lnt-set-workspace .banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgb(236 91 98 / 0.35);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-err-bg);
+  min-width: 0;
+}
+
+.lnt-set-workspace .banner-msg {
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.lnt-set-workspace .banner .glyph {
+  margin: 0;
+}
+
+.lnt-set-workspace .banner-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.lnt-set-workspace .banner-inline .banner-msg {
+  flex: 1;
+  min-width: 0;
+  color: var(--lnt-text);
+  overflow-wrap: anywhere;
+}
+
+.lnt-set-workspace .banner-glyph {
+  color: var(--lnt-err);
+  font: 600 12px / 16px var(--lnt-ui);
+  flex: none;
+}
+
+.lnt-set-workspace .glyph {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font: 400 14px / 20px var(--lnt-ui);
+  color: var(--lnt-text);
+}
+
+.lnt-set-workspace .glyph-ok {
+  /* Чистый --lnt-ok на --lnt-ok-bg даёт ~3.6:1 — осветляем как в примитивах. */
+  color: color-mix(in srgb, var(--lnt-ok) 65%, white);
+}
+
+:root[data-theme="light"] .lnt-set-workspace .glyph-ok {
+  color: var(--lnt-ok);
+}
+
+.lnt-set-workspace .glyph-warn {
+  color: var(--lnt-warn);
+}
+
+.lnt-set-workspace .glyph-err {
+  color: var(--lnt-err);
+}
+
+/* Тон-полоса устройства: была 4px слева на голом div — теперь баннерные 3px. */
+.lnt-set-workspace .lnt-set-tone-ok {
+  border-left-color: var(--lnt-ok);
+  background-color: var(--lnt-ok-bg);
+}
+
+.lnt-set-workspace .lnt-set-tone-ok .banner-glyph {
+  color: var(--lnt-ok);
+}
+
+.lnt-set-workspace .lnt-set-tone-warn {
+  border-left-color: var(--lnt-warn);
+  background-color: var(--lnt-warn-bg);
+}
+
+.lnt-set-workspace .lnt-set-tone-warn .banner-glyph {
+  color: var(--lnt-warn);
+}
+
+.lnt-set-workspace .lnt-set-tone-info {
+  border-left-color: var(--lnt-accent);
+  background-color: var(--lnt-elev);
+}
+
+.lnt-set-workspace .lnt-set-tone-info .banner-glyph {
+  color: var(--lnt-text-sec);
+}
+
+.lnt-set-workspace .lnt-set-ready-ok {
+  border-left-color: var(--lnt-ok);
+  background-color: var(--lnt-ok-bg);
+}
+
+.lnt-set-workspace .lnt-set-ready-ok .banner-glyph {
+  color: var(--lnt-ok);
+}
+
+.lnt-set-workspace .lnt-set-ready-blocked {
+  border-left-color: var(--lnt-warn);
+  background-color: var(--lnt-warn-bg);
+}
+
+.lnt-set-workspace .lnt-set-ready-blocked .banner-glyph {
+  color: var(--lnt-warn);
+}
+
+.lnt-set-workspace .lnt-set-preflight-findings {
+  margin: 0;
+  padding-left: 4px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lnt-set-workspace .lnt-set-preflight-findings .glyph {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* ── Команда сборника: моноширинный кадр (kit.css .frame) ───────────────── */
+
+.lnt-set-workspace .frame {
+  background: var(--lnt-canvas);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  padding: 8px 12px;
+  min-width: 0;
+}
+
+.lnt-set-workspace .lnt-set-command {
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lnt-set-workspace .lnt-set-honest-note {
+  font-weight: var(--lnt-weight-medium, 500);
+}
+
+.lnt-set-workspace .lnt-set-flags,
+.lnt-set-workspace .lnt-set-contents,
+.lnt-set-workspace .lnt-set-recipes {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lnt-set-workspace .lnt-set-root-value {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* ── Приватность: пары ключ/деталь сеткой показаний ─────────────────────── */
+
+.lnt-set-workspace .lnt-set-privacy-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lnt-set-workspace .readout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 4px 0 0;
+}
+
+.lnt-set-workspace .readout-label {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-dim);
+  overflow-wrap: anywhere;
+}
+
+.lnt-set-workspace .readout-grid dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Вложенные панели диагностики живут в теле родителя без внешней рамки. */
+.lnt-set-workspace .panel-bd > .panel {
+  border-left: 0;
+  border-right: 0;
+}
+
+.lnt-set-workspace .panel-bd > .panel:first-child {
+  border-top: 0;
+}
+
+.lnt-set-workspace .panel-bd > .panel:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 767px) {
+  .lnt-set-workspace .readout-grid {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .lnt-set-workspace .readout-grid dd {
+    margin-bottom: 8px;
+  }
+
+  .lnt-set-workspace .panel-bd {
+    padding: 8px;
+  }
+}

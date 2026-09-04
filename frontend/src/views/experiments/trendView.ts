@@ -1,11 +1,14 @@
 /** Тренды и продольные ряды (todo 43): описательный запрос /trends/query,
  * uPlot-график наблюдений, панели смешивающих факторов и пропусков.
- * Результат сервера — descriptive_exploratory: причинность исключена. */
+ * Результат сервера — descriptive_exploratory: причинность исключена.
+ * T11: панели смешивающих факторов и маркировки — в trendPanels. */
 
 import type { LntApiClient } from "../../api/client";
 import type { ObservationInput, TrendAnalysisResult } from "../../api/types-research";
 import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
+import type { ConfoundItem } from "./trendPanels";
+import { renderConfoundPanel, renderLimitationsPanel } from "./trendPanels";
 
 export interface TrendOptions {
   client: Pick<LntApiClient, "research">;
@@ -41,12 +44,12 @@ export class TrendView {
     this.client = options.client;
     this.valueSource = options.valueSource ?? null;
     this.minNInput = el("input", {
-      className: "lnt-input",
+      className: "lnt-input ctl",
       attrs: { type: "number", id: "lnt-trend-minn", "aria-label": "Минимальный N тренда" },
     });
     this.minNInput.value = "3";
     const runButton = el("button", {
-      className: "lnt-btn lnt-btn-primary",
+      className: "lnt-btn lnt-btn-primary btn",
       text: "Выполнить описательный запрос",
       attrs: { type: "button", id: "lnt-exp-run-trend" },
     });
@@ -61,12 +64,17 @@ export class TrendView {
         className: "lnt-helper-text",
         text: "Когортные и продольные ряды — только описательно (descriptive_exploratory). Связь ≠ причина.",
       }),
-      el("div", { className: "lnt-exp-actions" }, [
-        el("label", { className: "lnt-field-inline" }, [
-          el("span", { className: "lnt-label-text", text: "Минимальный N" }),
-          this.minNInput,
+      el("div", { className: "lnt-exp-actions cmdbar" }, [
+        el("div", { className: "cmd-fields" }, [
+          el("label", { className: "lnt-field-inline field cmd-field" }, [
+            el("span", {
+              className: "lnt-label-text field-label cmd-label",
+              text: "Минимальный N",
+            }),
+            this.minNInput,
+          ]),
         ]),
-        runButton,
+        el("div", { className: "cmd-actions" }, [runButton]),
       ]),
       this.resultHost,
     ]);
@@ -156,12 +164,12 @@ export class TrendView {
         ? "Мало данных: результат ограничен, интерпретация неустойчива."
         : "Достаточно данных для описательной сводки.";
     const banner = el("p", {
-      className: `lnt-exp-banner ${meta.n < Math.max(minimumN, 5) ? "lnt-exp-banner-warn" : "lnt-exp-banner-info"}`,
+      className: `lnt-exp-banner ${meta.n < Math.max(minimumN, 5) ? "lnt-exp-banner-warn" : "lnt-exp-banner-info"} banner banner-inline`,
       attrs: { role: "status" },
       text: status,
     });
 
-    const grid = el("dl", { className: "lnt-exp-result-grid" });
+    const grid = el("dl", { className: "lnt-exp-result-grid meter-grid" });
     const pairs: [string, string][] = [
       ["Единицы", meta.units],
       ["Рецепт (estimator)", `${meta.estimator} · описательный`],
@@ -178,7 +186,12 @@ export class TrendView {
       );
     }
     for (const [term, definition] of pairs) {
-      grid.append(el("dt", { text: term }), el("dd", { text: definition }));
+      grid.append(
+        el("div", { className: "kpi" }, [
+          el("dt", { className: "meter-label", text: term }),
+          el("dd", { className: "meter-value t-mono", text: definition }),
+        ]),
+      );
     }
 
     const trendsList = el("ul", {
@@ -202,63 +215,19 @@ export class TrendView {
       grid,
       el("h3", { className: "lnt-exp-subtitle", text: "Средние по группам (описательные)" }),
       trendsList,
-      this.confoundPanel(),
-      this.limitationsPanel(meta),
+      renderConfoundPanel([]),
+      renderLimitationsPanel(meta),
     );
   }
 
   /** Панель смешивающих факторов из confound_checklist эксперимента. */
-  renderConfoundChecklist(
-    checklist: { key: string; checked: boolean; note?: string | null }[],
-  ): void {
+  renderConfoundChecklist(checklist: ConfoundItem[]): void {
     const host = this.root.querySelector(".lnt-exp-confound-host");
     host?.remove();
     if (checklist.length === 0) {
       return;
     }
-    this.root.append(this.confoundPanel(checklist));
-  }
-
-  private confoundPanel(
-    checklist?: { key: string; checked: boolean; note?: string | null }[],
-  ): HTMLElement {
-    const items = checklist ?? this.readConfoundFromRoot();
-    const panel = el("section", { className: "lnt-exp-confound lnt-exp-confound-host" });
-    panel.append(el("h3", { className: "lnt-exp-subtitle", text: "Смешивающие факторы" }));
-    if (items.length === 0) {
-      panel.append(
-        el("p", { className: "lnt-helper-text", text: "Чек-лист смешивающих факторов пуст." }),
-      );
-      return panel;
-    }
-    const list = el("ul", { className: "lnt-exp-limitations" });
-    for (const item of items) {
-      list.append(
-        el("li", {
-          text: `${item.key}: ${item.checked ? "проверен" : "НЕ проверен"}${item.note ? ` — ${item.note}` : ""}${item.checked ? "" : " · неконтролируемый смешивающий фактор делает связь неинтерпретируемой"}`,
-        }),
-      );
-    }
-    panel.append(list);
-    return panel;
-  }
-
-  private readConfoundFromRoot(): { key: string; checked: boolean; note?: string | null }[] {
-    return [];
-  }
-
-  private limitationsPanel(meta: TrendAnalysisResult["metadata"]): HTMLElement {
-    return el("div", { className: "lnt-exp-provenance" }, [
-      el("h4", { className: "lnt-exp-provenance-title", text: "Маркировка результата" }),
-      el("p", {
-        className: "lnt-exp-meta-line",
-        text: `Описательный разведочный анализ (exploratory). Единицы: ${meta.units} · N=${String(meta.n)}. Ранговые связи — корреляции, НЕ причинные эффекты.`,
-      }),
-      el("p", {
-        className: "lnt-exp-meta-line",
-        text: "Недостающие данные показаны как «недоступно» с кодом причины и никогда не восполняются вымыслом.",
-      }),
-    ]);
+    this.root.append(renderConfoundPanel(checklist));
   }
 
   private showBanner(message: string, tone: "ok" | "warn" | "error"): void {
@@ -266,7 +235,7 @@ export class TrendView {
     existing?.remove();
     this.resultHost.before(
       el("p", {
-        className: `lnt-exp-banner lnt-exp-banner-${tone} lnt-exp-trend-status`,
+        className: `lnt-exp-banner lnt-exp-banner-${tone} lnt-exp-trend-status banner banner-inline`,
         attrs: tone === "error" ? { role: "alert" } : { role: "status" },
         text: message,
       }),

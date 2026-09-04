@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-/** E2E W1 inspect chrome: measurement artifacts vs v1-only banner.
+/** E2E W1 inspect chrome inside V6 extras: measurement artifacts vs v1-only banner.
+ * #/inspect mounts .app-v6; W1 lives in collapsed details[data-extra=w1].
  * API подменяется page.route как в spectrogram.spec.ts. */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -14,6 +15,11 @@ const BANNER =
   "Расширенный анализ (ITIC, гармоники, APD…) для этой сессии не записан. Метрики и спектр v1 на месте.";
 const CTA = "Пересчитать анализ (v2)";
 const ARTIFACT_KEY = "art-meas";
+const SPECTRUM = {
+  frequency_hz: [10, 100, 1000],
+  psd_v2_per_hz: [1e-6, 1e-4, 1e-2],
+  point_count: 3,
+};
 
 function readFixture(rel: string): string {
   return fs.readFileSync(path.join(FIXTURES, rel), "utf8");
@@ -63,6 +69,29 @@ async function mockSessionDetail(page: Page, id: string, metricsRel: string): Pr
   await page.route(`**/api/sessions/${id}`, (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body }),
   );
+  await mockSpectrum(page, id);
+}
+
+async function mockSpectrum(page: Page, id: string): Promise<void> {
+  await page.route(`**/api/sessions/${id}/spectrum?*`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(SPECTRUM),
+    }),
+  );
+}
+
+async function openW1Chrome(page: Page, id: string): Promise<void> {
+  await page.goto(INSPECT);
+  await expect(page.locator(".app-v6")).toBeVisible();
+  await page.locator(".v6-extras details[data-extra='w1'] summary").click();
+  await page.selectOption('select[aria-label="Сессия инспекции"]', id);
+}
+
+async function expectNoErrorBand(page: Page): Promise<void> {
+  const band = page.locator(".app-v6 .banner-inline");
+  if ((await band.count()) > 0) await expect(band).not.toBeVisible();
 }
 
 test("measurement fixtures: THD verdict and four scalars, no banner, no eight panels", async ({
@@ -101,8 +130,7 @@ test("measurement fixtures: THD verdict and four scalars, no banner, no eight pa
   }
 
   // When
-  await page.goto(INSPECT);
-  await page.selectOption('select[aria-label="Сессия инспекции"]', "t1-measurement");
+  await openW1Chrome(page, "t1-measurement");
 
   // Then: verdict + four scalars; no missing-artifact banner; no eight hollow panels.
   const chrome = page.locator(".lnt-w1-chrome");
@@ -114,6 +142,7 @@ test("measurement fixtures: THD verdict and four scalars, no banner, no eight pa
   await expect(chrome.getByText("σ_pk/μ_pk", { exact: true })).toBeVisible();
   await expect(chrome.locator("[data-scalar]")).toHaveCount(4);
   await expect(page.getByText(BANNER)).toHaveCount(0);
+  await expectNoErrorBand(page);
 });
 
 test("v1-only: exact Russian banner and CTA, no fake 0 scalars", async ({ page }) => {
@@ -136,8 +165,7 @@ test("v1-only: exact Russian banner and CTA, no fake 0 scalars", async ({ page }
   );
 
   // When
-  await page.goto(INSPECT);
-  await page.selectOption('select[aria-label="Сессия инспекции"]', "t1-v1-only");
+  await openW1Chrome(page, "t1-v1-only");
 
   // Then
   const chrome = page.locator(".lnt-w1-chrome");
@@ -149,4 +177,5 @@ test("v1-only: exact Russian banner and CTA, no fake 0 scalars", async ({ page }
   await expect(chrome.getByText("Burst Count", { exact: true })).toHaveCount(0);
   await expect(chrome.locator('[data-scalar="burst-count"]')).toHaveCount(0);
   await expect(chrome.locator(".lnt-w1-panel")).toHaveCount(0);
+  await expectNoErrorBand(page);
 });

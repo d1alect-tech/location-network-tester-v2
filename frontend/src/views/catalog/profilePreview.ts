@@ -1,6 +1,7 @@
-/** Предпросмотр снимка профиля: показывает ТОЧНО те данные выбранных
- * профилей (id, revision, время, поля), которые сохранит захват при этой
- * комбинации. Никаких вычислений «от себя» — только контракт ProfileRevision. */
+/** Предпросмотр снимка профиля V6: контейнер .frame, типографика .t-*.
+ * Показывает ТОЧНО те данные выбранных профилей (id, revision, время, поля),
+ * которые сохранит захват при этой комбинации. Никаких вычислений «от себя» —
+ * только контракт ProfileRevision. Сигнатура без изменений. */
 
 import type { ProfileKind, ProfileRevision } from "../../api/types";
 import { el } from "../../components/primitives/dom";
@@ -29,24 +30,24 @@ export function createProfilePreview(): {
   root: HTMLElement;
   setCombination(combination: ProfileCombination): void;
 } {
-  const host = el("div", { className: "lnt-cat-preview" });
-  const root = el("section", { className: "lnt-cat-preview-panel" }, [
+  const host = el("div", {});
+  const root = el("section", { className: "frame" }, [
     el("h4", {
-      className: "lnt-cat-preview-title",
+      className: "t-sub",
       text: "Снимок, который сохранит захват при текущей комбинации профилей",
     }),
     host,
   ]);
 
   function renderProfile(profile: ProfileRevision): HTMLElement {
-    const box = el("div", { className: "lnt-cat-preview-item" });
+    const box = el("div", {});
     const lines = formatSnapshotLine(profile);
-    box.append(el("p", { className: "lnt-mono", text: `[${lines[0] ?? ""}]` }));
+    box.append(el("p", { className: "t-mono", text: `[${lines[0] ?? ""}]` }));
     for (const line of lines.slice(1)) {
-      box.append(el("p", { className: "lnt-mono lnt-cat-preview-line", text: line }));
+      box.append(el("p", { className: "t-mono", text: line }));
     }
     // Данные профиля — дословно, как их хранит захват.
-    const pre = el("pre", { className: "lnt-mono lnt-cat-preview-json" });
+    const pre = el("pre", { className: "t-mono cat-preview-json" });
     pre.textContent = JSON.stringify(profile.data, null, 2);
     box.append(pre);
     return box;
@@ -62,7 +63,7 @@ export function createProfilePreview(): {
       if (chosen.length === 0) {
         host.append(
           el("p", {
-            className: "lnt-table-note",
+            className: "t-compact",
             text: "Профили не выбраны — снимок будет пустым. Выберите по одному профилю каждого вида.",
           }),
         );

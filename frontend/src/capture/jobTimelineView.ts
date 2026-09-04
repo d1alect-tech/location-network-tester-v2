@@ -31,30 +31,30 @@ export interface TimelineViewHandle {
 
 export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandle {
   const progress = createJobProgress();
-  const statusLine = el("p", { className: "capture-job-status" });
-  const stageLine = el("p", { className: "capture-job-stage" });
-  const seriesLine = el("p", { className: "capture-job-series" });
+  const statusLine = el("p", { className: "capture-job-status t-compact" });
+  const stageLine = el("p", { className: "capture-job-stage t-compact" });
+  const seriesLine = el("p", { className: "capture-job-series t-compact" });
   seriesLine.hidden = true;
   const connectionLine = el("p", {
-    className: "capture-job-connection",
+    className: "capture-job-connection t-compact",
     text: "Связь с задачей прервана, ожидаем восстановление…",
     attrs: { role: "status" },
   });
   connectionLine.hidden = true;
   const writtenWrap = el("div", { className: "capture-job-written" });
   const recoveryBanner = el("div", {
-    className: "capture-recovery-banner",
+    className: "capture-recovery-banner banner banner-inline banner-warn",
     attrs: { role: "alert" },
   });
   recoveryBanner.hidden = true;
 
   const cancelButton = el("button", {
-    className: "lnt-btn",
+    className: "lnt-btn btn-secondary",
     text: "Отменить после текущей сессии",
     attrs: { type: "button" },
   }) as HTMLButtonElement;
   const retryButton = el("button", {
-    className: "lnt-btn",
+    className: "lnt-btn btn-quiet",
     text: "Повторить задачу",
     attrs: { type: "button" },
   }) as HTMLButtonElement;
@@ -94,9 +94,11 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
 
   const root = el(
     "section",
-    { className: "capture-timeline", attrs: { "aria-label": "Хронология задачи" } },
+    { className: "capture-timeline panel", attrs: { "aria-label": "Хронология задачи" } },
     [
-      el("h3", { className: "capture-section-title", text: "Активная задача" }),
+      el("div", { className: "panel-hd" }, [
+        el("h3", { className: "capture-section-title panel-title", text: "Активная задача" }),
+      ]),
       recoveryBanner,
       connectionLine,
       statusLine,
@@ -104,7 +106,7 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
       seriesLine,
       progress.root,
       writtenWrap,
-      el("div", { className: "capture-job-actions" }, [cancelButton, retryButton]),
+      el("div", { className: "capture-job-actions statusbar" }, [cancelButton, retryButton]),
     ],
   );
 
@@ -161,7 +163,7 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
             "ul",
             { className: "capture-written-list" },
             snapshot.written_sessions.map((name) =>
-              el("li", { className: "capture-written-item lnt-mono", text: name }),
+              el("li", { className: "capture-written-item lnt-mono cell-wrap", text: name }),
             ),
           ),
         );
@@ -173,6 +175,7 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
         while (recoveryBanner.firstChild) recoveryBanner.removeChild(recoveryBanner.firstChild);
         recoveryBanner.append(
           el("p", {
+            className: "banner-msg",
             text: "Задача была прервана из-за перезапуска сервера. Данные сохранены частично.",
           }),
           el("p", {

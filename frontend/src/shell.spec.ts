@@ -18,19 +18,17 @@ test("AppShell loads offline with zero non-loopback requests", async ({ page }) 
   // Verify the app shell title is correct
   await expect(page).toHaveTitle("LNT v2 Workbench");
   await expect(page).toHaveURL("http://127.0.0.1:4101/static/v2/#/catalog");
-  await expect(page.locator(".placeholder-title")).toHaveText("Каталог");
+  await expect(page.locator(".lnt-cat-workspace")).toBeVisible();
 
-  // Verify navigation links exist
-  const navLinks = page.locator(".nav-link");
-  await expect(navLinks).toHaveCount(7);
-
-  // Verify we can navigate to different views
+  // Verify we can navigate to different views via stable nav ids.
   await page.click("#nav-capture");
   // Todo 40: раздел «Захват» рендерит полный рабочий процесс вместо заглушки.
   await expect(page.locator(".view-title")).toHaveText("Захват");
 
   await page.click("#nav-inspect");
-  await expect(page.locator(".placeholder-title")).toHaveText("Инспекция");
+  await expect(page.locator(".app-v6")).toBeVisible();
+  await expect(page.locator("header.hdr")).toBeVisible();
+  await expect(page.locator(".app-header")).toHaveCount(0);
 
   // Verify error boundary works
   // Navigate to experiments with trigger-error query param
@@ -45,7 +43,7 @@ test("AppShell loads offline with zero non-loopback requests", async ({ page }) 
   await page.click("#btn-recover");
   // Wait for the URL to change back to catalog
   await expect(page).toHaveURL("http://127.0.0.1:4101/static/v2/#/catalog");
-  await expect(page.locator(".placeholder-title")).toHaveText("Каталог");
+  await expect(page.locator(".lnt-cat-workspace")).toBeVisible();
 
   // Assert zero non-loopback requests
   expect(nonLoopbackRequests).toEqual([]);

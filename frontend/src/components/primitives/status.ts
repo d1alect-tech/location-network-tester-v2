@@ -38,7 +38,7 @@ export interface JobProgressHandle {
 export function createJobProgress(): JobProgressHandle {
   const bar = el("div", {
     className: "lnt-progress-bar",
-    attrs: { role: "progressbar", "aria-valuemin": "0" },
+    attrs: { role: "progressbar", "aria-label": "Прогресс задачи", "aria-valuemin": "0" },
   });
   const text = el("span", { className: "lnt-progress-text" });
   const root = el("div", { className: "lnt-progress" }, [bar, text]);

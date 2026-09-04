@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-/** E2E Batch 2–6 progressive disclosure: mount only when the artifact exists.
+/** E2E Batch 2–6 progressive disclosure inside V6 extras: mount only when the artifact exists.
+ * #/inspect mounts .app-v6; W1 lives in collapsed details[data-extra=w1].
  * API подменяется page.route как в spectrogram.spec.ts / w1Chrome.spec.ts. */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -13,6 +14,11 @@ const INSPECT = "http://127.0.0.1:4101/static/v2/#/inspect";
 const BANNER =
   "Расширенный анализ (ITIC, гармоники, APD…) для этой сессии не записан. Метрики и спектр v1 на месте.";
 const ARTIFACT_KEY = "art-meas";
+const SPECTRUM = {
+  frequency_hz: [10, 100, 1000],
+  psd_v2_per_hz: [1e-6, 1e-4, 1e-2],
+  point_count: 3,
+};
 const HARMONICS_LABEL = "CH1 HF plane, calibration_used=false, compare deltas";
 const MEASUREMENT_PANELS = ["harmonics", "notching", "apd", "burst", "trends", "audio"] as const;
 
@@ -59,11 +65,22 @@ async function mockCatalog(page: Page, id: string, sessionType: string): Promise
   );
 }
 
+async function mockSpectrum(page: Page, id: string): Promise<void> {
+  await page.route(`**/api/sessions/${id}/spectrum?*`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(SPECTRUM),
+    }),
+  );
+}
+
 async function mockSessionDetail(page: Page, id: string, metricsRel: string): Promise<void> {
   const body = JSON.stringify(detail(id, readFixture(metricsRel)));
   await page.route(`**/api/sessions/${id}`, (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body }),
   );
+  await mockSpectrum(page, id);
 }
 
 async function mockPointer(page: Page, id: string): Promise<void> {
@@ -99,7 +116,14 @@ async function mockArtifacts(
 
 async function openInspect(page: Page, id: string): Promise<void> {
   await page.goto(INSPECT);
+  await expect(page.locator(".app-v6")).toBeVisible();
+  await page.locator(".v6-extras details[data-extra='w1'] summary").click();
   await page.selectOption('select[aria-label="Сессия инспекции"]', id);
+}
+
+async function expectNoErrorBand(page: Page): Promise<void> {
+  const band = page.locator(".app-v6 .banner-inline");
+  if ((await band.count()) > 0) await expect(band).not.toBeVisible();
 }
 
 function panel(page: Page, kind: string) {
@@ -140,6 +164,7 @@ test("measurement fixtures: Batch 2-6 disclosure present, ITIC and CM/DM absent,
   await expect(panel(page, "notching").locator("table")).toHaveCount(0);
   await panel(page, "notching").locator("summary").click();
   await expect(panel(page, "notching").locator("table")).toHaveCount(1);
+  await expectNoErrorBand(page);
 });
 
 test("line_quality fixtures: ITIC disclosure present", async ({ page }) => {
@@ -158,6 +183,7 @@ test("line_quality fixtures: ITIC disclosure present", async ({ page }) => {
   await expect(panel(page, "itic")).toHaveCount(1);
   await expect(panel(page, "itic")).not.toHaveAttribute("open");
   await expect(panel(page, "cm_dm")).toHaveCount(0);
+  await expectNoErrorBand(page);
 });
 
 test("cm_dm fixtures: CM/DM disclosure present", async ({ page }) => {
@@ -176,6 +202,7 @@ test("cm_dm fixtures: CM/DM disclosure present", async ({ page }) => {
   await expect(panel(page, "cm_dm")).toHaveCount(1);
   await expect(panel(page, "cm_dm")).not.toHaveAttribute("open");
   await expect(panel(page, "itic")).toHaveCount(0);
+  await expectNoErrorBand(page);
 });
 
 test("v1-only: T6 banner still, no hollow panels", async ({ page }) => {
@@ -207,4 +234,5 @@ test("v1-only: T6 banner still, no hollow panels", async ({ page }) => {
   await expect(panel(page, "harmonics")).toHaveCount(0);
   await expect(panel(page, "itic")).toHaveCount(0);
   await expect(panel(page, "cm_dm")).toHaveCount(0);
+  await expectNoErrorBand(page);
 });

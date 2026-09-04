@@ -6,9 +6,9 @@ import { buildJobRequest, validateCaptureForm } from "./modes";
 import type { CaptureFormValues, CaptureModeDef, CaptureSource } from "./modes";
 
 function row(term: string, value: string): HTMLElement {
-  return el("div", { className: "capture-preview-row" }, [
-    el("dt", { className: "capture-preview-term", text: term }),
-    el("dd", { className: "capture-preview-value", text: value }),
+  return el("div", { className: "capture-preview-row readout-cell" }, [
+    el("dt", { className: "capture-preview-term readout-label", text: term }),
+    el("dd", { className: "capture-preview-value readout-value", text: value }),
   ]);
 }
 
@@ -21,7 +21,7 @@ export function renderProfilePreview(
   source: CaptureSource,
 ): void {
   const { valid } = validateCaptureForm(values);
-  const list = el("dl", { className: "capture-preview-list" });
+  const list = el("dl", { className: "capture-preview-list readout-grid" });
   list.append(
     row("Источник", source === "simulator" ? "Симулятор (синтетика)" : "Осциллограф Hantek 6022BE"),
   );
@@ -32,7 +32,7 @@ export function renderProfilePreview(
   if (valid === null) {
     list.append(row("Параметры записи", "исправьте ошибки формы"));
     clearAndAppend(container, [
-      el("h3", { className: "capture-section-title", text: "Профиль записи" }),
+      el("h3", { className: "capture-section-title panel-title", text: "Профиль записи" }),
       list,
     ]);
     return;
@@ -63,12 +63,12 @@ export function renderProfilePreview(
   // Точная форма запроса — то же, что уйдёт в POST /api/jobs.
   const request = buildJobRequest(mode, valid, source);
   const requestLine = el("p", {
-    className: "capture-preview-request",
+    className: "capture-preview-request cell-wrap",
     text: `POST /api/jobs → kind: ${request.kind}${source === "device" ? `, input: ${mode.input}` : ""}`,
   });
 
   clearAndAppend(container, [
-    el("h3", { className: "capture-section-title", text: "Профиль записи" }),
+    el("h3", { className: "capture-section-title panel-title", text: "Профиль записи" }),
     list,
     requestLine,
   ]);

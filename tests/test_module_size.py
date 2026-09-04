@@ -33,15 +33,13 @@ _GRANDFATHERED: Final[dict[str, int]] = {
     "src/lnt/runtime/store.py": 261,
     "src/lnt/experiments/runner.py": 257,
     # Фронтенд Todo 44 (замороженные экраны после visual-QA).
-    "frontend/src/views/experiments/comparisonView.ts": 393,
+    # T11-доб: comparisonView (393→246), profileManager (305→154),
+    # experimentsWorkspace (297→232), hypothesisView (284→100) и
+    # trendView (255→227) разбиты и сняты с дедлайна.
     "frontend/src/api/client-research.ts": 337,
     "frontend/src/components/charts/workbench.ts": 306,
-    "frontend/src/views/catalog/profileManager.ts": 305,
-    "frontend/src/views/experiments/experimentsWorkspace.ts": 297,
     "frontend/src/components/charts/spectrogramPanel.ts": 288,
-    "frontend/src/views/experiments/hypothesisView.ts": 284,
     "frontend/src/components/charts/spectrogramView.ts": 269,
-    "frontend/src/views/experiments/trendView.ts": 255,
 }
 
 _PY_GLOBS: Final = ("src/lnt/**/*.py",)

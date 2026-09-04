@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { AppShell, ROUTES } from "./AppShell";
+import { AppShell } from "./AppShell";
 
 /**
  * Базовый характеризационный тест: фиксирует наблюдаемое поведение AppShell.
  * С todo 39 в ROUTES добавлен раздел «Каталог» — ссылок стало семь;
  * остальные гарантии маршрутизации сохранены дословно.
+ * T5: маршрут «Каталог» монтирует настоящий воркспейс (.lnt-cat-workspace),
+ * плейсхолдер-заглушка удалена — фолбэк-тесты следуют новой реальности.
  */
 describe("AppShell (baseline characterization)", () => {
   let container: HTMLElement;
@@ -18,15 +20,14 @@ describe("AppShell (baseline characterization)", () => {
     document.body.appendChild(container);
   });
 
-  it("renders seven navigation links matching ROUTES", () => {
+  it("renders six navigation links matching V6 tabbar", () => {
     const shell = new AppShell(container);
     shell.init();
-    const links = container.querySelectorAll<HTMLAnchorElement>(".nav-link");
-    expect(links.length).toBe(Object.keys(ROUTES).length);
-    expect(links.length).toBe(7);
-    expect(container.querySelector("#nav-capture")?.textContent).toBe("Захват");
-    expect(container.querySelector("#nav-catalog")?.textContent).toBe("Каталог");
-    expect(links[0]?.getAttribute("href")).toBe("#/prepare");
+    const links = container.querySelectorAll<HTMLAnchorElement>(".snav-item");
+    expect(links.length).toBe(6);
+    expect(container.querySelector("#nav-capture")).not.toBeNull();
+    expect(container.querySelector("#nav-catalog")).not.toBeNull();
+    expect(links[0]?.href).toMatch(/#\/catalog$/);
   });
 
   it("renders the route view synchronously for a preset hash", () => {
@@ -37,7 +38,7 @@ describe("AppShell (baseline characterization)", () => {
     // вместо заглушки (базлайн зафиксирован зелёным до изменений).
     expect(container.querySelector(".capture-view")).not.toBeNull();
     expect(container.querySelector(".view-title")?.textContent).toBe("Захват");
-    const active = container.querySelector(".nav-link.active");
+    const active = container.querySelector('[aria-current="page"]');
     expect(active?.getAttribute("data-route")).toBe("capture");
   });
 
@@ -48,14 +49,14 @@ describe("AppShell (baseline characterization)", () => {
       setTimeout(resolve, 0);
     });
     expect(window.location.hash).toBe("#/catalog");
-    expect(container.querySelector(".placeholder-title")?.textContent).toBe("Каталог");
+    expect(container.querySelector(".lnt-cat-workspace")).not.toBeNull();
   });
 
   it("falls back to the default view for an unknown route and keeps the hash", () => {
     window.location.hash = "#/unknown";
     const shell = new AppShell(container);
     shell.init();
-    expect(container.querySelector(".placeholder-title")?.textContent).toBe("Каталог");
+    expect(container.querySelector(".lnt-cat-workspace")).not.toBeNull();
     expect(window.location.hash).toBe("#/unknown");
   });
 

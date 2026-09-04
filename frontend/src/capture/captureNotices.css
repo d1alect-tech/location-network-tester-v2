@@ -1,0 +1,157 @@
+/* T11: баннеры, устройство — выделено из capture.css. */
+/* ── Баннеры ошибок/предупреждений (kit .banner, полоса .banner-inline) ─── */
+
+.capture-view .banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgb(236 91 98 / 0.35);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-err-bg);
+  min-width: 0;
+}
+
+.capture-view .banner-msg {
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Инлайн-полоса по витрине (variantV6.css): без фона, верхняя линия +
+ * тон-полоса 3px слева. Контент с кнопками переносится — min-height. */
+.capture-view .banner-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--lnt-line);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: 0;
+}
+
+.capture-view .banner-inline .banner-msg {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Тон ошибки (сейчас) — класс заложен явно; warn-тон едет в T10 (D4=A). */
+.capture-view .banner-err {
+  border-left-color: var(--lnt-err);
+}
+
+.capture-view .banner-warn {
+  border: 1px solid rgb(230 134 25 / 0.35);
+  border-left: 3px solid var(--lnt-warn);
+  background: var(--lnt-warn-bg);
+}
+
+/* Тон-подсказка: акцентная полоса на хроме (токена info в витрине нет). */
+.capture-view .banner-info {
+  border: 1px solid rgb(86 129 255 / 0.35);
+  border-left: 3px solid var(--lnt-accent);
+  background: var(--lnt-chrome);
+}
+
+.capture-view .banner-inline.banner-warn {
+  border-left-color: var(--lnt-warn);
+}
+
+.capture-view .banner-inline.banner-info {
+  border-left-color: var(--lnt-accent);
+}
+
+/* Совместимость старого алёрта (e2e-пин .capture-alert, role=alert живёт). */
+.capture-view .capture-alert {
+  font-size: 13px;
+  color: var(--lnt-text);
+  margin: 12px 0 0;
+}
+
+/* ── Устройство и preflight: пилюли-glyph + карточки замечаний ─────────── */
+
+.capture-view .capture-device-line {
+  margin: 0 0 8px;
+}
+
+.capture-view .capture-device-desc {
+  font-size: 14px;
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.capture-view .capture-device-action,
+.capture-view .capture-finding-action {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lnt-text-sec);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.capture-view .capture-finding {
+  border: 1px solid var(--lnt-line);
+  border-left: 3px solid var(--lnt-warn);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  padding: 8px 12px;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.capture-view .capture-finding-message {
+  margin: 4px 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.capture-view .capture-preflight-summary,
+.capture-view .capture-preflight-ok {
+  font-size: 13px;
+  margin: 8px 0 0;
+  color: var(--lnt-text-sec);
+  overflow-wrap: anywhere;
+}
+
+.capture-view .capture-job-connection {
+  color: var(--lnt-accent);
+}
+
+.capture-view button[aria-disabled="true"] {
+  opacity: 0.6;
+}
+
+.capture-view .capture-written-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.capture-view .capture-written-item {
+  font-family: var(--lnt-mono);
+  font-size: 13px;
+}
+
+.capture-view .lnt-mono {
+  font-family: var(--lnt-mono);
+}
+
+.capture-view .capture-recovery-banner {
+  margin-bottom: 0;
+}
+
+.capture-view .capture-recovery-banner p {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+
+.capture-view .capture-recovery-banner p:last-child {
+  margin-bottom: 0;
+}

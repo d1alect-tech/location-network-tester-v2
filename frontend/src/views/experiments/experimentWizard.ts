@@ -47,18 +47,23 @@ export class ExperimentWizard {
       PLANS.map((kind) => [kind, protocolLabel(kind)]),
       "aba",
     );
-    const errorLine = el("p", { className: "lnt-error-text", attrs: { role: "alert" } });
+    const errorLine = el("p", {
+      className: "lnt-error-text banner banner-inline",
+      attrs: { role: "alert" },
+    });
     this.sessionListHost = el("div", { className: "lnt-exp-wizard-sessions" });
 
     const form = el("form", { className: "lnt-exp-wizard-form" });
     form.append(
-      planSelect.wrap,
-      idInput.wrap,
-      titleInput.wrap,
-      questionInput.wrap,
-      estimandInput.wrap,
-      unitsInput.wrap,
-      minNInput.wrap,
+      el("div", { className: "form-grid" }, [
+        planSelect.wrap,
+        idInput.wrap,
+        titleInput.wrap,
+        questionInput.wrap,
+        estimandInput.wrap,
+        unitsInput.wrap,
+        minNInput.wrap,
+      ]),
     );
     form.append(
       el("h3", { className: "lnt-exp-subtitle", text: "Сессии и условия" }),
@@ -66,11 +71,17 @@ export class ExperimentWizard {
     );
     form.append(errorLine);
     const submit = el("button", {
-      className: "lnt-btn lnt-btn-primary",
+      className: "lnt-btn lnt-btn-primary btn",
       text: "Создать эксперимент",
       attrs: { type: "submit" },
     });
-    form.append(submit);
+    const cancelButton = el("button", {
+      className: "lnt-btn btn-quiet",
+      text: "Закрыть",
+      attrs: { type: "button", "aria-label": "Закрыть мастер создания" },
+    });
+    cancelButton.addEventListener("click", () => this.root.remove());
+    form.append(el("div", { className: "form-actions cmd-actions" }, [submit, cancelButton]));
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -116,14 +127,26 @@ export class ExperimentWizard {
       this.renderSessions();
     });
 
-    this.root = el("section", { className: "lnt-exp-wizard" }, [
-      el("h2", { className: "placeholder-title", text: "Новый эксперимент" }),
-      el("p", {
-        className: "lnt-helper-text",
-        text: "Мастер создаёт протокол с таймлайном шагов; участники получают условия по вашему назначению.",
-      }),
-      form,
-    ]);
+    // V6-модалка: диалог поверх рабочей области; Esc и кнопка «Закрыть»
+    // выходят без создания (валидация и payload — без изменений).
+    this.root = el(
+      "section",
+      {
+        className: "lnt-exp-wizard wizard-modal modal",
+        attrs: { role: "dialog", "aria-modal": "true", "aria-label": "Новый эксперимент" },
+      },
+      [
+        el("h2", { className: "placeholder-title panel-title", text: "Новый эксперимент" }),
+        el("p", {
+          className: "lnt-helper-text",
+          text: "Мастер создаёт протокол с таймлайном шагов; участники получают условия по вашему назначению.",
+        }),
+        form,
+      ],
+    );
+    this.root.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") this.root.remove();
+    });
     void this.loadSessions();
   }
 
@@ -162,7 +185,7 @@ export class ExperimentWizard {
     }
     for (const session of this.sessions) {
       const select = el("select", {
-        className: "lnt-select",
+        className: "lnt-select ctl",
         attrs: { "aria-label": `Условие сессии ${session.id}` },
       });
       select.append(el("option", { text: "— не участвует —", attrs: { value: "" } }));
@@ -176,9 +199,9 @@ export class ExperimentWizard {
         else this.assignment.set(session.id, select.value);
       });
       this.sessionListHost.append(
-        el("div", { className: "lnt-field-inline" }, [
+        el("div", { className: "lnt-field-inline field" }, [
           el("span", {
-            className: "lnt-label-text",
+            className: "lnt-label-text field-label",
             text: session.label === null ? session.id : `${session.id} · ${session.label}`,
           }),
           select,
@@ -189,11 +212,11 @@ export class ExperimentWizard {
 }
 
 function text(labelText: string, value: string): { wrap: HTMLElement; input: HTMLInputElement } {
-  const input = el("input", { className: "lnt-input", attrs: { type: "text" } });
+  const input = el("input", { className: "lnt-input ctl", attrs: { type: "text" } });
   input.value = value;
-  const label = el("label", { className: "lnt-label", text: labelText });
+  const label = el("label", { className: "lnt-label field-label", text: labelText });
   label.htmlFor = input.id = `wiz-${labelText.replace(/\s+/gu, "-").toLowerCase()}`;
-  return { wrap: el("div", { className: "lnt-field" }, [label, input]), input };
+  return { wrap: el("div", { className: "lnt-field field" }, [label, input]), input };
 }
 
 function numberInput(
@@ -211,13 +234,13 @@ function select(
   options: [string, string][],
   selected?: string,
 ): { wrap: HTMLElement; input: HTMLSelectElement } {
-  const selectEl = el("select", { className: "lnt-select" });
+  const selectEl = el("select", { className: "lnt-select ctl" });
   for (const [value, optionText] of options) {
     const option = el("option", { text: optionText, attrs: { value } });
     if (value === selected) option.selected = true;
     selectEl.append(option);
   }
-  const label = el("label", { className: "lnt-label", text: labelText });
+  const label = el("label", { className: "lnt-label field-label", text: labelText });
   label.htmlFor = selectEl.id = ` wiz-${labelText.replace(/\s+/g, "-").toLowerCase()}`.trimStart();
-  return { wrap: el("div", { className: "lnt-field" }, [label, selectEl]), input: selectEl };
+  return { wrap: el("div", { className: "lnt-field field" }, [label, selectEl]), input: selectEl };
 }

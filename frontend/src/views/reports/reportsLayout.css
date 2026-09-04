@@ -1,0 +1,108 @@
+/* Рабочая область «Отчёты» (#/reports): двухпанельная раскладка по образцу
+ * экспериментов; на узких экранах панели складываются в одну колонку.
+ * T11: выделено из reports.css — kit-подмножество живёт в reportsKit.css. */
+
+.lnt-rep-workspace {
+  display: flex;
+  gap: var(--lnt-space-4);
+  align-items: flex-start;
+}
+
+.lnt-rep-left,
+.lnt-rep-right {
+  min-width: 0;
+}
+
+.lnt-rep-left {
+  flex: 0 0 320px;
+}
+
+.lnt-rep-right {
+  flex: 1 1 auto;
+}
+
+.lnt-rep-detail {
+  margin-top: var(--lnt-space-3);
+}
+
+.lnt-rep-meta {
+  color: var(--lnt-fg-secondary);
+  font-size: 13px;
+  margin: var(--lnt-space-1) 0 var(--lnt-space-3);
+}
+
+.lnt-rep-preview {
+  border-top: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  margin-top: var(--lnt-space-4);
+  padding-top: var(--lnt-space-3);
+}
+
+.lnt-rep-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--lnt-space-1) var(--lnt-space-4);
+  margin: var(--lnt-space-2) 0;
+}
+
+.lnt-rep-grid dt {
+  font-weight: var(--lnt-weight-medium);
+}
+
+.lnt-rep-grid dd {
+  margin: 0;
+}
+
+.lnt-rep-mono {
+  font-family: var(--lnt-font-mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.lnt-rep-planes,
+.lnt-rep-recipes,
+.lnt-rep-limitations {
+  margin: var(--lnt-space-2) 0;
+  padding-left: var(--lnt-space-5);
+}
+
+.lnt-rep-limitations li {
+  margin-bottom: var(--lnt-space-1);
+}
+
+.lnt-rep-banner {
+  border: var(--lnt-border-width) solid var(--lnt-border-strong);
+  border-radius: var(--lnt-radius-control);
+  padding: var(--lnt-space-2) var(--lnt-space-3);
+  margin: var(--lnt-space-2) 0;
+}
+
+.lnt-rep-banner-warn {
+  border-width: 2px;
+  border-left: 3px solid var(--lnt-warn, #e68619);
+  background-color: var(--lnt-status-warn-bg);
+}
+
+.lnt-rep-banner-info {
+  border-left: 3px solid var(--lnt-accent, #5681ff);
+  background-color: var(--lnt-bg-raised);
+}
+
+@media (max-width: 767px) {
+  .lnt-rep-workspace {
+    flex-direction: column;
+  }
+
+  .lnt-rep-left {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .lnt-rep-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .lnt-rep-grid dd {
+    margin-bottom: var(--lnt-space-2);
+  }
+}

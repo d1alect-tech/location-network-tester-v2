@@ -57,13 +57,20 @@ export class RouteStore {
   private location: WorkspaceLocation;
   private readonly listeners = new Set<RouteListener>();
   private readonly win: Window;
+  private readonly onHashChange: () => void;
 
   constructor(win: Window = window) {
     this.win = win;
     this.location = this.readLocation();
-    win.addEventListener("hashchange", () => {
+    this.onHashChange = (): void => {
       this.syncFromUrl();
-    });
+    };
+    win.addEventListener("hashchange", this.onHashChange);
+  }
+
+  /** Снимает hashchange-подписку (вызывает владелец, напр. AppShell.dispose). */
+  dispose(): void {
+    this.win.removeEventListener("hashchange", this.onHashChange);
   }
 
   get(): WorkspaceLocation {
