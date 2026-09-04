@@ -82,10 +82,17 @@ export function createV6ShellHeader(opts: V6ShellHeaderOpts): V6ShellHeader {
 
 export function createV6ShellStatusbar(): V6ShellStatusbar {
   return {
-    root: el("footer", { className: "statusbar" }, [
-      el("span", { className: "statusbar-item", text: "готов" }),
-      el("span", { className: "statusbar-spacer" }),
-      el("span", { className: "statusbar-item", text: "Корень: …" }),
-    ]),
+    root: el(
+      "footer",
+      {
+        className: "statusbar",
+        attrs: { role: "status", "aria-label": "Состояние приложения" },
+      },
+      [
+        el("span", { className: "statusbar-item", text: "готов" }),
+        el("span", { className: "statusbar-spacer" }),
+        el("span", { className: "statusbar-item", text: "Корень: …" }),
+      ],
+    ),
   };
 }

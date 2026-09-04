@@ -7,6 +7,7 @@
 import type { LntApiClient } from "../../api/client";
 import type { OpenRecord } from "../../api/types-research";
 import { clearElement, el } from "../../components/primitives/dom";
+import { errorWithRetry } from "../../components/primitives/stateViews";
 import { announcePolite } from "../../components/primitives/status";
 import type { RouteStore } from "../../state/routeState";
 import { protocolLabel } from "../experiments/experimentModel";
@@ -36,7 +37,13 @@ export function mountReportsWorkspace(
   const buildButton = el("button", {
     className: "btn lnt-btn lnt-btn-primary",
     text: "Собрать отчёт",
-    attrs: { type: "button", id: "lnt-rep-build", disabled: "disabled" },
+    attrs: {
+      type: "button",
+      id: "lnt-rep-build",
+      disabled: "disabled",
+      title: "Сначала выберите эксперимент слева",
+      "aria-describedby": "lnt-rep-hint",
+    },
   });
   const downloadButton = el("button", {
     className: "btn btn-secondary lnt-btn",
@@ -46,11 +53,18 @@ export function mountReportsWorkspace(
       id: "lnt-rep-download",
       disabled: "disabled",
       "data-export-format": REPORT_EXPORT_FORMAT,
+      title: "Станет доступна после сборки отчёта",
+      "aria-describedby": "lnt-rep-hint",
     },
   });
   const statusHost = el("p", {
     className: "t-compact lnt-helper-text",
     attrs: { role: "status" },
+  });
+  const buildHint = el("p", {
+    className: "lnt-hint",
+    text: "Сначала выберите эксперимент слева — кнопка «Собрать отчёт» станет доступна.",
+    attrs: { id: "lnt-rep-hint" },
   });
 
   const leftPane = el("div", { className: "lnt-rep-left" }, [
@@ -73,6 +87,7 @@ export function mountReportsWorkspace(
       className: "lnt-helper-text",
       text: "Выберите эксперимент слева, затем соберите отчёт: превью покажет provenance, единицы, N, плоскости измерения и ограничения.",
     }),
+    buildHint,
     statusHost,
     detailHost,
   ]);
@@ -83,6 +98,7 @@ export function mountReportsWorkspace(
 
   let currentDetail: ExperimentDetail | null = null;
   let currentMarkdown: string | null = null;
+  let pendingReportId: string | null = null;
 
   root.querySelector("#lnt-rep-refresh")?.addEventListener("click", () => void refreshList());
   buildButton.addEventListener("click", () => void build());
@@ -99,7 +115,10 @@ export function mountReportsWorkspace(
     }
     if (state.kind === "error") {
       listHost.append(
-        el("p", { className: "lnt-helper-text", text: `Ошибка загрузки: ${state.error.message}` }),
+        errorWithRetry(
+          `Не удалось загрузить список экспериментов: ${state.error.message}.`,
+          () => void refreshList(),
+        ),
       );
       return;
     }
@@ -137,6 +156,7 @@ export function mountReportsWorkspace(
   }
 
   async function loadDetailInto(experimentId: string): Promise<void> {
+    pendingReportId = experimentId;
     clearElement(detailHost);
     detailHost.append(el("p", { className: "lnt-helper-text", text: "Загрузка эксперимента…" }));
     await store.detail.load(experimentId);
@@ -145,9 +165,8 @@ export function mountReportsWorkspace(
       clearElement(detailHost);
       if (state.kind === "error") {
         detailHost.append(
-          el("p", {
-            className: "lnt-helper-text",
-            text: `Ошибка загрузки: ${state.error.message}`,
+          errorWithRetry(`Не удалось загрузить эксперимент: ${state.error.message}.`, () => {
+            if (pendingReportId) void loadDetailInto(pendingReportId);
           }),
         );
       }
@@ -165,7 +184,7 @@ export function mountReportsWorkspace(
         text: `План: ${protocolLabel(String((experiment.protocol as OpenRecord | undefined)?.kind ?? ""))} · участников: ${String(state.value.members.length)}`,
       }),
       el("div", { className: "lnt-exp-actions" }, [
-        el("label", { className: "field lnt-field-inline" }, [
+        el("label", { className: "field lnt-field-inline", attrs: { for: "lnt-rep-units" } }, [
           el("span", { className: "field-label lnt-label-text", text: "Единицы" }),
           unitsInput,
         ]),
@@ -174,6 +193,9 @@ export function mountReportsWorkspace(
       ]),
     );
     buildButton.disabled = false;
+    buildButton.title = "Собрать отчёт из данных бэкенда";
+    buildHint.textContent =
+      "Эксперимент выбран. Нажмите «Собрать отчёт», затем проверьте ограничения перед выгрузкой.";
   }
 
   async function build(): Promise<void> {
@@ -186,6 +208,8 @@ export function mountReportsWorkspace(
       detailHost.querySelector(".lnt-rep-preview")?.remove();
       detailHost.append(previewBlock(result.draft));
       downloadButton.disabled = false;
+      downloadButton.title = "Скачать собранный отчёт (.md)";
+      buildHint.textContent = "Отчёт собран. Проверьте ограничения, затем скачайте файл.";
       statusHost.setAttribute("role", "status");
       statusHost.textContent = "Отчёт собран. Проверьте ограничения перед выгрузкой.";
       announcePolite("Отчёт собран");

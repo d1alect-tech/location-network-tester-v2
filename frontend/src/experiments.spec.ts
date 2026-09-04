@@ -263,6 +263,25 @@ test("trends tab runs a descriptive query and shows confound/missingness marking
   await expect(trends).toContainText("НЕ причинные эффекты");
 });
 
+test("tabs follow the catalog pattern: arrows move focus, selection is explicit (queue A2)", async ({
+  page,
+}) => {
+  await openExperiments(page);
+  await createExperiment(page, { id: "exp.aba.demo", assignments: DEMO_ASSIGNMENTS });
+  const overview = page.locator('[data-exp-tab="overview"]');
+  const compare = page.locator('[data-exp-tab="compare"]');
+  await expect(compare).toHaveAttribute("tabindex", "-1");
+  await overview.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(compare).toBeFocused();
+  // Ручная активация: фокус не переключает панель.
+  await expect(overview).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Enter");
+  await expect(compare).toHaveAttribute("aria-selected", "true");
+  await expect(compare).toHaveAttribute("tabindex", "0");
+  await expect(overview).toHaveAttribute("tabindex", "-1");
+});
+
 test("keyboard: workspace is reachable and tabs are operable without pointer", async ({ page }) => {
   await openExperiments(page);
   await page.locator("#lnt-exp-create").click();

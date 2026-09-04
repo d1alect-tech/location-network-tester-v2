@@ -7,6 +7,7 @@
 
 import type { LntApiClient } from "../../api/client";
 import { clearElement, el } from "../../components/primitives/dom";
+import { errorWithRetry } from "../../components/primitives/stateViews";
 import { announcePolite } from "../../components/primitives/status";
 import type { RouteStore } from "../../state/routeState";
 import { ComparisonView } from "./comparisonView";
@@ -131,6 +132,7 @@ export function mountExperimentsWorkspace(
     ?.addEventListener("click", () => void refreshList());
 
   let currentDetail: ExperimentDetail | null = null;
+  let pendingDetailId: string | null = null;
 
   function renderListState(): void {
     const state = store.list.get();
@@ -143,7 +145,10 @@ export function mountExperimentsWorkspace(
     }
     if (state.kind === "error") {
       listHost.append(
-        el("p", { className: "lnt-helper-text", text: `Ошибка загрузки: ${state.error.message}` }),
+        errorWithRetry(
+          `Не удалось загрузить список экспериментов: ${state.error.message}.`,
+          () => void refreshList(),
+        ),
       );
       return;
     }
@@ -189,6 +194,7 @@ export function mountExperimentsWorkspace(
   }
 
   async function loadDetail(experimentId: string): Promise<void> {
+    pendingDetailId = experimentId;
     detailHost.replaceChildren(
       el("p", { className: "lnt-helper-text", text: "Загрузка эксперимента…" }),
     );
@@ -227,8 +233,13 @@ export function mountExperimentsWorkspace(
   const unsubscribeList = store.list.subscribe(() => renderListState());
   const unsubscribeDetail = store.detail.subscribe((state) => {
     if (state.kind === "error") {
-      detailHost.replaceChildren(
-        el("p", { className: "lnt-helper-text", text: `Ошибка загрузки: ${state.error.message}` }),
+      timeline.setError(`Не удалось загрузить протокол: ${state.error.message}.`);
+      clearElement(detailHost);
+      const retryId = pendingDetailId ?? routes.get().params.experiment;
+      detailHost.append(
+        errorWithRetry(`Не удалось загрузить эксперимент: ${state.error.message}.`, () => {
+          if (retryId) void loadDetail(retryId);
+        }),
       );
     }
   });

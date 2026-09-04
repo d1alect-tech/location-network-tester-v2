@@ -89,4 +89,13 @@ describe("createV6ShellStatusbar", () => {
     expect(root.children[1]?.classList.contains("statusbar-spacer")).toBe(true);
     expect(root.children[2]?.textContent).toBe("Корень: …");
   });
+
+  it("exposes a polite live region for status changes", () => {
+    // Given / When
+    const { root } = createV6ShellStatusbar();
+
+    // Then
+    expect(root.getAttribute("role")).toBe("status");
+    expect(root.getAttribute("aria-label")).toBe("Состояние приложения");
+  });
 });

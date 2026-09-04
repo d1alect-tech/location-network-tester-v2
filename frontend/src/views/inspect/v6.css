@@ -773,3 +773,30 @@
   min-width: 0;
   margin-bottom: 40px;
 }
+
+/* ── Состояния спектра (очередь A1): скелетон загрузки, stale-метка, CTA ──── */
+
+.app-v6 .spectrum-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 4px 0;
+  color: var(--lnt-text-sec);
+  font-size: 13px;
+}
+
+.app-v6 .panel.is-loading .frame {
+  opacity: 0.55;
+}
+
+.app-v6 .panel.is-stale .frame {
+  outline: 2px dashed var(--lnt-warn);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-v6 .panel.is-loading .frame {
+    opacity: 1;
+  }
+}

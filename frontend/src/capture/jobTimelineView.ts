@@ -47,16 +47,21 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
     attrs: { role: "alert" },
   });
   recoveryBanner.hidden = true;
+  const onboarding = el("p", {
+    className: "lnt-hint",
+    text: "Задач пока нет. Запустите захват — здесь появятся стадия, серия и записанные сессии.",
+    attrs: { role: "status", "data-timeline-onboarding": "" },
+  });
 
   const cancelButton = el("button", {
     className: "lnt-btn btn-secondary",
     text: "Отменить после текущей сессии",
-    attrs: { type: "button" },
+    attrs: { type: "button", disabled: "disabled" },
   }) as HTMLButtonElement;
   const retryButton = el("button", {
     className: "lnt-btn btn-quiet",
     text: "Повторить задачу",
-    attrs: { type: "button" },
+    attrs: { type: "button", disabled: "disabled" },
   }) as HTMLButtonElement;
 
   let latestState: TimelineState = {
@@ -99,6 +104,7 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
       el("div", { className: "panel-hd" }, [
         el("h3", { className: "capture-section-title panel-title", text: "Активная задача" }),
       ]),
+      onboarding,
       recoveryBanner,
       connectionLine,
       statusLine,
@@ -117,10 +123,19 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
       latestState = state;
       const snapshot = state.latest;
       if (snapshot === null) {
-        root.hidden = true;
+        root.hidden = false;
+        onboarding.hidden = false;
+        statusLine.textContent = "";
+        stageLine.textContent = "";
+        seriesLine.hidden = true;
+        connectionLine.hidden = true;
+        recoveryBanner.hidden = true;
+        cancelButton.disabled = true;
+        retryButton.disabled = true;
         return;
       }
       root.hidden = false;
+      onboarding.hidden = true;
 
       const terminal =
         snapshot.status === "succeeded" ||
