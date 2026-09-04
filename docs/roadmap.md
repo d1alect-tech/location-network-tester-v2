@@ -16,10 +16,10 @@
 
 | # | Что | Статус |
 |---|-----|--------|
-| B1 | RBW-селектор 10/30/50/100/300 Гц + окна Hann/Flattop/Kaiser + ENBW-поправки в manual | TODO |
-| B2 | Trace-детекторы Average/Max-Hold/Min-Hold + межсессионное усреднение повторов | TODO |
-| B3 | Маркеры Peak/Delta/Band-power/Harmonic + readout с интерполяцией | TODO |
-| B4 | Limit-lines / Mask Pass-Fail редактор (SEMI-F47 + пользовательские маски PSD/трендов) | TODO |
+| B1 | RBW-селектор 10/30/50/100/300 Гц + окна Hann/Flattop/Kaiser + ENBW-поправки в manual | DONE |
+| B2 | Trace-детекторы Average/Max-Hold/Min-Hold + межсессионное усреднение повторов | DONE |
+| B3 | Маркеры Peak/Delta/Band-power/Harmonic + readout с интерполяцией | DONE |
+| B4 | Limit-lines / Mask Pass-Fail редактор (SEMI-F47 + пользовательские маски PSD/трендов) | DONE |
 
 ## Очередь C — Тяжёлая артиллерия (L, квартал)
 
