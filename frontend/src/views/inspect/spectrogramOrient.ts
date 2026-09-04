@@ -2,13 +2,13 @@
  * (верх = начало записи). Оси — category по бинам npz; DOM-оверлей тиков
  * частоты не строится (это отдельная задача). Пул ячеек + кап TILE_CELL_CAP. */
 
-import { el } from "../../components/primitives/dom";
 import type { SpectrogramChart, SpectrogramChartOption } from "../../components/charts/echarts";
 import { initSpectrogramChart } from "../../components/charts/echarts";
 import type { SpectrogramLevel } from "../../components/charts/spectrogramModel";
 import { TILE_CELL_CAP } from "../../components/charts/spectrogramModel";
 import { SPECTROGRAM_PALETTE } from "../../components/charts/spectrogramPalette";
 import { readChartTheme } from "../../components/charts/theme";
+import { el } from "../../components/primitives/dom";
 
 export type OrientedSpectrogramTile = {
   readonly times: Float64Array;
@@ -95,7 +95,7 @@ export function createOrientedSpectrogramView(
           if (point === undefined) return "";
           const hz = domainFreqs[point[0]] ?? 0;
           const time = domainTimes[point[1]] ?? 0;
-          return `частота ${formatNumber(hz)} Гц · время ${formatNumber(time)} с · ${formatNumber(point[2])} дБ`;
+          return `частота ${formatNumber(hz)} Гц · время ${formatNumber(time)} с · ${formatNumber(point[2])} дБВ/Гц (отн. 1 В²/Гц)`;
         },
       },
       grid: { left: 64, right: 84, top: 16, bottom: 56 },
@@ -117,7 +117,7 @@ export function createOrientedSpectrogramView(
         orient: "vertical",
         right: 4,
         top: "center",
-        text: ["дБ макс", "дБ мин"],
+        text: ["дБВ/Гц макс", "дБВ/Гц мин"],
         inRange: { color: [...SPECTROGRAM_PALETTE] },
       },
       series: [{ type: "heatmap", data: [] }],

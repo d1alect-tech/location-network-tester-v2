@@ -6,13 +6,31 @@ from typing import Final
 
 import numpy as np
 
-from lnt.analysis import METRICS_FILENAME, SPECTRUM_FILENAME
+from lnt.analysis import (
+    METRICS_FILENAME,
+    SPECTRUM_FILENAME,
+    SPECTRUM_INPUT_REFERRED_FILENAME,
+)
 from lnt.errors import InputError
 from lnt.manifest import manifest_from_json
 from lnt.session_store import MANIFEST_FILENAME
 from lnt.types import SessionManifest
 from lnt.ui.decimation import decimate_spectrum, decimate_waveform
 from lnt.ui.sessions import list_sessions, resolve_session_dir
+
+
+class InputReferredSpectrumMissingError(InputError):
+    """Файл input-referred спектра отсутствует (HTTP 404 на границе маршрутов)."""
+
+
+class InputReferenceUnavailableError(InputError):
+    """Квалификация input-reference недоступна (HTTP 409 на границе маршрутов)."""
+
+    def __init__(self, message: str, *, reason_code: str | None) -> None:
+        """Сохраняет machine-readable reason_code рядом с сообщением."""
+        super().__init__(message)
+        self.reason_code: str | None = reason_code
+
 
 _WAVEFORM_CACHE_LIMIT: Final = 32
 type WaveformCacheKey = tuple[str, str, int, int]
@@ -86,10 +104,71 @@ def spectrum_payload(root: Path, name: str, *, max_points: int) -> dict[str, obj
         spectrum_table[:, 1],
         max_points=max_points,
     )
-    return {
+    result: dict[str, object] = {
         "frequency_hz": list(series.x),
         "psd_v2_per_hz": list(series.y),
         "point_count": series.point_count,
+    }
+    # RBW-контракт шкалы: только ADD ключей, старые клиенты целы.
+    result.update(_spectrum_meta(session_dir))
+    return result
+
+
+def input_referred_spectrum_payload(
+    root: Path,
+    name: str,
+    *,
+    max_points: int,
+) -> dict[str, object]:
+    """Возвращает ограниченный input-referred excess-PSD спектр CH1."""
+    session_dir = resolve_session_dir(root, name)
+    spectrum_path = session_dir / SPECTRUM_INPUT_REFERRED_FILENAME
+    if not spectrum_path.is_file():
+        raise InputReferredSpectrumMissingError(
+            "input-referred спектр отсутствует: запустите анализ",
+        )
+    analysis = _read_analysis(session_dir)
+    reference = analysis.get("ch1_input_reference")
+    reference_map = reference if isinstance(reference, dict) else {}
+    if reference_map.get("status") == "unavailable":
+        reason_code = reference_map.get("reason_code")
+        reason_text = reason_code if isinstance(reason_code, str) else "unknown"
+        raise InputReferenceUnavailableError(
+            f"input-reference недоступен: {reason_text}",
+            reason_code=reason_code if isinstance(reason_code, str) else None,
+        )
+    try:
+        spectrum_table = np.loadtxt(
+            spectrum_path,
+            delimiter=",",
+            skiprows=1,
+            dtype=np.float64,
+            ndmin=2,
+        )
+    except (OSError, ValueError):
+        spectrum_table = np.empty((0, 2), dtype=np.float64)
+    if spectrum_table.size == 0:
+        series = decimate_spectrum(
+            np.empty(0, dtype=np.float64),
+            np.empty(0, dtype=np.float64),
+            max_points=max_points,
+        )
+    else:
+        series = decimate_spectrum(
+            spectrum_table[:, 0],
+            spectrum_table[:, 1],
+            max_points=max_points,
+        )
+    spectrum_meta = _spectrum_meta(session_dir)
+    return {
+        "frequency_hz": list(series.x),
+        "input_referred_excess_psd_v2_per_hz": list(series.y),
+        "point_count": series.point_count,
+        "status": reference_map.get("status"),
+        "reason_code": reference_map.get("reason_code"),
+        "qualified_bin_count": reference_map.get("qualified_bin_count", 0),
+        "total_bin_count": reference_map.get("total_bin_count", 0),
+        "resolution_hz": spectrum_meta.get("resolution_hz"),
     }
 
 
@@ -139,6 +218,30 @@ def waveform_payload(
         del _WAVEFORM_CACHE[next(iter(_WAVEFORM_CACHE))]
     _WAVEFORM_CACHE[cache_key] = result
     return result
+
+
+def _read_analysis(session_dir: Path) -> dict[str, object]:
+    """Читает metrics.json сессии; при отсутствии/порче возвращает пустой словарь."""
+    metrics_path = session_dir / METRICS_FILENAME
+    try:
+        raw = json.loads(metrics_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _spectrum_meta(session_dir: Path) -> dict[str, object]:
+    """Возвращает RBW-метаданные шкалы из metrics.json (только числовые ключи)."""
+    analysis = _read_analysis(session_dir)
+    spectrum = analysis.get("spectrum")
+    if not isinstance(spectrum, dict):
+        return {}
+    meta: dict[str, object] = {}
+    for key in ("resolution_hz", "band_low_hz", "band_high_hz"):
+        value = spectrum.get(key)
+        if isinstance(value, (int, float)):
+            meta[key] = value
+    return meta
 
 
 def _read_validated_manifest(session_dir: Path) -> tuple[str, SessionManifest]:

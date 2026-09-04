@@ -78,7 +78,7 @@ describe("createGramPair", () => {
     pair.dispose();
   });
 
-  it("slices B minus A in dB with a symmetric range when mode is delta", async () => {
+  it("slices B minus A in dB with an honest min/max range when mode is delta", async () => {
     // Given: matching grids with mixed-sign cell deltas
     const pair = createGramPair({
       client: STUB_CLIENT,
@@ -94,12 +94,11 @@ describe("createGramPair", () => {
     // When
     pair.setMode("delta");
 
-    // Then: values are B.powerDb − A.powerDb; color scale straddles zero
+    // Then: values are B.powerDb − A.powerDb; scale shows the honest range
     const tile = asTile(pair.current());
     expect(Array.from(tile.tile.values)).toEqual(Array.from(DELTA_B_MINUS_A));
-    expect(tile.minDb).toBeLessThan(0);
-    expect(tile.maxDb).toBeGreaterThan(0);
-    expect(tile.minDb).toBe(-tile.maxDb);
+    expect(tile.minDb).toBe(-2);
+    expect(tile.maxDb).toBe(6);
     pair.dispose();
   });
 

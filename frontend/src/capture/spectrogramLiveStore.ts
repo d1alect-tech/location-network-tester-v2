@@ -81,12 +81,27 @@ export class LiveGramStore {
     return Number.isFinite(low) ? { low, high } : { low: -90, high: -30 };
   }
 
-  /** Кладёт колонку в кольцо; false — пустой вход, кольцо не тронуто. */
+  /** Кладёт колонку в кольцо; false — пустой вход, кольцо не тронуто.
+   * Пик-детектор: в бин пишется MAX сэмплов (в дБ max корректен как max PSD),
+   * пустые бины — nearest как раньше. */
   pushSpectrumColumn(frequencyHz: readonly number[], psdDb: readonly number[]): boolean {
     if (frequencyHz.length < 2 || frequencyHz.length !== psdDb.length) return false;
+    const span = this.logMax - this.logMin;
+    const peak = new Float32Array(FREQ_BINS).fill(Number.NEGATIVE_INFINITY);
+    for (let i = 0; i < frequencyHz.length; i += 1) {
+      const freq = frequencyHz[i] as number;
+      if (!(freq > 0) || span <= 0) continue;
+      const t = (Math.log10(freq) - this.logMin) / span;
+      if (!(t >= 0 && t < 1)) continue;
+      const bin = Math.min(FREQ_BINS - 1, Math.floor(t * FREQ_BINS));
+      const value = psdDb[i] as number;
+      if (value > (peak[bin] ?? Number.NEGATIVE_INFINITY)) peak[bin] = value;
+    }
     for (let bin = 0; bin < FREQ_BINS; bin += 1) {
-      const index = nearestIndex(frequencyHz, this.binCenter(bin));
-      this.cells[this.head * FREQ_BINS + bin] = psdDb[index] as number;
+      const max = peak[bin] as number;
+      this.cells[this.head * FREQ_BINS + bin] = Number.isFinite(max)
+        ? max
+        : (psdDb[nearestIndex(frequencyHz, this.binCenter(bin))] as number);
     }
     this.head = (this.head + 1) % TIME_BINS;
     this.count = Math.min(this.count + 1, TIME_BINS);

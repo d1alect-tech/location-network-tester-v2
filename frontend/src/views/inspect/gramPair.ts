@@ -128,19 +128,9 @@ function finiteDb(values: Float32Array): { minDb: number; maxDb: number } {
   return { minDb, maxDb };
 }
 
-function symmetricDb(values: Float32Array): { minDb: number; maxDb: number } {
-  let peak = 0;
-  for (const value of values) {
-    if (!Number.isFinite(value)) continue;
-    const abs = Math.abs(value);
-    if (abs > peak) peak = abs;
-  }
-  return { minDb: -peak, maxDb: peak };
-}
-
-function tileOf(level: SpectrogramLevel, scale: "finite" | "symmetric"): GramPairTile {
+function tileOf(level: SpectrogramLevel): GramPairTile {
   const tile = sliceTile(level, initialTileRequest(level));
-  const range = scale === "finite" ? finiteDb(tile.values) : symmetricDb(tile.values);
+  const range = finiteDb(tile.values);
   return { kind: "tile", tile, minDb: range.minDb, maxDb: range.maxDb };
 }
 
@@ -209,13 +199,13 @@ export function createGramPair(opts: GramPairOpts): GramPairHandle {
     current() {
       switch (activeMode) {
         case "a":
-          return levelA === null ? { kind: "mismatch" } : tileOf(levelA, "finite");
+          return levelA === null ? { kind: "mismatch" } : tileOf(levelA);
         case "b":
-          return levelB === null ? { kind: "mismatch" } : tileOf(levelB, "finite");
+          return levelB === null ? { kind: "mismatch" } : tileOf(levelB);
         case "delta": {
           if (levelA === null || levelB === null) return { kind: "mismatch" };
           const delta = deltaLevel(levelA, levelB);
-          return delta === null ? { kind: "mismatch" } : tileOf(delta, "symmetric");
+          return delta === null ? { kind: "mismatch" } : tileOf(delta);
         }
         default:
           return assertNever(activeMode);

@@ -6,7 +6,7 @@
 
 from typing import Annotated, TypedDict
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 
 from lnt.acquire import DEFAULT_RANGE_V, DEFAULT_SAMPLE_RATE_HZ, RANGE_CODES
@@ -142,6 +142,36 @@ def spectrum(
         return JSONResponse(
             payloads.spectrum_payload(services.root, name, max_points=max_points),
         )
+    except InputError as error:
+        raise map_domain_error(error) from error
+
+
+@router.get("/sessions/{name}/spectrum-input-referred")
+def spectrum_input_referred(
+    name: str,
+    services: Services,
+    max_points: SpectrumLimit = 5_000,
+) -> JSONResponse:
+    """Возвращает ограниченный input-referred excess-PSD спектр CH1."""
+    resolve_session_or_404(services.root, name)
+    try:
+        return JSONResponse(
+            payloads.input_referred_spectrum_payload(
+                services.root,
+                name,
+                max_points=max_points,
+            ),
+        )
+    except payloads.InputReferenceUnavailableError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
+    except payloads.InputReferredSpectrumMissingError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
     except InputError as error:
         raise map_domain_error(error) from error
 

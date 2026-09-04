@@ -1,6 +1,11 @@
 /** Единое сигнальное окно инспекции v6: uPlot-спектр A/B и слот спектрограммы. */
 
-import type { SessionDetailPayload, SpectrumPayload } from "../../api/types-plots";
+import type {
+  InputReferredSpectrumPayload,
+  SessionDetailPayload,
+  SpectrumPayload,
+  SpectrumPlane,
+} from "../../api/types-plots";
 import { createPeaksPlugin } from "../../components/charts/annotations";
 import { readChartTheme } from "../../components/charts/theme";
 import type { ChartHandle, ChartPeak, ChartRenderRequest } from "../../components/charts/types";
@@ -9,6 +14,7 @@ import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { peaksFromDetail, spectrumToRequest } from "../../components/charts/viewModels";
 import type { SeriesStyle } from "../../components/charts/viewModels";
 import { el } from "../../components/primitives/dom";
+import { createPlaneControl, planePayload } from "./spectrumPlaneControl";
 
 export type SpectrumView = "spectrum" | "gram";
 
@@ -19,6 +25,11 @@ export type SpectrumPanelClient = {
       maxPoints?: number,
       o?: { readonly signal?: AbortSignal },
     ) => Promise<SpectrumPayload>;
+    spectrumInputReferred?: (
+      name: string,
+      maxPoints?: number,
+      o?: { readonly signal?: AbortSignal },
+    ) => Promise<InputReferredSpectrumPayload>;
     detail: (
       name: string,
       o?: { readonly signal?: AbortSignal },
@@ -38,6 +49,8 @@ export type SpectrumPanelHandle = {
   load(a: string, b: string | null): Promise<void>;
   setView(view: SpectrumView): void;
   view(): SpectrumView;
+  plane(): SpectrumPlane;
+  setPlane(plane: SpectrumPlane): void;
   onViewChange(cb: (view: SpectrumView) => void): void;
   destroy(): void;
 };
@@ -109,8 +122,16 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
     { className: "view-toggle", attrs: { role: "group", "aria-label": "Вид сигнального окна" } },
     [spectrumBtn, gramBtn],
   );
+  let reloadPlane: () => void = () => undefined;
+  const planeControl = createPlaneControl(() => reloadPlane());
   const gramBar = el("div", { className: "gram-bar" });
-  const header = el("div", { className: "panel-hd" }, [title, viewToggle, gramBar]);
+  const header = el("div", { className: "panel-hd" }, [
+    title,
+    viewToggle,
+    planeControl.toggle,
+    planeControl.rbw,
+    gramBar,
+  ]);
   const frame = el("div", { className: "frame" });
   const gramHost = el("div", { className: "gram" });
   const body = el("div", { className: "panel-bd" }, [frame, gramHost]);
@@ -145,16 +166,50 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
   spectrumBtn.addEventListener("click", () => setView("spectrum"));
   gramBtn.addEventListener("click", () => setView("gram"));
 
+  let lastA: string | null = null;
+  let lastB: string | null = null;
+
+  /** Спектр в активной плоскости; вход при 404/409 откатывается на скоп. */
+  async function fetchPlaneSpectrum(name: string): Promise<SpectrumPayload> {
+    const plots = opts.client.plots;
+    if (planeControl.plane() !== "input-referred" || plots.spectrumInputReferred === undefined) {
+      return plots.spectrum(name);
+    }
+    try {
+      return planePayload(await plots.spectrumInputReferred(name));
+    } catch {
+      return plots.spectrum(name);
+    }
+  }
+
   async function load(a: string, b: string | null): Promise<void> {
+    lastA = a;
+    lastB = b;
     const [payloadA, payloadB, detail] = await Promise.all([
-      opts.client.plots.spectrum(a),
-      b === null ? Promise.resolve(null) : opts.client.plots.spectrum(b),
+      fetchPlaneSpectrum(a),
+      b === null ? Promise.resolve(null) : fetchPlaneSpectrum(b),
       opts.client.plots.detail(a),
     ]);
+    planeControl.paintPlane(detail.analysis);
+    planeControl.paintRbw(payloadA);
     peaksA = peaksFromDetail(detailForPeaks(a, detail));
-    const styleA: SeriesStyle = { color: theme.accentA, label: a };
-    const styleB: SeriesStyle = { color: theme.accentB, label: b ?? "", dash: DASH_B };
+    const suffix = planeControl.plane() === "input-referred" ? " · вход" : "";
+    const styleA: SeriesStyle = { color: theme.accentA, label: `${a}${suffix}` };
+    const styleB: SeriesStyle = {
+      color: theme.accentB,
+      label: `${b ?? ""}${suffix}`,
+      dash: DASH_B,
+    };
     chart.render(overlayRequest(payloadA, payloadB, styleA, styleB, peaksA));
+  }
+
+  reloadPlane = () => {
+    if (lastA === null) return;
+    void load(lastA, lastB);
+  };
+
+  function setPlane(next: SpectrumPlane): void {
+    if (planeControl.requestPlane(next)) reloadPlane();
   }
 
   return {
@@ -163,6 +218,8 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
     gramBar,
     load,
     setView,
+    plane: () => planeControl.plane(),
+    setPlane,
     view: () => current,
     onViewChange(cb) {
       viewChange = cb;

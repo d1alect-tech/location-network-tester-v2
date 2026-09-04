@@ -188,7 +188,7 @@ test("режимы А/Б/Δ рисуют тайлы", async ({ page }) => {
   await expect
     .poll(async () => paintedRatio(page, GRAM_CANVAS), { timeout: 15_000 })
     .toBeGreaterThan(0.5);
-  await expect(scale).toHaveText(/−.+ … \+.+ дБ/);
+  await expect(scale).toHaveText(/[−+].+ … \+.+ дБ/);
 });
 
 test("отсутствие артефакта у Б не ломает базу", async ({ page }) => {
