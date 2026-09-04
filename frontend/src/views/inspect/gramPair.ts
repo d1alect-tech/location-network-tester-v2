@@ -125,7 +125,12 @@ async function fetchLevel(
     },
   );
   return levelFromNpz(
-    await readNpzArrays(bytesToArrayBuffer(bytes), ["time_s", "frequency_hz", "power_db"]),
+    await readNpzArrays(bytesToArrayBuffer(bytes), [
+      "time_s",
+      "frequency_hz",
+      "power_db",
+      "power_max_hold_db",
+    ]),
   );
 }
 
