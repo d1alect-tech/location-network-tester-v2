@@ -8,10 +8,10 @@ import type {
 } from "../../api/types-plots";
 import { createPeaksPlugin } from "../../components/charts/annotations";
 import { readChartTheme } from "../../components/charts/theme";
-import type { ChartHandle, ChartPeak, ChartRenderRequest } from "../../components/charts/types";
+import type { ChartHandle, ChartPeak } from "../../components/charts/types";
 import { createUplotView } from "../../components/charts/uplotView";
 import type { UplotViewOptions } from "../../components/charts/uplotView";
-import { peaksFromDetail, spectrumToRequest } from "../../components/charts/viewModels";
+import { peaksFromDetail } from "../../components/charts/viewModels";
 import type { SeriesStyle } from "../../components/charts/viewModels";
 import { el } from "../../components/primitives/dom";
 import { createSpectrumExtras } from "./spectrumExtras";
@@ -58,7 +58,6 @@ export type SpectrumPanelHandle = {
 
 const DASH_B: readonly [number, number] = [6, 4];
 const SYNC_KEY = "lnt-inspect-spectrum-v6";
-const UNITS = { kind: "psd" } as const;
 
 function assertNever(value: never): never {
   throw new Error(`unhandled spectrum view ${String(value)}`);
@@ -73,6 +72,8 @@ function recordFromUnknown(value: unknown): Record<string, unknown> | null {
   return record;
 }
 
+import { overlayRequest } from "./spectrumHoldOverlay";
+
 function detailForPeaks(name: string, raw: { readonly analysis?: unknown }): SessionDetailPayload {
   return {
     name,
@@ -82,22 +83,6 @@ function detailForPeaks(name: string, raw: { readonly analysis?: unknown }): Ses
     waveform_available: false,
     ch2_available: false,
   };
-}
-
-function overlayRequest(
-  payloadA: SpectrumPayload,
-  payloadB: SpectrumPayload | null,
-  styleA: SeriesStyle,
-  styleB: SeriesStyle,
-  peaks: readonly ChartPeak[],
-): ChartRenderRequest {
-  const requestA = spectrumToRequest(payloadA, styleA, UNITS, true, peaks);
-  const series = [...requestA.series];
-  if (payloadB !== null) {
-    const requestB = spectrumToRequest(payloadB, styleB, UNITS, true, []);
-    series.push(...requestB.series);
-  }
-  return { ...requestA, xLabel: "", xLog: true, series };
 }
 
 export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHandle {

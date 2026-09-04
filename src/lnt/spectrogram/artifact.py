@@ -54,6 +54,7 @@ def save_overview(
             np.savez(
                 stream,
                 power_db=overview.power_db,
+                power_max_hold_db=overview.max_hold_db,
                 coverage=overview.coverage,
                 time_s=overview.time_s,
                 frequency_hz=overview.frequency_hz,
@@ -78,13 +79,23 @@ def load_overview(path: Path) -> SpectrogramOverview:
             frequency_hz = np.asarray(archive["frequency_hz"], dtype=np.float64)
             edges = np.asarray(archive["frequency_edges_hz"], dtype=np.float64)
             metadata = json.loads(str(archive["metadata"]))
+            hold_present = "power_max_hold_db" in archive
+            hold_db = (
+                np.asarray(archive["power_max_hold_db"], dtype=np.float32)
+                if hold_present
+                else np.full(power_db.shape, np.nan, dtype=np.float32)
+            )
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
         raise SpectrogramArtifactError(path, "npz_or_metadata") from error
     if not isinstance(metadata, dict) or metadata.get("schema") != 1:
         raise SpectrogramArtifactError(path, "schema")
     if power_db.shape != coverage.shape or power_db.shape != (frequency_hz.size, time_s.size):
         raise SpectrogramArtifactError(path, "shape")
+    if hold_db.shape != power_db.shape:
+        raise SpectrogramArtifactError(path, "shape")
     if not np.array_equal(np.isnan(power_db), coverage == 0):
+        raise SpectrogramArtifactError(path, "coverage")
+    if hold_present and not np.array_equal(np.isnan(hold_db), coverage == 0):
         raise SpectrogramArtifactError(path, "coverage")
     try:
         raw = metadata["settings"]
@@ -104,9 +115,13 @@ def load_overview(path: Path) -> SpectrogramOverview:
     linear = np.full(power_db.shape, np.nan, dtype=np.float64)
     available = coverage > 0
     linear[available] = reference * np.power(10.0, power_db[available] / 10.0)
+    hold_linear = np.full(power_db.shape, np.nan, dtype=np.float64)
+    hold_linear[available] = reference * np.power(10.0, hold_db[available] / 10.0)
     return SpectrogramOverview(
         power_db=power_db,
         linear_power=linear,
+        max_hold_db=hold_db,
+        max_hold_linear=hold_linear,
         coverage=coverage,
         time_s=time_s,
         frequency_hz=frequency_hz,

@@ -10,6 +10,9 @@ import { isPointer } from "./w1Parse";
 
 export type GramMode = "a" | "b" | "delta";
 
+/** Детектор граммы: mean — средний тайл, max-hold — удерживающий тайл. */
+export type GramDetector = "mean" | "max-hold";
+
 export type GramPairTile = {
   readonly kind: "tile";
   readonly tile: {
@@ -27,6 +30,10 @@ export type GramPairHandle = {
   load(a: string, b: string | null): Promise<void>;
   setMode(mode: GramMode): void;
   mode(): GramMode;
+  setDetector(detector: GramDetector): void;
+  detector(): GramDetector;
+  /** Активный режим имеет max-hold след. */
+  holdAvailable(): boolean;
   gridMatches(): boolean;
   /** Оба уровня загружены (есть и база, и сравнение). */
   paired(): boolean;
@@ -109,9 +116,14 @@ async function fetchLevel(
     signal,
   );
   if (!isPointer(pointerRaw)) throw new GramPairError("missing_pointer");
-  const bytes = await client.analysis.artifactBytes(session, pointerRaw.artifact_key, "spectrogram.npz", {
-    signal,
-  });
+  const bytes = await client.analysis.artifactBytes(
+    session,
+    pointerRaw.artifact_key,
+    "spectrogram.npz",
+    {
+      signal,
+    },
+  );
   return levelFromNpz(
     await readNpzArrays(bytesToArrayBuffer(bytes), ["time_s", "frequency_hz", "power_db"]),
   );
@@ -128,10 +140,27 @@ function finiteDb(values: Float32Array): { minDb: number; maxDb: number } {
   return { minDb, maxDb };
 }
 
-function tileOf(level: SpectrogramLevel): GramPairTile {
-  const tile = sliceTile(level, initialTileRequest(level));
+/** Уровень с выбранным детектором; max-hold без следа откатывается на mean. */
+function levelWithDetector(level: SpectrogramLevel, detector: GramDetector): SpectrogramLevel {
+  if (detector === "mean") return level;
+  const hold = level.powerMaxHoldDb;
+  if (hold === undefined || hold.length !== level.powerDb.length) return level;
+  return { ...level, powerDb: hold };
+}
+
+function tileOf(level: SpectrogramLevel, detector: GramDetector): GramPairTile {
+  const resolved = levelWithDetector(level, detector);
+  const tile = sliceTile(resolved, initialTileRequest(resolved));
   const range = finiteDb(tile.values);
   return { kind: "tile", tile, minDb: range.minDb, maxDb: range.maxDb };
+}
+
+function hasHold(level: SpectrogramLevel | null): boolean {
+  return (
+    level !== null &&
+    level.powerMaxHoldDb !== undefined &&
+    level.powerMaxHoldDb.length === level.powerDb.length
+  );
 }
 
 function deltaLevel(a: SpectrogramLevel, b: SpectrogramLevel): SpectrogramLevel | null {
@@ -147,13 +176,28 @@ function deltaLevel(a: SpectrogramLevel, b: SpectrogramLevel): SpectrogramLevel 
 }
 
 export function createGramPair(opts: GramPairOpts): GramPairHandle {
-  const resolveLevel = opts.loadLevel ?? ((session, signal) => fetchLevel(opts.client, session, signal));
+  const resolveLevel =
+    opts.loadLevel ?? ((session, signal) => fetchLevel(opts.client, session, signal));
   let generation = 0;
   let controller = new AbortController();
   let levelA: SpectrogramLevel | null = null;
   let levelB: SpectrogramLevel | null = null;
   let activeMode: GramMode = "a";
+  let activeDetector: GramDetector = "mean";
   let matches = false;
+
+  function activeLevel(): SpectrogramLevel | null {
+    switch (activeMode) {
+      case "a":
+        return levelA;
+      case "b":
+        return levelB;
+      case "delta":
+        return null;
+      default:
+        return assertNever(activeMode);
+    }
+  }
 
   return {
     async load(a, b) {
@@ -178,9 +222,7 @@ export function createGramPair(opts: GramPairOpts): GramPairHandle {
         levelA = loadedA;
         levelB = loadedB;
         matches =
-          loadedA !== null &&
-          loadedB !== null &&
-          alignGramLevels(loadedA, loadedB).kind === "ok";
+          loadedA !== null && loadedB !== null && alignGramLevels(loadedA, loadedB).kind === "ok";
         activeMode = loadedB !== null ? "b" : "a";
       } catch (error) {
         if (gen !== generation || isAbort(error)) return;
@@ -192,6 +234,12 @@ export function createGramPair(opts: GramPairOpts): GramPairHandle {
       if (mode === "b" && levelB === null) return;
       activeMode = mode;
     },
+    setDetector(detector) {
+      if (detector === "max-hold" && !hasHold(activeLevel())) return;
+      activeDetector = detector;
+    },
+    detector: () => activeDetector,
+    holdAvailable: () => hasHold(activeLevel()),
     mode: () => activeMode,
     gridMatches: () => matches,
     paired: () => levelA !== null && levelB !== null,
@@ -199,13 +247,14 @@ export function createGramPair(opts: GramPairOpts): GramPairHandle {
     current() {
       switch (activeMode) {
         case "a":
-          return levelA === null ? { kind: "mismatch" } : tileOf(levelA);
+          return levelA === null ? { kind: "mismatch" } : tileOf(levelA, activeDetector);
         case "b":
-          return levelB === null ? { kind: "mismatch" } : tileOf(levelB);
+          return levelB === null ? { kind: "mismatch" } : tileOf(levelB, activeDetector);
         case "delta": {
           if (levelA === null || levelB === null) return { kind: "mismatch" };
           const delta = deltaLevel(levelA, levelB);
-          return delta === null ? { kind: "mismatch" } : tileOf(delta);
+          // Дельта всегда считается по mean-уровням: честная разность средних.
+          return delta === null ? { kind: "mismatch" } : tileOf(delta, "mean");
         }
         default:
           return assertNever(activeMode);

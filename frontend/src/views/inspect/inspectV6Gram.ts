@@ -1,7 +1,7 @@
 import type { ChartHandle } from "../../components/charts/types";
 import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { el } from "../../components/primitives/dom";
-import type { GramMode, GramPairClient, GramPairTile } from "./gramPair";
+import type { GramDetector, GramMode, GramPairClient, GramPairTile } from "./gramPair";
 import { createGramPair } from "./gramPair";
 import { createOrientedSpectrogramView } from "./spectrogramOrient";
 
@@ -27,6 +27,11 @@ const MODES = [
   { mode: "delta", label: "Δ Б−А" },
 ] as const;
 
+const DETECTORS = [
+  { detector: "mean", label: "Среднее" },
+  { detector: "max-hold", label: "Макс-холд" },
+] as const;
+
 const MISMATCH_NOTE = "сетки спектрограмм не совпадают";
 const EMPTY_NOTE = "нет спектрограммы записи";
 
@@ -36,6 +41,10 @@ function assertNever(value: never): never {
 
 function isGramMode(value: string | null): value is GramMode {
   return value === "a" || value === "b" || value === "delta";
+}
+
+function isGramDetector(value: string | null): value is GramDetector {
+  return value === "mean" || value === "max-hold";
 }
 
 function formatDb(value: number): string {
@@ -85,12 +94,34 @@ export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle 
     { className: "gram-modes", attrs: { role: "group", "aria-label": "Содержимое спектрограммы" } },
     buttons,
   );
+  const detectorButtons: HTMLButtonElement[] = [];
+  for (const item of DETECTORS) {
+    detectorButtons.push(
+      el("button", {
+        className: "gram-detector",
+        text: item.label,
+        attrs: {
+          type: "button",
+          "data-spectrogram-detector": item.detector,
+          "aria-pressed": "false",
+        },
+      }),
+    );
+  }
+  const detectors = el(
+    "div",
+    {
+      className: "gram-detectors",
+      attrs: { role: "group", "aria-label": "Детектор спектрограммы" },
+    },
+    detectorButtons,
+  );
   const readout = el("span", { className: "gram-readout" });
   const scale = el("span", {
     className: "gram-scale",
     attrs: { role: "status", "aria-label": "Шкала спектрограммы" },
   });
-  spectrumPanel.gramBar.append(modes, readout, scale);
+  spectrumPanel.gramBar.append(modes, detectors, readout, scale);
 
   function deltaButton(): HTMLButtonElement | undefined {
     return buttons.find((button) => button.getAttribute("data-spectrogram-mode") === "delta");
@@ -103,6 +134,13 @@ export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle 
         "aria-pressed",
         String(button.getAttribute("data-spectrogram-mode") === active),
       );
+    }
+    const detector = gramPair.detector();
+    const hold = gramPair.holdAvailable();
+    for (const button of detectorButtons) {
+      const value = button.getAttribute("data-spectrogram-detector");
+      button.setAttribute("aria-pressed", String(value === detector));
+      if (value === "max-hold") button.disabled = !hold;
     }
   }
 
@@ -130,6 +168,16 @@ export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle 
       const mode = button.getAttribute("data-spectrogram-mode");
       if (!isGramMode(mode)) return;
       gramPair.setMode(mode);
+      paintPressed();
+      renderCurrent();
+    });
+  }
+
+  for (const button of detectorButtons) {
+    button.addEventListener("click", () => {
+      const detector = button.getAttribute("data-spectrogram-detector");
+      if (!isGramDetector(detector)) return;
+      gramPair.setDetector(detector);
       paintPressed();
       renderCurrent();
     });

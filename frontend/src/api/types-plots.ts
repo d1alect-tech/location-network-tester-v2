@@ -7,6 +7,8 @@ export type SpectrumPlane = "scope" | "input-referred";
 export interface SpectrumPayload {
   frequency_hz: number[];
   psd_v2_per_hz: number[];
+  /** Max-hold след повторов/сегментов (ADD-ключ B2): та же сетка, что psd. */
+  psd_max_hold_v2_per_hz?: number[];
   point_count: number;
   /** RBW-контракт шкалы (ADD-ключи): df полной сетки и полоса анализа. */
   resolution_hz?: number | null;

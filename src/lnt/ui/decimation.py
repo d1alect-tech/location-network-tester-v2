@@ -69,6 +69,47 @@ def decimate_spectrum(
     return _decimated_xy(frequency_hz[safe], psd_v2_per_hz[safe], max_points)
 
 
+def decimate_spectrum_pair(
+    frequency_hz: Float64Array,
+    psd_v2_per_hz: Float64Array,
+    psd_hold_v2_per_hz: Float64Array,
+    *,
+    max_points: int,
+) -> tuple[DecimatedSeries, DecimatedSeries]:
+    """Прореживает mean и max-hold одной маской и общими индексами.
+
+    Общая log-безопасная маска и общие экстремальные индексы mean-ряда
+    держат след на той же сетке, что основной спектр.
+    """
+    _require_vector_pair(frequency_hz, psd_v2_per_hz)
+    _require_vector_pair(frequency_hz, psd_hold_v2_per_hz)
+    _require_point_budget(max_points)
+    safe = (
+        np.isfinite(frequency_hz)
+        & np.isfinite(psd_v2_per_hz)
+        & np.isfinite(psd_hold_v2_per_hz)
+        & (frequency_hz > 0.0)
+        & (psd_v2_per_hz > 0.0)
+        & (psd_hold_v2_per_hz > 0.0)
+    )
+    clean_x = frequency_hz[safe]
+    clean_mean = psd_v2_per_hz[safe]
+    clean_hold = psd_hold_v2_per_hz[safe]
+    indices = _selected_indices(clean_mean, max_points)
+    return (
+        DecimatedSeries(
+            x=tuple(float(value) for value in clean_x[indices]),
+            y=tuple(float(value) for value in clean_mean[indices]),
+            point_count=int(indices.size),
+        ),
+        DecimatedSeries(
+            x=tuple(float(value) for value in clean_x[indices]),
+            y=tuple(float(value) for value in clean_hold[indices]),
+            point_count=int(indices.size),
+        ),
+    )
+
+
 def min_max_envelope(
     x: Float64Array,
     y: Float64Array,

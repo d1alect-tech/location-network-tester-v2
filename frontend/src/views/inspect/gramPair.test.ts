@@ -8,6 +8,7 @@ function makeLevel(
   timeS: readonly number[],
   frequencyHz: readonly number[],
   powerDb: readonly number[],
+  powerMaxHoldDb?: readonly number[],
 ): SpectrogramLevel {
   return {
     timeS: Float64Array.from(timeS),
@@ -15,6 +16,7 @@ function makeLevel(
     powerDb: Float32Array.from(powerDb),
     timeBins: timeS.length,
     bands: frequencyHz.length,
+    ...(powerMaxHoldDb === undefined ? {} : { powerMaxHoldDb: Float32Array.from(powerMaxHoldDb) }),
   };
 }
 
@@ -180,6 +182,43 @@ describe("createGramPair", () => {
     // Then
     expect(pair.empty()).toBe(true);
     expect(pair.current().kind).toBe("mismatch");
+    pair.dispose();
+  });
+
+  it("detector defaults to mean and switches to max-hold tiles", async () => {
+    // Given: уровень с max-hold следом рядом с mean
+    const level = makeLevel(TIME, FREQ, POWER_A, [9, 8, 7, 6]);
+    const pair = createGramPair({
+      client: STUB_CLIENT,
+      loadLevel: fakeLoadLevel(new Map([["sess-a", level]])),
+    });
+    await pair.load("sess-a", null);
+
+    // When / Then: дефолт mean, переключение на max-hold меняет значения
+    expect(pair.detector()).toBe("mean");
+    expect(Array.from(asTile(pair.current()).tile.values)).toEqual(Array.from(POWER_A));
+    pair.setDetector("max-hold");
+    expect(pair.detector()).toBe("max-hold");
+    expect(Array.from(asTile(pair.current()).tile.values)).toEqual([9, 8, 7, 6]);
+    pair.setDetector("mean");
+    expect(Array.from(asTile(pair.current()).tile.values)).toEqual(Array.from(POWER_A));
+    pair.dispose();
+  });
+
+  it("max-hold without a trace falls back to mean", async () => {
+    // Given: уровень без max-hold следа
+    const pair = createGramPair({
+      client: STUB_CLIENT,
+      loadLevel: fakeLoadLevel(new Map([["sess-a", LEVEL_A]])),
+    });
+    await pair.load("sess-a", null);
+
+    // When
+    pair.setDetector("max-hold");
+
+    // Then: откат на mean без смены детектора
+    expect(pair.detector()).toBe("mean");
+    expect(Array.from(asTile(pair.current()).tile.values)).toEqual(Array.from(POWER_A));
     pair.dispose();
   });
 

@@ -22,7 +22,7 @@ from lnt.errors import InputError
 from lnt.markers import refined_frequency_hz, refined_level_db
 from lnt.psd import FrequencyBand, PsdSettings, compute_welch
 from lnt.psd.errors import PsdSettingsError
-from lnt.psd.models import DEFAULT_MAX_CHUNK_SAMPLES
+from lnt.psd.models import DEFAULT_DETECTOR, DEFAULT_MAX_CHUNK_SAMPLES, KNOWN_DETECTORS
 from lnt.psd.windows import (
     DEFAULT_RBW_HZ,
     DEFAULT_WINDOW,
@@ -69,6 +69,17 @@ class BandSpectrum:
     peaks: tuple[SpectrumPeak, ...]
     window: str = DEFAULT_WINDOW
     enbw_hz: float = 0.0
+    detector: str = DEFAULT_DETECTOR
+    psd_max_hold_v2_per_hz: Float64Array | None = None
+
+
+def _resolve_spectrum_contract(rbw_hz: float, window: str, detector: str) -> tuple[float, str]:
+    """Проверяет RBW/окно/детектор; ошибки контракта — PsdSettingsError."""
+    resolved_rbw_hz = validate_rbw_hz(rbw_hz)
+    window_name = canonical_window_name(window)
+    if detector not in KNOWN_DETECTORS:
+        raise PsdSettingsError(f"PSD: неизвестный детектор {detector!r}")
+    return resolved_rbw_hz, window_name
 
 
 def compute_band_spectrum(  # noqa: PLR0913 - RBW/окно это отдельные контракты селектора
@@ -80,6 +91,8 @@ def compute_band_spectrum(  # noqa: PLR0913 - RBW/окно это отдельн
     max_peaks: int = DEFAULT_MAX_PEAKS,
     rbw_hz: float = DEFAULT_RBW_HZ,
     window: str = DEFAULT_WINDOW,
+    detector: str = DEFAULT_DETECTOR,
+    hold: bool = False,
 ) -> BandSpectrum:
     """Считает Welch-PSD в полосе и находит пики; вход в вольтах."""
     if samples.size < MIN_NPERSEG:
@@ -87,8 +100,7 @@ def compute_band_spectrum(  # noqa: PLR0913 - RBW/окно это отдельн
             f"слишком мало отсчётов для спектра: {samples.size}, нужно >= {MIN_NPERSEG}",
         )
     try:
-        resolved_rbw_hz = validate_rbw_hz(rbw_hz)
-        window_name = canonical_window_name(window)
+        resolved_rbw_hz, window_name = _resolve_spectrum_contract(rbw_hz, window, detector)
     except PsdSettingsError as error:
         raise InputError(str(error)) from error
     effective_high = min(band_high_hz, NYQUIST_FRACTION * sample_rate_hz)
@@ -106,6 +118,8 @@ def compute_band_spectrum(  # noqa: PLR0913 - RBW/окно это отдельн
             bands=(FrequencyBand(name="full", low_hz=0.0, high_hz=sample_rate_hz / 2.0),),
             window=window_name,
             overlap_fraction=0.5,
+            detector=detector,
+            track_max_hold=hold,
         ),
     )
     freqs = result.frequency_hz
@@ -117,6 +131,9 @@ def compute_band_spectrum(  # noqa: PLR0913 - RBW/окно это отдельн
         )
     band_freqs = freqs[mask].copy()
     band_psd = np.maximum(psd[mask], PSD_FLOOR).copy()
+    band_hold: Float64Array | None = None
+    if result.psd_max_hold_v2_per_hz is not None:
+        band_hold = np.maximum(result.psd_max_hold_v2_per_hz[mask], PSD_FLOOR).copy()
     resolution_hz = sample_rate_hz / nperseg
     peaks = _find_peaks(
         band_freqs,
@@ -133,6 +150,8 @@ def compute_band_spectrum(  # noqa: PLR0913 - RBW/окно это отдельн
         peaks=peaks,
         window=window_name,
         enbw_hz=enbw_hz(window_name, nperseg, sample_rate_hz),
+        detector=detector,
+        psd_max_hold_v2_per_hz=band_hold,
     )
 
 

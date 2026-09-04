@@ -92,6 +92,39 @@ describe("createSpectrumPanel", () => {
     expect(onViewChange).toHaveBeenCalledWith("spectrum");
   });
 
+  it("load(a, null) appends max-hold trace when payload carries it", async () => {
+    const payload: SpectrumPayload = {
+      ...SPECTRUM_A,
+      psd_max_hold_v2_per_hz: [2e-4, 3e-2, 2e-6],
+    };
+    const { createView, views } = makeFakeViewFactory();
+    const panel = createSpectrumPanel({
+      client: {
+        plots: {
+          spectrum: async () => payload,
+          detail: async () => ({ analysis: {} }),
+        },
+      },
+      createView,
+    });
+
+    await panel.load("a", null);
+
+    const request = views[0]?.renders[0];
+    expect(request?.series).toHaveLength(2);
+    expect(request?.series[1]?.label).toContain("max-hold");
+    expect(request?.series[1]?.values).toEqual([2e-4, 3e-2, 2e-6]);
+  });
+
+  it("load(a, null) renders a single series without max-hold key", async () => {
+    const { createView, views } = makeFakeViewFactory();
+    const panel = createSpectrumPanel({ client: makeClient(), createView });
+
+    await panel.load("a", null);
+
+    expect(views[0]?.renders[0]?.series).toHaveLength(1);
+  });
+
   it("load(a, b) renders one overlay request with solid A and dashed B", async () => {
     const { createView, views } = makeFakeViewFactory();
     const panel = createSpectrumPanel({ client: makeClient(), createView });

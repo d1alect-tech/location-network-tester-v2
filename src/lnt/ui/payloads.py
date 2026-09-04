@@ -14,8 +14,9 @@ from lnt.analysis import (
 from lnt.errors import InputError
 from lnt.manifest import manifest_from_json
 from lnt.session_store import MANIFEST_FILENAME
+from lnt.spectrum_hold import matching_hold_spectrum, read_hold_spectrum
 from lnt.types import SessionManifest
-from lnt.ui.decimation import decimate_spectrum, decimate_waveform
+from lnt.ui.decimation import decimate_spectrum, decimate_spectrum_pair, decimate_waveform
 from lnt.ui.sessions import list_sessions, resolve_session_dir
 
 
@@ -99,18 +100,31 @@ def spectrum_payload(root: Path, name: str, *, max_points: int) -> dict[str, obj
         dtype=np.float64,
         ndmin=2,
     )
-    series = decimate_spectrum(
-        spectrum_table[:, 0],
-        spectrum_table[:, 1],
-        max_points=max_points,
-    )
+    hold = matching_hold_spectrum(spectrum_table, read_hold_spectrum(session_dir))
+    if hold is None:
+        series = decimate_spectrum(
+            spectrum_table[:, 0],
+            spectrum_table[:, 1],
+            max_points=max_points,
+        )
+        hold_values: list[float] | None = None
+    else:
+        series, hold_series = decimate_spectrum_pair(
+            spectrum_table[:, 0],
+            spectrum_table[:, 1],
+            hold,
+            max_points=max_points,
+        )
+        hold_values = list(hold_series.y)
     result: dict[str, object] = {
         "frequency_hz": list(series.x),
         "psd_v2_per_hz": list(series.y),
         "point_count": series.point_count,
     }
-    # RBW-контракт шкалы: только ADD ключей, старые клиенты целы.
+    # RBW-контракт шкалы и max-hold след: только ADD ключей, старые клиенты целы.
     result.update(_spectrum_meta(session_dir))
+    if hold_values is not None:
+        result["psd_max_hold_v2_per_hz"] = hold_values
     return result
 
 

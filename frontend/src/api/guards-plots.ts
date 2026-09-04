@@ -20,11 +20,17 @@ function isOptionalNumber(value: unknown): boolean {
   return value === undefined || value === null || typeof value === "number";
 }
 
+/** Опциональный числовой массив (max-hold след B2): отсутствует или number[]. */
+function isOptionalNumberArray(value: unknown): boolean {
+  return value === undefined || isNumberArray(value);
+}
+
 export function isSpectrumPayload(value: unknown): value is SpectrumPayload {
   if (!isRecord(value)) return false;
   return (
     isNumberArray(value.frequency_hz) &&
     isNumberArray(value.psd_v2_per_hz) &&
+    isOptionalNumberArray(value.psd_max_hold_v2_per_hz) &&
     typeof value.point_count === "number" &&
     isOptionalNumber(value.resolution_hz) &&
     isOptionalNumber(value.band_low_hz) &&

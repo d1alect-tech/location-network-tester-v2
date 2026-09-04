@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -26,6 +26,10 @@ DEFAULT_HIGH_HZ: Final = 3_000_000.0
 DEFAULT_RESOLUTION_HZ: Final = 50.0
 DEFAULT_MAX_CHUNK_SAMPLES: Final = 1_000_000
 MIN_NPERSEG: Final = 2
+
+TraceDetector = Literal["mean", "rms", "max-hold", "min-hold"]
+KNOWN_DETECTORS: Final = ("mean", "rms", "max-hold", "min-hold")
+DEFAULT_DETECTOR: Final = "mean"
 
 Float64Array = NDArray[np.float64]
 
@@ -60,13 +64,17 @@ class PsdSettings:
     bands: tuple[FrequencyBand, ...]
     window: str = DEFAULT_WINDOW
     overlap_fraction: float = 0.5
+    detector: str = DEFAULT_DETECTOR
+    track_max_hold: bool = False
 
     def __post_init__(self) -> None:
-        """Проверяет частоту, размер порции, окно, перекрытие и границы Найквиста."""
+        """Проверяет частоту, размер порции, окно, детектор и границы Найквиста."""
         if not math.isfinite(self.sample_rate_hz) or self.sample_rate_hz <= 0:
             raise PsdSettingsError("PSD: частота дискретизации должна быть конечной и > 0")
         if self.window not in KNOWN_WINDOWS:
             raise PsdSettingsError(f"PSD: неизвестное окно {self.window!r}")
+        if self.detector not in KNOWN_DETECTORS:
+            raise PsdSettingsError(f"PSD: неизвестный детектор {self.detector!r}")
         if not math.isfinite(self.overlap_fraction) or not 0 <= self.overlap_fraction < 1:
             raise PsdSettingsError("PSD: overlap_fraction должен быть в [0, 1)")
         if self.nperseg < MIN_NPERSEG:
@@ -157,6 +165,8 @@ class PsdResult:
     segment_count: int
     window: str = DEFAULT_WINDOW
     enbw_hz: float = 0.0
+    detector: str = DEFAULT_DETECTOR
+    psd_max_hold_v2_per_hz: Float64Array | None = None
     psd_unit: str = "V²/Hz"
     asd_unit: str = "V/√Hz"
     level_unit: str = "dB re 1 V²/Hz"

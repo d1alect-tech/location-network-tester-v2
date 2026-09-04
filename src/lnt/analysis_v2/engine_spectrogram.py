@@ -28,5 +28,6 @@ def run_spectrogram(context: BranchContext) -> BranchOutput:
         time_s=overview.time_s,
         frequency_hz=overview.frequency_hz,
         power_db=overview.power_db,
+        power_max_hold_db=overview.max_hold_db,
     )
     return BranchOutput(files={"spectrogram.npz": buffer.getvalue()})

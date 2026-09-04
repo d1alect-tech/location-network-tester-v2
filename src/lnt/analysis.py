@@ -112,7 +112,7 @@ def analyze_session(session_dir: Path) -> AnalysisResult | LineQualityAnalysis:
             sample_rate_hz=manifest.sample_rate_hz,
             line_frequency_hz=manifest.line_frequency_hz,
         )
-    spectrum = compute_band_spectrum(loaded.ch1, sample_rate_hz=manifest.sample_rate_hz)
+    spectrum = compute_band_spectrum(loaded.ch1, sample_rate_hz=manifest.sample_rate_hz, hold=True)
     ch1_input_reference = derive_input_reference(session_dir, loaded, spectrum)
     return AnalysisResult(
         session_id=manifest.session_id,
