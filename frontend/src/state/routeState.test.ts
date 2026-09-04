@@ -26,6 +26,19 @@ describe("parseHash", () => {
     expect(parseHash("")).toBeNull();
     expect(parseHash("#no-slash")).toBeNull();
   });
+
+  it("maps the killed legacy route prepare to capture (A3)", () => {
+    expect(parseHash("#/prepare")).toEqual({ route: "capture", params: {} });
+    expect(parseHash("#/prepare?session=abc&nonce=leak")).toEqual({
+      route: "capture",
+      params: { session: "abc" },
+    });
+  });
+
+  it("WORKSPACE_ROUTES no longer lists the killed prepare route (A3)", () => {
+    expect(WORKSPACE_ROUTES).not.toContain("prepare");
+    expect(WORKSPACE_ROUTES).toContain("capture");
+  });
 });
 
 describe("serializeLocation", () => {
@@ -75,7 +88,7 @@ describe("RouteStore reload safety", () => {
   });
 
   it("navigate() updates the hash and notifies subscribers", () => {
-    window.location.hash = "#/prepare";
+    window.location.hash = "#/capture";
     const store = new RouteStore(window);
     const seen: WorkspaceLocation[] = [];
     store.subscribe((loc) => seen.push(loc));
@@ -88,7 +101,7 @@ describe("RouteStore reload safety", () => {
   });
 
   it("reacts to a real hashchange event", () => {
-    window.location.hash = "#/prepare";
+    window.location.hash = "#/capture";
     const store = new RouteStore(window);
     window.location.hash = "#/reports";
     window.dispatchEvent(new Event("hashchange"));
@@ -96,7 +109,7 @@ describe("RouteStore reload safety", () => {
   });
 
   it("does not notify when the parsed location is unchanged", () => {
-    window.location.hash = "#/prepare";
+    window.location.hash = "#/capture";
     const store = new RouteStore(window);
     let calls = 0;
     store.subscribe(() => {
@@ -104,6 +117,14 @@ describe("RouteStore reload safety", () => {
     });
     store.syncFromUrl();
     expect(calls).toBe(0);
+  });
+
+  it("canonicalizes a legacy prepare hash to capture on sync (A3)", () => {
+    window.location.hash = "#/prepare";
+    const store = new RouteStore(window);
+    store.syncFromUrl();
+    expect(store.get()).toEqual({ route: "capture", params: {} });
+    expect(window.location.hash).toBe("#/capture");
   });
 
   it("replaceParams merges filters without losing the route", () => {

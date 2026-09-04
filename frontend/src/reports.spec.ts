@@ -147,6 +147,18 @@ async function createDriftExperiment(page: Page): Promise<void> {
   await expect(page.locator(".lnt-exp-list")).toContainText("exp.aba.drift");
 }
 
+test("disabled buttons explain themselves until report is built (queue A1)", async ({ page }) => {
+  await openReports(page);
+  await expect(page.locator("#lnt-rep-hint")).toContainText("Сначала выберите эксперимент");
+  await createDemoExperiment(page);
+  await openReports(page);
+  await page.locator(".lnt-exp-open", { hasText: "exp.aba.demo" }).click();
+  const download = page.locator("#lnt-rep-download");
+  await expect(download).toBeDisabled();
+  await expect(download).toHaveAttribute("title", "Станет доступна после сборки отчёта");
+  await expect(page.locator("#lnt-rep-hint")).toContainText("Собрать отчёт");
+});
+
 test("empty workspace explains where experiments are created (no dead end)", async ({ page }) => {
   await openReports(page);
   await expect(page.locator(".lnt-rep-left")).toContainText(

@@ -52,6 +52,17 @@ describe("AppShell (baseline characterization)", () => {
     expect(container.querySelector(".lnt-cat-workspace")).not.toBeNull();
   });
 
+  it("redirects the killed legacy #/prepare to #/capture and renders capture (A3)", () => {
+    window.location.hash = "#/prepare";
+    const shell = new AppShell(container);
+    shell.init();
+    expect(window.location.hash).toBe("#/capture");
+    expect(container.querySelector(".capture-view")).not.toBeNull();
+    expect(container.querySelector('[aria-current="page"]')?.getAttribute("data-route")).toBe(
+      "capture",
+    );
+  });
+
   it("falls back to the default view for an unknown route and keeps the hash", () => {
     window.location.hash = "#/unknown";
     const shell = new AppShell(container);

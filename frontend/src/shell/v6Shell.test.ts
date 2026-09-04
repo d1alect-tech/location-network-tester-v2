@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createV6ShellHeader, createV6ShellStatusbar } from "./v6Shell";
 
-const TAB_ROUTES = [
-  "catalog",
-  "capture",
-  "inspect",
-  "experiments",
-  "reports",
-  "settings",
-] as const;
+const TAB_ROUTES = ["catalog", "capture", "inspect", "experiments", "reports", "settings"] as const;
 
 describe("createV6ShellHeader", () => {
   it("builds header.hdr with brand LNT and six tab links in route order", () => {
@@ -42,7 +35,7 @@ describe("createV6ShellHeader", () => {
     expect(root.querySelector("#nav-catalog")?.classList.contains("is-active")).toBe(false);
   });
 
-  it("clears aria-current when setActiveRoute is prepare", () => {
+  it("clears aria-current for a route without a tab (killed legacy prepare)", () => {
     // Given
     const header = createV6ShellHeader({ activeRoute: "inspect" });
 
@@ -95,5 +88,14 @@ describe("createV6ShellStatusbar", () => {
     expect(root.children[0]?.textContent).toBe("готов");
     expect(root.children[1]?.classList.contains("statusbar-spacer")).toBe(true);
     expect(root.children[2]?.textContent).toBe("Корень: …");
+  });
+
+  it("exposes a polite live region for status changes", () => {
+    // Given / When
+    const { root } = createV6ShellStatusbar();
+
+    // Then
+    expect(root.getAttribute("role")).toBe("status");
+    expect(root.getAttribute("aria-label")).toBe("Состояние приложения");
   });
 });

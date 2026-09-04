@@ -8,17 +8,9 @@ import type { Page } from "@playwright/test";
 
 const BASE = "http://127.0.0.1:4101/static/v2/";
 
-const TABS = 6; // Каталог, Захват, Инспекция, Эксперименты, Отчёты, Настройки (prepare скрыт из таббара)
+const TABS = 6; // Каталог, Захват, Инспекция, Эксперименты, Отчёты, Настройки (A3: prepare убит)
 
-const ROUTES = [
-  "catalog",
-  "capture",
-  "inspect",
-  "experiments",
-  "reports",
-  "settings",
-  "prepare",
-] as const;
+const ROUTES = ["catalog", "capture", "inspect", "experiments", "reports", "settings"] as const;
 
 async function mockInspectApi(page: Page): Promise<void> {
   const json = (body: unknown): string => JSON.stringify(body);
@@ -90,16 +82,27 @@ test("S1: общая V6-шапка и статус-бар на всех марш
     await expect(page.locator("footer.statusbar"), `маршрут #/${route}: статус-бар`).toBeVisible();
     // Старой шапки больше нет нигде.
     await expect(page.locator(".app-header")).toHaveCount(0);
-    // Активная вкладка помечена; на prepare активной вкладки нет.
+    // Активная вкладка помечена единым паттерном: is-active + aria-current=page.
     const active = header.locator(".tabbar a.snav-item[aria-current='page']");
-    if (route === "prepare") {
-      await expect(active).toHaveCount(0);
-    } else {
-      await expect(active).toHaveCount(1);
-      await expect(active).toHaveAttribute("href", `#/${route}`);
-    }
+    await expect(active).toHaveCount(1);
+    await expect(active).toHaveAttribute("href", `#/${route}`);
+    await expect(active).toHaveClass(/is-active/);
     await noHorizontalOverflow(page);
   }
+});
+
+test("S1b: убитый legacy-маршрут prepare редиректит на capture (A3)", async ({ page }) => {
+  await mockInspectApi(page);
+  await page.goto(`${BASE}#/prepare`);
+  await expect(page).toHaveURL(/#\/capture/);
+  const header = page.locator("header.hdr");
+  await expect(header).toBeVisible();
+  const active = header.locator(".tabbar a.snav-item[aria-current='page']");
+  await expect(active).toHaveCount(1);
+  await expect(active).toHaveAttribute("href", "#/capture");
+  await expect(page.locator(".capture-view")).toBeVisible();
+  await expect(page.locator(".error-panel")).toHaveCount(0);
+  await noHorizontalOverflow(page);
 });
 
 test("S2: инспект под общей оболочкой — окно сравнения без дублирования шелла", async ({ page }) => {

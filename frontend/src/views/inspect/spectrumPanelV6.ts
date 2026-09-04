@@ -134,7 +134,20 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
   ]);
   const frame = el("div", { className: "frame" });
   const gramHost = el("div", { className: "gram" });
-  const body = el("div", { className: "panel-bd" }, [frame, gramHost]);
+  const statusText = el("span", {});
+  const retryButton = el("button", {
+    className: "lnt-btn btn-quiet",
+    text: "Пересчитать спектр",
+    attrs: { type: "button" },
+  }) as HTMLButtonElement;
+  retryButton.addEventListener("click", () => reloadPlane());
+  const status = el(
+    "div",
+    { className: "spectrum-status", attrs: { role: "status", "data-spectrum-status": "" } },
+    [statusText, retryButton],
+  );
+  status.hidden = true;
+  const body = el("div", { className: "panel-bd" }, [status, frame, gramHost]);
   const root = el("section", { className: "panel", attrs: { "data-showcase": "spectrum" } }, [
     header,
     body,
@@ -168,6 +181,7 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
 
   let lastA: string | null = null;
   let lastB: string | null = null;
+  let rendered = false;
 
   /** Спектр в активной плоскости; вход при 404/409 откатывается на скоп. */
   async function fetchPlaneSpectrum(name: string): Promise<SpectrumPayload> {
@@ -185,22 +199,40 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
   async function load(a: string, b: string | null): Promise<void> {
     lastA = a;
     lastB = b;
-    const [payloadA, payloadB, detail] = await Promise.all([
-      fetchPlaneSpectrum(a),
-      b === null ? Promise.resolve(null) : fetchPlaneSpectrum(b),
-      opts.client.plots.detail(a),
-    ]);
-    planeControl.paintPlane(detail.analysis);
-    planeControl.paintRbw(payloadA);
-    peaksA = peaksFromDetail(detailForPeaks(a, detail));
-    const suffix = planeControl.plane() === "input-referred" ? " · вход" : "";
-    const styleA: SeriesStyle = { color: theme.accentA, label: `${a}${suffix}` };
-    const styleB: SeriesStyle = {
-      color: theme.accentB,
-      label: `${b ?? ""}${suffix}`,
-      dash: DASH_B,
-    };
-    chart.render(overlayRequest(payloadA, payloadB, styleA, styleB, peaksA));
+    status.hidden = false;
+    retryButton.hidden = true;
+    statusText.textContent = "Загрузка спектра…";
+    root.classList.add("is-loading");
+    root.classList.remove("is-stale");
+    try {
+      const [payloadA, payloadB, detail] = await Promise.all([
+        fetchPlaneSpectrum(a),
+        b === null ? Promise.resolve(null) : fetchPlaneSpectrum(b),
+        opts.client.plots.detail(a),
+      ]);
+      planeControl.paintPlane(detail.analysis);
+      planeControl.paintRbw(payloadA);
+      peaksA = peaksFromDetail(detailForPeaks(a, detail));
+      const suffix = planeControl.plane() === "input-referred" ? " · вход" : "";
+      const styleA: SeriesStyle = { color: theme.accentA, label: `${a}${suffix}` };
+      const styleB: SeriesStyle = {
+        color: theme.accentB,
+        label: `${b ?? ""}${suffix}`,
+        dash: DASH_B,
+      };
+      chart.render(overlayRequest(payloadA, payloadB, styleA, styleB, peaksA));
+      rendered = true;
+      status.hidden = true;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      retryButton.hidden = false;
+      statusText.textContent = rendered
+        ? `Данные устарели: ${reason}. Показан последний спектр.`
+        : `Не удалось загрузить спектр: ${reason}.`;
+      if (rendered) root.classList.add("is-stale");
+    } finally {
+      root.classList.remove("is-loading");
+    }
   }
 
   reloadPlane = () => {

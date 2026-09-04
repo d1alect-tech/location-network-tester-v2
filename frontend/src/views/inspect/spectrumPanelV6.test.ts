@@ -106,3 +106,96 @@ describe("createSpectrumPanel", () => {
     expect(request?.xLog).toBe(true);
   });
 });
+
+const QUEUE_A_PAYLOAD: SpectrumPayload = {
+  frequency_hz: [10, 20, 40],
+  psd_v2_per_hz: [1e-12, 2e-12, 1.5e-12],
+  point_count: 3,
+};
+
+function mountQueueA(
+  spectrumImpl: () => Promise<SpectrumPayload>,
+  render: () => void = () => undefined,
+) {
+  const spectrum = vi.fn(spectrumImpl);
+  const detail = vi.fn(async (_name: string) => ({ analysis: {} }));
+  const { createView } = makeFakeViewFactory();
+  const panel = createSpectrumPanel({
+    client: { plots: { spectrum, detail } },
+    createView: (options) => {
+      const view = createView(options);
+      const origin = view.render.bind(view);
+      view.render = (request) => {
+        render();
+        origin(request);
+      };
+      return view;
+    },
+  });
+  document.body.replaceChildren(panel.root);
+  return { panel, spectrum };
+}
+
+function spectrumStatus(): HTMLElement | null {
+  return document.querySelector<HTMLElement>("[data-spectrum-status]");
+}
+
+describe("spectrumPanelV6: скелетон, stale-метка и CTA пересчёта (очередь A1)", () => {
+  it("во время загрузки показывает русскую строку состояния", async () => {
+    // Given
+    let release!: (value: SpectrumPayload) => void;
+    const gate = new Promise<SpectrumPayload>((resolve) => {
+      release = resolve;
+    });
+    const { panel } = mountQueueA(() => gate);
+
+    // When
+    const pending = panel.load("a", null);
+    expect(spectrumStatus()?.hidden).toBe(false);
+    expect(spectrumStatus()?.textContent).toContain("Загрузка спектра");
+
+    // Then
+    release(QUEUE_A_PAYLOAD);
+    await pending;
+    expect(spectrumStatus()?.hidden).toBe(true);
+  });
+
+  it("ошибка без прошлого рендера: сообщение и кнопка «Пересчитать»", async () => {
+    // Given
+    const { panel, spectrum } = mountQueueA(async () => {
+      throw new Error("обрыв связи");
+    });
+
+    // When
+    await panel.load("a", null);
+
+    // Then
+    expect(spectrumStatus()?.hidden).toBe(false);
+    expect(spectrumStatus()?.textContent).toContain("Не удалось загрузить спектр");
+    const retry = spectrumStatus()?.querySelector("button");
+    expect(retry?.textContent).toContain("Пересчитать");
+    retry?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(spectrum).toHaveBeenCalledTimes(2);
+  });
+
+  it("ошибка после успеха: график сохранён, панель помечена stale", async () => {
+    // Given
+    let fail = false;
+    const render = vi.fn();
+    const { panel } = mountQueueA(async () => {
+      if (fail) throw new Error("обрыв связи");
+      return QUEUE_A_PAYLOAD;
+    }, render);
+    await panel.load("a", null);
+    expect(render).toHaveBeenCalledTimes(1);
+
+    // When
+    fail = true;
+    await panel.load("a", null);
+
+    // Then
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(panel.root.classList.contains("is-stale")).toBe(true);
+    expect(spectrumStatus()?.textContent).toContain("устарели");
+  });
+});

@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Final
 
 from lnt.analysis_store.identity import CodeIdentity
 from lnt.app_paths import resolve_app_paths
+from lnt.cli_spec import CLI_SUBCOMMANDS as CLI_SUBCOMMANDS  # noqa: PLC0414 — реэкспорт
 from lnt.errors import InputError
 from lnt.logging import attach_file_logging
 from lnt.runtime.lease import (
@@ -46,28 +47,10 @@ HEALTH_ATTEMPTS: Final = 120
 HEALTH_INTERVAL_S: Final = 0.25
 FOCUS_PROBE_TIMEOUT_S: Final = 0.5
 UI_URL_TEMPLATE: Final = "http://127.0.0.1:{port}/"
-# Верхнеуровневые подкоманды lnt.cli, доступные из замороженного exe. Тождество
-# этому множеству и реальному парсеру lnt.cli проверяет тест
+# Канонический список подкоманд живёт в lnt.cli_spec (очередь A4): этот модуль
+# лишь реэкспортирует его для диспетча замороженного exe. Тождество списку
+# и реальному парсеру lnt.cli проверяет тест
 # test_gui_main_cli_subcommands_match_parser (tests/test_launcher.py).
-CLI_SUBCOMMANDS: Final = frozenset(
-    {
-        "analyze",
-        "archive",
-        "capture",
-        "catalog",
-        "compare",
-        "context",
-        "experiment",
-        "hypothesis",
-        "profiles",
-        "reindex",
-        "selftest",
-        "sessions",
-        "simulate",
-        "support-bundle",
-        "ui",
-    }
-)
 _UI_DEPENDENCIES: Final = frozenset({"fastapi", "uvicorn", "starlette"})
 _INSTALL_HINT: Final = "интерфейс не установлен: pip install 'lnt[ui]' (см. README)"
 

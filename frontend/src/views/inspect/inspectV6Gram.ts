@@ -86,7 +86,10 @@ export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle 
     buttons,
   );
   const readout = el("span", { className: "gram-readout" });
-  const scale = el("span", { className: "gram-scale" });
+  const scale = el("span", {
+    className: "gram-scale",
+    attrs: { role: "status", "aria-label": "Шкала спектрограммы" },
+  });
   spectrumPanel.gramBar.append(modes, readout, scale);
 
   function deltaButton(): HTMLButtonElement | undefined {

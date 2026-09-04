@@ -16,19 +16,20 @@ type SelectItem = {
   readonly title: string;
 };
 
-function field(label: string, control: HTMLElement): HTMLLabelElement {
-  return el("label", { className: "cmd-field" }, [
-    el("span", { className: "cmd-label", text: label }),
+function field(labelText: string, controlId: string, control: HTMLElement): HTMLLabelElement {
+  return el("label", { className: "cmd-field", attrs: { for: controlId } }, [
+    el("span", { className: "cmd-label", text: labelText }),
     control,
   ]);
 }
 
 function selectField(label: string, name: string, items: readonly SelectItem[]): HTMLLabelElement {
-  const node = el("select", { className: "ctl", attrs: { name } });
+  const controlId = `cmd-${name}`;
+  const node = el("select", { className: "ctl", attrs: { id: controlId, name } });
   for (const item of items) {
     node.append(el("option", { text: item.title, attrs: { value: item.id } }));
   }
-  return field(label, node);
+  return field(label, controlId, node);
 }
 
 function inputField(spec: {
@@ -37,9 +38,14 @@ function inputField(spec: {
   readonly value: string;
   readonly type: string;
 }): HTMLLabelElement {
+  const controlId = `cmd-${spec.name}`;
   return field(
     spec.label,
-    el("input", { className: "ctl", attrs: { name: spec.name, type: spec.type, value: spec.value } }),
+    controlId,
+    el("input", {
+      className: "ctl",
+      attrs: { id: controlId, name: spec.name, type: spec.type, value: spec.value },
+    }),
   );
 }
 

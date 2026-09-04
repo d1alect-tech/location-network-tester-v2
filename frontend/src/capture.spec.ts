@@ -215,6 +215,16 @@ test.describe("capture workflow", () => {
     await expect(page.locator(".capture-written-item").first()).toHaveText("cap-001");
   });
 
+  test("timeline shows onboarding when no job exists yet (queue A1)", async ({ page }) => {
+    installMockBackend(page);
+    await page.goto(`${BASE}#/capture`);
+
+    const timeline = page.locator(".capture-timeline");
+    await expect(timeline).toBeVisible();
+    await expect(timeline).toContainText("Задач пока нет");
+    await expect(timeline).toContainText("Запустите захват");
+  });
+
   test("375px mobile and 200% zoom keep the form usable without clipped controls", async ({
     page,
   }) => {
