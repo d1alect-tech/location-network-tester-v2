@@ -23,6 +23,8 @@ from lnt.spectrogram import StftSettings, build_overview, load_overview, save_ov
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
+    from lnt.spectrogram.models import SpectrogramOverview
+
 _FS = 1024.0
 _TONE_HZ = 128.0  # точный бин rfftfreq(256): df = 4 Гц, бин 32
 
@@ -45,6 +47,20 @@ def _save(path: Path, values: NDArray[np.float32]) -> Path:
 
 def _tone(time_s: np.ndarray) -> np.ndarray:
     return np.sin(2.0 * np.pi * _TONE_HZ * time_s)
+
+
+def _hold_linear(overview: SpectrogramOverview) -> NDArray[np.float64]:
+    """Обзор из движка всегда несёт max-hold — сужаем Optional одним местом."""
+    hold = overview.max_hold_linear
+    assert hold is not None, "обзор из build_overview обязан нести max_hold_linear"
+    return hold
+
+
+def _hold_db(overview: SpectrogramOverview) -> NDArray[np.float32]:
+    """То же для dB-вида max-hold."""
+    hold = overview.max_hold_db
+    assert hold is not None, "обзор из build_overview обязан нести max_hold_db"
+    return hold
 
 
 def _direct_max_hold(
@@ -95,9 +111,9 @@ def test_stationary_tone_mean_equals_max_hold(tmp_path: Path) -> None:
 
     # Then: тайлы совпадают, NaN только вне покрытия
     np.testing.assert_allclose(
-        overview.max_hold_linear, overview.linear_power, rtol=1e-6, atol=1e-21, equal_nan=True
+        _hold_linear(overview), overview.linear_power, rtol=1e-6, atol=1e-21, equal_nan=True
     )
-    assert np.array_equal(np.isnan(overview.max_hold_db), overview.coverage == 0)
+    assert np.array_equal(np.isnan(_hold_db(overview)), overview.coverage == 0)
 
 
 def test_transient_survives_only_in_max_hold_tile(tmp_path: Path) -> None:
@@ -116,17 +132,17 @@ def test_transient_survives_only_in_max_hold_tile(tmp_path: Path) -> None:
     )
 
     # When
-    band = int(np.argmax(overview.max_hold_linear[:, 2]))
+    band = int(np.argmax(_hold_linear(overview)[:, 2]))
     burst_cell = int(np.argmin(np.abs(overview.time_s - 1.0)))
     quiet_cell = int(np.argmin(np.abs(overview.time_s - 0.25)))
 
     # Then: ячейка всплеска держит пик, тихая ячейка mean == hold
-    ratio = overview.max_hold_linear[band, burst_cell] / overview.linear_power[band, burst_cell]
+    ratio = _hold_linear(overview)[band, burst_cell] / overview.linear_power[band, burst_cell]
     assert ratio > 2.0
-    assert overview.max_hold_linear[band, quiet_cell] == pytest.approx(
+    assert _hold_linear(overview)[band, quiet_cell] == pytest.approx(
         overview.linear_power[band, quiet_cell], rel=1e-9
     )
-    assert np.all(overview.max_hold_linear[overview.coverage > 0] >= 0.0)
+    assert np.all(_hold_linear(overview)[overview.coverage > 0] >= 0.0)
 
 
 def test_max_hold_matches_direct_scipy_recomputation(tmp_path: Path) -> None:
@@ -150,7 +166,7 @@ def test_max_hold_matches_direct_scipy_recomputation(tmp_path: Path) -> None:
     expected = _direct_max_hold(values, settings, overview.frequency_edges_hz, 7)
 
     # Then
-    np.testing.assert_allclose(overview.max_hold_linear, expected, rtol=2e-5, equal_nan=True)
+    np.testing.assert_allclose(_hold_linear(overview), expected, rtol=2e-5, equal_nan=True)
 
 
 def test_hold_round_trip_and_legacy_artifact_without_hold(tmp_path: Path) -> None:
@@ -170,9 +186,9 @@ def test_hold_round_trip_and_legacy_artifact_without_hold(tmp_path: Path) -> Non
 
     # When / Then: round-trip хранит hold
     loaded = load_overview(artifact)
-    np.testing.assert_array_equal(loaded.max_hold_db, overview.max_hold_db)
+    np.testing.assert_array_equal(_hold_db(loaded), _hold_db(overview))
     np.testing.assert_allclose(
-        loaded.max_hold_linear, overview.max_hold_linear, rtol=1e-4, equal_nan=True
+        _hold_linear(loaded), _hold_linear(overview), rtol=1e-4, equal_nan=True
     )
 
     # Given: legacy-артефакт без hold-ключа
@@ -205,5 +221,5 @@ def test_hold_round_trip_and_legacy_artifact_without_hold(tmp_path: Path) -> Non
     # When / Then: старый файл читается, hold — сплошной NaN
     legacy_loaded = load_overview(legacy)
     np.testing.assert_array_equal(legacy_loaded.power_db, overview.power_db)
-    assert np.all(np.isnan(legacy_loaded.max_hold_db))
-    assert np.all(np.isnan(legacy_loaded.max_hold_linear))
+    assert np.all(np.isnan(_hold_db(legacy_loaded)))
+    assert np.all(np.isnan(_hold_linear(legacy_loaded)))

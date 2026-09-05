@@ -49,18 +49,33 @@ def save_overview(
         "floor_db": overview.floor_db,
         "ceiling_db": overview.ceiling_db,
     }
+    metadata_array = np.asarray(json.dumps(metadata, sort_keys=True))
+    max_hold_db = overview.max_hold_db
     try:
         with temporary.open("xb") as stream:
-            np.savez(
-                stream,
-                power_db=overview.power_db,
-                power_max_hold_db=overview.max_hold_db,
-                coverage=overview.coverage,
-                time_s=overview.time_s,
-                frequency_hz=overview.frequency_hz,
-                frequency_edges_hz=overview.frequency_edges_hz,
-                metadata=np.asarray(json.dumps(metadata, sort_keys=True)),
-            )
+            # Отсутствие max-hold — законное состояние обзора (см. SpectrogramOverview):
+            # ключ не пишется вовсе, и читатель трактует это как legacy-артефакт.
+            if max_hold_db is None:
+                np.savez(
+                    stream,
+                    power_db=overview.power_db,
+                    coverage=overview.coverage,
+                    time_s=overview.time_s,
+                    frequency_hz=overview.frequency_hz,
+                    frequency_edges_hz=overview.frequency_edges_hz,
+                    metadata=metadata_array,
+                )
+            else:
+                np.savez(
+                    stream,
+                    power_db=overview.power_db,
+                    power_max_hold_db=max_hold_db,
+                    coverage=overview.coverage,
+                    time_s=overview.time_s,
+                    frequency_hz=overview.frequency_hz,
+                    frequency_edges_hz=overview.frequency_edges_hz,
+                    metadata=metadata_array,
+                )
             stream.flush()
             os.fsync(stream.fileno())
         _check_cancelled(cancellation)
