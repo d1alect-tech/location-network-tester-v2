@@ -28,5 +28,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src", "bench"]
+  "include": ["src", "bench"],
+  // Витрины раунда 2 заморожены (frontend/AGENTS.md): править их запрещено,
+  // а два файла не проходят strict-профиль. Из корней тайпчека они убраны, но
+  // spectrogramPalette.ts продолжает проверяться — его импортирует живой
+  // capture/spectrogramLivePaint.ts, и он попадает в программу через граф импортов.
+  "exclude": ["src/showcase-round2"]
 }

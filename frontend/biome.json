@@ -13,7 +13,10 @@
     }
   },
   "files": {
-    "ignore": ["src/test-support/analysis-v2-fixtures/**"]
+    "ignore": [
+      "src/test-support/analysis-v2-fixtures/**",
+      "src/showcase-round2/**"
+    ]
   },
   "formatter": {
     "enabled": true,
