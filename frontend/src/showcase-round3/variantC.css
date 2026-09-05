@@ -1,0 +1,32 @@
+/* R3-C «Пара»: герой-строка пары сверху, спектр и таблица во всю ширину. */
+
+.r3--c .app {
+  grid-template-rows: auto auto 1fr auto;
+}
+
+.r3--c .hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: var(--r3-elev);
+  border-bottom: 1px solid var(--r3-line);
+}
+
+.r3--c .hero .chip {
+  height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+.r3--c .body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  min-width: 0;
+}
+
+.r3--c .delta-strip {
+  height: 96px;
+}

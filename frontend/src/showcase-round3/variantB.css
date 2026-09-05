@@ -1,0 +1,30 @@
+/* R3-B «Верстак»: график занимает центр, справа док 336px с панелями. */
+
+.r3--b .body {
+  display: grid;
+  grid-template-columns: 1fr 336px;
+  gap: 12px;
+  padding: 12px;
+  min-height: 0;
+}
+
+.r3--b .center {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.r3--b .center .panel {
+  flex: 1;
+}
+
+.r3--b .dock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.r3--b .delta-badges {
+  flex-wrap: wrap;
+}
