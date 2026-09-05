@@ -6,3 +6,8 @@ packaging/spike/__pycache__/
 __pycache__/
 .omo/
 .scratch/
+
+# Owner-local integrity receipts and August disk-crash forensics.
+# Machine-bound hash manifests, meaningless in a clone.
+.integrity/
+_recovery/
