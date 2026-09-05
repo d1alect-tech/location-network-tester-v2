@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from typing import TYPE_CHECKING, Final
 
 import numpy as np
 from numpy.typing import NDArray
@@ -20,7 +21,19 @@ from lnt.trends.models import (
     trends_settings_hash,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
 FloatArray = NDArray[np.floating]
+
+# Окно тренда: 100 мс — десять полупериодов сети, устойчиво к фазе: полупериод
+# чередуется и прячет дрейф постоянной составляющей.
+TREND_WINDOW_S: Final = 0.1
+# Минимум точек для наклона и минимум отсчётов, которые оставляем после discard.
+MIN_POINTS_FOR_SLOPE: Final = 2
+MIN_SAMPLES_AFTER_DISCARD: Final = 512
+# Порог вырожденности длительности, сигмы и RMS.
+EPS_LEVEL: Final = 1e-12
 
 
 def _validate(samples: FloatArray, fs: float, settings: TrendsSettings) -> int:
@@ -53,19 +66,10 @@ def _stream_rms_peak(arr: NDArray[np.float64], chunk_samples: int) -> tuple[floa
 
 
 def _half_cycle_series(
-    arr: NDArray[np.float64], fs: float, chunk_samples: int
+    arr: NDArray[np.float64], fs: float
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    """Строит ряд RMS потоково; 100ms окно для тренда (сглаживает 50Hz)."""
-    # Prefer stable 100ms RMS windows for trend detection; half-cycle alternates
-    # and hides DC drift. Keep power_quality attempt only as fallback validation.
-    try:
-        from lnt.power_quality.rms_series import detect_half_cycle_rms
-
-        _ = detect_half_cycle_rms  # keep import for coverage, not used for slope
-    except Exception:
-        pass
-    # chunked windows 100ms — 10x half-cycle, устойчив к фазе
-    window = max(1, int(round(fs * 0.1)))
+    """Строит ряд RMS потоково; окно TREND_WINDOW_S сглаживает сетевые 50 Гц."""
+    window = max(1, round(fs * TREND_WINDOW_S))
     n = int(arr.size)
     if n < window:
         return np.array([0.0]), np.array([float(np.sqrt(np.mean(arr * arr))) if n else 0.0])
@@ -86,7 +90,7 @@ def _theil_sen_sampling(
     times: NDArray[np.float64], values: NDArray[np.float64], max_pairs: int
 ) -> tuple[float, float]:
     n = int(values.size)
-    if n < 2:
+    if n < MIN_POINTS_FOR_SLOPE:
         return 0.0, float(values[0]) if n == 1 else 0.0
     # deterministic sampling: hash seeded RNG, O(n log n) approx
     seed = int(hashlib.sha256(values.tobytes()).hexdigest()[:8], 16) & 0xFFFFFFFF
@@ -98,7 +102,7 @@ def _theil_sen_sampling(
         i = int(rng.integers(0, n - 1))
         j = int(rng.integers(i + 1, n))
         dt = float(times[j] - times[i])
-        if abs(dt) < 1e-12:
+        if abs(dt) < EPS_LEVEL:
             continue
         slopes.append((float(values[j]) - float(values[i])) / dt)
     if not slopes:
@@ -129,7 +133,7 @@ def _cusum_change_points(
         # sigma via MAD for robustness
         mad = float(np.median(np.abs(seg - mean)))
         sigma = mad * 1.4826 if mad > 0 else float(np.std(seg))
-        if sigma < 1e-12:
+        if sigma < EPS_LEVEL:
             return
         cusum = np.cumsum(seg - mean)
         idx = int(np.argmax(np.abs(cusum)))
@@ -162,7 +166,7 @@ def _cusum_change_points(
     return tuple(points)
 
 
-def _eeprom_hash(inventory_dict: dict[str, object]) -> str:
+def _eeprom_hash(inventory_dict: Mapping[str, object]) -> str:
     """Симуляция EEPROM readback: SHA256 канонического JSON по 1М чанкам."""
     payload = json.dumps(inventory_dict, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     data = payload.encode("utf-8")
@@ -189,15 +193,14 @@ def compute_trends(
     # for tiny synthetic signals shorter than discard, clamp to keep data.
     if discard >= n_orig:
         discard = 0
-        if n_orig > 512:
-            discard = n_orig - 512
-            discard = max(discard, 0)
+        if n_orig > MIN_SAMPLES_AFTER_DISCARD:
+            discard = max(n_orig - MIN_SAMPLES_AFTER_DISCARD, 0)
     arr = arr_full[discard:] if discard > 0 else arr_full
     n_eff = int(arr.size)
     duration_s = n_eff / float(sample_rate_hz)
     rms_v, peak_v = _stream_rms_peak(arr, settings.chunk_samples)
-    crest = float(peak_v / rms_v) if rms_v > 1e-12 else 0.0
-    times, vals = _half_cycle_series(arr, float(sample_rate_hz), settings.chunk_samples)
+    crest = float(peak_v / rms_v) if rms_v > EPS_LEVEL else 0.0
+    times, vals = _half_cycle_series(arr, float(sample_rate_hz))
     slope, intercept = _theil_sen_sampling(times, vals, settings.theil_sen_max_pairs)
     change_points = _cusum_change_points(
         vals, times, settings.cusum_threshold_sigma, settings.min_segment_length
