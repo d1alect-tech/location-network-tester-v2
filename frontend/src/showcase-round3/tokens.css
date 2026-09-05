@@ -1,0 +1,111 @@
+/* Раунд 3, дизайн-бриф #13: прибор, не приложение. Тусклый хром / яркие данные.
+   База .r3 + три токенсета вариантов. A = циан сплошной ●, B = янтарь штрих ■ (DESIGN.md).
+   Дельта — собственный фиолетовый: сигнатурный объект, не смешивается с A/B. */
+
+.r3 {
+  /* Нейтральная шкала (переопределяется вариантом) */
+  --r3-canvas: #17191c;
+  --r3-chrome: #1e2125;
+  --r3-panel: #24282d;
+  --r3-elev: #2b3036;
+  --r3-line: #33383f;
+  --r3-line-strong: #444b54;
+  --r3-text: #e2e6ea;
+  --r3-text-sec: #aeb6bf;
+  --r3-text-dim: #7a828c;
+
+  /* Данные ярче хрома */
+  --r3-a: #3ec9e6;
+  --r3-b: #e6a13c;
+  --r3-delta: #b7a6ff;
+  --r3-ok: #3dbd8a;
+  --r3-err: #ef5b62;
+  --r3-limit: #ef5b62;
+  --r3-margin: rgb(239 91 98 / 0.45);
+  --r3-viol: #ffb03a;
+
+  /* Шрифты (слот варианта) */
+  --r3-ui: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --r3-mono: "IBM Plex Mono", "Consolas", monospace;
+
+  /* Геометрия прибора: радиусы минимальные, плотность — слот варианта */
+  --r3-r: 2px;
+  --r3-row: 28px;
+  --r3-pad: 10px;
+  --r3-bar-h: 34px;
+}
+
+/* Вариант A «Стойка»: FSW-плотность, нейтральный графит, Plex целиком */
+.r3--a {
+  --r3-row: 26px;
+  --r3-pad: 8px;
+}
+
+/* Вариант B «Верстак»: Spike-гибрид, тёплый графит, Golos + JetBrains */
+.r3--b {
+  --r3-canvas: #1a1815;
+  --r3-chrome: #211e1a;
+  --r3-panel: #282420;
+  --r3-elev: #302b26;
+  --r3-line: #3a352e;
+  --r3-line-strong: #4c463d;
+  --r3-text: #e8e4de;
+  --r3-text-sec: #b5aea4;
+  --r3-text-dim: #837c71;
+  --r3-ui: "Golos Text Variable", "Segoe UI", system-ui, sans-serif;
+  --r3-mono: "JetBrains Mono Variable", "Consolas", monospace;
+  --r3-row: 30px;
+  --r3-pad: 12px;
+}
+
+/* Вариант C «Пара»: холодный графит, сигнатура A/B/Δ первоклассна */
+.r3--c {
+  --r3-canvas: #15181e;
+  --r3-chrome: #1b1f27;
+  --r3-panel: #212630;
+  --r3-elev: #282e3a;
+  --r3-line: #323a48;
+  --r3-line-strong: #43506380;
+  --r3-text: #dfe4ec;
+  --r3-text-sec: #a9b2c0;
+  --r3-text-dim: #76808f;
+  --r3-mono: "JetBrains Mono Variable", "Consolas", monospace;
+}
+
+/* Типографические роли */
+.r3 .t-bar {
+  font: 600 12px / 16px var(--r3-ui);
+}
+.r3 .t-body {
+  font: 400 13px / 18px var(--r3-ui);
+  margin: 0;
+}
+.r3 .t-tag {
+  font: 700 10px / 14px var(--r3-ui);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--r3-text-dim);
+  margin: 0;
+}
+.r3 .t-num {
+  font: 500 12px / 16px var(--r3-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.r3 .t-num-big {
+  font: 600 20px / 24px var(--r3-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.r3 .t-unit {
+  color: var(--r3-text-sec);
+  font-weight: 400;
+  margin-inline-start: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .r3 *,
+  .r3 *::before,
+  .r3 *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
