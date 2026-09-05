@@ -16,10 +16,7 @@ import numpy as np
 from scipy import signal
 
 from lnt.analysis_store import AnalysisRecipe, ArtifactInputs, CodeIdentity, NamedDigest
-from lnt.analysis_v2.orchestrator import (
-    _artifact_inputs,  # pyright: ignore[reportPrivateUsage]
-    _sha256_file,  # pyright: ignore[reportPrivateUsage]
-)
+from lnt.analysis_v2.artifact_inputs import artifact_inputs, sha256_file
 from lnt.spectrum import compute_band_spectrum
 
 if TYPE_CHECKING:
@@ -120,7 +117,7 @@ def test_artifact_digest_unchanged_vs_read_bytes(tmp_path: Path) -> None:
     expected = hashlib.sha256(path.read_bytes()).hexdigest()
 
     # When
-    digest = _sha256_file(path)
+    digest = sha256_file(path)
 
     # Then
     assert digest == expected
@@ -148,7 +145,7 @@ def test_orchestrator_inputs_use_streaming_digest(tmp_path: Path) -> None:
     )
 
     # When
-    actual = _artifact_inputs(recipe, paths, identity)
+    actual = artifact_inputs(recipe, paths, identity)
 
     # Then
     assert actual == expected

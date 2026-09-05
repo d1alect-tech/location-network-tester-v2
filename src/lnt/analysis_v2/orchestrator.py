@@ -14,7 +14,6 @@ from lnt.errors import InputError
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 
 from .artifact_inputs import artifact_inputs as _artifact_inputs
-from .artifact_inputs import sha256_file as _sha256_file  # noqa: F401 - tests import digest helper
 from .projection import project_default
 from .types import (
     AnalysisCancelledError,

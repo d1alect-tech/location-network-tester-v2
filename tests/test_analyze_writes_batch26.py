@@ -7,7 +7,7 @@ from lnt.analysis import AnalysisResult
 from lnt.analysis_v2 import DefaultAnalysisEngine
 from lnt.ui.analysis_v2_wire import AnalyzeWriteResult
 from lnt.ui.operations import LntBackend
-from tests.analysis.test_orchestrator import _measurement_sine_session
+from tests.analysis.test_orchestrator import measurement_sine_session
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -30,7 +30,7 @@ _SAMPLE_COUNT = 24_000
 
 
 def _measurement_session(path: Path) -> Path:
-    session = _measurement_sine_session(path)
+    session = measurement_sine_session(path)
     (session / "manifest.json").write_text(
         json.dumps(
             {

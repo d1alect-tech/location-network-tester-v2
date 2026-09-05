@@ -243,5 +243,6 @@ __all__ = [
     "ProtocolRunStatus",
     "ProtocolRunStore",
     "ProtocolRunner",
+    "ProtocolStateError",
     "RandomizationSeedRequiredError",
 ]

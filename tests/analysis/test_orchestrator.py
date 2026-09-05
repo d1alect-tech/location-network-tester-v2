@@ -196,7 +196,7 @@ def test_cancellation_is_acknowledged_within_500_ms_and_publishes_no_partial(
     assert not tuple((session / "analyses").glob("*.partial-*"))
 
 
-def _measurement_sine_session(path: Path) -> Path:
+def measurement_sine_session(path: Path) -> Path:
     rate = 10_000.0
     duration_s = 2.4
     t = np.arange(round(rate * duration_s), dtype=np.float64) / rate
@@ -212,7 +212,7 @@ def _measurement_sine_session(path: Path) -> Path:
 
 
 def test_measurement_orchestrator_writes_batch_2_6_json(tmp_path: Path) -> None:
-    session = _measurement_sine_session(tmp_path / "measurement")
+    session = measurement_sine_session(tmp_path / "measurement")
     orchestrator = AnalysisOrchestrator(
         engine=DefaultAnalysisEngine(),
         code_identity=CodeIdentity(lnt="test", numpy=np.__version__, scipy="test"),
