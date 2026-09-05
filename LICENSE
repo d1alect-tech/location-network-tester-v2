@@ -19,21 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Note on the optional `hantek` extra
------------------------------------
-
-The MIT terms above cover this repository's own source code. They do not
-extend to third-party dependencies.
-
-The optional extra `lnt[hantek]` installs Hantek6022API, which is licensed
-GPL-3.0-or-later. This repository contains no Hantek6022API code and does not
-redistribute it; the extra is fetched from its upstream repository by the user
-at install time, and the import is lazy (see `src/lnt/scope_io.py`).
-
-Bundling that driver into a distributable binary produces a combined work
-subject to the GPL. See `docs/distribution-policy.md` before building or
-sharing any such artifact. A full dependency inventory with licenses lives in
-`THIRD_PARTY_NOTICES.md`.
