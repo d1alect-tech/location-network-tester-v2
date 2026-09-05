@@ -155,7 +155,15 @@ export function createCaptureView(
       alert.show(busyReasonRu(timelineState) ?? "Задача ещё выполняется.", "warn");
       return;
     }
-    if (request === null) return;
+    if (request === null) {
+      // U3: повтор без сохранённого запроса (например, восстановление
+      // после перезапуска сервера): молчаливый возврат заменён видимой причиной.
+      alert.show(
+        "Нет сохранённого запроса для повтора. Запустите новую запись через форму.",
+        "warn",
+      );
+      return;
+    }
 
     const source = form.getSource();
     if (source === "device" && !(await checkDeviceAndPreflight(request))) return;

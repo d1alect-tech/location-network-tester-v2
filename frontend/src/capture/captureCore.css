@@ -132,12 +132,16 @@
   margin-top: 24px;
 }
 
-/* Футер панели таймлайна: полоса действий как statusbar 32px (kit §5.5). */
+/* Футер панели таймлайна: полоса действий как statusbar 32px (kit §5.5).
+ * height:auto снимает жёсткие 32px из .statusbar (shell/v6Shell.css): полоса
+ * переносит кнопки (44px) на вторую строку вместо обрезки снизу,
+ * 32px остаются нижней границей ритма через min-height. */
 .capture-view .capture-job-actions.statusbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  height: auto;
   min-height: 32px;
   padding: 8px 12px;
   margin: 8px -12px -12px;

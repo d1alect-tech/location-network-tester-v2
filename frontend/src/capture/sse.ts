@@ -64,7 +64,10 @@ export function watchJobEvents(
           if (!closed) handlers.onSnapshot(snapshot);
         })
         .catch(() => {
-          // Опрос недоступен — ждём родное переподключение EventSource.
+          // Опрос недоступен — восстановление остаётся родным переподключением
+          // EventSource, но деградированное состояние подтверждается повторно
+          // (в обход дедупа announce): stale-индикатор должен остаться видимым.
+          handlers.onConnection("reconnecting");
         })
         .finally(() => {
           pollInFlight = false;

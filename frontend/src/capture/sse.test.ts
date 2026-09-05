@@ -176,6 +176,32 @@ describe("watchJobEvents (SSE)", () => {
     handle.close();
   });
 
+  it("re-announces reconnecting when the stale poll fails", async () => {
+    // Given: опрос снимка недоступен (сеть лежит вместе с SSE).
+    const deps = makeDeps();
+    deps.pollSnapshot = vi.fn(async () => {
+      throw new Error("snapshot unavailable");
+    });
+    const connections: string[] = [];
+    const handle = watchJobEvents(
+      "job-1",
+      { onSnapshot: () => {}, onConnection: (k) => connections.push(k) },
+      deps,
+    );
+    const source = firstSource();
+
+    // When: сбой потока, затем провал fallback-опроса.
+    source.fail();
+    expect(connections).toEqual(["reconnecting"]);
+    await vi.advanceTimersByTimeAsync(4000);
+
+    // Then: деградированное состояние подтверждено повторно — stale-индикатор
+    // остаётся видимым, а механизм восстановления — родной реконнект EventSource.
+    expect(deps.pollSnapshot).toHaveBeenCalledTimes(1);
+    expect(connections).toEqual(["reconnecting", "reconnecting"]);
+    handle.close();
+  });
+
   it("close() is idempotent and stops delivery", () => {
     const deps = makeDeps();
     const received: JobSnapshot[] = [];
