@@ -1,19 +1,11 @@
-/** Поля форм менеджера профилей (T11: выделено из profileManager — было 313
- * чистых LOC). Динамические поля под вид профиля и заливка существующих
- * значений; сборка data — в profileForms.collectProfileData, отправка — в
- * profileDialogs. Без смены разметки и имён полей (контракт data каждого вида). */
+/** Поля формы профилей (C2-лист, сменил T11-модуль profileFormView):
+ * динамические контролы под вид профиля и заполнение формы данными
+ * существующей revision. Имена полей — контракт data каждого вида,
+ * без изменений. Сборка типизированного запроса — profileForms.collectProfileData. */
 
 import type { ProfileData, ProfileKind } from "../../api/types";
 import { el } from "../../components/primitives/dom";
 import { createField } from "../../components/primitives/forms";
-
-export const KINDS: ProfileKind[] = [
-  "location",
-  "equipment",
-  "front_end",
-  "transformer",
-  "conditions",
-];
 
 export function input(name: string, label: string, value = ""): HTMLElement {
   const control = document.createElement("input");
@@ -31,6 +23,26 @@ export function quantityInputs(prefix: string, label: string): HTMLElement {
     input(`${prefix}_unit`, `${label} — единица`),
   );
   return wrap;
+}
+
+function conditionsFields(): HTMLElement[] {
+  const select = document.createElement("select");
+  select.name = "damper_state";
+  select.className = "lnt-select";
+  for (const [value, labelText] of [
+    ["unknown", "Неизвестно"],
+    ["on", "Включён"],
+    ["off", "Выключен"],
+  ] as const) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = labelText;
+    select.append(option);
+  }
+  return [
+    createField({ label: "Демпфер", control: select }).root,
+    input("nearby_load_states", "Нагрузки рядом (через запятую)"),
+  ];
 }
 
 /** Динамические поля формы под вид профиля (контракт data каждого вида). */
@@ -55,24 +67,8 @@ export function formFieldsFor(kind: ProfileKind): HTMLElement[] {
         quantityInputs("primary", "Первичная обмотка"),
         quantityInputs("secondary", "Вторичная обмотка"),
       ];
-    case "conditions": {
-      const select = document.createElement("select");
-      select.name = "damper_state";
-      select.className = "lnt-select";
-      for (const [value, labelText] of [
-        ["unknown", "Неизвестно"],
-        ["on", "Включён"],
-        ["off", "Выключен"],
-      ] as const) {
-        const option = document.createElement("option");
-        option.value = value;
-        option.textContent = labelText;
-        select.append(option);
-      }
-      const damper = createField({ label: "Демпфер", control: select }).root;
-      const loads = input("nearby_load_states", "Нагрузки рядом (через запятую)");
-      return [damper, loads];
-    }
+    case "conditions":
+      return conditionsFields();
   }
 }
 

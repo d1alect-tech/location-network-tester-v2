@@ -59,7 +59,10 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     className: "banner banner-inline banner-warn lnt-cat-conflict",
   });
   conflictPanel.hidden = true;
-  const errorNote = el("p", { className: "banner banner-inline", attrs: { role: "alert" } });
+  // Пустая строка ошибки остаётся скрытой: пустой role=alert и красная рамка
+  // до первой загрузки/сохранения — ложный сигнал (см. contextInspector.test.ts).
+  const errorClass = "lnt-error-text banner banner-inline";
+  const errorNote = el("p", { className: errorClass, attrs: { role: "alert" } });
   errorNote.hidden = true;
   const saveButton = el("button", {
     className: "btn lnt-btn lnt-btn-primary",

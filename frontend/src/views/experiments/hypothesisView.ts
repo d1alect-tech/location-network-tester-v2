@@ -56,9 +56,21 @@ export class HypothesisView {
       const page = await this.client.research.hypotheses({ page_size: 50 });
       this.hypotheses = page.items;
       this.renderList();
-    } catch {
+    } catch (error) {
+      // Недоступность списка — видимая ошибка с причиной и повтором, а не тупик без действий.
+      const detail = error instanceof Error ? error.message : String(error);
+      const retry = el("button", {
+        className: "lnt-btn btn-secondary",
+        text: "Повторить",
+        attrs: { type: "button" },
+      });
+      retry.addEventListener("click", () => void this.reload());
       this.listHost.replaceChildren(
-        el("p", { className: "lnt-helper-text", text: "Список гипотез недоступен." }),
+        el("p", {
+          className: "lnt-helper-text",
+          text: `Список гипотез недоступен: ${detail}.`,
+        }),
+        retry,
       );
     }
   }

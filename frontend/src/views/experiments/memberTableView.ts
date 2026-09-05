@@ -5,6 +5,7 @@
 
 import type { OpenRecord } from "../../api/types-research";
 import { el } from "../../components/primitives/dom";
+import { errorWithRetry } from "../../components/primitives/stateViews";
 import { announcePolite } from "../../components/primitives/status";
 import type { ExperimentsStore } from "./experimentsStore";
 import { currentState, deriveQcVerdict } from "./memberQc";
@@ -68,18 +69,33 @@ export class MemberTableView {
   private options: MemberTableOptions;
   private rows: MemberRow[] = [];
   private body: HTMLElement;
+  private readonly outageHost: HTMLElement;
 
   constructor(options: MemberTableOptions) {
     this.options = options;
     this.body = el("div", {});
+    this.outageHost = el("div", { className: "lnt-exp-health-outage", attrs: { hidden: "" } });
     this.root = el("section", { className: "lnt-exp-members" }, [
       el("h3", { className: "lnt-exp-subtitle", text: "Участники, QC и исключения" }),
       el("p", {
         className: "lnt-helper-text",
         text: "Исключённые участники остаются в таблице (зачёркнуты) с причиной; «Отменить» добавляет компенсирующую запись аудита.",
       }),
+      this.outageHost,
       this.body,
     ]);
+  }
+
+  /** Outage-баннер здоровья (role=alert + повтор) вместо выдуманных вердиктов. */
+  showHealthOutage(message: string, onRetry: () => void): void {
+    this.outageHost.replaceChildren(errorWithRetry(message, onRetry, "Повторить"));
+    this.outageHost.removeAttribute("hidden");
+  }
+
+  /** Убирает outage-баннер после успешной загрузки здоровья. */
+  clearHealthOutage(): void {
+    this.outageHost.replaceChildren();
+    this.outageHost.setAttribute("hidden", "");
   }
 
   /** Обновляет контекст при загрузке другого эксперимента. */

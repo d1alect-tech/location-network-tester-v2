@@ -8,8 +8,9 @@ import type { ProfileKind, ProfileRevision } from "../../api/types";
 import { openDialog } from "../../components/primitives/dialog";
 import { el } from "../../components/primitives/dom";
 import { createField } from "../../components/primitives/forms";
-import { KINDS, fillExisting, formFieldsFor } from "./profileFormView";
+import { fillExisting, formFieldsFor } from "./profileFormFields";
 import { PROFILE_KIND_LABELS, collectProfileData } from "./profileForms";
+import { KINDS } from "./profileList";
 import type { ProfileCombination } from "./profilePreview";
 
 export interface ProfileDialogContext {

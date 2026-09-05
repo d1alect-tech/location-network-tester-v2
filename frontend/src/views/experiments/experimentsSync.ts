@@ -1,8 +1,9 @@
 /** Синхронизация строк участников со сравнением/трендами (T11: выделено из
  * experimentsWorkspace). Чистые перекладки MemberRow → строки анализа и
- * чтение метрики из detail; клиент и вьюхи приходят аргументами. */
+ * чтение метрики из detail; клиент и вьюхи приходят аргументами.
+ * C3: загрузка здоровья переехала в experimentsDetailController — тихий
+ * catch маскировал outage под вердикт health_unavailable. */
 
-import type { LntApiClient } from "../../api/client";
 import type { SessionDetailPayload } from "../../api/types-plots";
 import type { ComparisonView } from "./comparisonView";
 import type { ExperimentDetail } from "./experimentsStore";
@@ -20,20 +21,6 @@ export function metricValue(detail: SessionDetailPayload, featureKey: string): n
   }
   const flat = (analysis as Record<string, unknown>)[featureKey];
   return typeof flat === "number" ? flat : null;
-}
-
-export async function loadHealthMap(
-  client: LntApiClient,
-  sessions: string[],
-): Promise<Map<string, string>> {
-  try {
-    const page = await client.catalogSessions({ page_size: 200 });
-    const map = new Map<string, string>();
-    for (const session of page.items) map.set(session.id, String(session.health ?? "ok"));
-    return map;
-  } catch {
-    return new Map(sessions.map((id) => [id, "health_unavailable"]));
-  }
 }
 
 export function toTrendRows(rows: MemberRow[]): {

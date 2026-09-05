@@ -4,8 +4,9 @@
  * и условий измерения + выбор комбинации для предпросмотра снимка захвата.
  * Мутации идут через api-клиент (nonce), состояния pending/success/failure
  * блокируют кнопки; ошибки — русские тексты, не console.
- * T11: поля форм — в profileFormView, диалоги — в profileDialogs; здесь
- * каркас, состояние комбинации и список. */
+ * Поля форм — в profileFormFields, диалоги — в profileDialogs, список и
+ * строки — в profileList (C2); здесь каркас, состояние комбинации,
+ * mutate/notify и загрузчик. */
 
 import type { LntApiClient } from "../../api/client";
 import { normalizeThrown } from "../../api/errors";
@@ -14,8 +15,8 @@ import { el } from "../../components/primitives/dom";
 import { createResourceLoader } from "../../state/resource";
 import type { ProfileDialogContext } from "./profileDialogs";
 import { openCreateDialog, openEditDialog } from "./profileDialogs";
-import { KINDS } from "./profileFormView";
-import { PROFILE_KIND_LABELS } from "./profileForms";
+import type { ProfileListDeps } from "./profileList";
+import { renderList } from "./profileList";
 import type { ProfileCombination } from "./profilePreview";
 
 export interface ProfileManagerOptions {
@@ -84,74 +85,16 @@ export function createProfileManager(options: ProfileManagerOptions): ProfileMan
     openCreateDialog(dialogContext);
   });
 
-  function renderList(items: ProfileRevision[]): void {
-    while (listHost.firstChild) listHost.removeChild(listHost.firstChild);
-    for (const kind of KINDS) {
-      const groupItems = items.filter((item) => item.kind === kind);
-      const bodyId = `cat-profile-${kind}`;
-      const toggle = el("button", {
-        className: "disc-toggle",
-        text: PROFILE_KIND_LABELS[kind],
-        attrs: { type: "button", "aria-expanded": "true", "aria-controls": bodyId },
-      });
-      const body = el("div", { className: "disc-body", attrs: { id: bodyId } });
-      toggle.addEventListener("click", () => {
-        const open = toggle.getAttribute("aria-expanded") === "true";
-        toggle.setAttribute("aria-expanded", String(!open));
-        body.hidden = open;
-      });
-      if (groupItems.length === 0) {
-        body.append(el("p", { className: "t-compact", text: "Профилей этого вида нет." }));
-      }
-      for (const item of groupItems) {
-        body.append(renderProfileRow(item));
-      }
-      listHost.append(toggle, body);
-    }
-  }
-
-  function renderProfileRow(item: ProfileRevision): HTMLElement {
-    const row = el("div", { className: "cat-profile-row" });
-    const radio = document.createElement("input");
-    radio.type = "radio";
-    radio.name = `combo-${item.kind}`;
-    radio.value = item.profile_id;
-    radio.id = `profile-radio-${item.profile_id}`;
-    radio.checked = combination[item.kind]?.profile_id === item.profile_id;
-    radio.addEventListener("change", () => {
-      combination[item.kind] = item;
-      notify();
-    });
-    const label = el("label", {
-      className: "cat-profile-name",
-      text: item.profile_id,
-    });
-    label.htmlFor = radio.id;
-    const editButton = el("button", {
-      className: "btn-quiet",
-      text: "Изменить",
-      attrs: { type: "button" },
-    });
-    editButton.addEventListener("click", () => handleEdit(item));
-    const deleteButton = el("button", {
-      className: "btn-quiet",
-      text: "Удалить",
-      attrs: { type: "button" },
-    });
-    deleteButton.addEventListener("click", () => {
-      void mutate(() => client.profilesApi.remove(item.profile_id), row).then(() => {
-        if (combination[item.kind]?.profile_id === item.profile_id) {
-          delete combination[item.kind];
-          notify();
-        }
-      });
-    });
-    row.append(radio, label, editButton, deleteButton);
-    return row;
-  }
+  const listDeps: ProfileListDeps = {
+    combination,
+    notify,
+    openEditDialog: handleEdit,
+    mutate,
+    client,
+  };
 
   loader.subscribe((state) => {
-    if (state.kind === "ready") renderList(state.value.items);
+    if (state.kind === "ready") renderList(listHost, state.value.items, listDeps);
     else if (state.kind === "error") setError(state.error.message);
   });
 

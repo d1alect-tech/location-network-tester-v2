@@ -3,29 +3,22 @@
  * «Сравнение» / «Тренды» / «Гипотезы». Монтируется аддитивным блоком
  * AppShell по образцу todo 39; при уходе с маршрута всё обрывается.
  * T11: вкладки — в experimentsTabs, синхронизация строк/метрики — в
- * experimentsSync; здесь каркас, список и загрузка деталей. */
+ * experimentsSync; C3: здоровье, оверлей и загрузка деталей — в
+ * experimentsDetailController; здесь каркас и список. */
 
 import type { LntApiClient } from "../../api/client";
 import { clearElement, el } from "../../components/primitives/dom";
 import { errorWithRetry } from "../../components/primitives/stateViews";
-import { announcePolite } from "../../components/primitives/status";
 import type { RouteStore } from "../../state/routeState";
 import { ComparisonView } from "./comparisonView";
-import { protocolLabel } from "./experimentModel";
 import { ExperimentWizard } from "./experimentWizard";
+import { ExperimentsDetailController } from "./experimentsDetailController";
 import { ExperimentsStore } from "./experimentsStore";
-import type { ExperimentDetail } from "./experimentsStore";
-import {
-  loadHealthMap,
-  metricValue,
-  overlayGroups,
-  syncComparisonAndTrends,
-} from "./experimentsSync";
+import { metricValue } from "./experimentsSync";
 import { createExperimentsTabs } from "./experimentsTabs";
 import { HypothesisView } from "./hypothesisView";
 import { MemberTableView } from "./memberTableView";
 import { createProtocolTimeline } from "./protocolTimeline";
-import { SpectralOverlay } from "./spectralOverlay";
 import { TrendView } from "./trendView";
 import "./experiments.css";
 
@@ -45,7 +38,7 @@ export function mountExperimentsWorkspace(
     store,
     experimentId: "",
     healthBySession: new Map(),
-    onInclusionChange: () => syncComparisonRows(),
+    onInclusionChange: () => detailController.syncComparisonRows(),
   });
   const comparison = new ComparisonView({
     client,
@@ -54,17 +47,18 @@ export function mountExperimentsWorkspace(
       return metricValue(detail, featureKey);
     },
   });
-  let overlay: SpectralOverlay | null = null;
-  const trends = new TrendView({
-    client,
-    valueSource: async (sessionId, signal) => {
-      const detail = await client.plots.detail(sessionId, { signal });
-      return metricValue(
-        detail,
-        String(currentDetail?.experiment.primary_estimands?.[0]?.feature_key ?? "band_mid_total"),
-      );
-    },
-  });
+  // Явный тип возврата разрывает цикл вывода trends ↔ detailController.
+  const trendValue = async (sessionId: string, signal: AbortSignal): Promise<number | null> => {
+    const detail = await client.plots.detail(sessionId, { signal });
+    return metricValue(
+      detail,
+      String(
+        detailController.currentDetail?.experiment.primary_estimands?.[0]?.feature_key ??
+          "band_mid_total",
+      ),
+    );
+  };
+  const trends = new TrendView({ client, valueSource: trendValue });
   const hypotheses = new HypothesisView({ client });
 
   // --- левая колонка: список + создание -----------------------------------
@@ -102,11 +96,25 @@ export function mountExperimentsWorkspace(
         if (key === "hypotheses") pane.append(hypotheses.root);
       },
       onSelect: (key) => {
-        if (key === "compare" && currentDetail !== null) void runOverlay();
+        if (key === "compare" && detailController.currentDetail !== null) {
+          void detailController.runOverlay();
+        }
       },
     },
   );
   const panes = tabs.panes;
+  const detailController = new ExperimentsDetailController({
+    client,
+    store,
+    timeline,
+    members,
+    comparison,
+    trends,
+    hypotheses,
+    panes,
+    detailHost,
+    selectTab: (key) => tabs.select(key),
+  });
   const rightPane = el("div", { className: "lnt-exp-right" }, [tabs.tabBar, ...panes.values()]);
   const root = el("div", { className: "lnt-exp-workspace app-body" }, [leftPane, rightPane]);
   container.append(root);
@@ -131,8 +139,12 @@ export function mountExperimentsWorkspace(
     .querySelector<HTMLButtonElement>("#lnt-exp-refresh")
     ?.addEventListener("click", () => void refreshList());
 
-  let currentDetail: ExperimentDetail | null = null;
   let pendingDetailId: string | null = null;
+
+  async function loadDetail(experimentId: string): Promise<void> {
+    pendingDetailId = experimentId;
+    await detailController.loadDetail(experimentId);
+  }
 
   function renderListState(): void {
     const state = store.list.get();
@@ -177,59 +189,6 @@ export function mountExperimentsWorkspace(
     listHost.append(list);
   }
 
-  function syncComparisonRows(): void {
-    syncComparisonAndTrends(comparison, trends, currentDetail, members.getRows());
-  }
-
-  async function runOverlay(): Promise<void> {
-    if (!currentDetail) return;
-    overlay?.destroy();
-    overlay = new SpectralOverlay((sessionId, signal) =>
-      client.plots.spectrum(sessionId, undefined, { signal }),
-    );
-    panes.get("compare")?.querySelector(".lnt-exp-overlay")?.remove();
-    panes.get("compare")?.append(overlay.root);
-    const controller = new AbortController();
-    await overlay.show(overlayGroups(members.getRows()), controller.signal);
-  }
-
-  async function loadDetail(experimentId: string): Promise<void> {
-    pendingDetailId = experimentId;
-    detailHost.replaceChildren(
-      el("p", { className: "lnt-helper-text", text: "Загрузка эксперимента…" }),
-    );
-    timeline.setLoading();
-    await store.detail.load(experimentId);
-    const state = store.detail.get();
-    if (state.kind !== "ready" || state.key !== experimentId) return;
-    currentDetail = state.value as ExperimentDetail;
-    const healths = await loadHealthMap(
-      client,
-      members.getRows().map((row) => row.sessionId),
-    );
-    members.setContext({
-      experimentId: state.value.experiment.experiment_id,
-      healthBySession: healths,
-    });
-    members.setMembers(state.value.members);
-    timeline.setSteps(
-      state.value.steps.map((step) => ({
-        order: typeof step.order === "number" ? step.order : Number(step.order),
-        condition_id: String(step.condition_id ?? "?"),
-        instruction: String(step.instruction ?? ""),
-      })),
-      protocolLabel(String(state.value.experiment.protocol?.kind ?? "aba")),
-    );
-    hypotheses.linkContext = {
-      experimentId: state.value.experiment.experiment_id,
-      estimand: String(state.value.experiment.primary_estimands?.[0]?.feature_key ?? ""),
-    };
-    syncComparisonRows();
-    detailHost.replaceChildren();
-    announcePolite(`Эксперимент ${state.value.experiment.experiment_id} открыт`);
-    tabs.select("overview");
-  }
-
   const unsubscribeList = store.list.subscribe(() => renderListState());
   const unsubscribeDetail = store.detail.subscribe((state) => {
     if (state.kind === "error") {
@@ -257,6 +216,6 @@ export function mountExperimentsWorkspace(
     unsubscribeDetail();
     comparison.abort();
     trends.abort();
-    overlay?.destroy();
+    detailController.destroy();
   };
 }
