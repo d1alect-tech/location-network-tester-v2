@@ -147,6 +147,7 @@ class BurstEvent:
     peak_envelope_v: float
 
     def to_dict(self) -> BurstEventDict:
+        """Одиночная пачка: границы во времени, длительность и пиковая амплитуда."""
         return {
             "start_time_s": self.start_time_s,
             "end_time_s": self.end_time_s,
@@ -165,6 +166,7 @@ class BurstSequence:
     period_ms: float
 
     def to_dict(self) -> BurstSequenceDict:
+        """Серия пачек: границы, число пачек и средний период повторения."""
         return {
             "start_time_s": self.start_time_s,
             "end_time_s": self.end_time_s,
@@ -190,6 +192,7 @@ class BurstInventory:
     sequences: tuple[BurstSequence, ...]
 
     def to_dict(self) -> BurstInventoryDict:
+        """Полный инвентарь для burst.json: настройки, порог, события и серии."""
         return {
             "schema_version": self.schema_version,
             "settings_hash": self.settings_hash,

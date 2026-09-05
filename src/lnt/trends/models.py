@@ -16,6 +16,8 @@ DEFAULT_DISCARD_SAMPLES: Final = 2000
 DEFAULT_THEIL_SEN_MAX_PAIRS: Final = 256
 DEFAULT_CUSUM_THRESHOLD_SIGMA: Final = 3.0
 DEFAULT_MIN_SEGMENT_LENGTH: Final = 10
+# Сегмент короче двух точек не даёт ни среднего до, ни среднего после точки разладки.
+MIN_SEGMENT_LENGTH_FLOOR: Final = 2
 
 
 class TrendsSettingsDict(TypedDict):
@@ -73,6 +75,7 @@ class TrendsSettings:
     min_segment_length: int
 
     def __post_init__(self) -> None:
+        """Отвергает чужую версию схемы и непригодные параметры Theil-Sen и CUSUM."""
         if self.trends_version != TRENDS_VERSION:
             raise InputError("тренды: неподдерживаемая версия")
         if not self.preset_name or self.chunk_samples <= 0:
@@ -81,10 +84,11 @@ class TrendsSettings:
             raise InputError("тренды: discard и max_pairs некорректны")
         if not math.isfinite(self.cusum_threshold_sigma) or self.cusum_threshold_sigma <= 0:
             raise InputError("тренды: порог CUSUM некорректен")
-        if self.min_segment_length < 2:
+        if self.min_segment_length < MIN_SEGMENT_LENGTH_FLOOR:
             raise InputError("тренды: min_segment_length >=2")
 
     def to_dict(self) -> TrendsSettingsDict:
+        """Возвращает настройки в виде, от которого считается хеш пресета."""
         return {
             "trends_version": self.trends_version,
             "preset_name": self.preset_name,
@@ -129,6 +133,7 @@ class TrendChangePoint:
     mean_after: float
 
     def to_dict(self) -> TrendChangePointDict:
+        """Точка разладки: индекс, время и средние до/после неё."""
         return {
             "index": self.index,
             "time_s": self.time_s,
@@ -159,6 +164,7 @@ class TrendsInventory:
     eeprom_verified: bool
 
     def to_dict(self) -> TrendsInventoryDict:
+        """Полный инвентарь для trends.json: наклон, crest, точки разладки и вердикт SPC."""
         return {
             "schema_version": self.schema_version,
             "settings_hash": self.settings_hash,

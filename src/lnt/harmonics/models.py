@@ -72,6 +72,7 @@ class HarmonicsSettings:
     chunk_samples: int
 
     def __post_init__(self) -> None:
+        """Отвергает чужую версию схемы и настройки вне рамок IEC 61000-4-7."""
         if self.harmonics_version != HARMONICS_VERSION:
             raise InputError("гармоники: неподдерживаемая версия")
         if not self.preset_name or self.chunk_samples <= 0:
@@ -82,6 +83,7 @@ class HarmonicsSettings:
             raise InputError("гармоники: диапазон гармоник некорректен")
 
     def to_dict(self) -> HarmonicsSettingsDict:
+        """Возвращает настройки в виде, от которого считается хеш пресета."""
         return {
             "harmonics_version": self.harmonics_version,
             "preset_name": self.preset_name,
@@ -132,6 +134,7 @@ class HarmonicsWindow:
     ihg: tuple[float, ...]
 
     def to_dict(self) -> HarmonicsWindowDict:
+        """Окно 200 мс: основная гармоника, THD и подгруппы H1–H40 с IHG."""
         return {
             "index": self.index,
             "start_time_s": self.start_time_s,
@@ -156,6 +159,7 @@ class HarmonicsInventory:
     windows: tuple[HarmonicsWindow, ...]
 
     def to_dict(self) -> HarmonicsInventoryDict:
+        """Полный инвентарь для harmonics.json: оценка частоты сети и 12 окон записи."""
         return {
             "schema_version": self.schema_version,
             "settings_hash": self.settings_hash,

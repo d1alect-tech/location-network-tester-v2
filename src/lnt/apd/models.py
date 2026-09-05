@@ -66,12 +66,14 @@ class ApdSettings:
     num_levels: int
 
     def __post_init__(self) -> None:
+        """Отвергает чужую версию схемы и непригодные размеры блока/сетки уровней."""
         if self.apd_version != APD_VERSION:
             raise InputError("apd: неподдерживаемая версия")
         if not self.preset_name or self.chunk_samples <= 0 or self.num_levels <= 1:
             raise InputError("apd: имя пресета и размеры некорректны")
 
     def to_dict(self) -> ApdSettingsDict:
+        """Возвращает настройки в виде, от которого считается хеш пресета."""
         return {
             "apd_version": self.apd_version,
             "preset_name": self.preset_name,
@@ -111,6 +113,7 @@ class ApdPoint:
     amplitude_v: float
 
     def to_dict(self) -> ApdPointDict:
+        """Уровень (дБ), вероятность превышения и амплитуда (В) одной точки кривой."""
         return {
             "level_db": self.level_db,
             "exceedance_prob": self.exceedance_prob,
@@ -129,6 +132,7 @@ class MiddletonParams:
     mean_power: float
 
     def to_dict(self) -> MiddletonParamsDict:
+        """Параметры Middleton Class A по моментам: A, Г, RMS, эксцесс, средняя мощность."""
         return {
             "overlap_index_A": self.overlap_index_A,
             "gamma": self.gamma,
@@ -154,6 +158,7 @@ class ApdInventory:
     apd: tuple[ApdPoint, ...]
 
     def to_dict(self) -> ApdInventoryDict:
+        """Полный инвентарь для apd.json: настройки, моменты, наклон и сама кривая APD."""
         return {
             "schema_version": self.schema_version,
             "settings_hash": self.settings_hash,
