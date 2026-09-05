@@ -2,6 +2,9 @@
 
 Retention запускается только явно: сохраняются последние N терминальных задач,
 а результаты, ссылающиеся на записанные сессии, не удаляются никогда.
+
+Фасад: чистые кодеки живут в ``store_codecs``, правила переходов — в
+``store_transitions``; здесь остаются только транзакции над базой.
 """
 
 from __future__ import annotations
@@ -9,35 +12,37 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Final, override
+from typing import TYPE_CHECKING, override
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
 from lnt.runtime.migrations import apply_migrations
-from lnt.ui.job_state import JobSnapshot, advance
-from lnt.ui.models import JobKind, JobStage, JobStatus
-
-_TRACEBACK_MARKER: Final = "Traceback (most recent call last)"
-_TERMINAL: Final = frozenset(
-    {JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.INTERRUPTED},
+from lnt.runtime.store_codecs import _dump_progress, _dump_snapshot, _load_snapshot
+from lnt.runtime.store_transitions import (
+    _ALLOWED,
+    _TERMINAL,
+    _TRACEBACK_MARKER,
+    _compact_error,
+    _next_statuses,
 )
-_ALLOWED: Final[Mapping[JobStatus, frozenset[JobStatus]]] = {
-    JobStatus.QUEUED: frozenset({JobStatus.RUNNING, JobStatus.CANCELLING, JobStatus.INTERRUPTED}),
-    JobStatus.RUNNING: frozenset(
-        {
-            JobStatus.CANCELLING,
-            JobStatus.SUCCEEDED,
-            JobStatus.FAILED,
-            JobStatus.CANCELLED,
-            JobStatus.INTERRUPTED,
-        },
-    ),
-    JobStatus.CANCELLING: frozenset(
-        {JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.INTERRUPTED},
-    ),
-}
+from lnt.ui.job_state import JobSnapshot, advance
+from lnt.ui.models import JobStage, JobStatus
+
+__all__ = [
+    "_ALLOWED",
+    "_TERMINAL",
+    "_TRACEBACK_MARKER",
+    "IllegalJobTransitionError",
+    "JobEvent",
+    "JobStore",
+    "_compact_error",
+    "_dump_progress",
+    "_dump_snapshot",
+    "_load_snapshot",
+    "_next_statuses",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,49 +255,3 @@ class JobStore:
             VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))""",
             (snapshot.job_id, snapshot.version, snapshot.status.value, payload),
         )
-
-
-def _next_statuses(snapshot: JobSnapshot) -> frozenset[JobStatus]:
-    return frozenset({snapshot.status, *_ALLOWED.get(snapshot.status, frozenset())})
-
-
-def _compact_error(code: str | None, message: str | None) -> str | None:
-    if message is None:
-        return None
-    if _TRACEBACK_MARKER in message or code == "internal_error":
-        return "внутренняя ошибка"
-    return message[:500]
-
-
-def _dump_progress(snapshot: JobSnapshot) -> str:
-    return json.dumps(
-        {
-            "stage": snapshot.stage.value,
-            "series_index": snapshot.series_index,
-            "series_total": snapshot.series_total,
-            "written_sessions": list(snapshot.written_sessions),
-        },
-        ensure_ascii=False,
-    )
-
-
-def _dump_snapshot(snapshot: JobSnapshot) -> str:
-    return json.dumps(snapshot.to_payload(), ensure_ascii=False)
-
-
-def _load_snapshot(raw: str) -> JobSnapshot:
-    data = json.loads(raw)
-    return JobSnapshot(
-        schema_version=int(data["schema_version"]),
-        version=int(data["version"]),
-        job_id=str(data["job_id"]),
-        kind=JobKind(str(data["kind"])),
-        status=JobStatus(str(data["status"])),
-        stage=JobStage(str(data["stage"])),
-        series_index=data["series_index"],
-        series_total=data["series_total"],
-        written_sessions=tuple(str(item) for item in data["written_sessions"]),
-        result=data["result"],
-        error_code=data["error_code"],
-        error_message=data["error_message"],
-    )
