@@ -1,7 +1,9 @@
-"""Сборка device-сессии: валидация входа, манифест, масштабирование raw -> В.
+"""Фасад сборки device-сессии: валидация входа, захват, манифест, запись.
 
-I/O с устройством — в ``scope_io``; масштаб и поправка АЦП — в
-``adc_calibration``. Без таблицы ``calibration_used=False``.
+I/O с устройством — в ``scope_io``; масштаб raw -> В и поправка АЦП — в
+``adc_calibration`` (единственный источник истины); чистые помощники входа CH1 —
+в ``acquire_setup``, коды частоты/диапазона — в ``acquire_validation``.
+Без таблицы ``calibration_used=False``.
 """
 
 import math
@@ -11,11 +13,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import overload
 
+from lnt.acquire_setup import (
+    FRONT_END_CH2,
+    _capture_setup,
+    _ch1_meta,
+    _ch1_probe_multiplier,
+    _metadata_front_end,
+)
+from lnt.acquire_validation import RANGE_CODES, _range_code, _rate_code
 from lnt.adc_calibration import AdcCalibration, apply_adc_calibration
 from lnt.errors import InputError
 from lnt.manifest import validated_label
 from lnt.metadata_collector import AcquisitionSettings, MetadataCollector
-from lnt.profiles import FrontEndProfile
 from lnt.scope_io import (
     NEVER_CANCELLED,
     RANGE_CODE_5V,
@@ -33,31 +42,18 @@ from lnt.types import (
     ChannelMeta,
     ChannelMode,
     ChannelRole,
-    ComponentValuesBasis,
-    FloatingDifferentialRcShunt,
     ParameterValue,
-    ReferenceAssumption,
-    ScopeInputTerminated,
     SeriesPosition,
     SessionManifest,
     SessionSource,
     SessionType,
-    TransformerLineProbe,
 )
 
+__all__ = ["DEFAULT_RANGE_V", "DEFAULT_SAMPLE_RATE_HZ", "RANGE_CODES", "capture_session"]
+
 DEFAULT_SAMPLE_RATE_HZ = 8_000_000.0
-MAX_DUAL_RATE_MHZ = 15
-MEGA = 1_000_000
 DEFAULT_RANGE_V = 5.0
-# Номинал диапазона CH1 (В) -> код гейна драйвера; полная шкала = +-5.12/код В.
-RANGE_CODES: dict[float, int] = {5.0: 1, 1.0: 5, 0.5: 10}
-FRONT_END_CH1 = "x2-probe 2x10nF+100R"
-FRONT_END_CH2 = "transformer 230:6"
 LINE_FREQUENCY_HZ = 50.0
-DEFAULT_TERMINATION_OHM = 50.0
-DEFAULT_TRANSFORMER_PRIMARY_V = 230.0
-DEFAULT_TRANSFORMER_SECONDARY_V = 6.0
-DEFAULT_TRANSFORMER_PROBE_MULTIPLIER = 10.0
 
 
 @overload
@@ -233,99 +229,3 @@ def capture_session(  # noqa: C901, PLR0913 -- capture assembly boundary
 
 class _CaptureCancelledError(Exception):
     """Internal signal used so ``write_session`` removes its partial tree."""
-
-
-def _metadata_front_end(setup: Ch1Setup) -> FrontEndProfile:
-    match setup:
-        case FloatingDifferentialRcShunt(
-            resistance_ohm=resistance,
-            c1_f=c1,
-            c2_f=c2,
-        ):
-            return FrontEndProfile.from_si(resistance_ohm=resistance, c1_f=c1, c2_f=c2)
-        case ScopeInputTerminated(termination_resistance_ohm=resistance):
-            return FrontEndProfile.from_si(resistance_ohm=resistance, c1_f=1e-30, c2_f=1e-30)
-        case TransformerLineProbe():
-            return FrontEndProfile.from_si(resistance_ohm=1.0, c1_f=1e-30, c2_f=1e-30)
-
-
-def _capture_setup(*, session_type: SessionType, setup: Ch1Setup | None) -> Ch1Setup:
-    selected = setup if setup is not None else _default_setup(session_type)
-    match session_type, selected:
-        case SessionType.MEASUREMENT, FloatingDifferentialRcShunt():
-            return selected
-        case SessionType.SELF_NOISE, ScopeInputTerminated():
-            return selected
-        case SessionType.LINE_QUALITY, TransformerLineProbe():
-            return selected
-        case _:
-            raise InputError("ch1_setup не соответствует назначению capture-сессии")
-
-
-def _default_setup(session_type: SessionType) -> Ch1Setup:
-    match session_type:
-        case SessionType.MEASUREMENT | SessionType.CM_DM | SessionType.CM_DM_CALIBRATION:
-            return FloatingDifferentialRcShunt(
-                resistance_ohm=100.0,
-                c1_f=10e-9,
-                c2_f=10e-9,
-                component_values_basis=ComponentValuesBasis.NOMINAL,
-                reference_assumption=ReferenceAssumption.FLOATING_HOST_UNVERIFIED,
-            )
-        case SessionType.SELF_NOISE:
-            return ScopeInputTerminated(termination_resistance_ohm=DEFAULT_TERMINATION_OHM)
-        case SessionType.LINE_QUALITY:
-            return TransformerLineProbe(
-                nominal_primary_v=DEFAULT_TRANSFORMER_PRIMARY_V,
-                nominal_secondary_v=DEFAULT_TRANSFORMER_SECONDARY_V,
-                probe_multiplier=DEFAULT_TRANSFORMER_PROBE_MULTIPLIER,
-            )
-
-
-def _ch1_probe_multiplier(setup: Ch1Setup) -> float:
-    match setup:
-        case TransformerLineProbe():
-            return setup.probe_multiplier
-        case _:
-            return 1.0
-
-
-def _ch1_meta(setup: Ch1Setup, *, range_code: int) -> ChannelMeta:
-    match setup:
-        case TransformerLineProbe():
-            return ChannelMeta(
-                filename="ch1.npy",
-                role=ChannelRole.LF_TRANSFORMER,
-                unit="V",
-                front_end=FRONT_END_CH2,
-                range_code=range_code,
-                probe_multiplier=setup.probe_multiplier,
-            )
-        case _:
-            return ChannelMeta(
-                filename="ch1.npy",
-                role=ChannelRole.HF_PROBE,
-                unit="V",
-                front_end=FRONT_END_CH1,
-                range_code=range_code,
-                probe_multiplier=1.0,
-            )
-
-
-def _rate_code(sample_rate_hz: float) -> int:
-    if not math.isfinite(sample_rate_hz) or sample_rate_hz <= 0.0:
-        raise InputError("частота дискретизации должна быть конечной и положительной")
-    megahertz = sample_rate_hz / MEGA
-    if megahertz != round(megahertz) or not 1 <= round(megahertz) <= MAX_DUAL_RATE_MHZ:
-        raise InputError(
-            f"частота {sample_rate_hz:.0f} Гц: допустимы целые 1..{MAX_DUAL_RATE_MHZ} МГц (dual)",
-        )
-    return round(megahertz)
-
-
-def _range_code(range_v: float) -> int:
-    code = RANGE_CODES.get(range_v)
-    if code is None:
-        supported = "/".join(f"{value:g}" for value in RANGE_CODES)
-        raise InputError(f"диапазон {range_v:g} В не поддерживается: допустимы {supported} В")
-    return code
