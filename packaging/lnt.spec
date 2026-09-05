@@ -73,7 +73,7 @@ for license_path in sorted((ROOT / "LICENSES").iterdir()):
 datas += [
     (str(ROOT / "THIRD_PARTY_NOTICES.md"), "."),
     (str(ROOT / "dependency-manifest.json"), "."),
-    (str(ROOT / "docs" / "private-use-policy.md"), "."),
+    (str(ROOT / "docs" / "distribution-policy.md"), "."),
     (str(ROOT / "packaging" / "PRIVATE-USE.txt"), "."),
 ]
 

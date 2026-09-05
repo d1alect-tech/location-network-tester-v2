@@ -52,7 +52,7 @@ All nine live in `docs/adr/`:
 │   ├── defect-ledger.md
 │   ├── safety-and-recovery.md
 │   ├── pristine-enforcement.md
-│   ├── private-use-policy.md
+│   ├── distribution-policy.md
 │   └── packaging-notices.md
 ├── src/lnt/
 ├── frontend/src/

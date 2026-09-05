@@ -17,6 +17,6 @@ NOT an installer and NOT a public release.
   x64 Microsoft-signed files from the frozen allowlist are loaded.
 - License texts and third-party notices ship inside this folder:
   licenses/, THIRD_PARTY_NOTICES.md, dependency-manifest.json,
-  private-use-policy.md.
+  distribution-policy.md.
 
-The full policy text is in private-use-policy.md next to this file.
+The full policy text is in distribution-policy.md next to this file.

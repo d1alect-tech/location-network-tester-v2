@@ -2,7 +2,7 @@
 
 Сборка для личного пользования (private-use). Пакет не является установщиком
 и не предназначен для передачи другим людям. Условия описаны в
-[packaging-notices.md](packaging-notices.md) и [private-use-policy.md](private-use-policy.md).
+[packaging-notices.md](packaging-notices.md) и [distribution-policy.md](distribution-policy.md).
 
 ## Состав поставки
 
@@ -13,7 +13,7 @@
 LNT/
   LNT.exe                  запуск приложения
   PRIVATE-USE.txt          метка сборки: owner-internal, no conveyance
-  private-use-policy.md    политика использования
+  distribution-policy.md    политика использования
   THIRD_PARTY_NOTICES.md   уведомления третьих сторон
   dependency-manifest.json версии зависимостей сборки
   licenses/                тексты лицензий компонентов
@@ -28,7 +28,7 @@ Zadig в пакет не входит, драйвер WinUSB ставится о
 1. Распакуйте ZIP в любой каталог на локальном диске. Путь может содержать
    кириллицу, но без сетевых дисков: приложение работает только с локальными
    путями.
-2. Прочитайте `PRIVATE-USE.txt` и `private-use-policy.md`.
+2. Прочитайте `PRIVATE-USE.txt` и `distribution-policy.md`.
 3. Запускайте `LNT.exe`. «Установка» в классическом смысле нет: удалить
    приложение можно простым удалением каталога.
 

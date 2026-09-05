@@ -155,7 +155,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $stage "LNT.exe"))) {
 # sees them. Move (not copy) so every file exists exactly once.
 if (-not $SkipBuild) {
     $internalDir = Join-Path $stage "_internal"
-    foreach ($doc in @("THIRD_PARTY_NOTICES.md", "private-use-policy.md", "PRIVATE-USE.txt", "dependency-manifest.json")) {
+    foreach ($doc in @("THIRD_PARTY_NOTICES.md", "distribution-policy.md", "PRIVATE-USE.txt", "dependency-manifest.json")) {
         $source = Join-Path $internalDir $doc
         $target = Join-Path $stage $doc
         if (-not (Test-Path -LiteralPath $source)) { Fail 3 "expected PyInstaller data missing: _internal/$doc" }
@@ -273,7 +273,7 @@ $vendoredAssets = @(
 )
 $bundledLicenseDocs = @(
     Get-ChildItem -LiteralPath (Join-Path $stage "licenses") -File | ForEach-Object { "licenses/" + $_.Name }
-    "THIRD_PARTY_NOTICES.md", "private-use-policy.md", "PRIVATE-USE.txt", "dependency-manifest.json",
+    "THIRD_PARTY_NOTICES.md", "distribution-policy.md", "PRIVATE-USE.txt", "dependency-manifest.json",
     "lnt/ui/static/fonts/OFL.txt", "lnt/ui/static/fonts/manifest.json"
 )
 @{

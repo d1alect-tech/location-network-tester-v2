@@ -2,7 +2,7 @@
 
 Документ фиксирует статус сборки LNT v2 как пакета: метка private-use,
 лицензионная граница и запрет передачи. Он дополняет
-[private-use-policy.md](private-use-policy.md) (канонический английский текст)
+[distribution-policy.md](distribution-policy.md) (канонический английский текст)
 и `packaging/PRIVATE-USE.txt` (метка внутри поставки).
 
 ## Метка сборки
@@ -52,7 +52,7 @@
 | `licenses/` | тексты лицензий всех компонентов |
 | `THIRD_PARTY_NOTICES.md` | сводные уведомления третьих сторон |
 | `dependency-manifest.json` | точные версии зависимостей сборки |
-| `private-use-policy.md` | политика использования и границы распространения |
+| `distribution-policy.md` | политика использования и границы распространения |
 | `PRIVATE-USE.txt` | короткая метка owner-internal / no conveyance |
 
 Дополнительные свойства сборки:

@@ -229,7 +229,7 @@ if (-not $upxDisabledSeen) { $packagingViolations.Add("packaging/lnt.spec does n
 # Conveyance/certification claims: private-use labels present; forbidden labels absent.
 $privateUseOk = Test-Path (Join-Path $root "packaging/PRIVATE-USE.txt")
 $claimHits = New-Object System.Collections.Generic.List[string]
-foreach ($doc in @("README.md", "packaging/PRIVATE-USE.txt", "docs/private-use-policy.md")) {
+foreach ($doc in @("README.md", "packaging/PRIVATE-USE.txt", "docs/distribution-policy.md")) {
     $path = Join-Path $root $doc
     if (-not (Test-Path $path)) { continue }
     $bad = @(Select-String -LiteralPath $path -Pattern "(?i)sterile|clean[- ]VM|public release certified|universally verified")

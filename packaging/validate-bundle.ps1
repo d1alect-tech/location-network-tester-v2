@@ -71,7 +71,7 @@ function Get-BundleClass {
     if ($lower.StartsWith("_internal/dateutil/zoneinfo/")) { return "dependency-data" }
     if ($lower.Contains(".dist-info/")) { return "package-metadata" }
     if ($lower.StartsWith("licenses/")) { return "license-document" }
-    if ($lower -in @("third_party_notices.md", "private-use-policy.md", "private-use.txt")) {
+    if ($lower -in @("third_party_notices.md", "distribution-policy.md", "private-use.txt")) {
         return "license-document"
     }
     if ($lower -eq "dependency-manifest.json") { return "provenance-manifest" }
@@ -98,7 +98,7 @@ function Test-RequiredEntries {
     Require "_internal/lnt/ui/static/vendor/uPlot.min.css"
     Require "THIRD_PARTY_NOTICES.md"
     Require "PRIVATE-USE.txt"
-    Require "private-use-policy.md"
+    Require "distribution-policy.md"
     Require "dependency-manifest.json"
 
     if (-not ($RelativePaths | Where-Object { $_ -match "^_internal/python3\d+\.dll$" })) {

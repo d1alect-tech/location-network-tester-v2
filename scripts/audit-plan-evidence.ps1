@@ -188,7 +188,7 @@ Add-Probe 48 @("packaging/smoke-portable.ps1", "packaging/system32-allowlist.v2.
 Add-Probe 49 @("scripts/quality.ps1", "scripts/release_lockcheck.py", "scripts/compare-builds.ps1")
 Add-Probe 50 @("scripts/rehearse-legacy.ps1")
 Add-Probe 51 @("scripts/audit-plan-evidence.ps1", "scripts/audit-scope.ps1", "tests/test_module_size.py", "tests/test_safe_paths.py", "tests/catalog/test_deep_verify.py", "tests/test_cli_bom_inputs.py")
-Add-Probe 52 @("README.md", "docs/private-use-policy.md")
+Add-Probe 52 @("README.md", "docs/distribution-policy.md")
 
 foreach ($num in 1..52) {
     if ($rows[$num].artifacts.Count -eq 0 -and $rows[$num].tests.Count -eq 0) {
