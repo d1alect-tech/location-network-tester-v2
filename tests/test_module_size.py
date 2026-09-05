@@ -22,26 +22,24 @@ _LIMIT: Final = 250
 
 # Точные значения пересчитываются тестом; запись означает «ровно столько сейчас».
 _GRANDFATHERED: Final[dict[str, int]] = {
-    # Recovered baseline (исходное дерево LNT, перенос без рефакторинга).
-    "src/lnt/_manifest_schema.py": 344,
     # Очередь C4: cli.py разбит на cli_simulate/cli_capture/cli_compare
     # (compare читает metrics.json+spectrum.csv с откатом на analyze_session);
     # analysis.py разбит на analysis_types/payload/render/write, фасад тонкий.
     # Очередь C3: масштаб raw→В переехал в lnt.adc_calibration (единый источник
     # истины с поправкой); capture-сборка ужалась честным выделением.
-    "src/lnt/acquire.py": 300,
-    # Волны 2/4/6: поведенческие контуры с собственными зелёными регрессиями;
-    # разбиение допускается только отдельной задачей с сохранением контрактов.
     # Очередь A4: launcher.py ужался до 250 (канон в lnt.cli_spec) и снят с дедлайна.
-    "src/lnt/runtime/store.py": 261,
-    "src/lnt/experiments/runner.py": 257,
+    # Хвост C4 (расслоение _GRANDFATHERED-модулей) закрыт: _manifest_schema
+    # (344→178) разбит на _manifest_primitives/_manifest_parse/_manifest_serialize,
+    # acquire (300→214) — на acquire_setup/acquire_validation, runtime/store
+    # (261→229) — на store_codecs/store_transitions, experiments/runner (257→227) —
+    # на runner_errors/runner_mapping; все четыре ушли под 250 и сняты с дедлайна.
     # Фронтенд Todo 44 (замороженные экраны после visual-QA).
     # T11-доб: comparisonView (393→246), profileManager (305→154),
     # experimentsWorkspace (297→232), hypothesisView (284→100) и
     # trendView (255→227) разбиты и сняты с дедлайна.
-    "frontend/src/api/client-research.ts": 337,
-    "frontend/src/components/charts/workbench.ts": 306,
-    "frontend/src/components/charts/spectrogramPanel.ts": 288,
+    # T10-C2/C3: workbench (306→246) разбит на workbenchControls/inputReferencePanel,
+    # spectrogramPanel (288→228) — на spectrogramLoader/WindowForm/Summary-CSV;
+    # оба ушли под 250 и сняты с дедлайна.
     "frontend/src/components/charts/spectrogramView.ts": 269,
 }
 
