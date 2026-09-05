@@ -6,10 +6,12 @@
 import type { LntApiClient } from "../../api/client";
 import type { CatalogPage } from "../../api/types";
 import type { SessionDetailPayload } from "../../api/types-plots";
+
 import { createChartShell } from "../primitives/chartshell";
 import { el } from "../primitives/dom";
 import { createPeaksPlugin, createPeaksSummary } from "./annotations";
 import { downloadCsv } from "./csvDownload";
+import { renderInputReference } from "./inputReferencePanel";
 import { createReadout } from "./readout";
 import type { ReadoutHandle } from "./readout";
 import { readChartTheme } from "./theme";
@@ -24,6 +26,7 @@ import {
   waveformToRequest,
 } from "./viewModels";
 import type { SeriesStyle } from "./viewModels";
+import { csvButton, csvOf, fillSessions, labeled } from "./workbenchControls";
 
 const SYNC_KEY = "lnt-workbench-charts";
 
@@ -38,73 +41,6 @@ export interface WorkbenchOptions {
   client: Pick<LntApiClient, "catalogSessions" | "plots">;
   /** Подмена uPlot-вью в тестах (jsdom без канвы). */
   createView?: (options: UplotViewOptions) => ChartHandle;
-}
-
-function csvOf(headers: string[], x: readonly number[], y: readonly number[]): string {
-  const rows: string[] = [];
-  const count = Math.min(x.length, y.length);
-  for (let i = 0; i < count; i += 1) {
-    const xi = x[i];
-    const yi = y[i];
-    if (xi !== undefined && yi !== undefined) rows.push(`${xi},${yi}`);
-  }
-  return [headers.join(","), ...rows].join("\n");
-}
-
-function labeled(label: string, control: HTMLElement): HTMLElement {
-  return el("label", { className: "lnt-field-inline" }, [
-    el("span", { className: "lnt-label-text", text: label }),
-    control,
-  ]);
-}
-
-function csvButton(onClick: () => void): HTMLElement {
-  const button = el("button", {
-    className: "lnt-btn lnt-btn-small",
-    text: "Скачать CSV",
-    attrs: { type: "button" },
-  });
-  button.addEventListener("click", onClick);
-  return button;
-}
-
-function fillSessions(
-  select: HTMLSelectElement,
-  page: CatalogPage | null,
-  placeholder: string,
-): void {
-  select.replaceChildren(el("option", { text: placeholder, attrs: { value: "" } }));
-  if (page === null) return;
-  for (const session of page.items) {
-    const title = session.label === null ? session.id : `${session.id} · ${session.label}`;
-    select.append(el("option", { text: title, attrs: { value: session.id } }));
-  }
-}
-
-/** Панель «Приведение ко входу»: статус/причина/модель из metrics.json v2. */
-function renderInputReference(host: HTMLElement, source: unknown): void {
-  host.replaceChildren();
-  const info =
-    typeof source === "object" && source !== null ? (source as Record<string, unknown>) : null;
-  if (info === null) {
-    host.append(
-      el("p", { className: "lnt-helper-text", text: "Приведение ко входу: нет данных анализа." }),
-    );
-    return;
-  }
-  const available = info.status === "available";
-  const reason = typeof info.reason_code === "string" ? ` (${info.reason_code})` : "";
-  const summary = el("p", {
-    className: "lnt-input-ref-status",
-    text: available
-      ? `Спектр приведён ко входу · модель ${String(info.model_kind ?? "—")}`
-      : `Спектр не приведён ко входу${reason}`,
-  });
-  const bins =
-    typeof info.qualified_bin_count === "number" && typeof info.total_bin_count === "number"
-      ? `Квалифицировано бинов: ${info.qualified_bin_count} из ${info.total_bin_count}`
-      : "Квалификация бинов недоступна";
-  host.append(summary, el("p", { className: "lnt-helper-text", text: bins }));
 }
 
 export function createChartsWorkbench(options: WorkbenchOptions): WorkbenchHandle {

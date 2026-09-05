@@ -7,22 +7,20 @@
 import type { LntApiClient } from "../../api/client";
 import type { CandidateEventPayload } from "../../api/types-analysis";
 import { el } from "../primitives/dom";
-import { downloadCsv } from "./csvDownload";
 import { createEventList } from "./eventList";
-import { readNpzArrays } from "./npz";
-import { createTileLoader, sliceTile, tileRequestForRange } from "./spectrogramModel";
+import { createSpectrogramArtifactLoader } from "./spectrogramLoader";
+import { createTileLoader, sliceTile } from "./spectrogramModel";
 import type { SpectrogramLevel, TileRequest, WindowSummary } from "./spectrogramModel";
 import {
   fillSessions,
   initialTileRequest,
   labeledField,
-  levelFromNpz,
-  numberInput,
   visibleMarkerIndices,
 } from "./spectrogramSetup";
-import { summarizeSliced, summaryCsv, tileMatrixCsv } from "./spectrogramSummary";
+import { createSpectrogramCsvControls, summarizeSliced } from "./spectrogramSummary";
 import { createSpectrogramView } from "./spectrogramView";
 import type { TileRenderData as TileRenderSlice } from "./spectrogramView";
+import { createSpectrogramWindowForm } from "./spectrogramWindowForm";
 import { TileError } from "./tileError";
 
 const RECORDING = "спектрограмма записи";
@@ -44,8 +42,6 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
   let visibleEventIds: number[] = [];
   let lastGood: TileRequest | null = null;
   let lastSummary: WindowSummary | null = null;
-  let loadGeneration = 0;
-  let loadAbort = new AbortController();
   /** Окно, фактически присутствующее в данных серии (для быстрого пути). */
   let renderedWindow: TileRequest["window"] | null = null;
 
@@ -63,10 +59,15 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
     attrs: { "aria-live": "polite" },
   });
 
-  function showError(message: string): void {
+  // Повтор баннера: явное действие (загрузка каталога) или перезапрос последнего тайла.
+  function showError(message: string, onRetry?: () => void): void {
     errorBanner.replaceChildren(el("p", { className: "lnt-error-text", text: message }));
     const retry = el("button", { className: "lnt-btn", text: "Повторить" });
     retry.addEventListener("click", () => {
+      if (onRetry !== undefined) {
+        onRetry();
+        return;
+      }
       if (lastGood !== null) void applyTile(lastGood);
     });
     errorBanner.append(retry);
@@ -99,6 +100,7 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
     if (state.kind !== "ready") return;
     lastGood = state.request;
     lastSummary = state.value.summary;
+    csv.syncCsvButtons();
     if (
       renderedWindow !== null &&
       state.request.window.t0 >= renderedWindow.t0 &&
@@ -118,7 +120,7 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
       view.renderTile(state.value.slice, state.value.summary.minDb, state.value.summary.maxDb);
       renderedWindow = { ...state.request.window };
     }
-    visibleEventIds = markerIndices(state.request);
+    visibleEventIds = visibleMarkerIndices(level, events, state.request);
     view.setMarkers(
       visibleEventIds.map((globalIndex) => ({
         timeS: (events[globalIndex] as CandidateEventPayload).peak_time_s,
@@ -131,10 +133,6 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
   async function applyTile(request: TileRequest): Promise<void> {
     errorBanner.setAttribute("hidden", "");
     await loader.load(request);
-  }
-
-  function markerIndices(request: TileRequest): number[] {
-    return visibleMarkerIndices(level, events, request);
   }
 
   function renderSummary(request: TileRequest, summary: WindowSummary): void {
@@ -155,37 +153,6 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
     );
   }
 
-  async function loadArtifact(session: string, key: string): Promise<void> {
-    // Гонко-защита загрузки уровня (паттерн createTileLoader): устаревший
-    // ответ отбрасывается по поколению, прежний полёт обрывается Abort'ом.
-    const generation = ++loadGeneration;
-    loadAbort.abort();
-    loadAbort = new AbortController();
-    const signal = loadAbort.signal;
-    errorBanner.setAttribute("hidden", "");
-    status.textContent = RECORDING;
-    try {
-      const [bytes, inventory] = await Promise.all([
-        options.client.analysis.artifactBytes(session, key, "spectrogram.npz", { signal }),
-        options.client.analysis.events(session, key, { signal }),
-      ]);
-      if (generation !== loadGeneration) return; // устаревшая загрузка — игнорируем
-      const parsed = levelFromNpz(
-        await readNpzArrays(bytes, ["time_s", "frequency_hz", "power_db"]),
-      );
-      level = parsed;
-      renderedWindow = null;
-      events = inventory.events;
-      eventList.setEvents(events);
-      // Домен осей строится один раз на уровень; тайлы меняют только данные.
-      view.setDomain(parsed);
-      await applyTile(initialTileRequest(parsed));
-    } catch (error) {
-      if (generation !== loadGeneration || isAbort(error)) return;
-      showError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
   // --- Связка маркер ↔ список (двусторонняя) -------------------------------
   const eventList = createEventList((globalIndex) => {
     const local = visibleEventIds.indexOf(globalIndex);
@@ -194,6 +161,25 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
   view.onMarkerActivate((local) => {
     const globalIndex = visibleEventIds[local];
     if (globalIndex !== undefined) eventList.highlight(globalIndex);
+  });
+
+  // Загрузка уровня — лист spectrogramLoader (поколение + Abort + U3-ошибки).
+  const artifactLoader = createSpectrogramArtifactLoader({
+    client: options.client,
+    showError,
+    hideError: () => errorBanner.setAttribute("hidden", ""),
+    resetStatus: () => {
+      status.textContent = RECORDING;
+    },
+    applyInitialTile: async (parsed, inventoryEvents) => {
+      level = parsed;
+      renderedWindow = null;
+      events = inventoryEvents;
+      eventList.setEvents(events);
+      // Домен осей строится один раз на уровень; тайлы меняют только данные.
+      view.setDomain(parsed);
+      await applyTile(initialTileRequest(parsed));
+    },
   });
 
   // --- Управление: сессия, ключ артефакта, точное окно, выгрузки -----------
@@ -211,79 +197,37 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
     attrs: { type: "button" },
   });
   buildButton.addEventListener("click", () => {
-    if (selectSession.value === "" || inputKey.value.trim() === "") {
-      showError("Укажите сессию и ключ артефакта анализа.");
-      return;
-    }
-    void loadArtifact(selectSession.value, inputKey.value.trim());
+    if (selectSession.value !== "" && inputKey.value.trim() !== "")
+      void artifactLoader.load(selectSession.value, inputKey.value.trim());
+    else showError("Укажите сессию и ключ артефакта анализа.");
   });
 
-  // Числовая форма окна — ТОЧНЫЙ bbox-запрос и нецветовая альтернатива матрице.
-  const tStart = numberInput("Начало окна, с");
-  const tEnd = numberInput("Конец окна, с");
-  const fLow = numberInput("Нижняя граница окна, Гц");
-  const fHigh = numberInput("Верхняя граница окна, Гц");
-  const applyWindowButton = el("button", {
-    className: "lnt-btn lnt-btn-small",
-    text: "Обновить окно",
-    attrs: { type: "button" },
-  });
-  applyWindowButton.addEventListener("click", () => {
-    if (level === null) {
-      showError("Сначала постройте спектрограмму.");
-      return;
-    }
-    try {
-      void applyTile(
-        tileRequestForRange(
-          level,
-          Number(tStart.value),
-          Number(tEnd.value),
-          Number(fLow.value),
-          Number(fHigh.value),
-        ),
-      );
-    } catch (error) {
-      showError(error instanceof Error ? error.message : String(error));
-    }
+  // Числовая форма окна — лист spectrogramWindowForm (точный bbox-запрос).
+  const windowForm = createSpectrogramWindowForm({
+    getLevel: () => level,
+    applyTile,
+    showError,
   });
   view.onWindowChange((t0s, t1s, f0hz, f1hz) => {
-    tStart.value = String(t0s);
-    tEnd.value = String(t1s);
-    fLow.value = String(f0hz);
-    fHigh.value = String(f1hz);
+    windowForm.syncFromWindow(t0s, t1s, f0hz, f1hz);
   });
 
-  const matrixButton = el("button", {
-    className: "lnt-btn lnt-btn-small",
-    text: "Скачать матрицу CSV",
-    attrs: { type: "button" },
-  });
-  matrixButton.addEventListener("click", () => {
-    if (level === null || lastGood === null) return;
-    downloadCsv(`spectrogram-${lastGood.key}.csv`, tileMatrixCsv(level, lastGood));
-  });
-  const summaryButton = el("button", {
-    className: "lnt-btn lnt-btn-small",
-    text: "Скачать сводку CSV",
-    attrs: { type: "button" },
-  });
-  summaryButton.addEventListener("click", () => {
-    if (lastSummary === null) return;
-    downloadCsv("spectrogram-summary.csv", summaryCsv(lastSummary));
+  // Выгрузки CSV — лист spectrogramSummary (кнопки + sync + U3-no-op причины).
+  const csv = createSpectrogramCsvControls({
+    getLevel: () => level,
+    getLastGood: () => lastGood,
+    getLastSummary: () => lastSummary,
+    showError,
   });
 
   const controls = el("div", { className: "lnt-workbench-controls lnt-spec-controls" }, [
     labeledField("Сессия", selectSession),
     labeledField("Ключ артефакта", inputKey),
     buildButton,
-    labeledField("Начало, с", tStart),
-    labeledField("Конец, с", tEnd),
-    labeledField("От, Гц", fLow),
-    labeledField("До, Гц", fHigh),
-    applyWindowButton,
-    matrixButton,
-    summaryButton,
+    ...windowForm.fields,
+    csv.matrixButton,
+    csv.summaryButton,
+    csv.csvHint,
   ]);
 
   const root = el("section", { className: "lnt-spec-panel" }, [
@@ -296,10 +240,15 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
     eventList.root,
   ]);
 
-  void options.client
-    .catalogSessions()
-    .then((page) => fillSessions(selectSession, page.items, "Выберите сессию"))
-    .catch(() => undefined);
+  // Загрузка каталога с видимой ошибкой и повтором вместо молчаливого пустого селекта.
+  function loadSessions(): void {
+    errorBanner.setAttribute("hidden", "");
+    void options.client
+      .catalogSessions()
+      .then((page) => fillSessions(selectSession, page.items, "Выберите сессию"))
+      .catch(() => showError("Не удалось загрузить список сессий.", loadSessions));
+  }
+  loadSessions();
 
   return {
     root,
@@ -309,13 +258,4 @@ export function createSpectrogramPanel(options: SpectrogramPanelOptions): Spectr
       root.remove();
     },
   };
-}
-
-function isAbort(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    ((error as { name?: unknown }).name === "AbortError" ||
-      (error as { status?: number }).status === 404)
-  );
 }

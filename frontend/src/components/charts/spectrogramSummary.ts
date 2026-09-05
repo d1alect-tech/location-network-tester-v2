@@ -3,6 +3,9 @@
  * NaN-ячейки считаются явно (coverage), а не молча пропускаются. */
 
 import type { CandidateEventPayload } from "../../api/types-analysis";
+import { el } from "../primitives/dom";
+import { announcePolite } from "../primitives/status";
+import { downloadCsv } from "./csvDownload";
 import type { BandSummary, SpectrogramLevel, TileRequest, WindowSummary } from "./spectrogramModel";
 import { levelValueAt, sliceTile } from "./spectrogramModel";
 
@@ -109,4 +112,87 @@ export function summaryCsv(summary: WindowSummary): string {
     push(`топ_полоса_${index + 1}_Гц`, `${formatRu(band.hz)},${formatRu(band.db)}`);
   }
   return rows.join("\n");
+}
+
+/** CSV-кнопки панели спектрограммы: вынесены из spectrogramPanel.ts без
+ * изменения поведения/строк; лист без обратного импорта панели. */
+export interface SpectrogramCsvDeps {
+  getLevel(): SpectrogramLevel | null;
+  getLastGood(): TileRequest | null;
+  getLastSummary(): WindowSummary | null;
+  showError(message: string): void;
+}
+
+export interface SpectrogramCsvHandle {
+  csvHint: HTMLElement;
+  matrixButton: HTMLButtonElement;
+  summaryButton: HTMLButtonElement;
+  syncCsvButtons(): void;
+}
+
+export function createSpectrogramCsvControls(deps: SpectrogramCsvDeps): SpectrogramCsvHandle {
+  const csvHint = el("p", {
+    className: "lnt-helper-text lnt-spec-csv-hint",
+    text: "CSV недоступен: сначала постройте спектрограмму.",
+  });
+  const matrixButton = el("button", {
+    className: "lnt-btn lnt-btn-small",
+    text: "Скачать матрицу CSV",
+    attrs: {
+      type: "button",
+      disabled: "disabled",
+      title: "Недоступно: сначала постройте спектрограмму",
+    },
+  }) as HTMLButtonElement;
+  matrixButton.addEventListener("click", () => {
+    const level = deps.getLevel();
+    const lastGood = deps.getLastGood();
+    if (level === null || lastGood === null) {
+      const reason =
+        "Нет данных спектрограммы для выгрузки матрицы. Сначала постройте спектрограмму.";
+      deps.showError(reason);
+      announcePolite(reason);
+      return;
+    }
+    downloadCsv(`spectrogram-${lastGood.key}.csv`, tileMatrixCsv(level, lastGood));
+  });
+  const summaryButton = el("button", {
+    className: "lnt-btn lnt-btn-small",
+    text: "Скачать сводку CSV",
+    attrs: {
+      type: "button",
+      disabled: "disabled",
+      title: "Недоступно: сначала постройте спектрограмму",
+    },
+  }) as HTMLButtonElement;
+  summaryButton.addEventListener("click", () => {
+    const lastSummary = deps.getLastSummary();
+    if (lastSummary === null) {
+      const reason = "Нет сводки спектрограммы для выгрузки. Сначала постройте спектрограмму.";
+      deps.showError(reason);
+      announcePolite(reason);
+      return;
+    }
+    downloadCsv("spectrogram-summary.csv", summaryCsv(lastSummary));
+  });
+
+  /** Синхронизирует disabled + видимую причину CSV-кнопок с наличием тайла. */
+  function syncCsvButtons(): void {
+    const matrixReady = deps.getLevel() !== null && deps.getLastGood() !== null;
+    const summaryReady = deps.getLastSummary() !== null;
+    matrixButton.disabled = !matrixReady;
+    matrixButton.title = matrixReady
+      ? "Скачать матрицу текущего тайла в CSV"
+      : "Недоступно: сначала постройте спектрограмму";
+    summaryButton.disabled = !summaryReady;
+    summaryButton.title = summaryReady
+      ? "Скачать сводку текущего окна в CSV"
+      : "Недоступно: сначала постройте спектрограмму";
+    csvHint.textContent =
+      matrixReady && summaryReady
+        ? "Матрица и сводка текущего тайла доступны для выгрузки."
+        : "CSV недоступен: сначала постройте спектрограмму.";
+  }
+
+  return { csvHint, matrixButton, summaryButton, syncCsvButtons };
 }
