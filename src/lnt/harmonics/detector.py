@@ -11,8 +11,15 @@ from lnt.errors import InputError
 from lnt.harmonics.constants import (
     BIN_HZ,
     DFT_BINS_PER_HARMONIC,
+    EPS_LEVEL,
+    GRID_PLAUSIBLE_HIGH_HZ,
+    GRID_PLAUSIBLE_LOW_HZ,
+    GRID_SEARCH_HIGH_HZ,
+    GRID_SEARCH_LOW_HZ,
     H_MAX,
     HARMONICS_VERSION,
+    MIN_BINS_FOR_PARABOLIC,
+    MIN_SAMPLES_FOR_GRID_ESTIMATE,
     NOMINAL_GRID_HZ,
     RECORD_DURATION_S,
     WINDOW_COUNT,
@@ -41,14 +48,14 @@ def _validate(samples: FloatArray, sample_rate_hz: float) -> int:
 def _estimate_grid_frequency(signal: NDArray[np.float64], fs: float) -> float:
     """Пик в 45–55 Гц с Hann и параболической интерполяцией."""
     n = int(signal.size)
-    if n < 1024:
+    if n < MIN_SAMPLES_FOR_GRID_ESTIMATE:
         return float(NOMINAL_GRID_HZ)
     windowed = signal * np.hanning(n)
     spectrum = np.abs(np.fft.rfft(windowed))
     freqs = np.fft.rfftfreq(n, d=1.0 / fs)
-    mask = (freqs >= 40.0) & (freqs <= 60.0)
+    mask = (freqs >= GRID_SEARCH_LOW_HZ) & (freqs <= GRID_SEARCH_HIGH_HZ)
     idx = np.nonzero(mask)[0]
-    if idx.size < 3:
+    if idx.size < MIN_BINS_FOR_PARABOLIC:
         return float(NOMINAL_GRID_HZ)
     sub = spectrum[idx]
     peak = int(np.argmax(sub))
@@ -59,7 +66,7 @@ def _estimate_grid_frequency(signal: NDArray[np.float64], fs: float) -> float:
     # parabolic interpolation
     a, b, c = float(spectrum[k - 1]), float(spectrum[k]), float(spectrum[k + 1])
     denom = a - 2 * b + c
-    delta = 0.0 if abs(denom) < 1e-12 else 0.5 * (a - c) / denom
+    delta = 0.0 if abs(denom) < EPS_LEVEL else 0.5 * (a - c) / denom
     # delta in bins
     bin_hz = freqs[1] - freqs[0]
     return float(freqs[k] + delta * bin_hz)
@@ -93,11 +100,9 @@ def _window_metrics(
     mag = np.abs(spectrum).astype(np.float64)
     rms = mag * math.sqrt(2.0) / float(n)
     rms[0] /= math.sqrt(2.0)  # DC
-    if rms.size > 1:
-        rms[-1] /= 1.0 if n % 2 == 0 else 1.0  # Nyquist already correct for sqrt2? keep
-        # For even N Nyquist is real-only, our sqrt2 overestimates by sqrt2, correct:
-        if n % 2 == 0:
-            rms[-1] /= math.sqrt(2.0)
+    # Для чётного N бин Найквиста вещественный — общий множитель sqrt2 его завышает.
+    if rms.size > 1 and n % 2 == 0:
+        rms[-1] /= math.sqrt(2.0)
     # number of bins
     # subgroups H1..40
     h_sub: list[float] = []
@@ -126,7 +131,7 @@ def _window_metrics(
         ihg.append(math.sqrt(energy))
     # THD: sqrt(sum h=2..40)/h1
     h1 = float(h_sub[0]) if h_sub else 0.0
-    if h1 < 1e-12:
+    if h1 < EPS_LEVEL:
         thd = 0.0
         fund = h1
     else:
@@ -147,8 +152,8 @@ def compute_harmonics(
     if settings is None:
         settings = harmonics_preset()
     fs = float(sample_rate_hz)
-    n_nominal = int(round(WINDOW_DURATION_S * fs))
-    needed = int(round(RECORD_DURATION_S * fs))
+    n_nominal = round(WINDOW_DURATION_S * fs)
+    needed = round(RECORD_DURATION_S * fs)
     if n < needed:
         raise InputError("гармоники: запись короче 2.4 с")
     # truncate to first 2.4s nominal for bounded work
@@ -156,7 +161,7 @@ def compute_harmonics(
     # estimate grid
     f_est = _estimate_grid_frequency(signal, fs)
     # clamp to plausible
-    if not math.isfinite(f_est) or not 40.0 < f_est < 70.0:
+    if not math.isfinite(f_est) or not GRID_PLAUSIBLE_LOW_HZ < f_est < GRID_PLAUSIBLE_HIGH_HZ:
         f_est = float(NOMINAL_GRID_HZ)
     # build windows
     windows: list[HarmonicsWindow] = []
