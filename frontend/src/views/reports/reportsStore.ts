@@ -71,12 +71,14 @@ export class ReportsStore {
     const featureKey = String(experiment.primary_estimands?.[0]?.feature_key ?? "band_mid_total");
     const units = input.units?.trim() || DEFAULT_UNITS;
 
-    const healthBySession = await this.loadHealth(signal);
+    const health = await this.loadHealth(signal);
+    const healthBySession = health.map;
     // Семантика рабочей области «Эксперименты»: включение участника — явное
     // действие оператора, health каталога — вердикт QC на экране. Отчёт
     // включает всех участников, чьи значения удалось собрать; недоступные
     // значения и замечания здоровья фиксируются типизированными ограничениями.
-    const values = await this.collectValues(detail.members, featureKey, signal);
+    const collected = await this.collectValues(detail.members, featureKey, signal);
+    const values = collected.values;
     const excluded: { session_id: string; health: string }[] = [];
     const included = detail.members.filter((member) => {
       const sessionId = String(member.session_id);
@@ -98,6 +100,24 @@ export class ReportsStore {
     const extraLimitations = [
       ...raggedGroupsLimitation(groups),
       ...healthNotesLimitation(healthNotes),
+      ...(health.warningMessage === null
+        ? []
+        : [
+            {
+              code: "catalog_health_unavailable",
+              detail: `Состояние каталога недоступно: ${health.warningMessage}. Метки здоровья не учтены; повторите сборку для уточнения.`,
+            },
+          ]),
+      ...(collected.failures.length === 0
+        ? []
+        : [
+            {
+              code: "values_unavailable",
+              detail: `Значения недоступны и исключены из расчёта: ${collected.failures
+                .map((item) => `${item.session_id} (${item.message})`)
+                .join("; ")}. Повторите сборку после восстановления данных.`,
+            },
+          ]),
     ];
     const request = buildStatisticsRequest(
       String(detail.experiment.protocol.kind),
@@ -114,7 +134,20 @@ export class ReportsStore {
       const sessionId = String(member.session_id);
       planes.push(planeRowOf(sessionId, await this.client.plots.detail(sessionId, { signal })));
     }
-    const recipes = await this.client.analysis.recipes({ signal }).catch(() => []);
+    let recipes: { recipe_id: string; name: string; sha256: string }[] = [];
+    let recipesError: string | null = null;
+    try {
+      recipes = await this.client.analysis.recipes({ signal });
+    } catch (error) {
+      if (signal.aborted) throw error;
+      recipesError = error instanceof Error ? error.message : String(error);
+    }
+    if (recipesError !== null) {
+      extraLimitations.push({
+        code: "recipes_load_failed",
+        detail: `Не удалось загрузить рецепты: ${recipesError}. Список показан пустым; повторите сборку.`,
+      });
+    }
 
     const core: ReportCore = {
       units: envelope.metadata.units,
@@ -161,25 +194,33 @@ export class ReportsStore {
     return { draft, markdown: composeReportMarkdown(draft) };
   }
 
-  private async loadHealth(signal: AbortSignal): Promise<Map<string, string>> {
+  private async loadHealth(
+    signal: AbortSignal,
+  ): Promise<{ map: Map<string, string>; warningMessage: string | null }> {
     try {
       const page = await this.client.catalogSessions({ page_size: 200 }, { signal });
       const map = new Map<string, string>();
       for (const session of page.items) map.set(session.id, String(session.health ?? "ok"));
-      return map;
-    } catch {
-      return new Map();
+      return { map, warningMessage: null };
+    } catch (error) {
+      if (signal.aborted) throw error;
+      return {
+        map: new Map(),
+        warningMessage: error instanceof Error ? error.message : String(error),
+      };
     }
   }
 
   /** Значения estimand по всем участникам; сессии с недоступными данными
-   * пропускаются (ошибка сети/разбора) и попадают в ограничения. */
+   * пропускаются (ошибка сети/разбора) и попадают в ограничения с исходной
+   * причиной — никогда не глотаются молча. */
   private async collectValues(
     members: OpenRecord[],
     featureKey: string,
     signal: AbortSignal,
-  ): Promise<Map<string, number>> {
-    const map = new Map<string, number>();
+  ): Promise<{ values: Map<string, number>; failures: { session_id: string; message: string }[] }> {
+    const values = new Map<string, number>();
+    const failures: { session_id: string; message: string }[] = [];
     for (const member of members) {
       const sessionId = String(member.session_id);
       try {
@@ -187,12 +228,17 @@ export class ReportsStore {
           await this.client.plots.detail(sessionId, { signal }),
           featureKey,
         );
-        if (value !== null) map.set(sessionId, value);
+        if (value !== null) values.set(sessionId, value);
+        else failures.push({ session_id: sessionId, message: "значение отсутствует в деталях" });
       } catch (error) {
         if (signal.aborted) throw error;
+        failures.push({
+          session_id: sessionId,
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
-    return map;
+    return { values, failures };
   }
 
   private async pollResult(jobId: string, signal: AbortSignal): Promise<StatisticsResultEnvelope> {

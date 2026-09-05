@@ -244,4 +244,48 @@ describe("ReportsStore.buildReport", () => {
     expect(draft.recipes).toHaveLength(0);
     expect(draft.limitations.map((item) => item.code)).toContain("recipes_unlinked");
   });
+
+  it("health load failure keeps provenance as a typed limitation, never an empty silent map", async () => {
+    // Given: каталог недоступен (сеть легла)
+    const client = clientStub(effectEnvelope(), { health: fullHealth() });
+    client.catalogSessions = (async () => {
+      throw new Error("каталог недоступен");
+    }) as unknown as ClientStub["catalogSessions"];
+    const store = new ReportsStore({ client: client as unknown as LntApiClient });
+    // When
+    const { draft } = await store.buildReport(abaDetail());
+    // Then: тихой пустой карты нет — есть типизированное ограничение с причиной
+    const codes = draft.limitations.map((item) => item.code);
+    expect(codes).toContain("catalog_health_unavailable");
+    const entry = draft.limitations.find((item) => item.code === "catalog_health_unavailable");
+    expect(entry?.detail).toContain("каталог недоступен");
+  });
+
+  it("value load failures keep per-session provenance instead of silent swallow", async () => {
+    // Given: одна сессия не отдаёт детали
+    const client = clientStub(effectEnvelope(), {
+      health: fullHealth(),
+      failDetailFor: ["u2-cond_b"],
+    });
+    const store = new ReportsStore({ client: client as unknown as LntApiClient });
+    // When
+    const { draft } = await store.buildReport(abaDetail());
+    // Then: ограничение хранит и сессию, и исходную причину
+    const entry = draft.limitations.find((item) => item.code === "values_unavailable");
+    expect(entry).toBeDefined();
+    expect(entry?.detail).toContain("u2-cond_b");
+    expect(entry?.detail).toContain("detail unavailable");
+  });
+
+  it("recipes failure keeps the backend message in a typed limitation", async () => {
+    // Given: /api/analysis/recipes падает
+    const client = clientStub(effectEnvelope(), { health: fullHealth(), recipesFail: true });
+    const store = new ReportsStore({ client: client as unknown as LntApiClient });
+    // When
+    const { draft } = await store.buildReport(abaDetail());
+    // Then: пустой список не молчит — причина зафиксирована типизированно
+    const entry = draft.limitations.find((item) => item.code === "recipes_load_failed");
+    expect(entry).toBeDefined();
+    expect(entry?.detail).toContain("recipes unavailable");
+  });
 });

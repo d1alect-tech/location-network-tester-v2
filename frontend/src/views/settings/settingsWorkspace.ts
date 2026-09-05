@@ -9,10 +9,10 @@
 import type { LntApiClient } from "../../api/client";
 import { createDeviceApi } from "../../api/client-device";
 import { clearElement, el } from "../../components/primitives/dom";
-import { createField } from "../../components/primitives/forms";
 import { announcePolite } from "../../components/primitives/status";
 import { refreshProfiles, refreshRecipes } from "./settingsLists";
-import { ROOT_NOTE_MAX_LENGTH, validateRootNote } from "./settingsModel";
+import { readCapturePreflightRequest } from "./settingsPreflight";
+import { createRootNoteBlock } from "./settingsRootNote";
 import {
   buildBundleSection,
   buildPrivacySection,
@@ -27,8 +27,6 @@ export interface SettingsWorkspaceOptions {
   client: LntApiClient;
 }
 
-const ROOT_NOTE_KEY = "lnt-root-note";
-
 export function mountSettingsWorkspace(
   container: HTMLElement,
   options: SettingsWorkspaceOptions,
@@ -38,44 +36,26 @@ export function mountSettingsWorkspace(
   const deviceHost = el("div", { className: "lnt-set-device" });
   const preflightHost = el("div", {});
   const recipesHost = el("div", {});
-  const profilesHost = el("p", { className: "t-body", text: "Загрузка профилей…" });
+  const profilesHost = el("div", { className: "t-body", text: "Загрузка профилей…" });
 
-  const rootNoteInput = el("input", {
-    className: "ctl",
-    attrs: {
-      type: "text",
-      id: "lnt-set-root-note",
-      maxlength: String(ROOT_NOTE_MAX_LENGTH),
-      autocomplete: "off",
-    },
-  });
-  const rootNoteField = createField({
-    label: "Локальная заметка о корне (не меняет сервер)",
-    control: rootNoteInput,
-    hintText:
-      "Фактический корень отдаёт сервер и меняется только перезапуском: uv run lnt ui --root <путь>. Заметка хранится локально в браузере.",
-  });
-  // V6-форма поверх примитива (примитив не трогаем — он общий для разделов):
-  // .field для раскладки, .field-label для подписи; .lnt-field остаётся e2e-хуком.
-  rootNoteField.root.classList.add("field");
-  rootNoteField.root.querySelector("label")?.classList.add("field-label");
+  const rootNote = createRootNoteBlock();
   const rootValue = el("code", { className: "t-mono lnt-set-root-value", text: "…" });
-  const savedNote = readNote();
-  if (savedNote !== null) rootNoteInput.value = savedNote;
-
-  const saveButton = el("button", {
-    className: "btn",
-    text: "Сохранить заметку",
-    attrs: { type: "button", id: "lnt-set-root-save" },
+  // U2: недоступный /api/config — видимое outage-состояние с повтором,
+  // а не тихая строка «недоступно» без выхода.
+  const rootRetry = el("button", {
+    className: "btn btn-secondary",
+    text: "Повторить",
+    attrs: { type: "button", id: "lnt-set-root-retry", hidden: "" },
   });
-  saveButton.addEventListener("click", () => saveNote());
+  rootRetry.addEventListener("click", () => void refreshRoot());
   const rootSection = panelSection(
     "Корень сессий",
     [
       el("p", { className: "t-body", text: "Фактический корень (GET /api/config):" }),
       rootValue,
-      el("div", { className: "form-grid" }, [rootNoteField.root]),
-      el("div", { className: "form-actions" }, [saveButton]),
+      rootRetry,
+      el("div", { className: "form-grid" }, [rootNote.field]),
+      el("div", { className: "form-actions" }, [rootNote.saveButton]),
     ],
     "lnt-set-root",
   );
@@ -148,25 +128,22 @@ export function mountSettingsWorkspace(
   );
   container.append(root);
 
-  function readNote(): string | null {
+  /** Факт корня с видимым outage-состоянием и объявлением восстановления. */
+  async function refreshRoot(): Promise<void> {
     try {
-      return window.localStorage.getItem(ROOT_NOTE_KEY);
-    } catch {
-      return null;
+      const config = await client.bootstrap();
+      const recovered = rootRetry.getAttribute("hidden") === null;
+      rootValue.textContent = config.root;
+      rootValue.removeAttribute("role");
+      rootRetry.setAttribute("hidden", "");
+      if (recovered) announcePolite("Корень сессий загружен");
+    } catch (error) {
+      const message = `Корень сессий недоступен: ${error instanceof Error ? error.message : String(error)}. Проверьте, что панель запущена, и повторите.`;
+      rootValue.textContent = "недоступно (сервер не отвечает)";
+      rootValue.setAttribute("role", "alert");
+      rootRetry.removeAttribute("hidden");
+      announcePolite(message);
     }
-  }
-
-  function saveNote(): void {
-    const validation = validateRootNote(rootNoteInput.value);
-    rootNoteField.setError(validation.error);
-    if (!validation.ok) return;
-    try {
-      if (rootNoteInput.value.trim() === "") window.localStorage.removeItem(ROOT_NOTE_KEY);
-      else window.localStorage.setItem(ROOT_NOTE_KEY, rootNoteInput.value.trim());
-    } catch {
-      // приватный режим: заметка живёт только в поле ввода
-    }
-    announcePolite("Заметка о корне сохранена локально");
   }
 
   async function refreshDevice(): Promise<void> {
@@ -191,18 +168,8 @@ export function mountSettingsWorkspace(
     clearElement(preflightHost);
     preflightHost.append(el("p", { className: "t-compact", text: "Проверка готовности захвата…" }));
     try {
-      const report = await device.preflight({
-        kind: "capture",
-        channels: 2,
-        sample_rate_hz: 20_000_000,
-        duration_s: 2.4,
-        range_v: 5,
-        label: "",
-        self_noise: false,
-        repeat: 1,
-        interval_s: 0,
-        baseline_session: null,
-      });
+      // U3 BIND: запрос собирается из живой формы захвата, а не из хардкода.
+      const report = await device.preflight(readCapturePreflightRequest());
       clearElement(preflightHost);
       preflightHost.append(renderPreflight(report));
       announcePolite(report.ready ? "Захват готов к запуску" : "Захват заблокирован проверкой");
@@ -216,17 +183,23 @@ export function mountSettingsWorkspace(
     }
   }
 
-  void client.ensureReady().then(async () => {
-    try {
-      const config = await client.bootstrap();
-      rootValue.textContent = config.root;
-    } catch {
-      rootValue.textContent = "недоступно (сервер не отвечает)";
-    }
-    void refreshProfiles(client, profilesHost);
-    void refreshRecipes(client, recipesHost);
-    void refreshDevice();
-  });
+  /** Профили с самовосстанавливающимся повтором (U2). */
+  async function loadProfiles(): Promise<void> {
+    await refreshProfiles(client, profilesHost, () => void loadProfiles());
+  }
+
+  async function bootstrapAll(): Promise<void> {
+    // Порядок фиксирован: успешные объявления — первыми, ошибки — последними.
+    await refreshDevice();
+    await refreshRoot();
+    await loadProfiles();
+    await refreshRecipes(client, recipesHost);
+  }
+
+  void client.ensureReady().then(
+    () => void bootstrapAll(),
+    () => void bootstrapAll(),
+  );
 
   return () => undefined;
 }

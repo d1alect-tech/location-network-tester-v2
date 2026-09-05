@@ -5,17 +5,27 @@
 
 import type { LntApiClient } from "../../api/client";
 import { clearElement, el } from "../../components/primitives/dom";
+import { errorWithRetry } from "../../components/primitives/errorRetry";
+import { announcePolite } from "../../components/primitives/status";
 import { errorBlock } from "./settingsSections";
 
+/** U2: тихий catch заменён видимой русской ошибкой role=alert с повтором;
+ * восстановление после ошибки объявляется отдельно. */
 export async function refreshProfiles(
   client: LntApiClient,
   profilesHost: HTMLElement,
+  onRetry: () => void,
 ): Promise<void> {
   try {
     const list = await client.profiles();
+    const recovered = profilesHost.querySelector("[role=alert]") !== null;
     profilesHost.textContent = `Зарегистрированных профилей: ${String(list.items.length)}.`;
-  } catch {
-    profilesHost.textContent = "Список профилей недоступен (сервер не отвечает).";
+    if (recovered) announcePolite("Список профилей загружен");
+  } catch (error) {
+    const message = `Список профилей недоступен: ${error instanceof Error ? error.message : String(error)}. Проверьте, что панель запущена, и повторите.`;
+    clearElement(profilesHost);
+    profilesHost.append(errorWithRetry(message, onRetry));
+    announcePolite(message);
   }
 }
 

@@ -14,7 +14,9 @@ import { protocolLabel } from "../experiments/experimentModel";
 import type { ExperimentDetail } from "../experiments/experimentsStore";
 import { REPORT_EXPORT_FORMAT, buildReportFilename, downloadMarkdown } from "./reportExport";
 import { previewBlock } from "./reportPreview";
+import { createReportsHeader, createReportsInvitation } from "./reportsHeader";
 import { ReportsStore } from "./reportsStore";
+import { createWorkspaceStatusBlock, degradedReportMessage } from "./reportsWorkspaceStatus";
 import "./reports.css";
 
 export interface ReportsWorkspaceOptions {
@@ -57,10 +59,8 @@ export function mountReportsWorkspace(
       "aria-describedby": "lnt-rep-hint",
     },
   });
-  const statusHost = el("p", {
-    className: "t-compact lnt-helper-text",
-    attrs: { role: "status" },
-  });
+  const { statusHost, errorBanner, setStatus, showError, setPendingRetry } =
+    createWorkspaceStatusBlock();
   const buildHint = el("p", {
     className: "lnt-hint",
     text: "Сначала выберите эксперимент слева — кнопка «Собрать отчёт» станет доступна.",
@@ -68,11 +68,6 @@ export function mountReportsWorkspace(
   });
 
   const leftPane = el("div", { className: "lnt-rep-left" }, [
-    el("h2", { className: "placeholder-title", text: "Отчёты" }),
-    el("p", {
-      className: "lnt-helper-text",
-      text: "Отчёт собирается из существующих данных бэкенда: statistics-runs, детали сессий, рецепты. Готового HTTP-маршрута отчётов нет — выгрузка формируется клиентом из тех же данных, что показаны в превью.",
-    }),
     el("div", { className: "lnt-exp-actions" }, [
       el("button", {
         className: "btn btn-secondary lnt-btn",
@@ -82,19 +77,23 @@ export function mountReportsWorkspace(
     ]),
     listHost,
   ]);
+  const invitation = createReportsInvitation();
   const rightPane = el("div", { className: "lnt-rep-right" }, [
-    el("p", {
-      className: "lnt-helper-text",
-      text: "Выберите эксперимент слева, затем соберите отчёт: превью покажет provenance, единицы, N, плоскости измерения и ограничения.",
-    }),
+    invitation,
     buildHint,
     statusHost,
+    errorBanner,
     detailHost,
   ]);
-  const root = el("div", { className: "lnt-rep-workspace" }, [leftPane, rightPane]);
+  const workspace = el("div", { className: "lnt-rep-workspace" }, [leftPane, rightPane]);
+  const root = el("div", { className: "lnt-rep" }, [createReportsHeader(), workspace]);
   container.append(root);
 
-  void client.ensureReady().catch(() => undefined);
+  void client.ensureReady().catch((error: unknown) => {
+    const reason = error instanceof Error ? error.message : String(error);
+    setPendingRetry(() => void refreshList());
+    showError(`Сервер недоступен: ${reason}. Проверьте соединение и повторите.`);
+  });
 
   let currentDetail: ExperimentDetail | null = null;
   let currentMarkdown: string | null = null;
@@ -157,6 +156,7 @@ export function mountReportsWorkspace(
 
   async function loadDetailInto(experimentId: string): Promise<void> {
     pendingReportId = experimentId;
+    invitation.hidden = true;
     clearElement(detailHost);
     detailHost.append(el("p", { className: "lnt-helper-text", text: "Загрузка эксперимента…" }));
     await store.detail.load(experimentId);
@@ -175,6 +175,8 @@ export function mountReportsWorkspace(
     currentDetail = state.value;
     currentMarkdown = null;
     downloadButton.disabled = true;
+    downloadButton.title = "Станет доступна после сборки отчёта";
+    setStatus("Сначала соберите отчёт: выгрузка станет доступна после сборки.");
     const experiment = state.value.experiment as OpenRecord;
     clearElement(detailHost);
     detailHost.append(
@@ -199,9 +201,14 @@ export function mountReportsWorkspace(
   }
 
   async function build(): Promise<void> {
-    if (currentDetail === null) return;
+    if (currentDetail === null) {
+      showError("Нет выбранного эксперимента для сборки. Сначала выберите эксперимент слева.");
+      return;
+    }
+    setPendingRetry(() => void build());
     buildButton.disabled = true;
-    statusHost.textContent = "Сборка отчёта: расчёт статистики на сервере…";
+    errorBanner.setAttribute("hidden", "");
+    setStatus("Сборка отчёта: расчёт статистики на сервере…");
     try {
       const result = await store.buildReport(currentDetail, { units: unitsInput.value });
       currentMarkdown = result.markdown;
@@ -210,28 +217,38 @@ export function mountReportsWorkspace(
       downloadButton.disabled = false;
       downloadButton.title = "Скачать собранный отчёт (.md)";
       buildHint.textContent = "Отчёт собран. Проверьте ограничения, затем скачайте файл.";
-      statusHost.setAttribute("role", "status");
-      statusHost.textContent = "Отчёт собран. Проверьте ограничения перед выгрузкой.";
+      setStatus("Отчёт собран. Проверьте ограничения перед выгрузкой.");
+      const degraded = degradedReportMessage(result.draft.limitations);
+      if (degraded !== null) return showError(degraded);
       announcePolite("Отчёт собран");
     } catch (error) {
-      statusHost.textContent = `Сборка не выполнена: ${error instanceof Error ? error.message : String(error)}`;
-      statusHost.setAttribute("role", "alert");
-      announcePolite("Сборка отчёта не выполнена");
+      const reason = error instanceof Error ? error.message : String(error);
+      setStatus("Сборка не выполнена.");
+      showError(
+        `Сборка не выполнена: ${reason}. Проверьте соединение и повторите.`,
+        () => void build(),
+      );
     } finally {
       buildButton.disabled = false;
     }
   }
 
   function download(): void {
-    if (currentMarkdown === null || currentDetail === null) return;
-    const experimentId = String(currentDetail.experiment.experiment_id);
-    downloadMarkdown(currentMarkdown, buildReportFilename(experimentId));
+    if (currentMarkdown === null || currentDetail === null) {
+      showError("Нет собранного отчёта для выгрузки. Сначала соберите отчёт.");
+      return;
+    }
+    setPendingRetry(() => download());
+    try {
+      const experimentId = String(currentDetail.experiment.experiment_id);
+      downloadMarkdown(currentMarkdown, buildReportFilename(experimentId));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      showError(`Выгрузка не выполнена: ${reason}. Проверьте соединение и повторите.`);
+    }
   }
 
-  async function refreshList(): Promise<void> {
-    await store.experiments.load("all");
-  }
-
+  const refreshList = (): Promise<void> => store.experiments.load("all");
   const unsubscribe = store.experiments.subscribe(() => renderListState());
   void refreshList().then(() => {
     const preset = routes.get().params.experiment;
