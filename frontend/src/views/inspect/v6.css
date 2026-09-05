@@ -104,9 +104,14 @@
   border-right: 1px solid var(--lnt-line);
 }
 
+/* Рельс каталога прокручивается внутри своей колонки: <table> не создаёт
+   scroll-контейнер (overflow к display:table не применяется), поэтому область
+   прокрутки владеет панель. Без неё 30 строк рисуются наружу — ниже
+   .view-container (overflow:hidden) и поверх .banner-inline (F-T14-01). */
 .app-v6 .col-cat > .panel {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
   background: var(--lnt-chrome);
 }
 

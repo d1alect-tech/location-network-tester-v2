@@ -1,6 +1,6 @@
 import type { CatalogSession } from "../../api/types";
 import { el } from "../../components/primitives/dom";
-import { roleOf, type CatalogRow } from "./catalogColumnModel";
+import { type CatalogRow, roleOf } from "./catalogColumnModel";
 import type { PairStateValue } from "./pairState";
 
 const DAY_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" });
@@ -85,18 +85,16 @@ function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLT
   if (role !== null) {
     labelCell.append(roleChip(role));
   }
+  // V6: полное имя — в title, обрезанное эллипсисом читается по наведению.
+  const fullLabel = session.label ?? session.id;
   labelCell.append(
     el("span", {
       className: "cell-ellipsis",
-      text: session.label ?? session.id,
-      attrs: { "data-cat-label": "" },
+      text: fullLabel,
+      attrs: { "data-cat-label": "", title: fullLabel },
     }),
   );
-  const dateText = ctx.grouped
-    ? formatTime(session.created_utc)
-    : day === "unknown"
-      ? "—"
-      : day;
+  const dateText = ctx.grouped ? formatTime(session.created_utc) : day === "unknown" ? "—" : day;
   const row = el("tr", { attrs: { "data-session": session.id, "data-cat-date": day } }, [
     roleCell,
     labelCell,

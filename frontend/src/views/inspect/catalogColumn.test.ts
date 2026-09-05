@@ -92,6 +92,20 @@ describe("createCatalogColumn", () => {
     expect(column.root.querySelector("[data-cat-empty]")).not.toBeNull();
   });
 
+  it("exposes the full session name on the label for truncated rows", async () => {
+    const pair = createPairState();
+    const column = createCatalogColumn({
+      client: fakeClient([s1, s2]),
+      pair,
+      onPick: vi.fn(),
+    });
+    await column.reload();
+
+    const label = column.root.querySelector('[data-session="s1"] [data-cat-label]');
+    expect(label?.textContent).toBe("Alpha");
+    expect(label?.getAttribute("title")).toBe("Alpha");
+  });
+
   it("drops day groups and sets aria-sort when sorting by label", async () => {
     const column = createCatalogColumn({
       client: fakeClient([s1, s2]),
