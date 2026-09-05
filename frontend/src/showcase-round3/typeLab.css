@@ -1,0 +1,113 @@
+/* Типолаба: четыре шрифтовые системы поверх макета R3-A.
+   Семейства и акценты меняются через data-type на body; макет не трогаем. */
+
+/* T2 «Терминал»: JetBrains Mono целиком — голос прошивки. */
+body[data-type="t2"] .r3,
+body[data-type="t2"].r3 {
+  --r3-ui: "JetBrains Mono Variable", "Consolas", monospace;
+  --r3-mono: "JetBrains Mono Variable", "Consolas", monospace;
+}
+body[data-type="t2"] .t-tag {
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+body[data-type="t2"] .bar-brand {
+  letter-spacing: 0.22em;
+}
+
+/* T3 «Гротеск»: Golos тяжёлый + Source Code Pro, числа крупнее. */
+body[data-type="t3"] .r3,
+body[data-type="t3"].r3 {
+  --r3-ui: "Golos Text Variable", "Segoe UI", system-ui, sans-serif;
+  --r3-mono: "Source Code Pro Variable", "Consolas", monospace;
+}
+body[data-type="t3"] .t-tag {
+  font-weight: 800;
+  letter-spacing: 0.09em;
+}
+body[data-type="t3"] .delta-badge .t-num {
+  font-size: 26px;
+  line-height: 30px;
+  font-weight: 700;
+}
+body[data-type="t3"] .verdict .t-bar {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* T4 «Журнал»: числа — Source Serif 4, интерфейс — Source Sans 3,
+   таблица остаётся моно (JBM). Голос журнала измерений. */
+body[data-type="t4"] .r3,
+body[data-type="t4"].r3 {
+  --r3-ui: "Source Sans 3 Variable", "Segoe UI", system-ui, sans-serif;
+  --r3-mono: "JetBrains Mono Variable", "Consolas", monospace;
+}
+body[data-type="t4"] .delta-badge .t-num {
+  font-family: "Source Serif 4 Variable", Georgia, serif;
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 600;
+}
+body[data-type="t4"] .verdict .t-bar {
+  font-family: "Source Serif 4 Variable", Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+body[data-type="t4"] .marker-chip .t-num {
+  font-size: 13px;
+}
+
+/* T5 «Системный»: базовый Ариал — ноль веб-шрифтов, самый сдержанный голос. */
+body[data-type="t5"] .r3,
+body[data-type="t5"].r3 {
+  --r3-ui: Arial, "Helvetica Neue", system-ui, sans-serif;
+  --r3-mono: Consolas, "Courier New", monospace;
+}
+body[data-type="t5"] .t-tag {
+  letter-spacing: 0.05em;
+}
+
+/* Крупные числа: единица измерения остаётся мелкой */
+body[data-type="t3"] .delta-badge .t-num .t-unit,
+body[data-type="t4"] .delta-badge .t-num .t-unit {
+  font-size: 12px;
+}
+
+/* Панель переключателя */
+.r3 .type-lab {
+  position: fixed;
+  left: 50%;
+  bottom: 46px;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--r3-elev);
+  border: 1px solid var(--r3-line-strong);
+  border-radius: var(--r3-r);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.4);
+}
+.r3 .type-lab-title {
+  margin-right: 4px;
+}
+.r3 .type-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 4px 10px;
+  background: var(--r3-panel);
+  border: 1px solid var(--r3-line-strong);
+  border-radius: var(--r3-r);
+  color: var(--r3-text);
+  cursor: pointer;
+}
+.r3 .type-btn[aria-pressed="true"] {
+  border-color: var(--r3-a);
+  color: var(--r3-a);
+}
+.r3 .type-btn-label {
+  font: 600 12px / 16px var(--r3-ui);
+}
