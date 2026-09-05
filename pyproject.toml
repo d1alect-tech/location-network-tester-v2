@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "lnt"
 version = "0.1.0"
-description = "LNT (Location Network Tester): mains-noise capture (Hantek 6022BE) and analysis for the fable5-inputlag research wiki"
+description = "Захват и спектральный анализ питающей сети для постановки и проверки гипотез об электрическом инпутлаге, сравнения локаций и условий питания"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
