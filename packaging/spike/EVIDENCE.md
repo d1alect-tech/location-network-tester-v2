@@ -19,6 +19,6 @@ sanitized-reference-host/process. This is not clean/sterile VM evidence.
 - Full suite: 359 tests passed.
 
 Authoritative runtime files are under
-`C:\Users\Kirill\Documents\InputLag\.omo\start-work\evidence\task-13-lnt-complete-redesign\`:
+`<рабочее-дерево>\.omo\start-work\evidence\task-13-lnt-complete-redesign\`:
 `frozen-stdout.txt`, `probe-report.json`, `dependency-inventory.json`,
 `verdict.json`, and `failure-qa/stdout.txt`.

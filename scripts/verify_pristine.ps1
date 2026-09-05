@@ -10,13 +10,13 @@
     Absolute path to the original location-network-tester product directory.
 
 .PARAMETER SessionRoot
-    Absolute path to the sessions root (e.g. C:\Users\Kirill\lnt-sessions).
+    Absolute path to the sessions root (e.g. C:\lnt-sessions).
 
 .PARAMETER ReceiptDir
     Absolute path to the .integrity directory containing receipts and policy.
 
 .EXAMPLE
-    .\verify_pristine.ps1 -Original C:\repo\location-network-tester -SessionRoot C:\Users\Kirill\lnt-sessions -ReceiptDir C:\repo\.integrity
+    .\verify_pristine.ps1 -Original C:\repo\location-network-tester -SessionRoot C:\lnt-sessions -ReceiptDir C:\repo\.integrity
 #>
 [CmdletBinding()]
 param(

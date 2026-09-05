@@ -29,7 +29,7 @@ Invokes `verify_pristine.ps1` with the correct parameters:
 ```powershell
 .\scripts\Assert-Pristine.ps1 `
     -Original C:\path\to\location-network-tester `
-    -SessionRoot C:\Users\Kirill\lnt-sessions
+    -SessionRoot C:\lnt-sessions
 ```
 
 ### 2. `scripts/Assert-EvidencePaths.ps1` — evidence-path guard
@@ -47,7 +47,7 @@ original source tree or the real sessions root.  Catches:
 .\scripts\Assert-EvidencePaths.ps1 `
     -Paths @("C:\out\report.pdf") `
     -Original C:\path\to\location-network-tester `
-    -SessionRoot C:\Users\Kirill\lnt-sessions
+    -SessionRoot C:\lnt-sessions
 ```
 
 ### 3. `.integrity/approved-work-plan.md` + `.integrity/approved-work-plan.sha256`

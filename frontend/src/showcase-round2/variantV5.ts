@@ -13,7 +13,7 @@ import { mountPeakMarkers } from "./peakMarkers";
 const app = document.getElementById("app");
 if (!(app instanceof HTMLElement)) throw new Error("нет #app");
 
-const SESSION_ROOT = "C:\\Users\\Kirill\\lnt-sessions";
+const SESSION_ROOT = "C:\\lnt-sessions";
 
 /** Шапка 32px: навигация и прибор. В V3 та же полоса несла шесть сущностей сразу,
  *  и таб-бар в ней не читался как главный. */

@@ -22,9 +22,9 @@
     Print detailed resolution steps.
 
 .EXAMPLE
-    .\Assert-EvidencePaths.ps1 -Paths @("C:\out\report.pdf") -Original C:\repo\lnt -SessionRoot C:\Users\Kirill\lnt-sessions
+    .\Assert-EvidencePaths.ps1 -Paths @("C:\out\report.pdf") -Original C:\repo\lnt -SessionRoot C:\lnt-sessions
 .EXAMPLE
-    .\Assert-EvidencePaths.ps1 -Paths @("..\lnt\secrets.txt") -Original C:\repo\lnt -SessionRoot C:\Users\Kirill\lnt-sessions
+    .\Assert-EvidencePaths.ps1 -Paths @("..\lnt\secrets.txt") -Original C:\repo\lnt -SessionRoot C:\lnt-sessions
 #>
 [CmdletBinding()]
 param(

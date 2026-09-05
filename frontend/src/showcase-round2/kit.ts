@@ -92,7 +92,7 @@ export function buildStatusbar(): HTMLElement {
       `${JOB.status} — ${JOB.stage} · ${JOB.series}`,
     ]),
     h("span", "statusbar-spacer", {}),
-    h("span", "statusbar-item num", {}, ["Корень: C:\\Users\\Kirill\\lnt-sessions"]),
+    h("span", "statusbar-item num", {}, ["Корень: C:\\lnt-sessions"]),
   ]);
 }
 

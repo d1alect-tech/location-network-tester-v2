@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -42,14 +43,28 @@ def _run_ps(
 # --- fixtures ---------------------------------------------------------------
 
 
+def _receipt_root(name: str) -> str:
+    """Корень из расписки целостности.
+
+    Расписки привязаны к машине владельца и не входят в репозиторий,
+    поэтому без них гейт пропускается, а не падает.
+    """
+    receipt = INTEGRITY_DIR / name
+    if not receipt.is_file():
+        pytest.skip(f"{name}: расписка целостности недоступна")
+    root = json.loads(receipt.read_text(encoding="utf-8"))["root"]
+    assert isinstance(root, str)
+    return root
+
+
 @pytest.fixture
 def original_path() -> str:
-    return r"C:\Users\Kirill\Documents\InputLag\location-network-tester"
+    return _receipt_root("receipt-original.json")
 
 
 @pytest.fixture
 def session_root() -> str:
-    return r"C:\Users\Kirill\lnt-sessions"
+    return _receipt_root("receipt-sessions.json")
 
 
 # --- Assert-Pristine (happy path) -------------------------------------------
@@ -153,9 +168,14 @@ class TestAssertEvidencePaths:
     ) -> None:
         """A path with ..\\ traversal into the original tree should be rejected."""
         # Simulate an evidence path that uses ..\\ to climb back into original
-        escape_path = (
-            r"C:\Users\Kirill\Documents\other_stuff\..\InputLag"
-            r"\location-network-tester\secrets.txt"
+        original = Path(original_path)
+        escape_path = str(
+            original.parent.parent
+            / "other_stuff"
+            / ".."
+            / original.parent.name
+            / original.name
+            / "secrets.txt"
         )
         cp = _run_ps(
             "Assert-EvidencePaths.ps1",

@@ -16,7 +16,7 @@ import { buildSpectrogramV6 } from "./spectrogramV6";
 const app = document.getElementById("app");
 if (!(app instanceof HTMLElement)) throw new Error("нет #app");
 
-const SESSION_ROOT = "C:\\Users\\Kirill\\lnt-sessions";
+const SESSION_ROOT = "C:\\lnt-sessions";
 const base = SESSIONS[0];
 const compare = SESSIONS[6];
 if (base === undefined || compare === undefined) throw new Error("нет пары сессий");
