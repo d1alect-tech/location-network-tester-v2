@@ -13,7 +13,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
 from fastapi.testclient import TestClient
@@ -144,7 +144,8 @@ def test_missing_confirmation_raises_pinned_protocol_state_error(tmp_path: Path)
         )
         assert pending.current_confirmation is None
         with pytest.raises(facade.ProtocolStateError) as raised:
-            runner._finish_member(pending, lambda: False)
+            # Характеризация внутреннего перехода: публичного пути к этому состоянию нет.
+            runner._finish_member(pending, lambda: False)  # pyright: ignore[reportPrivateUsage]
     finally:
         runner.close()
 
@@ -187,7 +188,7 @@ def test_identity_route_error_mapping_catches_the_leaf_exception_class(
 ) -> None:
     """Given seam кидает класс листа, When confirm по HTTP, Then маршрут всё ещё ловит его."""
 
-    def _raise_leaf(_self: ProtocolRunner, _run_id: str, **_kwargs: Any) -> None:  # noqa: ANN401
+    def _raise_leaf(_self: ProtocolRunner, _run_id: str, **_kwargs: object) -> None:
         raise leaves.AutoConfirmationRejectedError
 
     monkeypatch.setattr(ProtocolRunner, "confirm", _raise_leaf)

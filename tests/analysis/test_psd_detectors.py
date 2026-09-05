@@ -23,16 +23,17 @@ _TONE_HZ = 1000.0  # ровно бин 128: 1000 / (8000/1024) = 128
 _BURST_BIN = 128
 
 
-def _settings(**overrides: object) -> PsdSettings:
-    base: dict[str, object] = {
-        "sample_rate_hz": _FS,
-        "nperseg": _NPERSEG,
-        "max_chunk_samples": _NPERSEG,
-        "bands": (FrequencyBand(name="full", low_hz=0.0, high_hz=_FS / 2),),
-        "overlap_fraction": 0.0,
-    }
-    base.update(overrides)
-    return PsdSettings(**base)  # type: ignore[arg-type]
+def _settings(*, detector: str = "mean", track_max_hold: bool = False) -> PsdSettings:
+    """Базовые настройки теста; варьируются только детектор и max-hold."""
+    return PsdSettings(
+        sample_rate_hz=_FS,
+        nperseg=_NPERSEG,
+        max_chunk_samples=_NPERSEG,
+        bands=(FrequencyBand(name="full", low_hz=0.0, high_hz=_FS / 2),),
+        overlap_fraction=0.0,
+        detector=detector,
+        track_max_hold=track_max_hold,
+    )
 
 
 def _burst_samples() -> np.ndarray:

@@ -5,11 +5,18 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from typing import override
 
 import numpy as np
 
 from lnt.analysis_store import AnalysisRecipe, CodeIdentity
-from lnt.analysis_v2 import AnalysisOrchestrator, BranchContext, BranchFailure, SessionKind
+from lnt.analysis_v2 import (
+    AnalysisOrchestrator,
+    BranchContext,
+    BranchFailure,
+    BranchOutput,
+    SessionKind,
+)
 from lnt.analysis_v2.engine import DefaultAnalysisEngine
 from lnt.apd import ApdSettings, apd_preset, compute_apd
 from lnt.scope_io import NEVER_CANCELLED
@@ -209,7 +216,8 @@ def test_orchestrator_apd_dispatch_and_failure_isolation(tmp_path: Path) -> None
 
     # failure isolation
     class FailEngine(DefaultAnalysisEngine):
-        def run_branch(self, name: str, context: BranchContext):  # type: ignore[override]
+        @override
+        def run_branch(self, name: str, context: BranchContext) -> BranchOutput:
             if name == "apd":
                 raise RuntimeError("boom-apd")
             return super().run_branch(name, context)

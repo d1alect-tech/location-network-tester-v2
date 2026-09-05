@@ -265,7 +265,7 @@ def test_run_uvicorn_disables_uvicorn_dict_config(
     monkeypatch.setattr(sys, "stdout", None)  # windowed PyInstaller reality
 
     sentinel_socket = object()
-    launcher_module._run_uvicorn(  # pyright: ignore[reportPrivateUsage]
+    launcher_module._run_uvicorn(
         object(),  # pyright: ignore[reportArgumentType]
         server_socket=sentinel_socket,  # pyright: ignore[reportArgumentType]
     )

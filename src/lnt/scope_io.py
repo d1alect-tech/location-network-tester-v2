@@ -144,7 +144,11 @@ class SpooledBlockCollector:
 def open_real_scope() -> ScopeProtocol:
     """Лениво импортирует драйвер; его отсутствие -> ``DeviceNotFoundError``."""
     try:
-        from PyHT6022.LibUsbScope import Oscilloscope  # noqa: PLC0415
+        # PyHT6022 — опциональный GPL-драйвер из extra `lnt[hantek]`: его нет ни в MIT-дереве,
+        # ни в dev-окружении — поэтому тайпчекер его не разрешает по построению.
+        from PyHT6022.LibUsbScope import (  # noqa: PLC0415 # pyright: ignore[reportMissingImports]
+            Oscilloscope,
+        )
     except ImportError as exc:
         raise DeviceNotFoundError(
             "драйвер hantek6022api не установлен: pip install 'lnt[hantek]' (см. README)",

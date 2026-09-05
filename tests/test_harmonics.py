@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
+from lnt.analysis_store import AnalysisRecipe
+from lnt.analysis_v2 import BranchContext, SessionKind
+from lnt.analysis_v2.engine import DefaultAnalysisEngine
 from lnt.harmonics import compute_harmonics
+from lnt.scope_io import NEVER_CANCELLED
 
 
 def _sine(duration_s: float, rate: float, freq: float, amp: float = 1.0) -> np.ndarray:
@@ -91,13 +97,6 @@ def test_long_record_takes_first_2_4s() -> None:
 
 
 def test_engine_branch_files() -> None:
-    from pathlib import Path
-
-    from lnt.analysis_store import AnalysisRecipe
-    from lnt.analysis_v2 import BranchContext, SessionKind
-    from lnt.analysis_v2.engine import DefaultAnalysisEngine
-    from lnt.scope_io import NEVER_CANCELLED
-
     rate = 10000.0
     sig = _sine(2.4, rate, 50.0, 1.0)
     engine = DefaultAnalysisEngine()

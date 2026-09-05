@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from typing import override
 
 import numpy as np
 
@@ -37,10 +38,10 @@ def _sine_with_notches(
     count: int = 3,
 ) -> np.ndarray:
     arr = _sine(duration_s, sample_rate, peak_v).astype(np.float64)
-    width_samples = max(1, int(round(width_us * 1e-6 * sample_rate)))
+    width_samples = max(1, round(width_us * 1e-6 * sample_rate))
     step = int(arr.size // (count + 1))
     # offset to peaks (quarter period = 5ms at 50Hz) to avoid zero-crossing blind spot
-    peak_offset = int(round(sample_rate * 0.005))
+    peak_offset = round(sample_rate * 0.005)
     for k in range(count):
         centre = (k + 1) * step + peak_offset
         if centre >= arr.size - width_samples:
@@ -162,7 +163,7 @@ def test_to_dict_json_and_settings_hash() -> None:
     assert len(inv.settings_hash) == 64
 
 
-def test_engine_branch_emits_notching_json(tmp_path: Path | None = None) -> None:
+def test_engine_branch_emits_notching_json() -> None:
     engine = DefaultAnalysisEngine()
     sig = _sine(duration_s=0.4)
     tmp = Path.cwd()
@@ -200,7 +201,8 @@ def test_orchestrator_notching_dispatch(tmp_path: Path) -> None:
 
     # failure isolation
     class FailEngine(DefaultAnalysisEngine):
-        def run_branch(self, name: str, context: BranchContext) -> BranchOutput:  # type: ignore[override]
+        @override
+        def run_branch(self, name: str, context: BranchContext) -> BranchOutput:
             if name == "notching":
                 raise RuntimeError("boom-notching")
             return super().run_branch(name, context)

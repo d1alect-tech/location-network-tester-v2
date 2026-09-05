@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from lnt.analysis_store import AnalysisRecipe, CodeIdentity
-from lnt.analysis_v2 import AnalysisOrchestrator, BranchContext, SessionKind
+from lnt.analysis_v2 import AnalysisOrchestrator, BranchContext, BranchOutput, SessionKind
 from lnt.analysis_v2.engine import DefaultAnalysisEngine
 from lnt.burst import BurstSettings, burst_preset, detect_bursts
 from lnt.scope_io import NEVER_CANCELLED
@@ -108,11 +108,9 @@ def test_burst_train_5kHz_rep_count_and_period() -> None:
 
 
 def test_gap_separates_sequences() -> None:
-    sig = _burst_train(duration_s=2.0, amp=5.0, offset_s=0.1, period_s=0.3)
-    # add extra gap by removing middle bursts via zeroing 0.6-1.2 region
-    # instead create two clusters with 0.8 gap
+    # Два кластера пачек с разрывом 0.9 с строятся здесь напрямую, а не через
+    # _burst_train: нужен именно разрыв между сериями, а не равномерный период.
     sr = 1_000_000.0
-    n = int(sr * 2.0)
     base = _quiet(2.0, sr).astype(np.float64)
     # cluster1: 0.1,0.4
     for off in [0.1, 0.4]:
@@ -210,14 +208,14 @@ def test_engine_branch_emits_burst_json_and_orchestrator() -> None:
         np.save(session2 / "ch1.npy", sig)
 
         class Boom:
-            def run_branch(self, name: str, ctx: BranchContext):  # type: ignore[no-untyped-def]
+            def run_branch(self, name: str, context: BranchContext) -> BranchOutput:
                 if name == "burst":
                     raise RuntimeError("boom-burst")
-                return engine.run_branch(name, ctx)
+                return engine.run_branch(name, context)
 
         orch2 = AnalysisOrchestrator(
             engine=Boom(),
             code_identity=CodeIdentity(lnt="test", numpy=np.__version__, scipy="test"),
-        )  # type: ignore[arg-type]
+        )
         res2 = orch2.run(session2, recipe, project_legacy=False)
         assert any(f.branch == "burst" for f in res2.failures)

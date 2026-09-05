@@ -29,7 +29,7 @@ NOISE_SIGMA_V: float = 0.001
 _NOISE_SEED: int = 20260826
 
 
-def build_probe_pair_session(  # noqa: PLR0913 - поверхность повторяет параметры захвата probe-pair
+def build_probe_pair_session(
     target: Path,
     *,
     session_id: str = "cm-dm-1",

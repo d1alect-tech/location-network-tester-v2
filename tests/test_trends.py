@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from lnt.analysis_store import AnalysisRecipe, CodeIdentity
-from lnt.analysis_v2 import AnalysisOrchestrator, BranchContext, SessionKind
+from lnt.analysis_v2 import AnalysisOrchestrator, BranchContext, BranchOutput, SessionKind
 from lnt.analysis_v2.engine import DefaultAnalysisEngine
 from lnt.scope_io import NEVER_CANCELLED
 from lnt.trends import TrendsSettings, compute_trends, trends_preset
@@ -69,8 +69,9 @@ def test_step_change_detected() -> None:
     sig[step_at:] += 2.0
     inv = compute_trends(sig.astype(np.float32), sample_rate_hz=sr, settings=trends_preset())
     assert len(inv.change_points) >= 1
-    # change point near 3.0s absolute -> ~1.0s in effective (2-4s) => 0.4-1.6 effective, 2.4-3.6 absolute
-    cps = [c for c in inv.change_points]
+    # Точка разладки на 3.0 с абсолютных → ~1.0 с в эффективном окне (2–4 с),
+    # то есть допуск 0.4–1.6 эффективных = 2.4–3.6 абсолютных.
+    cps = list(inv.change_points)
     assert any(abs(c.time_s - 1.0) < 0.6 for c in cps)
 
 
@@ -202,15 +203,15 @@ def test_engine_branch_emits_trends_json_and_orchestrator() -> None:
         np.save(session2 / "ch1.npy", sig)
 
         class Boom:
-            def run_branch(self, name: str, ctx: BranchContext):  # type: ignore[no-untyped-def]
+            def run_branch(self, name: str, context: BranchContext) -> BranchOutput:
                 if name == "trends":
                     raise RuntimeError("boom-trends")
-                return engine.run_branch(name, ctx)
+                return engine.run_branch(name, context)
 
         orch2 = AnalysisOrchestrator(
             engine=Boom(),
             code_identity=CodeIdentity(lnt="test", numpy=np.__version__, scipy="test"),
-        )  # type: ignore[arg-type]
+        )
         res2 = orch2.run(session2, recipe, project_legacy=False)
         assert any(f.branch == "trends" for f in res2.failures)
 
@@ -226,7 +227,6 @@ def test_theil_sen_deterministic_and_sampling_256() -> None:
     inv2 = compute_trends(sig, sample_rate_hz=sr, settings=settings)
     assert inv1.theil_sen_slope == inv2.theil_sen_slope
     assert inv1.eeprom_readback_hash == inv2.eeprom_readback_hash
-    d = inv1.to_dict()
     h2 = hashlib.sha256(
         json.dumps(
             settings.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
