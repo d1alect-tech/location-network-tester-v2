@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, final, override
+from typing import TYPE_CHECKING, final
 
-from lnt.capture_preflight import FindingSeverity, PreflightFinding
 from lnt.comparability import recommend_exclusion
+from lnt.experiments.runner_errors import (
+    AutoConfirmationRejectedError,
+    ProtocolStateError,
+    RandomizationSeedRequiredError,
+)
+from lnt.experiments.runner_mapping import _finding, _preflight
 from lnt.experiments.runner_models import (
     CompletedMember,
     ConfirmationRecord,
-    FindingRecord,
     PlannedMember,
     ProtocolRunMode,
     ProtocolRunRecord,
@@ -24,6 +28,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from lnt.acquisition_quality import AcquisitionQuality
+    from lnt.capture_preflight import PreflightFinding
     from lnt.experiments.model import Experiment
 
 
@@ -35,28 +40,6 @@ class CaptureArtifact:
     storage_ref: str
     artifact_refs: tuple[str, ...]
     quality: AcquisitionQuality
-
-
-@dataclass(frozen=True, slots=True)
-class AutoConfirmationRejectedError(Exception):
-    """Real physical interventions can never be auto-confirmed."""
-
-    code: str = "real_intervention_auto_confirmation_forbidden"
-
-    @override
-    def __str__(self) -> str:
-        return "физическое вмешательство нельзя подтвердить автоматически в реальном режиме"
-
-
-@dataclass(frozen=True, slots=True)
-class RandomizationSeedRequiredError(Exception):
-    """A randomized protocol cannot start without a persisted seed."""
-
-    code: str = "protocol_randomization_seed_required"
-
-    @override
-    def __str__(self) -> str:
-        return "для рандомизации протокола требуется сохранённый seed"
 
 
 @final
@@ -251,35 +234,6 @@ class ProtocolRunner:
             transition=transition,
             actor=actor,
         )
-
-
-def _finding(source: PreflightFinding) -> FindingRecord:
-    return FindingRecord(
-        severity=source.severity.value,
-        code=source.code,
-        message_ru=source.message_ru,
-        recovery_action_ru=source.recovery_action_ru,
-    )
-
-
-def _preflight(source: FindingRecord) -> PreflightFinding:
-    return PreflightFinding(
-        severity=FindingSeverity(source.severity),
-        code=source.code,
-        message_ru=source.message_ru,
-        recovery_action_ru=source.recovery_action_ru,
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class ProtocolStateError(Exception):
-    """Persisted state violates a runner invariant."""
-
-    code: str
-
-    @override
-    def __str__(self) -> str:
-        return f"запуск протокола содержит недопустимое состояние: {self.code}"
 
 
 __all__ = [
