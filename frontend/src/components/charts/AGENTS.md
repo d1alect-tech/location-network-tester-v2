@@ -7,8 +7,8 @@ uPlot + echarts wrappers with min/max decimation, CSV export, peaks/markers; dis
 - `series.ts`: `psdToDb` = 10*log10(psd), `psdToAsd`, `decimateMinMax`, `seriesToCsv`, `filterFinitePairs`
 - `uplotView.ts` + `uplotOptions.ts`: uPlot mount, cursor emit, log-safe axes
 - `echarts.ts` + `spectrogramView.ts`: echarts spectrogram shell, `baseOption`, markers A/B
-- `spectrogramView.ts` (269 LOC) / `spectrogramPanel.ts` (288 LOC): grandfathered, split only
-- `workbench.ts` (306 LOC): grandfathered multi-chart host, cursor bridge, detail open
+- `spectrogramView.ts` (269 LOC): the ONLY grandfathered file left repo-wide; pinned exact, split never grow
+- `spectrogramPanel.ts` -> `spectrogramLoader/WindowForm/Summary-CSV`; `workbench.ts` -> `workbenchControls/inputReferencePanel`: both split under 250, off the ledger
 - `spectrogramModel.ts`: tile requests, `TILE_CELL_CAP`, loader, slice
 - `spectrogramSetup.ts` + `spectrogramSummary.ts`: tile init, window summary, matrix CSV
 - `viewModels.ts`: `spectrumToRequest`, `waveformToRequest`, `POINT_BUDGETS`
@@ -31,7 +31,7 @@ uPlot + echarts wrappers with min/max decimation, CSV export, peaks/markers; dis
 ## ANTI-PATTERNS
 - No third chart lib; no Plotly string anywhere in assets (`build-check` scans).
 - No canvas-only output; every figure needs DOM name + status sibling.
-- Do not grow grandfathered files: spectrogramView / spectrogramPanel / workbench.
+- Do not grow `spectrogramView.ts` past 269; `tests/test_module_size.py` pins it exactly.
 - No color literals in TS; route through tokens.
 - No raw PSD on log axis; convert via `psdToDb` / `psdToAsd` first.
 - No sync CSV stringify on full tiles; use sliced summary helpers.

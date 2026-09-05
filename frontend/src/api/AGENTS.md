@@ -11,7 +11,7 @@
 - `client-analysis.ts`: analyze / reanalyze triggers, branch selection, result polling.
 - `types-plots.ts` + `guards-plots.ts`: `SpectrumPayload` / `InputReferredSpectrumPayload` shapes + narrowing.
 - `spectrumInputReferred`: input-referred excess PSD resolution; pairs with plot types/guards above.
-- `client-research.ts`: pinned 337, split only, don't grow.
+- `client-research.ts`: thin facade (45 LOC) over `client-research-*.ts` leaves; add new research calls to a leaf.
 - `client-device.ts`, `client-profiles.ts`, `client-statistics.ts`: device / profile / stats groups.
 - `types-jobs.ts`, `types-analysis.ts`, `types-device.ts`, `types-research.ts`: per-group payloads.
 - `guards-jobs.ts`, `guards-analysis.ts`, `guards-device.ts`, `guards.ts`: per-group predicates.

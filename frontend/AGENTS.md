@@ -25,7 +25,7 @@
 - Theme: system/light/dark toggle, `localStorage` persist; launch-nonce on mutating calls.
 
 ## ANTI-PATTERNS
-- NEVER touch `src/showcase-round2/`; frozen reference, read-only.
+- NEVER touch `src/showcase-round2/`; frozen reference, read-only — and it is NOT inert: `capture/spectrogramLivePaint.ts` + `spectrogramLiveRenderer.ts` import `showcase-round2/spectrogramPalette`, so an "unused prototype" edit breaks live capture rendering. A second, independent `components/charts/spectrogramPalette.ts` also exists; check which one a file imports before touching either.
 - NEVER hand-edit built `src/lnt/ui/static/v2/`; rebuild via `npm run build`.
 - Tokens on `.app-v6` only, never `:root`; no hardcoded colors outside tokens.
 - DESIGN.md A/B semantics: A = cyan solid + circle marker; B = amber dashed + square marker.

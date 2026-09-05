@@ -28,7 +28,7 @@ Science + data-plane + orchestration packages, flat modules + ~26 subpacks.
 
 ## ANTI-PATTERNS
 
-- Grandfathered ceilings, split not grow: `_manifest_schema 344`, `analysis 309`, `cli 307`, `acquire 306`, `launcher 268`, `store 261`, `runner 257`.
+- Zero Python modules on the grandfather ledger — every `src/lnt/**` file must stay ≤250 pure LOC on its own. A new oversize module fails `tests/test_module_size.py`; split it, never add a ledger entry.
 - `CLI_SUBCOMMANDS` in `launcher.py` must mirror `cli.py` parser.
 - Never interrupt atomic rename in `acquire.py` (`.partial-*` + rename).
 - Never bypass `capture_preflight.py` checks in capture flows.

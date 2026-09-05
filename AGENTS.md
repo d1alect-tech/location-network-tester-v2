@@ -25,11 +25,12 @@
 | Charts | `frontend/src/components/charts/` | uPlot + echarts, token CSS only |
 | Session format | `manifest.py` + `analysis_store/` | v1 legacy / v2 strict, bytes frozen |
 | Tickets | GitHub Issues via `gh` | See `docs/agents/issue-tracker.md` |
+| Onboarding / setup | `README.md`, `docs/agent-setup.md` | Public-facing; simulation path works with no hardware |
 | Queue | `docs/roadmap.md` | A→B→C, mobile explicitly dropped |
 
 ## CONVENTIONS
 
-- TDD RED→GREEN; module ≤250 pure LOC (`tests/test_module_size.py`, `_GRANDFATHERED` pins exact — split, never grow).
+- TDD RED→GREEN; module ≤250 pure LOC (`tests/test_module_size.py`). Ledger is down to ONE entry, `frontend/src/components/charts/spectrogramView.ts: 269` — everything else must pass on its own. Split, never add an entry.
 - `uv run --python 3.12` everything; ruff `ALL` (RUF001-003 off for Russian text); basedpyright `all`; biome + `tsc --noEmit` strict for frontend.
 - CLI exits 0/1/2/3, one-line stderr, no traceback. Sessions atomic `.partial-*` + rename. Compare deltas `B - A`.
 - Tests: `*.test.ts` = vitest, `*.spec.ts` = playwright (vite :4101, `installMockBackend` + `pumpAll`), `tests/js/*.mjs` = node:test.
@@ -37,9 +38,9 @@
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
-- NEVER touch `frontend/src/showcase-round2/` (frozen); never update golden/corpus values silently.
+- NEVER touch `frontend/src/showcase-round2/` (frozen, and live capture imports its palette — see `frontend/AGENTS.md`); never update golden/corpus values silently.
 - NEVER: Plotly, React/Tailwind/Electron, opaque ML, UPX/onefile, auto-update, geolocation/telemetry collection.
-- NEVER write into original `location-network-tester` tree or real `~\lnt-sessions`; receipts in `.integrity/` never auto-update.
+- NEVER write into original `location-network-tester` tree or real `~\lnt-sessions`. `.integrity/` + `_recovery/` are untracked (still on disk); receipts never auto-update — regenerate explicitly or `test_pristine_gate` skips.
 - NEVER claim calibrated voltage / IEC compliance / GUM / causation; `unavailable, never fabricated`.
 - Built `src/lnt/ui/static/v2/` is committed — rebuild via `npm run build`, never hand-edit.
 - No `as any`, `@ts-ignore`; no `innerHTML` for untrusted content; tokens on `.app-v6`, never `:root`.
@@ -57,9 +58,13 @@ node --test "tests/js/*.test.mjs"
 ## NOTES
 
 - `CLI_SUBCOMMANDS` in `launcher.py` must mirror `cli.py` parser (see roadmap A4).
+- KNOWN BUG (open): the API looks a session up by DIRECTORY NAME while the catalog shows the `id` from `manifest.json`. When they differ the spectrum endpoint 404s; when they match it serves 200. Do not "fix" the catalog display — the lookup key is the defect.
+- `lnt ui` holds a single-instance lease: a second launch exits 2. Kill the first before retrying, and free ports 8765/8770.
 - Vite builds INTO `src/lnt/ui/static/v2` (base `/static/v2/`); byte-stable rebuild required by `build-check.js`.
 - Offline: vendored uPlot 1.6.32 + IBM Plex; server binds 127.0.0.1 only, Swagger/ReDoc off.
-- Hantek dep pinned to git `e65d52b` (GPL); private-use build must never leave the machine.
+- Repo is PUBLIC under MIT (`LICENSE`). Hantek driver is an optional extra `lnt[hantek]` pinned to git `e65d52b` (GPL), imported lazily in `scope_io.py`, so the source tree stays MIT-clean.
+- GPL attaches only to PyInstaller builds (`packaging/lnt.spec`). Releases are tags with NO attached binaries — see `docs/distribution-policy.md`. `docs/packaging-notices.md` still carries the older OWNER-INTERNAL framing; it governs binaries only, not this source tree.
+- Before publishing anything: `git grep Kirill` on tracked files must stay empty.
 
 ## ГРАНИЦА v1/v2 (очередь C4)
 
@@ -79,3 +84,13 @@ node --test "tests/js/*.test.mjs"
   анализ при отсутствии/порче); перед сравнением нужен `lnt analyze`.
   `spectrum.csv` хранит PSD в `%.9g` — дельты сходятся на точности рендера
   (0.1 дБ), не побитово.
+
+## Agent skills
+
+### Issue tracker
+
+Tickets live as GitHub issues on `d1alect-tech/location-network-tester-v2`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: `AGENTS.md` + `docs/adr/` (no `CONTEXT.md` yet, created lazily). See `docs/agents/domain.md`.
