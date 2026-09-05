@@ -61,9 +61,18 @@ async function mockBackend(page: Page): Promise<void> {
   );
 }
 
+interface BenchWindow extends Window {
+  spectrogramBenchReady?: boolean;
+}
+
 test("Бенч спектрограммы у капа 524k: рендер, интеракция, RSS", async ({ page }) => {
   await mockBackend(page);
-  await page.goto("http://127.0.0.1:4101/static/v2/#/inspect");
+  // Стенд бенча, а не маршрут инспекции: панель-эксплорер монтируется напрямую
+  // той же фабрикой (charts/register.ts) — мерим рендер тайла, а не хром вьюхи.
+  await page.goto("http://127.0.0.1:4101/static/v2/bench/spectrogram-bench.html");
+  await page.waitForFunction(
+    () => (window as unknown as BenchWindow).spectrogramBenchReady === true,
+  );
   await page.selectOption('select[aria-label="Сессия спектрограммы"]', "bench-001");
   await page.fill('input[aria-label="Ключ артефакта анализа"]', "bench-key");
 

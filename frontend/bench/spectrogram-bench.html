@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Бенч спектрограммы: панель-эксплорер у капа тайла</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #12161a;
+        color: #f4f4f4;
+        font-family: sans-serif;
+      }
+      #panel-host {
+        width: 1100px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Стенд бенча: панель монтируется той же фабрикой, что и в продукте
+         (charts/register.ts), но без маршрутизатора и хрома инспекции —
+         измеряется чистая стоимость рендера тайла. -->
+    <div id="panel-host"></div>
+    <script type="module" src="/bench/spectrogram-bench.ts"></script>
+  </body>
+</html>
