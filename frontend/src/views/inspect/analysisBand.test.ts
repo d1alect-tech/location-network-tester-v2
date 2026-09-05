@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionDetailPayload } from "../../api/types-plots";
-import {
-  createAnalysisBand,
-  metersFromDetail,
-  type Meter,
-  type PeakRow,
-} from "./analysisBand";
+import { type Meter, type PeakRow, createAnalysisBand, metersFromDetail } from "./analysisBand";
 
 const METER_LABELS = [
   "Частота сети",

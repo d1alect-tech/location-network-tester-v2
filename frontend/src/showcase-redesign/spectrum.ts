@@ -182,9 +182,9 @@ function buildOptions(style: SpectrumStyle, width: number, extras: PlotExtras): 
     axes: [
       // label == null (а не ""): иначе uPlot всё равно резервирует labelSize 30px
       // мёртвой полосы под тиками; size ужат до строки тиков (дефолт оси X — 50px).
-      ...(style.xLabel ?? "Частота, Гц") !== ""
+      ...((style.xLabel ?? "Частота, Гц") !== ""
         ? [{ ...axis, label: style.xLabel ?? "Частота, Гц" }]
-        : [{ ...axis, size: 30 }],
+        : [{ ...axis, size: 30 }]),
       {
         ...axis,
         label: "PSD, В²/Гц",

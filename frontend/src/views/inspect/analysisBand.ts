@@ -89,18 +89,14 @@ function deltaCell(deltaDb: number | null): HTMLTableCellElement {
   const flat = Math.abs(deltaDb) <= FLAT_DB;
   const glyph = flat ? "—" : deltaDb < 0 ? "▼" : "▲";
   const tone = flat ? "is-flat" : deltaDb < 0 ? "is-down" : "is-up";
-  return el(
-    "td",
-    { className: `num delta ${tone}`, attrs: { "data-delta": deltaDb.toFixed(2) } },
-    [
-      el("span", {
-        className: "delta-glyph",
-        text: glyph,
-        attrs: { "aria-hidden": "true" },
-      }),
-      document.createTextNode(Math.abs(deltaDb).toFixed(1)),
-    ],
-  );
+  return el("td", { className: `num delta ${tone}`, attrs: { "data-delta": deltaDb.toFixed(2) } }, [
+    el("span", {
+      className: "delta-glyph",
+      text: glyph,
+      attrs: { "aria-hidden": "true" },
+    }),
+    document.createTextNode(Math.abs(deltaDb).toFixed(1)),
+  ]);
 }
 
 function peakRow(row: PeakRow, index: number): HTMLTableRowElement {
@@ -114,9 +110,7 @@ function peakRow(row: PeakRow, index: number): HTMLTableRowElement {
 }
 
 function heading(text: string): HTMLElement {
-  return el("div", { className: "panel-hd" }, [
-    el("h2", { className: "panel-title", text }),
-  ]);
+  return el("div", { className: "panel-hd" }, [el("h2", { className: "panel-title", text })]);
 }
 
 export function createAnalysisBand(): {
@@ -150,7 +144,8 @@ export function createAnalysisBand(): {
 
   function update(input: { meters: Meter[]; peaks: PeakRow[] }): void {
     const ordered = [...input.meters].sort(
-      (left, right) => Number(left.value.length > WIDE_CHARS) - Number(right.value.length > WIDE_CHARS),
+      (left, right) =>
+        Number(left.value.length > WIDE_CHARS) - Number(right.value.length > WIDE_CHARS),
     );
     grid.replaceChildren(...ordered.map(readoutCell));
     body.replaceChildren(...input.peaks.map(peakRow));

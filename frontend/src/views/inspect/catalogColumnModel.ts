@@ -98,7 +98,7 @@ export function buildCatalogRows(options: BuildCatalogRowsOptions): readonly Cat
 
 export function roleOf(
   sessionId: string,
-  pair: { a: string | null; b: string | null }
+  pair: { a: string | null; b: string | null },
 ): "a" | "b" | null {
   if (sessionId === pair.a) return "a";
   if (sessionId === pair.b) return "b";

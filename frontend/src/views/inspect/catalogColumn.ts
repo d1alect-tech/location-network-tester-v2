@@ -1,6 +1,6 @@
 import type { CatalogQuery, CatalogSession } from "../../api/types";
 import { clearElement, el } from "../../components/primitives/dom";
-import { buildCatalogRows, type CatalogSort, type SortDir } from "./catalogColumnModel";
+import { type CatalogSort, type SortDir, buildCatalogRows } from "./catalogColumnModel";
 import { renderCatalogRow } from "./catalogColumnRender";
 import type { PairStateHandle } from "./pairState";
 
@@ -76,7 +76,10 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
   ]);
 
   const root = el("section", { className: "panel cat-v6" }, [
-    el("div", { className: "panel-hd" }, [el("h2", { className: "panel-title", text: "Каталог" }), found]),
+    el("div", { className: "panel-hd" }, [
+      el("h2", { className: "panel-title", text: "Каталог" }),
+      found,
+    ]),
     el("div", { className: "cat-tools" }, [search, clear]),
     table,
   ]);
@@ -92,7 +95,7 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
         labelTh.setAttribute("aria-sort", "none");
         return;
       default:
-        return assertNever(sort);
+        assertNever(sort);
     }
   }
 
@@ -104,9 +107,7 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
     let visible = 0;
     for (const row of rows) {
       if (row.kind === "session") visible += 1;
-      tbody.append(
-        renderCatalogRow(row, { grouped: sort === "date", pair, onPick: opts.onPick }),
-      );
+      tbody.append(renderCatalogRow(row, { grouped: sort === "date", pair, onPick: opts.onPick }));
     }
     found.textContent = String(visible);
   }

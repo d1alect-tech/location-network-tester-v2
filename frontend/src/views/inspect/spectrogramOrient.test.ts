@@ -21,18 +21,14 @@ function axisOf(
 function heatmapCells(option: SpectrogramChartOption): HeatmapCell[] {
   const series = option.series;
   const first = Array.isArray(series) ? series[0] : series;
-  if (!isRecord(first) || !Array.isArray(first["data"])) return [];
+  if (!isRecord(first) || !Array.isArray(first.data)) return [];
   const cells: HeatmapCell[] = [];
-  for (const row of first["data"]) {
+  for (const row of first.data) {
     if (!Array.isArray(row) || row.length < 3) continue;
     const freqIndex = row[0];
     const timeIndex = row[1];
     const db = row[2];
-    if (
-      typeof freqIndex === "number" &&
-      typeof timeIndex === "number" &&
-      typeof db === "number"
-    ) {
+    if (typeof freqIndex === "number" && typeof timeIndex === "number" && typeof db === "number") {
       cells.push([freqIndex, timeIndex, db]);
     }
   }
@@ -76,10 +72,10 @@ describe("createOrientedSpectrogramView", () => {
     if (option === undefined) return;
     const xAxis = axisOf(option, "xAxis");
     const yAxis = axisOf(option, "yAxis");
-    expect(xAxis?.["name"]).toBe("Частота, Гц");
-    expect(yAxis?.["inverse"]).toBe(true);
-    expect(Array.isArray(xAxis?.["data"]) ? xAxis["data"].length : 0).toBe(2);
-    expect(Array.isArray(yAxis?.["data"]) ? yAxis["data"].length : 0).toBe(2);
+    expect(xAxis?.name).toBe("Частота, Гц");
+    expect(yAxis?.inverse).toBe(true);
+    expect(Array.isArray(xAxis?.data) ? xAxis.data.length : 0).toBe(2);
+    expect(Array.isArray(yAxis?.data) ? yAxis.data.length : 0).toBe(2);
   });
 
   it("writes heatmap cells as [freqIndex, timeIndex, db]", () => {

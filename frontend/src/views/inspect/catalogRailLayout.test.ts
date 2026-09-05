@@ -42,7 +42,11 @@ function topLevelRules(css: string, offset: number): StyleRule[] {
       cursor += 1;
     }
     if (!prelude.startsWith("@")) {
-      rules.push({ selector: prelude, body: clean.slice(open + 1, cursor - 1), order: offset + index });
+      rules.push({
+        selector: prelude,
+        body: clean.slice(open + 1, cursor - 1),
+        order: offset + index,
+      });
     }
     index = cursor;
   }

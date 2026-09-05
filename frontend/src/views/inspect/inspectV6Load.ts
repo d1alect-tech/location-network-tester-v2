@@ -68,16 +68,8 @@ export async function loadAnalysisBand(
   if (b === null) {
     return { meters, peaks: parsed.map((peak) => withDelta(peak, null)) };
   }
-  const [specA, specB] = await Promise.all([
-    client.plots.spectrum(a),
-    client.plots.spectrum(b),
-  ]);
-  const deltas = peakDeltas(
-    specA.frequency_hz,
-    specA.psd_v2_per_hz,
-    specB.psd_v2_per_hz,
-    parsed,
-  );
+  const [specA, specB] = await Promise.all([client.plots.spectrum(a), client.plots.spectrum(b)]);
+  const deltas = peakDeltas(specA.frequency_hz, specA.psd_v2_per_hz, specB.psd_v2_per_hz, parsed);
   return {
     meters,
     peaks: parsed.map((peak, index) => withDelta(peak, deltas[index]?.deltaDb ?? null)),

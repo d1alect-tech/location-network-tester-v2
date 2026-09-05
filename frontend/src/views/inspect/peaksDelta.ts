@@ -7,10 +7,7 @@ export interface PeakDelta {
   readonly deltaDb: number | null;
 }
 
-function findNearestIndex(
-  freqHz: readonly number[],
-  targetHz: number
-): number | null {
+function findNearestIndex(freqHz: readonly number[], targetHz: number): number | null {
   if (freqHz.length === 0) {
     return null;
   }
@@ -32,10 +29,7 @@ function findNearestIndex(
   return Number.isFinite(minDiff) ? nearestIdx : null;
 }
 
-function computeDeltaDb(
-  psdAVal: number | undefined,
-  psdBVal: number | undefined
-): number | null {
+function computeDeltaDb(psdAVal: number | undefined, psdBVal: number | undefined): number | null {
   if (
     psdAVal === undefined ||
     psdBVal === undefined ||
@@ -55,7 +49,7 @@ export function peakDeltas(
   freqHz: readonly number[],
   psdA: readonly number[],
   psdB: readonly number[],
-  peaks: readonly PeakFrequency[]
+  peaks: readonly PeakFrequency[],
 ): readonly PeakDelta[] {
   if (peaks.length === 0) {
     return [];

@@ -76,7 +76,8 @@ export function createV6Extras(opts: V6ExtrasOpts): V6ExtrasHandle {
     if (!waveDetails.open) return;
     const name = session;
     if (name === null) return;
-    const gen = (loadGen += 1);
+    loadGen += 1;
+    const gen = loadGen;
     const payload = await opts.client.plots.waveform(name, "ch1");
     if (gen !== loadGen) return;
     ensureView().render(waveformToRequest(payload, { label: "CH1", color: theme.accentA }));

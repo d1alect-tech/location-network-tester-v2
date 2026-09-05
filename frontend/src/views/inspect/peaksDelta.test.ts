@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { peakDeltas, type PeakDelta, type PeakFrequency } from "./peaksDelta";
+import { type PeakDelta, type PeakFrequency, peakDeltas } from "./peaksDelta";
 
 describe("peakDeltas", () => {
   it("calculates deltaDb and preserves frequencyHz for matching peaks", () => {
