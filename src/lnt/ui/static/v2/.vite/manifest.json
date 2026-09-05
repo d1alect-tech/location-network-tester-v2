@@ -22,19 +22,19 @@
     "file": "assets/chartshell.DTqKjRH4.css",
     "src": "_chartshell.DTqKjRH4.css"
   },
-  "_form.BArInMtH.js": {
-    "file": "assets/form.BArInMtH.js",
+  "_form.BUF79Nh4.js": {
+    "file": "assets/form.BUF79Nh4.js",
     "name": "form",
     "imports": [
-      "_spectrum.caPTC1_b.js",
-      "_metrics.C8XMEfh9.js"
+      "_spectrum.DkMTgLBy.js",
+      "_metrics.Bj-MDfpM.js"
     ]
   },
-  "_metrics.C8XMEfh9.js": {
-    "file": "assets/metrics.C8XMEfh9.js",
+  "_metrics.Bj-MDfpM.js": {
+    "file": "assets/metrics.Bj-MDfpM.js",
     "name": "metrics",
     "imports": [
-      "_spectrum.caPTC1_b.js"
+      "_spectrum.DkMTgLBy.js"
     ],
     "css": [
       "assets/metrics.CgP5Hqd6.css"
@@ -44,11 +44,11 @@
     "file": "assets/metrics.CgP5Hqd6.css",
     "src": "_metrics.CgP5Hqd6.css"
   },
-  "_peakMarkers.CMVx9hrh.js": {
-    "file": "assets/peakMarkers.CMVx9hrh.js",
+  "_peakMarkers.Bl5IZsKb.js": {
+    "file": "assets/peakMarkers.Bl5IZsKb.js",
     "name": "peakMarkers",
     "imports": [
-      "_spectrum.caPTC1_b.js"
+      "_spectrum.DkMTgLBy.js"
     ]
   },
   "_spectrogramPalette.CfMVLFb-.js": {
@@ -59,8 +59,8 @@
     "file": "assets/spectrum.CXwmWaak.css",
     "src": "_spectrum.CXwmWaak.css"
   },
-  "_spectrum.caPTC1_b.js": {
-    "file": "assets/spectrum.caPTC1_b.js",
+  "_spectrum.DkMTgLBy.js": {
+    "file": "assets/spectrum.DkMTgLBy.js",
     "name": "spectrum",
     "imports": [
       "_uPlot.min.I5bB1VQk.js"
@@ -158,12 +158,12 @@
     "src": "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-vietnamese-wght-normal.woff2"
   },
   "showcase-a.html": {
-    "file": "assets/showcaseVariantA.PO0Udm05.js",
+    "file": "assets/showcaseVariantA.-6O7DjhJ.js",
     "name": "showcaseVariantA",
     "src": "showcase-a.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.caPTC1_b.js",
+      "_spectrum.DkMTgLBy.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -171,12 +171,12 @@
     ]
   },
   "showcase-b.html": {
-    "file": "assets/showcaseVariantB.Dg0M9uUO.js",
+    "file": "assets/showcaseVariantB.BON_R_yj.js",
     "name": "showcaseVariantB",
     "src": "showcase-b.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.caPTC1_b.js",
+      "_spectrum.DkMTgLBy.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -184,12 +184,12 @@
     ]
   },
   "showcase-c.html": {
-    "file": "assets/showcaseVariantC.BqjyaNqT.js",
+    "file": "assets/showcaseVariantC.ChfD6hGN.js",
     "name": "showcaseVariantC",
     "src": "showcase-c.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.caPTC1_b.js",
+      "_spectrum.DkMTgLBy.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -197,12 +197,12 @@
     ]
   },
   "showcase-d.html": {
-    "file": "assets/showcaseVariantD.AzciWK_M.js",
+    "file": "assets/showcaseVariantD.CK9C1M5z.js",
     "name": "showcaseVariantD",
     "src": "showcase-d.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.caPTC1_b.js",
+      "_spectrum.DkMTgLBy.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -218,14 +218,14 @@
     "src": "showcase-round2.html"
   },
   "showcase-v1.html": {
-    "file": "assets/showcaseRound2V1.BSRC9eaY.js",
+    "file": "assets/showcaseRound2V1.CRMFQkTU.js",
     "name": "showcaseRound2V1",
     "src": "showcase-v1.html",
     "isEntry": true,
     "imports": [
-      "_form.BArInMtH.js",
-      "_metrics.C8XMEfh9.js",
-      "_spectrum.caPTC1_b.js",
+      "_form.BUF79Nh4.js",
+      "_metrics.Bj-MDfpM.js",
+      "_spectrum.DkMTgLBy.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -233,14 +233,14 @@
     ]
   },
   "showcase-v2.html": {
-    "file": "assets/showcaseRound2V2.C5OrQ45J.js",
+    "file": "assets/showcaseRound2V2.DP0PHjK-.js",
     "name": "showcaseRound2V2",
     "src": "showcase-v2.html",
     "isEntry": true,
     "imports": [
-      "_form.BArInMtH.js",
-      "_metrics.C8XMEfh9.js",
-      "_spectrum.caPTC1_b.js",
+      "_form.BUF79Nh4.js",
+      "_metrics.Bj-MDfpM.js",
+      "_spectrum.DkMTgLBy.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -249,14 +249,14 @@
     ]
   },
   "showcase-v3.html": {
-    "file": "assets/showcaseRound2V3.DkPgSjgS.js",
+    "file": "assets/showcaseRound2V3.CTYUFZrB.js",
     "name": "showcaseRound2V3",
     "src": "showcase-v3.html",
     "isEntry": true,
     "imports": [
-      "_form.BArInMtH.js",
-      "_metrics.C8XMEfh9.js",
-      "_spectrum.caPTC1_b.js",
+      "_form.BUF79Nh4.js",
+      "_metrics.Bj-MDfpM.js",
+      "_spectrum.DkMTgLBy.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -264,14 +264,14 @@
     ]
   },
   "showcase-v4.html": {
-    "file": "assets/showcaseRound2V4.Cm-g0Hvh.js",
+    "file": "assets/showcaseRound2V4.B38wQP7q.js",
     "name": "showcaseRound2V4",
     "src": "showcase-v4.html",
     "isEntry": true,
     "imports": [
-      "_form.BArInMtH.js",
-      "_metrics.C8XMEfh9.js",
-      "_spectrum.caPTC1_b.js",
+      "_form.BUF79Nh4.js",
+      "_metrics.Bj-MDfpM.js",
+      "_spectrum.DkMTgLBy.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -279,15 +279,15 @@
     ]
   },
   "showcase-v5.html": {
-    "file": "assets/showcaseRound2V5.B-_19Ks-.js",
+    "file": "assets/showcaseRound2V5.BHGZ57wg.js",
     "name": "showcaseRound2V5",
     "src": "showcase-v5.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.caPTC1_b.js",
-      "_form.BArInMtH.js",
-      "_metrics.C8XMEfh9.js",
-      "_peakMarkers.CMVx9hrh.js",
+      "_spectrum.DkMTgLBy.js",
+      "_form.BUF79Nh4.js",
+      "_metrics.Bj-MDfpM.js",
+      "_peakMarkers.Bl5IZsKb.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -295,14 +295,14 @@
     ]
   },
   "showcase-v6.html": {
-    "file": "assets/showcaseRound2V6.CVAu6KGK.js",
+    "file": "assets/showcaseRound2V6.Dq1HCFi6.js",
     "name": "showcaseRound2V6",
     "src": "showcase-v6.html",
     "isEntry": true,
     "imports": [
-      "_spectrum.caPTC1_b.js",
-      "_metrics.C8XMEfh9.js",
-      "_peakMarkers.CMVx9hrh.js",
+      "_spectrum.DkMTgLBy.js",
+      "_metrics.Bj-MDfpM.js",
+      "_peakMarkers.Bl5IZsKb.js",
       "_spectrogramPalette.CfMVLFb-.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
