@@ -20,6 +20,12 @@ from lnt.notching.models import (
 
 FloatArray = NDArray[np.floating]
 FILTER_ORDER: int = 4
+# По одному фронту период не очертить — нужна хотя бы пара восходящих нулей.
+_MIN_RISING_FOR_PERIOD: int = 2
+# Минимум чанков для edge-guard и минимум точек/интервалов для оценки джиттера.
+_MIN_SAMPLES_FOR_EDGE_GUARD: int = 4
+_MIN_POSITIONS_FOR_JITTER: int = 3
+_MIN_DIFFS_FOR_STD: int = 2
 
 
 def detect_notching(
@@ -127,12 +133,12 @@ def _chunked_rising_crossings(samples: FloatArray, chunk_samples: int) -> NDArra
 
 
 def _nominal_peak(lf: NDArray[np.float64], rising: NDArray[np.float64]) -> float:
-    if rising.size < 2:
+    if rising.size < _MIN_RISING_FOR_PERIOD:
         return float(np.median(np.abs(lf))) * 1.2 if lf.size else 1.0
     maxima: list[float] = []
     for i in range(rising.size - 1):
-        lo = int(math.floor(rising[i]))
-        hi = min(lf.size, int(math.ceil(rising[i + 1])) + 1)
+        lo = math.floor(rising[i])
+        hi = min(lf.size, math.ceil(rising[i + 1]) + 1)
         if hi > lo:
             maxima.append(float(np.max(np.abs(lf[lo:hi]))))
     if not maxima:
@@ -150,8 +156,8 @@ def _scan_notches(
     """Chunked scan по отклонению |LF|-|raw| > порога."""
     n = int(raw.size)
     # Edge guard: ignore filter transient at boundaries (sosfiltfilt edge)
-    edge = max(32, int(round(sample_rate_hz * 0.002)))
-    edge = min(edge, n // 4) if n >= 4 else 0
+    edge = max(32, round(sample_rate_hz * 0.002))
+    edge = min(edge, n // 4) if n >= _MIN_SAMPLES_FOR_EDGE_GUARD else 0
     intervals: list[tuple[int, int]] = []
     for start in range(0, n, settings.chunk_samples):
         stop = min(n, start + settings.chunk_samples)
@@ -204,8 +210,8 @@ def _merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:
 
 
 def _jitter_us(positions: NDArray[np.float64], sample_rate_hz: float) -> float:
-    if positions.size < 3:
+    if positions.size < _MIN_POSITIONS_FOR_JITTER:
         return 0.0
     diffs = np.diff(positions) / float(sample_rate_hz) * 1e6
     # std от медианы интервалов
-    return float(np.std(diffs, ddof=1)) if diffs.size >= 2 else 0.0
+    return float(np.std(diffs, ddof=1)) if diffs.size >= _MIN_DIFFS_FOR_STD else 0.0

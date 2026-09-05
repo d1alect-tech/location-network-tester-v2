@@ -26,6 +26,8 @@ _SIGMA_MULT: float = 4.0
 _MIN_THRESHOLD: float = 1e-12
 _GAP_MS: float = 2.0
 _FALLBACK_PERCENTILE: float = 95.0
+# Период повторения считается по пачкам внутри серии: одна пачка его не задаёт.
+_MIN_BURSTS_FOR_PERIOD: int = 2
 
 
 def detect_bursts(
@@ -164,7 +166,7 @@ def _group_sequences(bursts: list[BurstEvent], period_ms: float) -> list[BurstSe
         start = g[0].start_time_s
         end = g[-1].end_time_s
         count = len(g)
-        if count >= 2:
+        if count >= _MIN_BURSTS_FOR_PERIOD:
             periods = [g[i + 1].start_time_s - g[i].start_time_s for i in range(count - 1)]
             avg_ms = float(np.mean(periods)) * 1e3
         else:
