@@ -14,6 +14,7 @@ import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { peaksFromDetail } from "../../components/charts/viewModels";
 import type { SeriesStyle } from "../../components/charts/viewModels";
 import { el } from "../../components/primitives/dom";
+import { createDeltaStrip } from "./deltaStrip";
 import { createSpectrumExtras } from "./spectrumExtras";
 import { createPlaneControl, planePayload } from "./spectrumPlaneControl";
 
@@ -48,6 +49,8 @@ export type SpectrumPanelHandle = {
   readonly gramHost: HTMLElement;
   readonly gramBar: HTMLElement;
   load(a: string, b: string | null): Promise<void>;
+  /** U2/U3: последние пейлоады пары (null — пара не загружена). */
+  payloads(): { readonly a: SpectrumPayload | null; readonly b: SpectrumPayload | null };
   setView(view: SpectrumView): void;
   view(): SpectrumView;
   plane(): SpectrumPlane;
@@ -109,6 +112,9 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
     [spectrumBtn, gramBtn],
   );
   let reloadPlane: () => void = () => undefined;
+  let lastPayload: SpectrumPayload | null = null;
+  let lastPayloadB: SpectrumPayload | null = null;
+  const deltaStrip = createDeltaStrip();
   const planeControl = createPlaneControl(() => reloadPlane());
   const extras = createSpectrumExtras();
   const gramBar = el("div", { className: "gram-bar" });
@@ -135,7 +141,13 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
     [statusText, retryButton],
   );
   status.hidden = true;
-  const body = el("div", { className: "panel-bd" }, [status, frame, gramHost, extras.markers]);
+  const body = el("div", { className: "panel-bd" }, [
+    status,
+    frame,
+    deltaStrip.root,
+    gramHost,
+    extras.markers,
+  ]);
   const root = el("section", { className: "panel", attrs: { "data-showcase": "spectrum" } }, [
     header,
     body,
@@ -202,6 +214,9 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
       planeControl.paintRbw(payloadA);
       extras.paint({ payloadA, payloadB, analysis: detail.analysis });
       peaksA = peaksFromDetail(detailForPeaks(a, detail));
+      lastPayload = payloadA;
+      lastPayloadB = payloadB;
+      deltaStrip.paint(payloadA, payloadB);
       const suffix = planeControl.plane() === "input-referred" ? " · вход" : "";
       const styleA: SeriesStyle = { color: theme.accentA, label: `${a}${suffix}` };
       const styleB: SeriesStyle = {
@@ -238,6 +253,7 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
     gramHost,
     gramBar,
     load,
+    payloads: () => ({ a: lastPayload, b: lastPayloadB }),
     setView,
     plane: () => planeControl.plane(),
     setPlane,

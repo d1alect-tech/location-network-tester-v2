@@ -1,0 +1,51 @@
+/* U3: Δ-полоса B − A под спектром. Канва в физических пикселях (тезис 8
+   ADR-0009); цвета из --lnt-* (дельта заведена в U1), фолбэки — R3-A. */
+.delta-strip {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-width: 0;
+  background: var(--lnt-chrome);
+  border-top: 1px solid var(--lnt-line);
+}
+
+.delta-strip-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 12px;
+}
+
+.delta-strip-label {
+  font: 700 10px / 14px var(--lnt-ui);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec); /* axe: dim 4.1:1 на хроме, нужен 4.5:1 */
+}
+
+.delta-strip-toggle {
+  margin-left: auto;
+  min-height: 28px;
+}
+
+.delta-strip-bd {
+  height: 56px;
+  padding: 0 12px 8px;
+}
+
+.delta-strip.is-closed .delta-strip-bd {
+  display: none;
+}
+
+.delta-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.delta-strip-empty {
+  font: 400 12px / 48px var(--lnt-ui);
+  color: var(--lnt-text-sec); /* axe: dim 4.1:1 на хроме, нужен 4.5:1 */
+  text-align: center;
+}

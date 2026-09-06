@@ -35,6 +35,21 @@ describe("createPairbar", () => {
     expect(onSwap).toHaveBeenCalledTimes(1);
   });
 
+  it("U3/U4: бейджи всегда на месте", () => {
+    const { root } = createPairbar({ onSwap: () => {} });
+    expect(root.querySelector('[data-pair-delta="mean"]')?.textContent).toBe("Δср —");
+    expect(root.querySelector('[data-pair-delta="max"]')?.textContent).toBe("Δmax —");
+  });
+
+  it("U3: setDelta пишет сводку в бейджи, null гасит в прочерки", () => {
+    const bar = createPairbar({ onSwap: () => {} });
+    bar.setDelta({ bins: 2, meanDb: 5, maxAbsDb: 10 });
+    expect(bar.root.querySelector('[data-pair-delta="mean"]')?.textContent).toBe("Δср +5,0 дБ");
+    expect(bar.root.querySelector('[data-pair-delta="max"]')?.textContent).toBe("Δmax +10,0 дБ");
+    bar.setDelta(null);
+    expect(bar.root.querySelector('[data-pair-delta="mean"]')?.textContent).toBe("Δср —");
+  });
+
   it("setPair(null, null) shows em dash names and does not throw", () => {
     const bar = createPairbar({ onSwap: () => {} });
     expect(() => bar.setPair(null, null)).not.toThrow();

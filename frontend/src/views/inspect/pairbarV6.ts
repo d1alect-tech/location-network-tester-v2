@@ -2,6 +2,7 @@
 
 import type { CatalogSession, SessionHealth } from "../../api/types";
 import { clearElement, el } from "../../components/primitives/dom";
+import { type DeltaSummary, formatDeltaDb } from "./deltaSummary";
 
 export interface PairbarV6Options {
   readonly onSwap: () => void;
@@ -10,6 +11,7 @@ export interface PairbarV6Options {
 export interface PairbarV6Handle {
   readonly root: HTMLElement;
   setPair(base: CatalogSession | null, compare: CatalogSession | null): void;
+  setDelta(summary: DeltaSummary | null): void;
 }
 
 const HEALTH_GLYPH = {
@@ -57,6 +59,16 @@ function fillSlot(slotEl: HTMLElement, role: string, session: CatalogSession | n
 export function createPairbar(opts: PairbarV6Options): PairbarV6Handle {
   const slotA = el("div", { className: "pair-slot", attrs: { "data-pair": "a" } });
   const slotB = el("div", { className: "pair-slot", attrs: { "data-pair": "b" } });
+  const meanBadge = el("span", {
+    className: "pair-badge",
+    attrs: { "data-pair-delta": "mean" },
+    text: "Δср —",
+  });
+  const maxBadge = el("span", {
+    className: "pair-badge",
+    attrs: { "data-pair-delta": "max" },
+    text: "Δmax —",
+  });
   const pathEl = el("span", { className: "pair-path" });
   const swap = el("button", {
     className: "btn-quiet",
@@ -68,6 +80,8 @@ export function createPairbar(opts: PairbarV6Options): PairbarV6Handle {
     slotA,
     el("span", { className: "pair-delta", text: "Δ", attrs: { "aria-hidden": "true" } }),
     slotB,
+    meanBadge,
+    maxBadge,
     pathEl,
     swap,
   ]);
@@ -80,6 +94,11 @@ export function createPairbar(opts: PairbarV6Options): PairbarV6Handle {
     pathEl.title = path;
   }
 
+  function setDelta(summary: DeltaSummary | null): void {
+    meanBadge.textContent = summary === null ? "Δср —" : `Δср ${formatDeltaDb(summary.meanDb)}`;
+    maxBadge.textContent = summary === null ? "Δmax —" : `Δmax ${formatDeltaDb(summary.maxAbsDb)}`;
+  }
+
   setPair(null, null);
-  return { root, setPair };
+  return { root, setPair, setDelta };
 }
