@@ -5,13 +5,14 @@ from __future__ import annotations
 import argparse  # noqa: TC003 - runtime parser
 from pathlib import Path
 
+from .backup import backup_all_sessions
 from .export import ExportSelection, create_archive
 from .inspect import inspect_archive
 from .restore import restore_archive
 
 
 def configure_archive_parser(archive: argparse.ArgumentParser) -> None:
-    """Регистрирует ``lnt archive`` и четыре операции."""
+    """Регистрирует ``lnt archive`` и пять операций."""
     commands = archive.add_subparsers(dest="archive_command", required=True)
 
     create = commands.add_parser("create", help="создать архив явной выборки")
@@ -29,6 +30,11 @@ def configure_archive_parser(archive: argparse.ArgumentParser) -> None:
     verify.add_argument("archive", type=Path)
     verify.set_defaults(handler=_verify)
 
+    backup = commands.add_parser("backup", help="архив всех сессий корня")
+    backup.add_argument("output", type=Path)
+    backup.add_argument("--root", type=Path, required=True, help="корень сессий")
+    backup.set_defaults(handler=_backup)
+
     restore = commands.add_parser("restore", help="восстановить в один новый каталог")
     restore.add_argument("archive", type=Path)
     restore.add_argument("--dest", type=Path, required=True)
@@ -45,6 +51,12 @@ def _create(args: argparse.Namespace) -> int:
             experiment_ids=tuple(args.experiment),
         ),
     )
+    print(f"Архив создан: {args.output} ({len(manifest.entries)} файлов)")  # noqa: T201
+    return 0
+
+
+def _backup(args: argparse.Namespace) -> int:
+    manifest = backup_all_sessions(args.output, args.root)
     print(f"Архив создан: {args.output} ({len(manifest.entries)} файлов)")  # noqa: T201
     return 0
 
