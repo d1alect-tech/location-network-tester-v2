@@ -18,6 +18,7 @@ import { refreshProfiles, refreshRecipes } from "./settingsLists";
 import type { BundleJobKind } from "./settingsModel";
 import { bundleDone, bundleFailed, bundleFile, bundleRunning } from "./settingsModel";
 import { readCapturePreflightRequest } from "./settingsPreflight";
+import { createRootChoiceBlock } from "./settingsRootChoice";
 import { createRootNoteBlock } from "./settingsRootNote";
 import {
   buildBundleSection,
@@ -45,6 +46,7 @@ export function mountSettingsWorkspace(
   const profilesHost = el("div", { className: "t-body", text: "Загрузка профилей…" });
 
   const rootNote = createRootNoteBlock();
+  const rootChoice = createRootChoiceBlock();
   const rootValue = el("code", { className: "t-mono lnt-set-root-value", text: "…" });
   // U2: недоступный /api/config — видимое outage-состояние с повтором,
   // а не тихая строка «недоступно» без выхода.
@@ -62,6 +64,8 @@ export function mountSettingsWorkspace(
       rootRetry,
       el("div", { className: "form-grid" }, [rootNote.field]),
       el("div", { className: "form-actions" }, [rootNote.saveButton]),
+      el("div", { className: "form-grid" }, [rootChoice.field]),
+      el("div", { className: "form-actions" }, [rootChoice.copyButton]),
     ],
     "lnt-set-root",
   );
