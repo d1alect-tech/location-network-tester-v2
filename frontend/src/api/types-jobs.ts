@@ -8,6 +8,8 @@ export const JOB_KINDS = [
   "compare",
   "selftest",
   "device_check",
+  "backup",
+  "support_bundle",
 ] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
@@ -30,6 +32,8 @@ export const JOB_STAGES = [
   "comparing",
   "selftest",
   "checking_device",
+  "backup",
+  "support_bundle",
   "done",
 ] as const;
 export type JobStage = (typeof JOB_STAGES)[number];
@@ -97,13 +101,23 @@ export interface DeviceCheckJobRequest {
   kind: "device_check";
 }
 
+export interface BackupJobRequest {
+  kind: "backup";
+}
+
+export interface SupportBundleJobRequest {
+  kind: "support_bundle";
+}
+
 export type JobRequest =
   | SimulateJobRequest
   | CaptureJobRequest
   | AnalyzeJobRequest
   | CompareJobRequest
   | SelftestJobRequest
-  | DeviceCheckJobRequest;
+  | DeviceCheckJobRequest
+  | BackupJobRequest
+  | SupportBundleJobRequest;
 
 /** Страница durable задач GET /api/jobs. */
 export interface JobListPayload {

@@ -103,7 +103,7 @@ describe("настройки V6: пины контрактов (уже зелё�
     expect(node.getAttribute("role")).not.toBe("alert");
   });
 
-  it("ошибка остаётся role=alert, сборник — честный CLI без кнопки", () => {
+  it("ошибка остаётся role=alert, сборник — кнопки панели плюс честный CLI", () => {
     // Given / When
     const error = errorBlock("Недопустимые символы.");
     const bundle = buildBundleSection();
@@ -111,6 +111,8 @@ describe("настройки V6: пины контрактов (уже зелё�
     // Then
     expect(error.getAttribute("role")).toBe("alert");
     expect(bundle.textContent).toContain("uv run lnt support-bundle");
-    expect(bundle.querySelectorAll("button")).toHaveLength(0);
+    expect(bundle.querySelector("#lnt-set-backup-run")?.textContent).toContain("Создать бэкап");
+    expect(bundle.querySelector("#lnt-set-bundle-run")?.textContent).toContain("Собрать сборник");
+    expect(bundle.querySelector("#lnt-set-bundle-status")).toBeInstanceOf(HTMLElement);
   });
 });

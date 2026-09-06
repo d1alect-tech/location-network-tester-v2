@@ -1,6 +1,7 @@
 /** Чистая модель «Настроек» (#/settings): сводка приватности, зеркалящая
- * семантику lnt/metadata_collector.py (todo 8), честная инструкция сборника
- * поддержки (HTTP-маршрута нет — только CLI lnt support-bundle) и валидация
+ * семантику lnt/metadata_collector.py (todo 8), инструкция сборника
+ * поддержки (кнопки панели запускают задачи backup/support_bundle через
+ * POST /api/jobs; CLI lnt support-bundle остаётся доступным) и валидация
  * локальной заметки о корне сессий. Никаких выдуманных эндпоинтов. */
 
 export interface PrivacyItem {
@@ -79,19 +80,18 @@ export function privacyGroups(): PrivacyGroup[] {
 }
 
 export interface SupportBundleGuidance {
-  /** HTTP-маршрут отсутствует: кнопки сборки в панели НЕТ и не будет,
-   * пока бэкенд его не предоставит. */
-  httpAvailable: false;
+  /** Панель запускает сборку задачами backup/support_bundle (POST /api/jobs). */
+  httpAvailable: boolean;
   command: string;
   flags: { flag: string; detail: string }[];
   contents: string[];
   manifestNote: string;
 }
 
-/** Честная инструкция: сборник поддержки собирается CLI-командой. */
+/** Инструкция: сборка кнопками панели; CLI-команда остаётся запасным путём. */
 export function supportBundleGuidance(): SupportBundleGuidance {
   return {
-    httpAvailable: false,
+    httpAvailable: true,
     command: "uv run lnt support-bundle <путь\\к\\lnt-support.zip>",
     flags: [
       {
@@ -110,6 +110,30 @@ export function supportBundleGuidance(): SupportBundleGuidance {
     manifestNote:
       "manifest.json фиксирует состав и SHA-256 каждого члена: получатель может проверить целостность.",
   };
+}
+
+/** Вид задачи сборки: полный бэкап корня или сборник поддержки. */
+export type BundleJobKind = "backup" | "support_bundle";
+
+/** Имя выходного файла из result терминального снимка (ключи path/file/archive/bundle). */
+export function bundleFile(result: Record<string, unknown> | null): string | null {
+  const value = result?.path ?? result?.file ?? result?.archive ?? result?.bundle;
+  return typeof value === "string" && value !== "" ? value : null;
+}
+
+/** Русские тексты статуса задачи сборки (запуск / успех / провал). */
+export function bundleRunning(kind: BundleJobKind): string {
+  return kind === "backup" ? "Создание бэкапа…" : "Сборка сборника поддержки…";
+}
+
+export function bundleDone(kind: BundleJobKind, file: string | null): string {
+  const head = kind === "backup" ? "Бэкап создан" : "Сборник поддержки собран";
+  return file === null ? `${head}.` : `${head}: ${file}`;
+}
+
+export function bundleFailed(kind: BundleJobKind, reason: string): string {
+  const head = kind === "backup" ? "Не удалось создать бэкап" : "Не удалось собрать сборник";
+  return `${head}: ${reason}`;
 }
 
 export const ROOT_NOTE_MAX_LENGTH = 200;

@@ -34,9 +34,9 @@ describe("privacyGroups", () => {
 });
 
 describe("supportBundleGuidance", () => {
-  it("honestly reports no HTTP route and gives the exact CLI command", () => {
+  it("reports panel job route available and keeps the exact CLI command", () => {
     const guidance = supportBundleGuidance();
-    expect(guidance.httpAvailable).toBe(false);
+    expect(guidance.httpAvailable).toBe(true);
     expect(guidance.command).toContain("lnt support-bundle");
     expect(guidance.flags.map((flag) => flag.flag)).toEqual([
       "--include-private-notes",

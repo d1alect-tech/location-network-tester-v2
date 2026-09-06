@@ -1,6 +1,7 @@
 /** Рабочая область «Настройки» (#/settings): корень сессий (факт + локальная
- * заметка), диагностика устройства (T14: состояние + preflight), честная
- * инструкция сборника поддержки (HTTP-маршрута нет — только CLI), ссылки на
+ * заметка), диагностика устройства (T14: состояние + preflight), бэкап
+ * и сборник поддержки (D2: задачи backup/support_bundle через POST /api/jobs
+ * с SSE-прогрессом; CLI остаётся запасным путём), ссылки на
  * профили, сводка приватности (зеркало metadata_collector) и рецепты анализа.
  * V6 (D3=A): секции — .panel/.panel-hd/.panel-bd через panelSection(),
  * формы — .field/.ctl/.form-grid, действия — .btn в .form-actions-футерах.
@@ -8,9 +9,14 @@
 
 import type { LntApiClient } from "../../api/client";
 import { createDeviceApi } from "../../api/client-device";
+import type { JobSnapshot } from "../../api/types-jobs";
+import { watchJobEvents } from "../../capture/sse";
+import type { WatchHandle } from "../../capture/sse";
 import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { refreshProfiles, refreshRecipes } from "./settingsLists";
+import type { BundleJobKind } from "./settingsModel";
+import { bundleDone, bundleFailed, bundleFile, bundleRunning } from "./settingsModel";
 import { readCapturePreflightRequest } from "./settingsPreflight";
 import { createRootNoteBlock } from "./settingsRootNote";
 import {
@@ -113,6 +119,18 @@ export function mountSettingsWorkspace(
     "lnt-set-recipes-section",
   );
 
+  const bundleSection = buildBundleSection();
+  const bundleStatus = bundleSection.querySelector("#lnt-set-bundle-status");
+  for (const [id, kind] of [
+    ["lnt-set-backup-run", "backup"],
+    ["lnt-set-bundle-run", "support_bundle"],
+  ] as const) {
+    const button = bundleSection.querySelector(`#${id}`);
+    if (button instanceof HTMLButtonElement) {
+      button.addEventListener("click", () => void runBundleJob(kind, button));
+    }
+  }
+
   const root = el(
     "div",
     { className: "lnt-set-workspace", attrs: { role: "region", "aria-label": "Настройки" } },
@@ -120,7 +138,7 @@ export function mountSettingsWorkspace(
       el("h2", { className: "placeholder-title t-page", text: "Настройки" }),
       rootSection,
       deviceSection,
-      buildBundleSection(),
+      bundleSection,
       profilesSection,
       buildPrivacySection(),
       recipesSection,
@@ -183,6 +201,53 @@ export function mountSettingsWorkspace(
     }
   }
 
+  let bundleStream: WatchHandle | null = null;
+
+  function clearBundleErrors(): void {
+    for (const old of bundleSection.querySelectorAll(".lnt-set-error")) old.remove();
+  }
+
+  /** D2: бэкап/сборник — ensureReady → disable → start → SSE с poll fallback. */
+  async function runBundleJob(kind: BundleJobKind, button: HTMLButtonElement): Promise<void> {
+    const running = bundleRunning(kind);
+    const fail = (reason: string): void => {
+      const text = bundleFailed(kind, reason);
+      clearBundleErrors();
+      bundleSection.append(errorBlock(text));
+      if (bundleStatus !== null) bundleStatus.textContent = text;
+      announcePolite(text);
+      button.disabled = false;
+    };
+    const onSnapshot = (snapshot: JobSnapshot): void => {
+      if (snapshot.status === "succeeded") {
+        const done = bundleDone(kind, bundleFile(snapshot.result));
+        clearBundleErrors();
+        if (bundleStatus !== null) bundleStatus.textContent = done;
+        announcePolite(done);
+        button.disabled = false;
+      } else if (snapshot.status === "failed") {
+        fail(snapshot.error_message ?? snapshot.error_code ?? "причина неизвестна");
+      }
+    };
+    button.disabled = true;
+    clearBundleErrors();
+    if (bundleStatus !== null) bundleStatus.textContent = running;
+    announcePolite(running);
+    try {
+      await client.ensureReady();
+      const first = await client.jobs.start({ kind });
+      onSnapshot(first);
+      bundleStream?.close();
+      bundleStream = watchJobEvents(
+        first.job_id,
+        { onSnapshot, onConnection: () => undefined },
+        { pollSnapshot: () => client.jobs.get(first.job_id) },
+      );
+    } catch (error) {
+      fail(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   /** Профили с самовосстанавливающимся повтором (U2). */
   async function loadProfiles(): Promise<void> {
     await refreshProfiles(client, profilesHost, () => void loadProfiles());
@@ -201,5 +266,7 @@ export function mountSettingsWorkspace(
     () => void bootstrapAll(),
   );
 
-  return () => undefined;
+  return () => {
+    bundleStream?.close();
+  };
 }

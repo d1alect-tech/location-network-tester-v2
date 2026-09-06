@@ -159,7 +159,23 @@ export function buildBundleSection(): HTMLElement {
     [
       el("p", {
         className: "t-body lnt-set-honest-note",
-        text: "Кнопки сборки в панели нет: бэкенд не предоставляет HTTP-маршрут для сборника поддержки. Сборник собирается командой CLI:",
+        text: "Бэкап корня сессий и сборник поддержки собираются кнопками ниже (задачи панели backup и support_bundle). Запасной путь — команда CLI:",
+      }),
+      el("div", { className: "form-actions" }, [
+        el("button", {
+          className: "btn",
+          text: "Создать бэкап",
+          attrs: { type: "button", id: "lnt-set-backup-run" },
+        }),
+        el("button", {
+          className: "btn",
+          text: "Собрать сборник",
+          attrs: { type: "button", id: "lnt-set-bundle-run" },
+        }),
+      ]),
+      el("p", {
+        className: "t-compact lnt-set-bundle-status",
+        attrs: { id: "lnt-set-bundle-status", role: "status" },
       }),
       el("pre", { className: "frame t-mono lnt-set-command", text: guidance.command }),
       el("ul", { className: "lnt-set-flags" }, [

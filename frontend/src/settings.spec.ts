@@ -98,19 +98,32 @@ test("diagnostics panel: ready device passes preflight with only a warning", asy
   );
 });
 
-test("support bundle section gives CLI guidance and never fakes a build button", async ({
+test("bundle section launches panel backup and support-bundle jobs, CLI stays as fallback", async ({
   page,
 }) => {
   await openSettings(page);
   const guidance = page.locator(".lnt-set-bundle-guidance");
-  await expect(guidance).toContainText("бэкенд не предоставляет HTTP-маршрут");
   await expect(guidance.locator(".lnt-set-command")).toContainText("uv run lnt support-bundle");
   await expect(guidance).toContainText("--include-private-notes");
   await expect(guidance).toContainText("--no-logs");
   await expect(guidance).toContainText("SHA-256");
-  // Никакой кнопки сборки/скачивания сборника в секции нет.
-  const buttons = guidance.getByRole("button");
-  await expect(buttons).toHaveCount(0);
+  const backup = guidance.getByRole("button", { name: "Создать бэкап" });
+  const bundle = guidance.getByRole("button", { name: "Собрать сборник" });
+  await expect(backup).toBeVisible();
+  await expect(bundle).toBeVisible();
+
+  await backup.click();
+  await expect(backend.startedRequests.at(-1)).toMatchObject({ kind: "backup" });
+  await expect(guidance.locator("#lnt-set-bundle-status")).toContainText("Создание бэкапа");
+  backend.pumpAll();
+  await expect(guidance.locator("#lnt-set-bundle-status")).toContainText("Бэкап создан");
+
+  await bundle.click();
+  await expect(backend.startedRequests.at(-1)).toMatchObject({ kind: "support_bundle" });
+  backend.pumpAll();
+  await expect(guidance.locator("#lnt-set-bundle-status")).toContainText(
+    "Сборник поддержки собран",
+  );
 });
 
 test("privacy summary mirrors collector semantics; recipes are read-only", async ({ page }) => {

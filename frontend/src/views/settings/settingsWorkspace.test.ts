@@ -2,8 +2,9 @@
  * RED: падает, пока refreshProfiles/bootstrap показывают голый текст без
  * role=alert и кнопки повтора. */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LntApiClient } from "../../api/client";
+import type { JobSnapshot } from "../../api/types-jobs";
 import { createModeForm } from "../../capture/modeForm";
 import { mountSettingsWorkspace } from "./settingsWorkspace";
 
@@ -251,5 +252,182 @@ describe("settingsWorkspace error visibility (U2)", () => {
     expect(container.querySelector(".lnt-set-root-value")?.getAttribute("role")).toBeNull();
     expect(container.querySelector("#lnt-set-root-retry")?.getAttribute("hidden")).not.toBeNull();
     expect(politeRegion()?.textContent).toMatch(/загружен/i);
+  });
+});
+/** D2: кнопки бэкапа и сборника в «Настройках» — запуск panel-задач
+ * backup/support_bundle через client.jobs.start со статусом и объявлением.
+ * RED: падает, пока в секции сборника нет кнопок lnt-set-backup-run /
+ * lnt-set-bundle-run и проводки на POST /api/jobs. */
+
+function bundleSnap(overrides: Partial<JobSnapshot>): JobSnapshot {
+  return {
+    schema_version: 1,
+    version: 1,
+    job_id: "job-bundle-1",
+    kind: "backup",
+    status: "queued",
+    stage: "queued",
+    series_index: null,
+    series_total: null,
+    written_sessions: [],
+    result: null,
+    error_code: null,
+    error_message: null,
+    ...overrides,
+  };
+}
+
+/** Фальшивый EventSource: именованные события "snapshot", как шлёт бэкенд. */
+class FakeBundleEventSource {
+  static instances: FakeBundleEventSource[] = [];
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  closed = false;
+  private readonly snapshotHandlers: Array<(event: { data: string }) => void> = [];
+
+  constructor(_url: string) {
+    FakeBundleEventSource.instances.push(this);
+  }
+
+  addEventListener(type: string, handler: (event: { data: string }) => void): void {
+    if (type === "snapshot") this.snapshotHandlers.push(handler);
+  }
+
+  close(): void {
+    this.closed = true;
+  }
+
+  emit(snapshot: JobSnapshot): void {
+    for (const handler of [...this.snapshotHandlers]) {
+      handler({ data: JSON.stringify(snapshot) });
+    }
+  }
+}
+
+function stubBundleFetch(seen: unknown[], first: JobSnapshot): typeof fetch {
+  return (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    const json = (body: unknown, status = 200): Response =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      });
+    if (url.startsWith("/api/config")) return json(CONFIG);
+    if (url.startsWith("/api/profiles")) return json({ items: [] });
+    if (url.startsWith("/api/device/state")) return json(DEVICE_ABSENT);
+    if (url.startsWith("/api/analysis/recipes")) return json({ items: [] });
+    if (url.startsWith("/api/jobs") && init?.method === "POST") {
+      seen.push(JSON.parse(String(init.body)));
+      return json(first, 202);
+    }
+    if (/\/api\/jobs\/[^/]+$/.exec(url) !== null) return json(first);
+    return json({ detail: "неизвестный маршрут" }, 404);
+  }) as typeof fetch;
+}
+
+describe("settingsWorkspace bundle jobs (D2)", () => {
+  const cleanups: Array<() => void> = [];
+
+  afterEach(() => {
+    for (const cleanup of cleanups) cleanup();
+    cleanups.length = 0;
+    vi.unstubAllGlobals();
+    FakeBundleEventSource.instances = [];
+    document.body.replaceChildren();
+  });
+
+  it("backup button starts {kind:'backup'} and announces the result file", async () => {
+    // Given: секция сборника с кнопкой бэкапа, сервер принимает задачу.
+    const seen: unknown[] = [];
+    vi.stubGlobal("EventSource", FakeBundleEventSource);
+    const container = document.createElement("div");
+    document.body.append(container);
+    cleanups.push(
+      mountSettingsWorkspace(container, {
+        client: new LntApiClient(stubBundleFetch(seen, bundleSnap({ kind: "backup" }))),
+      }),
+    );
+    await flush();
+
+    // When: оператор жмёт «Создать бэкап».
+    const button = container.querySelector("#lnt-set-backup-run");
+    expect(button).toBeInstanceOf(HTMLButtonElement);
+    expect(button?.textContent).toContain("Создать бэкап");
+    (button as HTMLButtonElement).click();
+    await flush();
+
+    // Then: POST /api/jobs с kind backup, кнопка заблокирована на время задачи.
+    expect(seen).toEqual([{ kind: "backup" }]);
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(container.querySelector("#lnt-set-bundle-status")?.textContent).toMatch(/бэкап/i);
+
+    // When: SSE приносит терминальный снимок с именем файла.
+    const source = FakeBundleEventSource.instances[0];
+    expect(source).toBeInstanceOf(FakeBundleEventSource);
+    source?.emit(
+      bundleSnap({
+        kind: "backup",
+        status: "succeeded",
+        stage: "done",
+        version: 2,
+        result: { path: "lnt-backup-2026-09-06.zip" },
+      }),
+    );
+    await flush();
+
+    // Then: имя файла видно и объявлено, кнопка снова активна.
+    expect(container.querySelector("#lnt-set-bundle-status")?.textContent).toContain(
+      "lnt-backup-2026-09-06.zip",
+    );
+    expect(politeRegion()?.textContent).toContain("lnt-backup-2026-09-06.zip");
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("bundle button starts {kind:'support_bundle'} and shows errorBlock on failure", async () => {
+    // Given: секция сборника с кнопкой сборника.
+    const seen: unknown[] = [];
+    vi.stubGlobal("EventSource", FakeBundleEventSource);
+    const container = document.createElement("div");
+    document.body.append(container);
+    cleanups.push(
+      mountSettingsWorkspace(container, {
+        client: new LntApiClient(stubBundleFetch(seen, bundleSnap({ kind: "support_bundle" }))),
+      }),
+    );
+    await flush();
+
+    // When: оператор жмёт «Собрать сборник».
+    const button = container.querySelector("#lnt-set-bundle-run");
+    expect(button).toBeInstanceOf(HTMLButtonElement);
+    expect(button?.textContent).toContain("Собрать сборник");
+    (button as HTMLButtonElement).click();
+    await flush();
+
+    // Then: POST /api/jobs с kind support_bundle.
+    expect(seen).toEqual([{ kind: "support_bundle" }]);
+
+    // When: SSE приносит провал задачи.
+    const source = FakeBundleEventSource.instances[0];
+    source?.emit(
+      bundleSnap({
+        kind: "support_bundle",
+        status: "failed",
+        stage: "done",
+        version: 2,
+        error_code: "bundle_failed",
+        error_message: "не хватило места на диске",
+      }),
+    );
+    await flush();
+
+    // Then: видимый errorBlock с русской причиной, кнопка снова активна.
+    const guidance = container.querySelector(".lnt-set-bundle-guidance");
+    expect(guidance?.querySelector('[role="alert"]')?.textContent).toMatch(
+      /не удалось собрать сборник/i,
+    );
+    expect(guidance?.querySelector('[role="alert"]')?.textContent).toContain(
+      "не хватило места на диске",
+    );
+    expect((button as HTMLButtonElement).disabled).toBe(false);
   });
 });

@@ -98,6 +98,8 @@ export const STAGE_LABELS_RU: Record<JobStage, string> = {
   comparing: "сравнение",
   selftest: "самопроверка",
   checking_device: "проверка устройства",
+  backup: "резервное копирование",
+  support_bundle: "сборник поддержки",
   done: "готово",
 };
 
