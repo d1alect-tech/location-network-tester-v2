@@ -40,7 +40,8 @@ _GRANDFATHERED: Final[dict[str, int]] = {
     # T10-C2/C3: workbench (306→246) разбит на workbenchControls/inputReferencePanel,
     # spectrogramPanel (288→228) — на spectrogramLoader/WindowForm/Summary-CSV;
     # оба ушли под 250 и сняты с дедлайна.
-    "frontend/src/components/charts/spectrogramView.ts": 269,
+    # D3: spectrogramView (269→127) — на spectrogramViewOption/spectrogramTiles/
+    # spectrogramMarkers; леджер пуст, лимит держат все модули.
 }
 
 _PY_GLOBS: Final = ("src/lnt/**/*.py",)

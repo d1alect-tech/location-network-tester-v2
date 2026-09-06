@@ -43,7 +43,7 @@ export function baseOption(
         if (point === undefined) return "";
         const time = domainTimes[point[0]] ?? 0;
         const hz = domainFreqs[point[1]] ?? 0;
-        return `время ${formatSeconds(time)} с · ${formatSeconds(hz)} Гц · ${formatSeconds(point[2])} дБ`;
+        return `время ${formatSeconds(time)} с · ${formatSeconds(hz)} Гц · ${formatSeconds(point[2])} дБВ/Гц (отн. 1 В²/Гц)`;
       },
     },
     grid: { left: 64, right: 84, top: 16, bottom: 56 },
@@ -79,7 +79,7 @@ export function baseOption(
       orient: "vertical",
       right: 4,
       top: "center",
-      text: ["дБ макс", "дБ мин"],
+      text: ["дБВ/Гц макс", "дБВ/Гц мин"],
       inRange: { color: [...SPECTROGRAM_PALETTE] },
     },
     series: [{ type: "heatmap", data: [] }],
