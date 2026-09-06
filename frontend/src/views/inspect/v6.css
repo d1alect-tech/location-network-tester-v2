@@ -17,6 +17,10 @@
   background: var(--lnt-chrome);
   color: var(--lnt-text);
   font: 400 14px / 20px var(--lnt-ui);
+  /* U4: плотность прибора R3-A в скоупе inspect (глобальные примитивы не тронуты). */
+  --lnt-radius-panel: 2px;
+  --lnt-radius-control: 2px;
+  --lnt-table-row-min: 26px;
 }
 
 /* ── Полоса пары А—Б: главный объект интерфейса ─────────────────────────── */
@@ -74,6 +78,15 @@
 .app-v6 .pair-delta {
   font: 600 14px / 18px var(--lnt-mono);
   color: var(--lnt-accent);
+  flex: none;
+}
+
+/* U3: бейджи сигнатуры пары — дельта сред./макс, только за лесами. */
+.app-v6 .pair-badge {
+  font: 600 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--lnt-delta, #b7a6ff);
+  white-space: nowrap;
   flex: none;
 }
 
@@ -197,7 +210,7 @@
 }
 
 .app-v6 .readout-label {
-  font: 700 11px / 14px var(--lnt-ui);
+  font: 700 10px / 14px var(--lnt-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--lnt-text-dim);
@@ -207,7 +220,7 @@
 }
 
 .app-v6 .readout-value {
-  font: 600 16px / 20px var(--lnt-mono);
+  font: 600 20px / 24px var(--lnt-mono);
   font-variant-numeric: tabular-nums lining-nums;
   color: var(--lnt-text);
   white-space: nowrap;
@@ -220,9 +233,9 @@
   color: var(--lnt-text-sec);
 }
 
-/* Плотность данных, а не интерфейса: строки пиков по нижней границе §2.3. */
+/* Строки пиков — плотность R3-A через общий var. */
 .app-v6 .tbl-compare td {
-  height: 28px;
+  height: var(--lnt-table-row-min);
 }
 
 /* Колонка дельты: направление читается глифом, цвет только усиливает (§6). */
@@ -391,7 +404,7 @@
 
 .app-v6 .cat-found {
   font: 400 11px / 14px var(--lnt-mono);
-  color: var(--lnt-text-dim);
+  color: var(--lnt-text-sec); /* axe: dim 4.1:1 на панели, нужен 4.5:1 */
   flex: none;
 }
 
@@ -433,14 +446,14 @@
   padding: 0;
 }
 
-/* §2.3: шапка таблицы 30-32px, §6: цель ≥ 28px. */
+/* Шапка таблицы — плотность R3-A. */
 .app-v6 .cat-sort {
   display: flex;
   align-items: center;
   gap: 4px;
   width: 100%;
   padding: 0 8px;
-  font: 600 11px / 30px var(--lnt-ui);
+  font: 600 11px / 26px var(--lnt-ui);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--lnt-text-sec);
@@ -496,7 +509,7 @@
 }
 
 .app-v6 .cat-v6 .tbl-cat tbody td {
-  height: 28px;
+  height: var(--lnt-table-row-min);
   padding: 0 8px;
 }
 

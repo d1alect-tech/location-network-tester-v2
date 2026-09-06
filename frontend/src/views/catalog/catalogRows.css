@@ -7,7 +7,7 @@
 
 .lnt-cat-workspace .cat-found {
   font: 400 11px / 14px var(--lnt-mono);
-  color: var(--lnt-text-dim);
+  color: var(--lnt-text-sec); /* axe: dim 4.1:1 на панели, нужен 4.5:1 */
   flex: none;
 }
 

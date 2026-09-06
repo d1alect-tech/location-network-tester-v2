@@ -42,9 +42,9 @@ D3 стоит перед U-волнами намеренно: U4 рестайл�
 
 | # | Слот | Что | Размер | Статус |
 |---|------|-----|--------|--------|
-| D1 | C0 (#8) | Поиск сессии по имени каталога: fallback в `resolve_session_dir` на `manifest.session_id` + переписать абзац-«ловушку» в README | S | TODO |
-| D2 | C1 (#2) | `lnt archive backup` и `lnt support-bundle` как job-kind + кнопки в Настройках; restore остаётся CLI-only | M | TODO |
-| D3 | C2 (#6) | Леджер module-size до нуля: расщепить `frontend/src/components/charts/spectrogramView.ts` (269) | S | TODO |
+| D1 | C0 (#8) | Поиск сессии по имени каталога: fallback в `resolve_session_dir` на `manifest.session_id` + переписать абзац-«ловушку» в README | S | DONE |
+| D2 | C1 (#2) | `lnt archive backup` и `lnt support-bundle` как job-kind + кнопки в Настройках; restore остаётся CLI-only | M | DONE |
+| D3 | C2 (#6) | Леджер module-size до нуля: расщепить `frontend/src/components/charts/spectrogramView.ts` (269) | S | DONE |
 | — | C3 (#3) | Свободен (запас) | — | — |
 
 ### Интерфейсная волна — U-слоты
@@ -54,10 +54,10 @@ D3 стоит перед U-волнами намеренно: U4 рестайл�
 
 | # | Слот | Что | Статус |
 |---|------|-----|--------|
-| U1 | U1 (#5) | Токены (значения `--lnt-*`) + Плекс вместо Golos/Source Code Pro + рамка (шапка, статус-бар) глобально; леса-переключатель старый/новый вид | TODO |
-| U2 | U2 (#7) | channel-bar (полоса / RBW / окно / детектор / сегментов) в inspect и capture | TODO |
-| U3 | U3 (#4) | Сигнатура пары: дельта-бейджи в паирбар + Δ-полоса B − A под спектром (сворачиваемая, с памятью) | TODO |
-| U4 | U4 (#9) | Рестайл существующих объектов inspect (таблица, вердикты, панели) + **снос лесов** | TODO |
+| U1 | U1 (#5) | Токены (значения `--lnt-*`) + Плекс вместо Golos/Source Code Pro + рамка (шапка, статус-бар) глобально; леса-переключатель старый/новый вид | DONE (рамка уже была глобальной в AppShell; R3-A за `?ui=new`, дефолт старый вид; акцент #5681FF, сигнатурные --lnt-a/b/delta; round2 frozen) |
+| U2 | U2 (#7) | channel-bar (полоса / RBW / окно / детектор / сегментов) в inspect и capture | DONE (индикатор по R3-A buildChannelBar за `?ui=new`; селекты RBW/окна остались в шапке панели; capture — проекция из формы + stored-префы; детектор «Среднее», сегментов до анализа — прочерк) |
+| U3 | U3 (#4) | Сигнатура пары: дельта-бейджи в паирбар + Δ-полоса B − A под спектром (сворачиваемая, с памятью) | DONE (бейджи Δср/Δmax из summarizeDelta за `?ui=new`; полоса canvas DPR ±8 дБ, тумблер с localStorage-памятью; сетки индекс-совмещены как peakDeltas) |
+| U4 | U4 (#9) | Рестайл существующих объектов inspect (таблица, вердикты, панели) + **снос лесов** | DONE (R3-A в :root дефолтом, `?ui=new`/`isNewUi`/`data-ui` удалены, fontsource Golos/SCP выкинут из бандла; плотность 26px/радиусы 2px/t-num в скоупе .app-v6; round2 frozen зелёный) |
 
 Критерий готовности U-волны: существующие e2e зелёные + новые playwright-пины на каждый новый элемент +
 module-size + byte-stable rebuild `src/lnt/ui/static/v2` + скриншот-сет и **реакция владельца** как точка выхода.

@@ -2,12 +2,15 @@ import "./v6.css";
 import { LntApiClient } from "../../api/client";
 import { createDeviceApi } from "../../api/client-device";
 import type { CatalogQuery, CatalogSession } from "../../api/types";
+import { createChannelbar } from "../../components/channelbar/channelbar";
 import type { ChartHandle } from "../../components/charts/types";
 import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { el } from "../../components/primitives/dom";
 import type { RouteStore } from "../../state/routeState";
 import { createAnalysisBand } from "./analysisBand";
 import { createCatalogColumn } from "./catalogColumn";
+import { cyclesFromMeters, paintChannelbarFromPayload } from "./channelbarPaint";
+import { summarizeDelta } from "./deltaSummary";
 import type { GramPairClient } from "./gramPair";
 import { ticketToCaptureParams } from "./inspectTicket";
 import { wireInspectV6Gram } from "./inspectV6Gram";
@@ -69,10 +72,7 @@ export async function mountInspectV6(
     pair,
     onPick: (id) => pair.pick(id),
   });
-  const spectrumPanel = createSpectrumPanel({
-    client,
-    createView: opts.createView,
-  });
+  const spectrumPanel = createSpectrumPanel({ client, createView: opts.createView });
   const analysisBand = createAnalysisBand();
   const extras = createV6Extras({
     client,
@@ -92,8 +92,11 @@ export async function mountInspectV6(
     createView: opts.createView,
   });
 
+  // U2: channel-bar первой строкой главной колонки.
+  const channelbar = createChannelbar();
   const colCat = el("div", { className: "col-cat" }, [catalogColumn.root]);
   const colMain = el("div", { className: "col-main" }, [
+    channelbar.root,
     spectrumPanel.root,
     analysisBand.root,
     extras.root,
@@ -119,11 +122,21 @@ export async function mountInspectV6(
     if (a === null || a === "") return;
     chrome.hideError();
     try {
-      await Promise.all([
+      const [, bandData] = await Promise.all([
         spectrumPanel.load(a, b),
-        loadAnalysisBand(client, a, b).then((data) => analysisBand.update(data)),
+        loadAnalysisBand(client, a, b).then((data) => {
+          analysisBand.update(data);
+          return data;
+        }),
         gram.refresh(a, b),
       ]);
+      const payloads = spectrumPanel.payloads();
+      paintChannelbarFromPayload(channelbar, payloads.a, cyclesFromMeters(bandData.meters));
+      pairbar.setDelta(
+        payloads.b === null
+          ? null
+          : summarizeDelta(payloads.a?.psd_v2_per_hz, payloads.b.psd_v2_per_hz),
+      );
       extras.setSession(a);
     } catch (error) {
       // no-excuse-ok: catch — inspect v6 pair-refresh boundary
