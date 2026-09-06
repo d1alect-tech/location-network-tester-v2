@@ -160,3 +160,26 @@ export function validateRootNote(value: string): RootNoteValidation {
   }
   return { ok: true, error: null };
 }
+
+/** Папка сессий: те же правила длины и запрещённых символов, что у
+ * validateRootNote, плюс обязательный абсолютный путь Windows (буква диска
+ * `X:\` или UNC `\\`). Пустая строка не проходит: папку надо указать явно.
+ * Проверяется только форма записи; есть ли папка на диске, станет ясно при
+ * следующем старте сервера. */
+export function validateSessionsFolder(value: string): RootNoteValidation {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return { ok: false, error: "Укажите путь к папке сессий." };
+  if (trimmed.length > ROOT_NOTE_MAX_LENGTH) {
+    return { ok: false, error: `Максимум ${ROOT_NOTE_MAX_LENGTH} символов.` };
+  }
+  if (/[\n\r]/.test(trimmed)) {
+    return { ok: false, error: "Путь должен быть одной строкой." };
+  }
+  if (/[<>|?*"]/.test(trimmed)) {
+    return { ok: false, error: "Путь содержит недопустимые символы." };
+  }
+  if (!/^[A-Za-z]:\\/.test(trimmed) && !/^\\\\/.test(trimmed)) {
+    return { ok: false, error: "Нужен абсолютный путь Windows: D:\\lnt-sessions или \\\\server\\share." };
+  }
+  return { ok: true, error: null };
+}

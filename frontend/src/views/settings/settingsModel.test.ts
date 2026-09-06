@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { privacyGroups, supportBundleGuidance, validateRootNote } from "./settingsModel";
+import {
+  privacyGroups,
+  supportBundleGuidance,
+  validateRootNote,
+  validateSessionsFolder,
+} from "./settingsModel";
 
 describe("privacyGroups", () => {
   it("mirrors metadata_collector semantics: automatic, opt-in and never groups", () => {
@@ -44,6 +49,31 @@ describe("supportBundleGuidance", () => {
     ]);
     expect(guidance.contents.join("\n")).toContain("dependencies.json");
     expect(guidance.manifestNote).toContain("SHA-256");
+  });
+});
+
+describe("validateSessionsFolder", () => {
+  it("accepts drive-letter and UNC absolute paths", () => {
+    expect(validateSessionsFolder("D:\\lnt-sessions")).toEqual({ ok: true, error: null });
+    expect(validateSessionsFolder("\\\\server\\share")).toEqual({ ok: true, error: null });
+  });
+
+  it("rejects relative paths", () => {
+    expect(validateSessionsFolder("sessions").ok).toBe(false);
+    expect(validateSessionsFolder(".\\sessions").ok).toBe(false);
+  });
+
+  it("rejects illegal characters", () => {
+    expect(validateSessionsFolder("D:\\bad|path").ok).toBe(false);
+    expect(validateSessionsFolder("D:\\bad?path").ok).toBe(false);
+    expect(validateSessionsFolder("D:\\bad*path").ok).toBe(false);
+    expect(validateSessionsFolder("D:\\bad|path").error).toContain("недопустимые символы");
+  });
+
+  it("rejects overlong and empty paths", () => {
+    expect(validateSessionsFolder(`D:\\${"x".repeat(198)}`).ok).toBe(false);
+    expect(validateSessionsFolder("").ok).toBe(false);
+    expect(validateSessionsFolder("   ").ok).toBe(false);
   });
 });
 
