@@ -45,7 +45,7 @@ D3 стоит перед U-волнами намеренно: U4 рестайл�
 | D1 | C0 (#8) | Поиск сессии по имени каталога: fallback в `resolve_session_dir` на `manifest.session_id` + переписать абзац-«ловушку» в README | S | DONE |
 | D2 | C1 (#2) | `lnt archive backup` и `lnt support-bundle` как job-kind + кнопки в Настройках; restore остаётся CLI-only | M | DONE |
 | D3 | C2 (#6) | Леджер module-size до нуля: расщепить `frontend/src/components/charts/spectrogramView.ts` (269) | S | DONE |
-| — | C3 (#3) | Свободен (запас) | — | — |
+| D4 | C3 (#3) | Выбор папки сессий в Настройках через перезапуск | S | TODO |
 
 ### Интерфейсная волна — U-слоты
 
