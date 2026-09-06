@@ -1,26 +1,33 @@
 {
-  "_chartshell.B3gvIpKi.js": {
-    "file": "assets/chartshell.B3gvIpKi.js",
+  "_chartshell.Brtr_Od0.css": {
+    "file": "assets/chartshell.Brtr_Od0.css",
+    "src": "_chartshell.Brtr_Od0.css"
+  },
+  "_chartshell.CPVeE_RT.js": {
+    "file": "assets/chartshell.CPVeE_RT.js",
     "name": "chartshell",
     "css": [
-      "assets/chartshell.DTqKjRH4.css"
+      "assets/chartshell.Brtr_Od0.css"
     ],
     "assets": [
-      "assets/source-code-pro-cyrillic-ext-wght-normal.BODHZjil.woff2",
-      "assets/source-code-pro-cyrillic-wght-normal.aqTvhEeI.woff2",
-      "assets/source-code-pro-greek-wght-normal.BvT6WsG1.woff2",
-      "assets/source-code-pro-vietnamese-wght-normal.B6x53GZG.woff2",
-      "assets/source-code-pro-latin-ext-wght-normal.0UZNSh4u.woff2",
-      "assets/source-code-pro-latin-wght-normal.BP8Zz55n.woff2",
-      "assets/golos-text-cyrillic-ext-wght-normal.hICkpzq7.woff2",
+      "assets/inter-cyrillic-wght-normal.DqGufNeO.woff2",
+      "assets/inter-latin-wght-normal.Dx4kXJAl.woff2",
       "assets/golos-text-cyrillic-wght-normal.mKek_fSS.woff2",
-      "assets/golos-text-latin-ext-wght-normal.B-I5lbAQ.woff2",
-      "assets/golos-text-latin-wght-normal.BS5oQT7X.woff2"
+      "assets/golos-text-latin-wght-normal.BS5oQT7X.woff2",
+      "assets/source-serif-4-cyrillic-wght-normal.DwHjdM4S.woff2",
+      "assets/source-serif-4-latin-wght-normal.D9elroTD.woff2",
+      "assets/jetbrains-mono-cyrillic-wght-normal.D73BlboJ.woff2",
+      "assets/jetbrains-mono-latin-wght-normal.B9CIFXIH.woff2",
+      "assets/source-sans-3-cyrillic-wght-normal.BMDVbyM7.woff2",
+      "assets/source-sans-3-latin-wght-normal.BqRLTx4X.woff2",
+      "assets/source-code-pro-cyrillic-wght-normal.aqTvhEeI.woff2",
+      "assets/source-code-pro-latin-wght-normal.BP8Zz55n.woff2",
+      "assets/IBMPlexSans-Regular.BiEB_oxT.woff2",
+      "assets/IBMPlexSans-Medium.BQLKo0ot.woff2",
+      "assets/IBMPlexSans-SemiBold.KfaJl9PC.woff2",
+      "assets/IBMPlexMono-Regular.Du0PCiXT.woff2",
+      "assets/IBMPlexMono-Medium.CiYsa3y2.woff2"
     ]
-  },
-  "_chartshell.DTqKjRH4.css": {
-    "file": "assets/chartshell.DTqKjRH4.css",
-    "src": "_chartshell.DTqKjRH4.css"
   },
   "_form.BUF79Nh4.js": {
     "file": "assets/form.BUF79Nh4.js",
@@ -104,58 +111,18 @@
     "src": "_variantV1.CCz54TsC.css"
   },
   "index.html": {
-    "file": "assets/main.Cq6eZYz2.js",
+    "file": "assets/main.DlVYlHig.js",
     "name": "main",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.B3gvIpKi.js",
+      "_chartshell.CPVeE_RT.js",
       "_spectrogramPalette.CfMVLFb-.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
-      "assets/main.DhEo6DTQ.css"
+      "assets/main.CCCMJesM.css"
     ]
-  },
-  "node_modules/@fontsource-variable/golos-text/files/golos-text-cyrillic-ext-wght-normal.woff2": {
-    "file": "assets/golos-text-cyrillic-ext-wght-normal.hICkpzq7.woff2",
-    "src": "node_modules/@fontsource-variable/golos-text/files/golos-text-cyrillic-ext-wght-normal.woff2"
-  },
-  "node_modules/@fontsource-variable/golos-text/files/golos-text-cyrillic-wght-normal.woff2": {
-    "file": "assets/golos-text-cyrillic-wght-normal.mKek_fSS.woff2",
-    "src": "node_modules/@fontsource-variable/golos-text/files/golos-text-cyrillic-wght-normal.woff2"
-  },
-  "node_modules/@fontsource-variable/golos-text/files/golos-text-latin-ext-wght-normal.woff2": {
-    "file": "assets/golos-text-latin-ext-wght-normal.B-I5lbAQ.woff2",
-    "src": "node_modules/@fontsource-variable/golos-text/files/golos-text-latin-ext-wght-normal.woff2"
-  },
-  "node_modules/@fontsource-variable/golos-text/files/golos-text-latin-wght-normal.woff2": {
-    "file": "assets/golos-text-latin-wght-normal.BS5oQT7X.woff2",
-    "src": "node_modules/@fontsource-variable/golos-text/files/golos-text-latin-wght-normal.woff2"
-  },
-  "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-cyrillic-ext-wght-normal.woff2": {
-    "file": "assets/source-code-pro-cyrillic-ext-wght-normal.BODHZjil.woff2",
-    "src": "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-cyrillic-ext-wght-normal.woff2"
-  },
-  "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-cyrillic-wght-normal.woff2": {
-    "file": "assets/source-code-pro-cyrillic-wght-normal.aqTvhEeI.woff2",
-    "src": "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-cyrillic-wght-normal.woff2"
-  },
-  "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-greek-wght-normal.woff2": {
-    "file": "assets/source-code-pro-greek-wght-normal.BvT6WsG1.woff2",
-    "src": "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-greek-wght-normal.woff2"
-  },
-  "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-latin-ext-wght-normal.woff2": {
-    "file": "assets/source-code-pro-latin-ext-wght-normal.0UZNSh4u.woff2",
-    "src": "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-latin-ext-wght-normal.woff2"
-  },
-  "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-latin-wght-normal.woff2": {
-    "file": "assets/source-code-pro-latin-wght-normal.BP8Zz55n.woff2",
-    "src": "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-latin-wght-normal.woff2"
-  },
-  "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-vietnamese-wght-normal.woff2": {
-    "file": "assets/source-code-pro-vietnamese-wght-normal.B6x53GZG.woff2",
-    "src": "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-vietnamese-wght-normal.woff2"
   },
   "showcase-a.html": {
     "file": "assets/showcaseVariantA.-6O7DjhJ.js",
@@ -311,12 +278,12 @@
     ]
   },
   "showcase.html": {
-    "file": "assets/showcase.BZehpKcm.js",
+    "file": "assets/showcase.C6cHUG-l.js",
     "name": "showcase",
     "src": "showcase.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.B3gvIpKi.js"
+      "_chartshell.CPVeE_RT.js"
     ]
   },
   "src/showcase-redesign/fonts/IBMPlexMono-Medium.woff2": {
@@ -341,11 +308,11 @@
   },
   "src/showcase-redesign/fonts/golos-text-cyrillic-wght-normal.woff2": {
     "file": "assets/golos-text-cyrillic-wght-normal.mKek_fSS.woff2",
-    "src": "node_modules/@fontsource-variable/golos-text/files/golos-text-cyrillic-wght-normal.woff2"
+    "src": "src/showcase-redesign/fonts/golos-text-cyrillic-wght-normal.woff2"
   },
   "src/showcase-redesign/fonts/golos-text-latin-wght-normal.woff2": {
     "file": "assets/golos-text-latin-wght-normal.BS5oQT7X.woff2",
-    "src": "node_modules/@fontsource-variable/golos-text/files/golos-text-latin-wght-normal.woff2"
+    "src": "src/showcase-redesign/fonts/golos-text-latin-wght-normal.woff2"
   },
   "src/showcase-redesign/fonts/inter-cyrillic-wght-normal.woff2": {
     "file": "assets/inter-cyrillic-wght-normal.DqGufNeO.woff2",
@@ -365,11 +332,11 @@
   },
   "src/showcase-redesign/fonts/source-code-pro-cyrillic-wght-normal.woff2": {
     "file": "assets/source-code-pro-cyrillic-wght-normal.aqTvhEeI.woff2",
-    "src": "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-cyrillic-wght-normal.woff2"
+    "src": "src/showcase-redesign/fonts/source-code-pro-cyrillic-wght-normal.woff2"
   },
   "src/showcase-redesign/fonts/source-code-pro-latin-wght-normal.woff2": {
     "file": "assets/source-code-pro-latin-wght-normal.BP8Zz55n.woff2",
-    "src": "node_modules/@fontsource-variable/source-code-pro/files/source-code-pro-latin-wght-normal.woff2"
+    "src": "src/showcase-redesign/fonts/source-code-pro-latin-wght-normal.woff2"
   },
   "src/showcase-redesign/fonts/source-sans-3-cyrillic-wght-normal.woff2": {
     "file": "assets/source-sans-3-cyrillic-wght-normal.BMDVbyM7.woff2",
