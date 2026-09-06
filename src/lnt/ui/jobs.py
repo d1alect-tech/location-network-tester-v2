@@ -33,6 +33,8 @@ _FIRST_STAGES: Final[dict[JobKind, JobStage]] = {
     JobKind.COMPARE: JobStage.COMPARING,
     JobKind.SELFTEST: JobStage.SELFTEST,
     JobKind.DEVICE_CHECK: JobStage.CHECKING_DEVICE,
+    JobKind.BACKUP: JobStage.BACKUP,
+    JobKind.SUPPORT_BUNDLE: JobStage.SUPPORT_BUNDLE,
 }
 _HARDWARE_KINDS: Final = frozenset({JobKind.CAPTURE, JobKind.DEVICE_CHECK})
 

@@ -12,6 +12,7 @@ from lnt.scope_io import CancellationToken, CancelledResult
 from lnt.series import run_series, series_dirs
 from lnt.ui.models import (
     AnalyzeRequest,
+    BackupRequest,
     CaptureRequest,
     CompareRequest,
     DeviceCheckRequest,
@@ -19,6 +20,7 @@ from lnt.ui.models import (
     JobStage,
     SelftestRequest,
     SimulateRequest,
+    SupportBundleRequest,
 )
 from lnt.ui.sessions import allocate_output_base, resolve_session_dir
 
@@ -99,7 +101,9 @@ def execute_job(context: WorkerContext, request: JobRequest) -> WorkerResult:
         return WorkerFailed(error_code="internal_error", error_message="внутренняя ошибка")
 
 
-def _dispatch(context: WorkerContext, request: JobRequest) -> WorkerSucceeded:
+def _dispatch(  # noqa: PLR0911 - по одному return на kind задачи панели
+    context: WorkerContext, request: JobRequest
+) -> WorkerSucceeded:
     match request:
         case SimulateRequest() | CaptureRequest():
             return _execute_series(context, request)
@@ -128,6 +132,24 @@ def _dispatch(context: WorkerContext, request: JobRequest) -> WorkerSucceeded:
                     "message": result.message,
                     "frequency_hz": result.frequency_hz,
                     "cycles_analyzed": result.cycles_analyzed,
+                },
+            )
+        case BackupRequest():
+            context.report(WorkerUpdate(stage=JobStage.BACKUP))
+            archived = context.backend.backup(context.root)
+            return WorkerSucceeded(
+                result={
+                    "archive": archived.path.name,
+                    "entry_count": archived.entry_count,
+                },
+            )
+        case SupportBundleRequest():
+            context.report(WorkerUpdate(stage=JobStage.SUPPORT_BUNDLE))
+            bundle = context.backend.support_bundle()
+            return WorkerSucceeded(
+                result={
+                    "bundle": bundle.path.name,
+                    "members": list(bundle.member_names),
                 },
             )
         case DeviceCheckRequest():

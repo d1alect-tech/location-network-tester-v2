@@ -29,6 +29,8 @@ class JobKind(StrEnum):
     COMPARE = "compare"
     SELFTEST = "selftest"
     DEVICE_CHECK = "device_check"
+    BACKUP = "backup"
+    SUPPORT_BUNDLE = "support_bundle"
 
 
 class JobStatus(StrEnum):
@@ -53,6 +55,8 @@ class JobStage(StrEnum):
     COMPARING = "comparing"
     SELFTEST = "selftest"
     CHECKING_DEVICE = "checking_device"
+    BACKUP = "backup"
+    SUPPORT_BUNDLE = "support_bundle"
     DONE = "done"
 
 
@@ -237,13 +241,31 @@ class DeviceCheckRequest(BaseModel):
     kind: Literal["device_check"]
 
 
+class BackupRequest(BaseModel):
+    """Запрос на архив всех сессий корня."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["backup"]
+
+
+class SupportBundleRequest(BaseModel):
+    """Запрос на сборник поддержки (логи включены, приватных заметок нет)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["support_bundle"]
+
+
 JobRequest = Annotated[
     SimulateRequest
     | CaptureRequest
     | AnalyzeRequest
     | CompareRequest
     | SelftestRequest
-    | DeviceCheckRequest,
+    | DeviceCheckRequest
+    | BackupRequest
+    | SupportBundleRequest,
     Field(discriminator="kind"),
 ]
 

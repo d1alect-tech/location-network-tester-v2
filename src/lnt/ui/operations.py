@@ -1,6 +1,7 @@
 """Типизированный адаптер запросов панели к доменным операциям LNT."""
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
@@ -11,6 +12,8 @@ from lnt.analysis import (
     write_analysis,
     write_line_quality_analysis,
 )
+from lnt.app_paths import resolve_app_paths
+from lnt.archive.backup import backup_all_sessions, backup_output_name
 from lnt.cm_dm.analysis import analyze_cm_dm_session, write_cm_dm_analysis
 from lnt.cm_dm.dispatch import is_cm_dm_session
 from lnt.compare import ComparisonResult, compare_analyses, ensure_comparable
@@ -18,10 +21,19 @@ from lnt.scope_io import NEVER_CANCELLED, CancellationToken, CancelledResult
 from lnt.selftest import SelftestResult, run_selftest
 from lnt.simulate import simulate_session
 from lnt.spectrum_hold import write_hold_spectrum
+from lnt.support import BundleOptions, SupportBundleResult, build_support_bundle
 from lnt.types import ChannelMode, SeriesPosition, SessionType
 from lnt.ui.analysis_v2_wire import AnalyzeWriteResult, run_v2_after_v1
 from lnt.ui.device import DeviceStatus, diagnose_device
 from lnt.ui.models import CaptureRequest, SimulateRequest
+
+
+@dataclass(frozen=True, slots=True)
+class BackupResult:
+    """Итог backup: путь архива и число записей."""
+
+    path: Path
+    entry_count: int
 
 
 class JobBackend(Protocol):
@@ -63,6 +75,14 @@ class JobBackend(Protocol):
 
     def device_check(self) -> DeviceStatus:
         """Диагностирует доступность устройства захвата."""
+        ...
+
+    def backup(self, root: Path) -> BackupResult:
+        """Архивирует все сессии корня в автоименованный ZIP внутри него."""
+        ...
+
+    def support_bundle(self) -> SupportBundleResult:
+        """Собирает ZIP-диагностику в каталоге данных приложения."""
         ...
 
 
@@ -160,3 +180,30 @@ class LntBackend:
     def device_check(self) -> DeviceStatus:
         """Возвращает результат диагностики устройства."""
         return diagnose_device()
+
+    def backup(self, root: Path) -> BackupResult:
+        """Архивирует корень в автоименованный ZIP, обходя коллизии суффиксом."""
+        stem = backup_output_name(datetime.now(UTC)).removesuffix(".zip")
+        output = root / f"{stem}.zip"
+        suffix = 1
+        while output.exists():
+            output = root / f"{stem}-{suffix}.zip"
+            suffix += 1
+        manifest = backup_all_sessions(output, root)
+        return BackupResult(path=output, entry_count=len(manifest.entries))
+
+    def support_bundle(self) -> SupportBundleResult:
+        """Собирает сборник с логами по умолчанию в каталоге support."""
+        paths = resolve_app_paths()
+        stem = f"support-bundle-{datetime.now(UTC):%Y%m%d-%H%M%S}"
+        output = paths.support_dir / f"{stem}.zip"
+        suffix = 1
+        while output.exists():
+            output = paths.support_dir / f"{stem}-{suffix}.zip"
+            suffix += 1
+        return build_support_bundle(
+            output,
+            paths=paths,
+            options=BundleOptions(),
+            probe=None,
+        )
