@@ -19,12 +19,14 @@ from lnt.runtime.store import JobStore
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 from lnt.selftest import SelftestResult
 from lnt.simulate import simulate_session
+from lnt.support import SupportBundleResult
 from lnt.types import SeriesPosition
 from lnt.ui.analysis_v2_wire import AnalyzeWriteResult
 from lnt.ui.dependencies import AppServices, install_services
 from lnt.ui.device import DeviceStatus
 from lnt.ui.jobs import JobManager
 from lnt.ui.models import CaptureRequest, SimulateRequest
+from lnt.ui.operations import BackupResult
 from lnt.ui.routes_sessions import router
 
 if TYPE_CHECKING:
@@ -64,6 +66,13 @@ class _UnusedBackend:
         raise AssertionError("задачи не должны запускаться")
 
     def device_check(self) -> DeviceStatus:
+        raise AssertionError("задачи не должны запускаться")
+
+    def backup(self, root: Path) -> BackupResult:
+        del root
+        raise AssertionError("задачи не должны запускаться")
+
+    def support_bundle(self) -> SupportBundleResult:
         raise AssertionError("задачи не должны запускаться")
 
 

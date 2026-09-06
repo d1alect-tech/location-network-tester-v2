@@ -110,8 +110,17 @@ def resolve_session_dir(root: Path, name: str) -> Path:
     """Разрешает существующий реальный каталог сессии внутри ``root``."""
     _validate_session_name(name)
     candidate = root / name
-    if candidate.is_symlink() or not candidate.is_dir():
-        raise InputError(f"каталог сессии не найден или небезопасен: {name!r}")
+    if not candidate.is_symlink() and candidate.is_dir():
+        return _checked_session_dir(root, candidate, name)
+    # D1: каталог показывает session_id из манифеста — принимаем и его.
+    # ponytail: обход корня только на промахе; индекс позже, если сессий станет много.
+    fallback = _find_by_session_id(root, name)
+    if fallback is not None:
+        return fallback
+    raise InputError(f"каталог сессии не найден или небезопасен: {name!r}")
+
+
+def _checked_session_dir(root: Path, candidate: Path, name: str) -> Path:
     try:
         resolved_root = root.resolve(strict=True)
         resolved_candidate = candidate.resolve(strict=True)
@@ -126,6 +135,24 @@ def resolve_session_dir(root: Path, name: str) -> Path:
     if resolved_candidate.parent != resolved_root:
         raise InputError(f"каталог сессии выходит за пределы корня: {name!r}")
     return candidate
+
+
+def _find_by_session_id(root: Path, name: str) -> Path | None:
+    if not root.is_dir():
+        return None
+    for session_dir in sorted(root.iterdir(), key=lambda path: path.name):
+        if session_dir.is_symlink() or not session_dir.is_dir():
+            continue
+        manifest_path = session_dir / _MANIFEST_FILENAME
+        if not manifest_path.is_file():
+            continue
+        try:
+            manifest = manifest_from_json(manifest_path.read_text(encoding="utf-8"))
+        except (InputError, UnicodeDecodeError, OSError):
+            continue
+        if manifest.session_id == name:
+            return _checked_session_dir(root, session_dir, name)
+    return None
 
 
 def allocate_output_base(
