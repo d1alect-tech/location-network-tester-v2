@@ -1,7 +1,7 @@
 /* Import design tokens from T36 */
 @import "../../src/lnt/ui/static/v2-tokens.css";
-@import "@fontsource-variable/source-code-pro";
-@import "@fontsource-variable/golos-text";
+/* U4: только Плекс (R3-A T1). Витрины грузят свои шрифты сами. */
+@import "./showcase-redesign/fonts/fonts.css";
 @import "./components/primitives/primitives.css";
 @import "./capture/capture.css";
 

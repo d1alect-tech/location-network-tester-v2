@@ -22,8 +22,8 @@ const FALLBACK: ChartTheme = {
   canvasBg: "#1d1d1d",
   fgSecondary: "#d1d1d1",
   borderSubtle: "#3f3f3f",
-  fontMono: '"Source Code Pro Variable", Consolas, monospace',
-  fontSans: '"Golos Text Variable", "Segoe UI", system-ui, sans-serif',
+  fontMono: '"IBM Plex Mono", Consolas, monospace',
+  fontSans: '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif',
   lineWidth: 1,
 };
 

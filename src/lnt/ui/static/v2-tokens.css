@@ -1,9 +1,9 @@
 /* v2-tokens.css — LNT v2 Design Tokens */
 
 :root {
-  /* Typography */
-  --lnt-font-sans: "Golos Text Variable", "Segoe UI", system-ui, sans-serif;
-  --lnt-font-mono: "Source Code Pro Variable", Consolas, monospace;
+  /* Typography: U4 — Плекс дефолт (R3-A T1); леса ?ui=new снесены. */
+  --lnt-font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --lnt-font-mono: "IBM Plex Mono", Consolas, monospace;
   --lnt-weight-regular: 400;
   --lnt-weight-medium: 500;
   --lnt-weight-semibold: 600;
@@ -26,7 +26,8 @@
   --lnt-radius-panel: 8px;
   --lnt-radius-status: 4px;
 
-  /* Interactive Targets */
+  /* Interactive Targets: 44px держит контракт test_44px_rule (a11y);
+     плотность R3-A — в строках таблиц и шапках, не в тач-таргетах. */
   --lnt-control-height: 44px;
   --lnt-touch-target-min: 44px;
   --lnt-table-row-min: 44px;
@@ -50,24 +51,27 @@
   --lnt-motion-standard: 160ms;
   --lnt-ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
-  /* V6 showcase aliases */
-  --lnt-canvas: #1d1d1d;
-  --lnt-chrome: #262626;
-  --lnt-panel: #323232;
-  --lnt-elev: #3f3f3f;
-  --lnt-line: #3f3f3f;
-  --lnt-line-struct: #545454;
+  /* U4: нейтральная шкала R3-A «Стойка» дефолтом; акцент #5681FF оставлен (Q2). */
+  --lnt-canvas: #17191c;
+  --lnt-chrome: #1e2125;
+  --lnt-panel: #24282d;
+  --lnt-elev: #2b3036;
+  --lnt-line: #33383f;
+  --lnt-line-struct: #444b54;
   --lnt-line-hot: #707070;
-  --lnt-text: #ebebeb;
-  --lnt-text-sec: #d1d1d1;
-  --lnt-text-dim: #909090;
+  --lnt-text: #e2e6ea;
+  --lnt-text-sec: #aeb6bf;
+  --lnt-text-dim: #7a828c;
   --lnt-accent: #5681ff;
-  --lnt-ok: #2d9d78;
+  --lnt-a: #3ec9e6;
+  --lnt-b: #e6a13c;
+  --lnt-delta: #b7a6ff;
+  --lnt-ok: #3dbd8a;
   --lnt-warn: #e68619;
-  --lnt-err: #ec5b62;
+  --lnt-err: #ef5b62;
   --lnt-mono: var(--lnt-font-mono);
   --lnt-ui: var(--lnt-font-sans);
-  --lnt-r-ctl: 4px;
+  --lnt-r-ctl: 2px;
   --lnt-t-fast: 120ms;
   --lnt-ease: cubic-bezier(0.2, 0, 0, 1);
   --lnt-panel-hd: rgb(0 0 0 / 0.18);
@@ -75,25 +79,25 @@
   --lnt-r-pill: 9999px;
 }
 
-/* Dark Theme (Default) */
+/* Dark Theme (Default): U4 — та же шкала R3-A. */
 :root, [data-theme="dark"] {
   color-scheme: dark;
-  --lnt-bg-canvas: #1d1d1d;
-  --lnt-bg-panel: #323232;
-  --lnt-bg-raised: #3f3f3f;
-  --lnt-bg-selected: #3f3f3f;
-  --lnt-fg-primary: #ebebeb;
-  --lnt-fg-secondary: #d1d1d1;
-  --lnt-fg-disabled: #909090;
-  --lnt-border-subtle: #3f3f3f;
-  --lnt-border-strong: #545454;
+  --lnt-bg-canvas: #17191c;
+  --lnt-bg-panel: #24282d;
+  --lnt-bg-raised: #2b3036;
+  --lnt-bg-selected: #2b3036;
+  --lnt-fg-primary: #e2e6ea;
+  --lnt-fg-secondary: #aeb6bf;
+  --lnt-fg-disabled: #7a828c;
+  --lnt-border-subtle: #33383f;
+  --lnt-border-strong: #444b54;
   --lnt-accent-a: #5681ff;
-  --lnt-accent-b: #e68619;
-  --lnt-status-ok: #2d9d78;
+  --lnt-accent-b: #e6a13c;
+  --lnt-status-ok: #3dbd8a;
   --lnt-status-ok-bg: #1a3d32;
   --lnt-status-warn: #e68619;
   --lnt-status-warn-bg: #3d2a12;
-  --lnt-status-error: #ec5b62;
+  --lnt-status-error: #ef5b62;
   --lnt-status-error-bg: #3d1a1c;
 }
 
@@ -117,6 +121,11 @@
   --lnt-status-warn-bg: #fff8e6;
   --lnt-status-error: #da1e28;
   --lnt-status-error-bg: #fff1f1;
+}
+
+/* v6.css задаёт --lnt-mono на .app-v6 — дотягиваем до Плекса точнее. */
+:root .app-v6 {
+  --lnt-mono: "IBM Plex Mono", Consolas, monospace;
 }
 
 /* Forced Colors Mode (Windows High Contrast) */
