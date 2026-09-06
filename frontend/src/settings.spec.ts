@@ -62,6 +62,44 @@ test("session root shows the server fact; local note persists but is marked loca
   await expect(page.locator(".lnt-field [role=alert]")).toContainText("недопустимые символы");
 });
 
+test("session folder choice: valid path keeps the server fact; bad path alerts; copy gives the quoted restart command", async ({
+  page,
+  context,
+}) => {
+  await openSettings(page);
+  const folderField = page.locator(".lnt-field", { has: page.locator("#lnt-set-folder-path") });
+  const folderInput = page.locator("#lnt-set-folder-path");
+  const expectedCommand = 'uv run lnt ui --root "D:\\lnt-sessions"';
+
+  // Валидный путь: ошибки нет, кнопка отдаёт точную команду перезапуска.
+  await folderInput.fill("D:\\lnt-sessions");
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.locator("#lnt-set-folder-copy").click();
+  await expect(folderField.locator("[role=alert]")).toHaveCount(0);
+  const clipboard = await page.evaluate(() =>
+    navigator.clipboard.readText().then(
+      (text) => text,
+      () => null,
+    ),
+  );
+  if (clipboard === null) {
+    // Headless отказал в clipboard: fallback подставляет команду в поле.
+    await expect(folderInput).toHaveValue(expectedCommand);
+  } else {
+    expect(clipboard).toBe(expectedCommand);
+  }
+
+  // Факт корня меняется только перезапуском: после reload — тот же мок.
+  await page.reload();
+  await expect(page.locator(".lnt-set-workspace")).toBeVisible();
+  await expect(page.locator(".lnt-set-root-value")).toHaveText("C:\\lnt-sessions-test");
+
+  // Невалидный путь: русская ошибка поля, команда не копируется.
+  await page.locator("#lnt-set-folder-path").fill("D:\\bad|path");
+  await page.locator("#lnt-set-folder-copy").click();
+  await expect(folderField.locator("[role=alert]")).toContainText("недопустимые символы");
+});
+
 test("diagnostics panel: device absent is a valid typed state with recovery action", async ({
   page,
 }) => {
