@@ -48,6 +48,19 @@ function nearestRbw(value: number): number {
   return best;
 }
 
+/** U2: stored-префы анализа для channel-bar захвата (те же ключи, что селекты). */
+export function storedRbw(): number | null {
+  const raw = storedChoice(RBW_STORAGE_KEY);
+  if (raw === null) return null;
+  const value = Number(raw);
+  return MARKER_RBW_OPTIONS.includes(value as (typeof MARKER_RBW_OPTIONS)[number]) ? value : null;
+}
+
+export function storedWindow(): string | null {
+  const raw = storedChoice(WINDOW_STORAGE_KEY);
+  return raw !== null && raw in MARKER_WINDOW_LABELS ? raw : null;
+}
+
 export function createSpectrumSelectors(): SpectrumSelectors {
   const rbwId = nextId("spectrum-rbW");
   const windowId = nextId("spectrum-window");

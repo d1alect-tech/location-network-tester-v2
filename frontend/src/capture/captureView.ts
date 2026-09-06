@@ -12,6 +12,7 @@ import { createCaptureAlert } from "./captureAlerts";
 import type { CaptureAlertHandle } from "./captureAlerts";
 import { applyCapturePrefill } from "./captureDeepLink";
 import type { CapturePrefill } from "./captureDeepLink";
+import { mountCaptureChannelbar } from "./channelbarCapture";
 import { createDevicePanel } from "./devicePanel";
 import type { DevicePanelHandle } from "./devicePanel";
 import {
@@ -236,6 +237,7 @@ export function createCaptureView(
     });
   });
   form.onChange(refreshPreview);
+  const channelbar = mountCaptureChannelbar(form);
 
   const previewContainer = el("aside", {
     className: "capture-preview panel",
@@ -243,6 +245,7 @@ export function createCaptureView(
   });
   const root = el("section", { className: "capture-view t-page" }, [
     el("h2", { className: "view-title t-page", text: "Захват" }),
+    channelbar.root,
     el("div", { className: "capture-layout" }, [
       el("div", { className: "capture-form-column" }, [
         form.root,
