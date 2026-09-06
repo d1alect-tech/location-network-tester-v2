@@ -18,8 +18,7 @@ import { refreshProfiles, refreshRecipes } from "./settingsLists";
 import type { BundleJobKind } from "./settingsModel";
 import { bundleDone, bundleFailed, bundleFile, bundleRunning } from "./settingsModel";
 import { readCapturePreflightRequest } from "./settingsPreflight";
-import { createRootChoiceBlock } from "./settingsRootChoice";
-import { createRootNoteBlock } from "./settingsRootNote";
+import { createRootSection } from "./settingsRootSection";
 import {
   buildBundleSection,
   buildPrivacySection,
@@ -45,30 +44,7 @@ export function mountSettingsWorkspace(
   const recipesHost = el("div", {});
   const profilesHost = el("div", { className: "t-body", text: "Загрузка профилей…" });
 
-  const rootNote = createRootNoteBlock();
-  const rootChoice = createRootChoiceBlock();
-  const rootValue = el("code", { className: "t-mono lnt-set-root-value", text: "…" });
-  // U2: недоступный /api/config — видимое outage-состояние с повтором,
-  // а не тихая строка «недоступно» без выхода.
-  const rootRetry = el("button", {
-    className: "btn btn-secondary",
-    text: "Повторить",
-    attrs: { type: "button", id: "lnt-set-root-retry", hidden: "" },
-  });
-  rootRetry.addEventListener("click", () => void refreshRoot());
-  const rootSection = panelSection(
-    "Корень сессий",
-    [
-      el("p", { className: "t-body", text: "Фактический корень (GET /api/config):" }),
-      rootValue,
-      rootRetry,
-      el("div", { className: "form-grid" }, [rootNote.field]),
-      el("div", { className: "form-actions" }, [rootNote.saveButton]),
-      el("div", { className: "form-grid" }, [rootChoice.field]),
-      el("div", { className: "form-actions" }, [rootChoice.copyButton]),
-    ],
-    "lnt-set-root",
-  );
+  const rootSection = createRootSection(client);
 
   const checkDeviceButton = el("button", {
     className: "btn",
@@ -140,7 +116,7 @@ export function mountSettingsWorkspace(
     { className: "lnt-set-workspace", attrs: { role: "region", "aria-label": "Настройки" } },
     [
       el("h2", { className: "placeholder-title t-page", text: "Настройки" }),
-      rootSection,
+      rootSection.section,
       deviceSection,
       bundleSection,
       profilesSection,
@@ -149,24 +125,6 @@ export function mountSettingsWorkspace(
     ],
   );
   container.append(root);
-
-  /** Факт корня с видимым outage-состоянием и объявлением восстановления. */
-  async function refreshRoot(): Promise<void> {
-    try {
-      const config = await client.bootstrap();
-      const recovered = rootRetry.getAttribute("hidden") === null;
-      rootValue.textContent = config.root;
-      rootValue.removeAttribute("role");
-      rootRetry.setAttribute("hidden", "");
-      if (recovered) announcePolite("Корень сессий загружен");
-    } catch (error) {
-      const message = `Корень сессий недоступен: ${error instanceof Error ? error.message : String(error)}. Проверьте, что панель запущена, и повторите.`;
-      rootValue.textContent = "недоступно (сервер не отвечает)";
-      rootValue.setAttribute("role", "alert");
-      rootRetry.removeAttribute("hidden");
-      announcePolite(message);
-    }
-  }
 
   async function refreshDevice(): Promise<void> {
     clearElement(deviceHost);
@@ -260,7 +218,7 @@ export function mountSettingsWorkspace(
   async function bootstrapAll(): Promise<void> {
     // Порядок фиксирован: успешные объявления — первыми, ошибки — последними.
     await refreshDevice();
-    await refreshRoot();
+    await rootSection.refresh();
     await loadProfiles();
     await refreshRecipes(client, recipesHost);
   }

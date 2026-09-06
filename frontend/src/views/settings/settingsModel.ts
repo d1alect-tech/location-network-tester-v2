@@ -179,7 +179,10 @@ export function validateSessionsFolder(value: string): RootNoteValidation {
     return { ok: false, error: "Путь содержит недопустимые символы." };
   }
   if (!/^[A-Za-z]:\\/.test(trimmed) && !/^\\\\/.test(trimmed)) {
-    return { ok: false, error: "Нужен абсолютный путь Windows: D:\\lnt-sessions или \\\\server\\share." };
+    return {
+      ok: false,
+      error: "Нужен абсолютный путь Windows: D:\\lnt-sessions или \\\\server\\share.",
+    };
   }
   return { ok: true, error: null };
 }

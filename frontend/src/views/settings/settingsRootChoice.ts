@@ -67,7 +67,9 @@ export function createRootChoiceBlock(): RootChoiceHandle {
       folderInput.value = command;
       folderInput.focus();
       folderInput.select();
-      announcePolite("Не удалось скопировать автоматически: команда подставлена в поле, скопируйте её вручную");
+      announcePolite(
+        "Не удалось скопировать автоматически: команда подставлена в поле, скопируйте её вручную",
+      );
     }
   }
 
