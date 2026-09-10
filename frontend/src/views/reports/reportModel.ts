@@ -47,7 +47,6 @@ export interface ReportPlaneRow {
 export interface ReportRecipeRow {
   recipe_id: string;
   name: string;
-  sha256: string;
 }
 
 export interface ReportLimitation {
@@ -219,9 +218,7 @@ export function composeReportMarkdown(draft: ReportDraft): string {
     lines.push("Рецепты анализа не зарегистрированы.", "");
   }
   for (const recipe of draft.recipes) {
-    lines.push(
-      `- ${escapeCell(recipe.name)} (\`${recipe.recipe_id}\`, sha256 \`${recipe.sha256}\`)`,
-    );
+    lines.push(`- ${escapeCell(recipe.name)} (recipe_id / SHA-256 \`${recipe.recipe_id}\`)`);
   }
   lines.push("", "## Ограничения", "");
   for (const limitation of draft.limitations) {

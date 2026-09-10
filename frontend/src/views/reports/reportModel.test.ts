@@ -44,7 +44,7 @@ function draftBase(): ReportDraft {
       { session_id: "s1", available: true, reason_code: null, model_kind: "rc_shunt_v1" },
       { session_id: "s2", available: true, reason_code: null, model_kind: "rc_shunt_v1" },
     ],
-    recipes: [{ recipe_id: "rec-1", name: "Базовый спектр", sha256: "a".repeat(64) }],
+    recipes: [{ recipe_id: "a".repeat(64), name: "Базовый спектр" }],
     limitations: [],
   };
 }
