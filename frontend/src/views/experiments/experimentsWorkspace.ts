@@ -49,14 +49,11 @@ export function mountExperimentsWorkspace(
   });
   // Явный тип возврата разрывает цикл вывода trends ↔ detailController.
   const trendValue = async (sessionId: string, signal: AbortSignal): Promise<number | null> => {
+    const featureKey =
+      detailController.currentDetail?.experiment.primary_estimands?.[0]?.feature_key;
+    if (!featureKey) return null;
     const detail = await client.plots.detail(sessionId, { signal });
-    return metricValue(
-      detail,
-      String(
-        detailController.currentDetail?.experiment.primary_estimands?.[0]?.feature_key ??
-          "band_mid_total",
-      ),
-    );
+    return metricValue(detail, featureKey);
   };
   const trends = new TrendView({ client, valueSource: trendValue });
   const hypotheses = new HypothesisView({ client });
@@ -81,7 +78,7 @@ export function mountExperimentsWorkspace(
   ]);
 
   // --- правая колонка: вкладки ---------------------------------------------
-  const detailHost = el("div", {});
+  const detailHost = el("div", { className: "lnt-exp-detail-state" });
   const tabs = createExperimentsTabs(
     [
       { key: "overview", label: "Обзор", paneContent: [timeline.root, members.root] },
@@ -115,25 +112,39 @@ export function mountExperimentsWorkspace(
     detailHost,
     selectTab: (key) => tabs.select(key),
   });
-  const rightPane = el("div", { className: "lnt-exp-right" }, [tabs.tabBar, ...panes.values()]);
+  const rightPane = el("div", { className: "lnt-exp-right" }, [
+    detailHost,
+    tabs.tabBar,
+    ...panes.values(),
+  ]);
   const root = el("div", { className: "lnt-exp-workspace app-body" }, [leftPane, rightPane]);
   container.append(root);
+  const modalBackground = root.closest<HTMLElement>(".app-v6") ?? container;
   // Начальное состояние вкладок: «Обзор» видима, остальные hidden (ленивость).
   tabs.select("overview");
 
   // Bootstrap до любых мутаций: nonce запуска обязателен для POST/PUT.
   void client.ensureReady().catch(() => undefined);
 
+  let activeWizard: ExperimentWizard | null = null;
   const createButton = root.querySelector<HTMLButtonElement>("#lnt-exp-create");
   createButton?.addEventListener("click", () => {
-    const wizard = new ExperimentWizard({
+    if (activeWizard !== null) {
+      activeWizard.focus();
+      return;
+    }
+    activeWizard = new ExperimentWizard({
       client,
       onCreated: (experimentId) => {
         void refreshList().then(() => void loadDetail(experimentId));
         routes.replaceParams({ experiment: experimentId });
       },
     });
-    root.prepend(wizard.root);
+    activeWizard.open(() => {
+      modalBackground.removeAttribute("inert");
+      activeWizard = null;
+    });
+    modalBackground.setAttribute("inert", "");
   });
   root
     .querySelector<HTMLButtonElement>("#lnt-exp-refresh")
@@ -212,6 +223,7 @@ export function mountExperimentsWorkspace(
   });
 
   return () => {
+    activeWizard?.close();
     unsubscribeList();
     unsubscribeDetail();
     comparison.abort();
