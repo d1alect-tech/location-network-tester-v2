@@ -1,10 +1,7 @@
-﻿# Failure-mode proof harness for the LNT private-use distribution (Todo 47 QA).
+﻿# Failure-mode proof harness for the public GPL-3.0-only LNT distribution.
 
-# Proves the adversarial requirement: removing a required DLL / font / static
-# asset / license from a staged bundle makes validation FAIL BEFORE any ZIP is
-# written. Runs build.ps1 in its internal -SkipBuild mode against corrupted
-# bundle copies and asserts BOTH the nonzero exit AND that no new ZIP appeared
-# in the repository dist/ directory.
+# Proves that removing a required DLL / font / static asset / license, replacing
+# the approved firmware, or adding firmware makes validation fail before any ZIP.
 # Exit codes: 0 all scenarios proven; 5 control scenario unexpectedly failed;
 # 6 a removal scenario unexpectedly validated OK; 7 zip appeared despite failure.
 # PowerShell 5.1 compatible (pwsh is not installed on this host).
@@ -58,7 +55,7 @@ if (-not $controlOk) {
 }
 Move-Item -LiteralPath $controlReport -Destination (Join-Path $evidenceRoot "control-classification.json") -Force
 
-# --- Scenarios: one required file removed at a time ------------------------------
+# --- Scenarios: required removals plus same-count firmware substitution ----------
 function Resolve-ScenarioTarget {
     param([string]$Bundle, [string[]]$Patterns)
     foreach ($pattern in $Patterns) {
@@ -69,24 +66,47 @@ function Resolve-ScenarioTarget {
     throw ("scenario target not found; tried: " + ($Patterns -join ", "))
 }
 
+function Get-ZipInventory {
+    @(Get-Item (Join-Path $repoRoot "dist\LNT-*.zip") -ErrorAction SilentlyContinue |
+        Sort-Object FullName |
+        ForEach-Object {
+            "{0}|{1}|{2}" -f $_.FullName, $_.Length, (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+        })
+}
+
 $scenarios = @(
     @{ name = "removed-required-dll"; rel = (Resolve-ScenarioTarget -Bundle $bundleCopy -Patterns @("libscipy_openblas*.dll", "libopenblas*.dll", "VCRUNTIME140.dll")) },
     @{ name = "removed-required-font"; rel = "_internal/lnt/ui/static/fonts/IBMPlexSans-Regular.woff2" },
     @{ name = "removed-required-static"; rel = "_internal/lnt/ui/static/v2/index.html" },
-    @{ name = "removed-required-license"; rel = "licenses/MIT.txt" }
+    @{ name = "removed-required-license"; rel = "licenses/MIT.txt" },
+    @{ name = "removed-top-level-license"; rel = "LICENSE" },
+    @{ name = "wrong-firmware-substitution"; rel = "_internal/PyHT6022/Firmware/HEX/dso6022be-firmware.hex"; replacement = ":00000001FF`n" },
+    @{ name = "extra-hex-firmware"; rel = "_internal/PyHT6022/Firmware/HEX/unapproved.hex"; create = ":00000001FF`n" }
 )
 
 $results = @()
 foreach ($scenario in $scenarios) {
     $target = Join-Path $bundleCopy ($scenario.rel.Replace("/", "\"))
-    if (-not (Test-Path -LiteralPath $target)) { throw "scenario target missing: $($scenario.rel)" }
-    # Backup OUTSIDE the bundle: a leftover file inside would fail validation
-    # for the wrong reason; the removal itself must be the cause.
-    $backup = Join-Path $workRoot ($scenario.name + ".proof-backup")
-    Move-Item -LiteralPath $target -Destination $backup -Force
-    Log ("SCENARIO {0} :: removed {1}" -f $scenario.name, $scenario.rel)
+    $backup = $null
+    if ($scenario.ContainsKey("create")) {
+        if (Test-Path -LiteralPath $target) { throw "scenario target already exists: $($scenario.rel)" }
+        [System.IO.File]::WriteAllText($target, $scenario.create, (New-Object System.Text.UTF8Encoding($false)))
+        Log ("SCENARIO {0} :: added unapproved firmware {1}" -f $scenario.name, $scenario.rel)
+    } else {
+        if (-not (Test-Path -LiteralPath $target)) { throw "scenario target missing: $($scenario.rel)" }
+        # Backup OUTSIDE the bundle: a leftover file inside would fail validation
+        # for the wrong reason; the removal itself must be the cause.
+        $backup = Join-Path $workRoot ($scenario.name + ".proof-backup")
+        Move-Item -LiteralPath $target -Destination $backup -Force
+    }
+    if ($scenario.ContainsKey("replacement")) {
+        [System.IO.File]::WriteAllText($target, $scenario.replacement, (New-Object System.Text.UTF8Encoding($false)))
+        Log ("SCENARIO {0} :: substituted {1} with same-count wrong firmware" -f $scenario.name, $scenario.rel)
+    } elseif (-not $scenario.ContainsKey("create")) {
+        Log ("SCENARIO {0} :: removed {1}" -f $scenario.name, $scenario.rel)
+    }
 
-    $zipBefore = @(Get-Item (Join-Path $repoRoot "dist\LNT-*.zip") -ErrorAction SilentlyContinue)
+    $zipBefore = @(Get-ZipInventory)
     $scenarioEvidence = Join-Path $evidenceRoot $scenario.name
     New-Item -ItemType Directory -Force -Path $scenarioEvidence | Out-Null
 
@@ -103,10 +123,9 @@ foreach ($scenario in $scenarios) {
     $output | ForEach-Object { Log ("build| " + $_) }
     Log ("SCENARIO {0} EXIT_CODE={1}" -f $scenario.name, $buildExit)
 
-    $zipAfter = @(Get-Item (Join-Path $repoRoot "dist\LNT-*.zip") -ErrorAction SilentlyContinue)
+    $zipAfter = @(Get-ZipInventory)
     $noZipWritten = ($zipAfter.Count -eq $zipBefore.Count) -and
-        (@(Compare-Object -ReferenceObject @($zipBefore | ForEach-Object FullName) `
-                -DifferenceObject @($zipAfter | ForEach-Object FullName)).Count -eq 0)
+        (@(Compare-Object -ReferenceObject $zipBefore -DifferenceObject $zipAfter).Count -eq 0)
 
     $validationFailed = ($buildExit -ne 0)
     if (-not $validationFailed) {
@@ -127,7 +146,8 @@ foreach ($scenario in $scenarios) {
         }
     }
 
-    Move-Item -LiteralPath $backup -Destination $target -Force
+    if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force }
+    if ($null -ne $backup) { Move-Item -LiteralPath $backup -Destination $target -Force }
 }
 
 $allProven = @($results | Where-Object { $_.proof -ne $true }).Count -eq 0
@@ -137,7 +157,7 @@ $finalExit = $(if ($allProven) { 0 } else { 6 })
     stage = $stageFull
     control_validation_passed = [bool]$controlOk
     scenarios = $results
-    verdict = $(if ($allProven) { "proven: every staged-removal fails validation BEFORE any ZIP" } else { "FAILED: unexpected validation outcome" })
+    verdict = $(if ($allProven) { "proven: every required removal or firmware substitution fails validation BEFORE any ZIP" } else { "FAILED: unexpected validation outcome" })
 } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $evidenceRoot "failure-modes-verdict.json") -Encoding UTF8
 
 $summary = New-Object System.Collections.Generic.List[string]

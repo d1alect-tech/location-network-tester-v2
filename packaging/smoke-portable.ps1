@@ -1,6 +1,6 @@
 ﻿# Sanitized non-elevated reference-host smoke for the frozen portable LNT (Todo 48).
 
-# Verifies dist\LNT-0.1.0-win64-private-use.zip end-to-end WITHOUT external
+# Verifies dist\LNT-0.1.0-win64.zip end-to-end WITHOUT external
 # Python/Node/network: fresh temp payload + HOME/APPDATA/LOCALAPPDATA/session root,
 # project toolchains removed from PATH, PYTHON*/NODE* scrubbed, SHA-256 vs sidecar
 # BEFORE extraction, bundle-local closure + canonical System32/x64/Microsoft-signer
@@ -8,8 +8,9 @@
 # packaging/spike/pe_imports.py - standard import directory only), UI cold start,
 # health/build-id/assets/API checks, synthetic journey simulate -> analyze ->
 # compare -> selftest(job) -> experiment(simulator run) -> statistics report ->
-# filesystem backup/restore round-trip, non-invasive typed device diagnosis, four
-# failure-mode proofs, and full process/temp teardown with receipts.
+# filesystem backup/restore round-trip, non-invasive typed device diagnosis,
+# failure-mode proofs including firmware substitution, and full process/temp
+# teardown with receipts.
 #
 # DEFECT NOTE (Todo 48): the shipped Todo 47 artifact exposed ONLY the GUI
 # launcher surface (packaging/lnt.spec -> lnt/launcher.py gui_main;
@@ -40,7 +41,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$script:FirmwareExpectedCount = 7
+$script:FirmwareExpectedPath = "_internal/pyht6022/firmware/hex/dso6022be-firmware.hex"
+$script:FirmwareExpectedSha256 = "7773d886de861e2a95b159f103135b06391a6433adf0727d3d1e23aec9e65cfd"
 $script:SizeLimitBytes = 600L * 1024L * 1024L
 $script:HostLabel = "sanitized-reference-host-verified"
 $script:ForbiddenLabels = @("sterile", "clean-vm", "clean vm", "universal",
@@ -335,9 +337,15 @@ function Test-BundleCore {
     if ($totalBytes -gt $script:SizeLimitBytes) {
         $null = $errors.Add(("размер бандла {0} байт превышает лимит {1}" -f $totalBytes, $script:SizeLimitBytes))
     }
-    if ($firmware.Count -ne $script:FirmwareExpectedCount) {
-        $null = $errors.Add(("неполный класс firmware: ожидалось {0}, найдено {1}" -f `
-            $script:FirmwareExpectedCount, $firmware.Count))
+    if (($firmware.Count -ne 1) -or
+        ($firmware[0].ToLowerInvariant() -ne $script:FirmwareExpectedPath)) {
+        $null = $errors.Add("firmware должен содержать только $($script:FirmwareExpectedPath)")
+    } else {
+        $firmwarePath = Join-Path $Bundle ($firmware[0].Replace("/", "\"))
+        $firmwareHash = Get-Sha256 $firmwarePath
+        if ($firmwareHash -ne $script:FirmwareExpectedSha256) {
+            $null = $errors.Add(("неверный SHA-256 прошивки: {0}" -f $firmwareHash))
+        }
     }
     $requiredRef = [ref]$errors
     Test-RequiredEntries -Bundle $Bundle -RelativePaths $relativePaths `
@@ -450,7 +458,7 @@ function Resolve-ExternalImport {
     $payload = [ordered]@{
         schema_version = 1
         bundle = $Bundle
-        policy = "private-use one-folder distribution; every file classified; external OS DLLs allowlisted (Todo 13); sanitized-host re-check"
+        policy = "public GPL-3.0-only one-folder distribution; exact 6022BE firmware; external OS DLLs allowlisted; sanitized-host re-check"
         file_count = $allFiles.Count
         total_bytes = $totalBytes
         classes = $classes
@@ -705,7 +713,7 @@ try {
         foreach ($err in $validation.errors) { Log "VALIDATION ERROR: $err" }
         throw ("BUNDLE VALIDATION FAIL: " + $validation.errors.Count + " ошибок")
     }
-    Step "02-bundle-validation" 0 ("files=" + $validation.report.file_count + " external-system32-ok firmware=7")
+    Step "02-bundle-validation" 0 ("files=" + $validation.report.file_count + " external-system32-ok firmware=dso6022be-firmware.hex sha256=" + $script:FirmwareExpectedSha256)
 
     # --- S03 frozen CLI surface: run the REAL `selftest` via LNT-cli.exe ----------
     # Exact subcommand name verified in src/lnt/cli.py (parser: "selftest").

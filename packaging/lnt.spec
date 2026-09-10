@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""Спецификация PyInstaller для частной one-folder сборки LNT (Todo 47).
+"""Спецификация PyInstaller для публичной GPL-3.0-only one-folder сборки LNT.
 
 Решения зафиксированы спайком Todo 13 (packaging/spike, вердикт `go`):
 one-folder COLLECT, без UPX, без one-file, без копирования системных DLL.
@@ -11,12 +11,12 @@ pre-bind 127.0.0.1:8765 с детерминированным фолбэком, 
 
 Состав сверх рантайма Python и залоченных зависимостей:
 - данные NumPy/SciPy и их DLL (собираются анализом импортов + хуки);
-- прошивки Hantek (PyHT6022/Firmware/HEX) и libusb-1.0.dll из пакета usb1;
+- прошивка Hantek 6022BE и libusb-1.0.dll из пакета usb1;
 - вендоренные ассеты UI v1+v2 с шрифтами IBM Plex (обслуживаются из
   ``lnt/ui/static``, см. ``_STATIC`` в lnt/ui/app.py); dev-метаданные Vite
   (каталог ``.vite``) в комплект не входят — рантаймом не читаются;
-- лицензии/уведомления: LICENSES/, THIRD_PARTY_NOTICES.md,
-  dependency-manifest.json, политика частного использования;
+- лицензии/уведомления: LICENSE, LICENSES/, THIRD_PARTY_NOTICES.md,
+  dependency-manifest.json, SOURCE.txt;
 - dist-info залоченных пакетов, читаемых через importlib.metadata
   (lnt/numpy/scipy/fastapi/uvicorn), чтобы CodeIdentity работал в frozen-режиме.
 
@@ -26,10 +26,11 @@ pre-bind 127.0.0.1:8765 с детерминированным фолбэком, 
 from __future__ import annotations
 
 import tomllib
+import hashlib
+import os
 from pathlib import Path
 
 from PyInstaller.utils.hooks import (
-    collect_data_files,
     collect_dynamic_libs,
     copy_metadata,
 )
@@ -45,6 +46,11 @@ from PyInstaller.utils.win32.versioninfo import (
 
 ROOT = Path(SPECPATH).resolve().parents[0]
 SRC = ROOT / "src"
+HANTEK_SRC = Path(os.environ["LNT_HANTEK_SOURCE"]).resolve()
+HANTEK_FIRMWARE = HANTEK_SRC / "PyHT6022" / "Firmware" / "HEX" / "dso6022be-firmware.hex"
+HANTEK_FIRMWARE_SHA256 = "7773d886de861e2a95b159f103135b06391a6433adf0727d3d1e23aec9e65cfd"
+if hashlib.sha256(HANTEK_FIRMWARE.read_bytes()).hexdigest() != HANTEK_FIRMWARE_SHA256:
+    raise RuntimeError("patched Hantek tree contains unapproved 6022BE firmware")
 PROJECT_VERSION = tomllib.loads(
     (ROOT / "pyproject.toml").read_text(encoding="utf-8"),
 )["project"]["version"]
@@ -58,23 +64,24 @@ datas = [
     if path.is_file() and ".vite" not in path.parts
 ]
 
-# --- Данные: прошивки Hantek (7 файлов HEX) и libusb из usb1. ---
-datas += collect_data_files("PyHT6022", includes=["Firmware/HEX/*"])
+# --- Данные: только утверждённая прошивка Hantek 6022BE и libusb из usb1. ---
+datas.append((str(HANTEK_FIRMWARE), "PyHT6022/Firmware/HEX"))
 datas += collect_dynamic_libs("usb1")
 
 # --- Метаданные пакетов для importlib.metadata в frozen-режиме. ---
 for package_name in ("lnt", "numpy", "scipy", "fastapi", "uvicorn"):
     datas += copy_metadata(package_name)
 
-# --- Лицензии, уведомления и политика частного использования. ---
+# --- Лицензии, уведомления и соответствующий исходный код. ---
 for license_path in sorted((ROOT / "LICENSES").iterdir()):
     if license_path.is_file():
         datas.append((str(license_path), "licenses"))
 datas += [
+    (str(ROOT / "LICENSE"), "."),
     (str(ROOT / "THIRD_PARTY_NOTICES.md"), "."),
     (str(ROOT / "dependency-manifest.json"), "."),
     (str(ROOT / "docs" / "distribution-policy.md"), "."),
-    (str(ROOT / "packaging" / "PRIVATE-USE.txt"), "."),
+    (str(ROOT / "packaging" / "SOURCE.txt"), "."),
 ]
 
 
@@ -108,14 +115,14 @@ def _version_info(original_name: str, description: str) -> VSVersionInfo:
                     StringTable(
                         "040904B0",
                         [
-                            StringStruct("CompanyName", "LNT owner-internal build"),
+                            StringStruct("CompanyName", "LNT contributors"),
                             StringStruct("FileDescription", description),
                             StringStruct("FileVersion", PROJECT_VERSION),
                             StringStruct("InternalName", original_name.removesuffix(".exe")),
                             StringStruct("OriginalFilename", original_name),
                             StringStruct("ProductName", "LNT"),
                             StringStruct("ProductVersion", PROJECT_VERSION),
-                            StringStruct("PrivateBuild", "owner-internal; no conveyance"),
+                            StringStruct("LegalCopyright", "GPL-3.0-only binary distribution"),
                         ],
                     ),
                 ],
@@ -140,7 +147,7 @@ version_resource_cli = _version_info(
 
 analysis = Analysis(
     [str(SRC / "lnt" / "launcher.py")],
-    pathex=[str(SRC)],
+    pathex=[str(HANTEK_SRC), str(SRC)],
     binaries=[],
     datas=datas,
     hiddenimports=[
@@ -190,10 +197,26 @@ analysis = Analysis(
         "pygments",
         "contourpy",
         "kiwisolver",
+        "pytest",
+        "_pytest",
     ],
     noarchive=False,
     optimize=0,
 )
+
+forbidden_test_modules = sorted(
+    name
+    for name, *_ in analysis.pure
+    if name == "pytest"
+    or name.startswith("pytest.")
+    or name == "_pytest"
+    or name.startswith("_pytest.")
+)
+if forbidden_test_modules:
+    raise RuntimeError(
+        "forbidden test modules selected for PYZ: "
+        + ", ".join(forbidden_test_modules)
+    )
 
 pyz = PYZ(analysis.pure)
 

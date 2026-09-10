@@ -1,4 +1,4 @@
-﻿# Bundle classification/validation library for the private LNT distribution.
+﻿# Bundle classification/validation library for the public GPL-3.0-only LNT distribution.
 
 # Dot-sourced by packaging/build.ps1 and packaging/test-failure-modes.ps1.
 # Every file in a candidate bundle MUST be classified into an allowed class;
@@ -9,7 +9,8 @@
 Set-StrictMode -Version Latest
 
 $script:SIZE_LIMIT_BYTES = 600 * 1024 * 1024 # <=600 MiB unzipped
-$script:FIRMWARE_EXPECTED_COUNT = 7
+$script:FIRMWARE_EXPECTED_PATH = "_internal/pyht6022/firmware/hex/dso6022be-firmware.hex"
+$script:FIRMWARE_EXPECTED_SHA256 = "7773d886de861e2a95b159f103135b06391a6433adf0727d3d1e23aec9e65cfd"
 $script:MACHINE_X64 = 0x8664
 $script:CORE_LICENSES = @(
     "OFL-1.1.txt", "GPL-3.0.txt", "LGPL-2.1.txt", "MIT.txt",
@@ -65,13 +66,14 @@ function Get-BundleClass {
     if ($lower -match "^_internal/(base_library\.zip|[^/]+\.pyz)$") { return "python-runtime" }
     if ($lower.EndsWith(".pyd")) { return "python-extension" }
     if ($lower -eq "_internal/usb1/libusb-1.0.dll") { return "libusb-driver" }
-    if ($lower.EndsWith(".hex") -or $lower.EndsWith(".ihex")) { return "firmware" }
+    if ($lower -eq $script:FIRMWARE_EXPECTED_PATH) { return "firmware" }
+    if ($lower.EndsWith(".hex") -or $lower.EndsWith(".ihex")) { return $null }
     if ($lower.StartsWith("_internal/") -and $lower.EndsWith(".dll")) { return "bundled-binary" }
     if ($lower.StartsWith("_internal/lnt/ui/static/")) { return "ui-static-assets" }
     if ($lower.StartsWith("_internal/dateutil/zoneinfo/")) { return "dependency-data" }
     if ($lower.Contains(".dist-info/")) { return "package-metadata" }
     if ($lower.StartsWith("licenses/")) { return "license-document" }
-    if ($lower -in @("third_party_notices.md", "distribution-policy.md", "private-use.txt")) {
+    if ($lower -in @("license", "third_party_notices.md", "distribution-policy.md", "source.txt")) {
         return "license-document"
     }
     if ($lower -eq "dependency-manifest.json") { return "provenance-manifest" }
@@ -96,8 +98,9 @@ function Test-RequiredEntries {
     Require "_internal/lnt/ui/static/v2/index.html"
     Require "_internal/lnt/ui/static/vendor/uPlot.esm.js"
     Require "_internal/lnt/ui/static/vendor/uPlot.min.css"
+    Require "LICENSE"
     Require "THIRD_PARTY_NOTICES.md"
-    Require "PRIVATE-USE.txt"
+    Require "SOURCE.txt"
     Require "distribution-policy.md"
     Require "dependency-manifest.json"
 
@@ -105,11 +108,18 @@ function Test-RequiredEntries {
         $Errors.Value.Add("отсутствует обязательный элемент: _internal/python3xx.dll")
     }
 
-    $firmwareCount = $FirmwareByExtension["firmware"].Count
-    if ($firmwareCount -ne $script:FIRMWARE_EXPECTED_COUNT) {
-        $Errors.Value.Add(
-            "неполный класс firmware: ожидалось $($script:FIRMWARE_EXPECTED_COUNT), найдено $firmwareCount"
-        )
+    $firmwarePaths = @($FirmwareByExtension["firmware"])
+    if (($firmwarePaths.Count -ne 1) -or
+        ($firmwarePaths[0].ToLowerInvariant() -ne $script:FIRMWARE_EXPECTED_PATH)) {
+        $Errors.Value.Add("firmware должен содержать только $($script:FIRMWARE_EXPECTED_PATH)")
+    } else {
+        $firmwarePath = Join-Path $Bundle ($firmwarePaths[0].Replace("/", "\"))
+        $firmwareHash = (Get-FileHash -LiteralPath $firmwarePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($firmwareHash -ne $script:FIRMWARE_EXPECTED_SHA256) {
+            $Errors.Value.Add(
+                "неверный SHA-256 прошивки: ожидался $($script:FIRMWARE_EXPECTED_SHA256), найден $firmwareHash"
+            )
+        }
     }
 
     # Fonts: каждый файл, заявленный в комплектном fonts/manifest.json, плюс OFL.
@@ -214,6 +224,7 @@ function Test-BundleValidation {
         [Parameter(Mandatory = $true)][string]$ReportPath,
         [string]$PeReportPath
     )
+    $Bundle = [System.IO.Path]::GetFullPath($Bundle).TrimEnd("\")
     $errors = New-Object System.Collections.Generic.List[string]
     $warnings = New-Object System.Collections.Generic.List[string]
     if (-not $PeReportPath) { $PeReportPath = "$ReportPath.pe-imports.raw.json" }
@@ -298,7 +309,7 @@ function Write-ClassificationReport {
     $payload = [ordered]@{
         schema_version = 1
         bundle = (Resolve-Path -LiteralPath $Bundle -ErrorAction SilentlyContinue).Path
-        policy = "private-use one-folder distribution; every file classified; external OS DLLs allowlisted (Todo 13)"
+        policy = "public GPL-3.0-only one-folder distribution; exact 6022BE firmware; every file classified; external OS DLLs allowlisted"
         file_count = ($Classes.Values | ForEach-Object Count | Measure-Object -Sum).Sum
         total_bytes = $TotalBytes
         size_limit_bytes = $script:SIZE_LIMIT_BYTES
