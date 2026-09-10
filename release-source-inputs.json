@@ -1,0 +1,281 @@
+{
+  "conveyed_artifact": {
+    "name": "LNT-0.1.0-win64.zip",
+    "relationship": "Corresponding Source materials for the named binary artifact"
+  },
+  "inputs": [
+    {
+      "archive_root": "python-build-standalone-c1991f8fc3eb8774907f0cffb93792f59079cd7a",
+      "commit": "c1991f8fc3eb8774907f0cffb93792f59079cd7a",
+      "kind": "native",
+      "name": "astral-python-build-standalone",
+      "sha256": "f65ac6627e027b2361c606a02de67ea353aefee7f1d1ba13a91367d7395d6c19",
+      "url": "https://codeload.github.com/astral-sh/python-build-standalone/zip/c1991f8fc3eb8774907f0cffb93792f59079cd7a"
+    },
+    {
+      "archive_root": "Python-3.12.13",
+      "kind": "native",
+      "name": "cpython",
+      "sha256": "c08bc65a81971c1dd5783182826503369466c7e67374d1646519adf05207b684",
+      "url": "https://www.python.org/ftp/python/3.12.13/Python-3.12.13.tar.xz"
+    },
+    {
+      "archive_root": "openssl-3.5.7",
+      "kind": "native",
+      "name": "openssl",
+      "sha256": "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8",
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz"
+    },
+    {
+      "archive_root": "cpython-source-deps-16fad4855b3d8c03b5910e405ff3a04395b39a98",
+      "commit": "16fad4855b3d8c03b5910e405ff3a04395b39a98",
+      "kind": "native",
+      "name": "libffi",
+      "sha256": "257d9311f521975b2f3ee1778be732e1d7077fb3b84413d327b709b3dcc5ff90",
+      "url": "https://codeload.github.com/python/cpython-source-deps/zip/16fad4855b3d8c03b5910e405ff3a04395b39a98"
+    },
+    {
+      "archive_root": "bzip2-1.0.8",
+      "kind": "native",
+      "name": "bzip2",
+      "sha256": "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269",
+      "url": "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz"
+    },
+    {
+      "archive_root": "sqlite-autoconf-3530100",
+      "kind": "native",
+      "name": "sqlite",
+      "sha256": "83e6b2020a034e9a7ad4a72feea59e1ad52f162e09cbd26735a3ffb98359fc4f",
+      "url": "https://www.sqlite.org/2026/sqlite-autoconf-3530100.tar.gz"
+    },
+    {
+      "archive_root": "xz-5.8.3",
+      "kind": "native",
+      "name": "xz",
+      "sha256": "3d3a1b973af218114f4f889bbaa2f4c037deaae0c8e815eec381c3d546b974a0",
+      "url": "https://github.com/tukaani-project/xz/releases/download/v5.8.3/xz-5.8.3.tar.gz"
+    },
+    {
+      "archive_root": "zlib-1.3.2",
+      "kind": "native",
+      "name": "zlib",
+      "sha256": "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16",
+      "url": "https://zlib.net/zlib-1.3.2.tar.gz"
+    },
+    {
+      "archive_root": "libusb-1.0.29",
+      "kind": "native",
+      "name": "libusb",
+      "sha256": "5977fc950f8d1395ccea9bd48c06b3f808fd3c2c961b44b0c2e6e29fc3a70a85",
+      "url": "https://github.com/libusb/libusb/releases/download/v1.0.29/libusb-1.0.29.tar.bz2"
+    },
+    {
+      "archive_root": "openblas-libs-befbe32a3783db3e9cfd1a9e68f5d8212a1bf8de",
+      "commit": "befbe32a3783db3e9cfd1a9e68f5d8212a1bf8de",
+      "kind": "native",
+      "name": "numpy-openblas-recipe",
+      "sha256": "b2a5aab877238cc338ceeb827e96d5cfb9e05763c9e689f2e9a2f1f43934dc91",
+      "url": "https://codeload.github.com/MacPython/openblas-libs/zip/befbe32a3783db3e9cfd1a9e68f5d8212a1bf8de"
+    },
+    {
+      "archive_root": "OpenBLAS-9bdf051b96e956f848dfcef89c23e1993b0e1b3e",
+      "commit": "9bdf051b96e956f848dfcef89c23e1993b0e1b3e",
+      "kind": "native",
+      "name": "numpy-openblas",
+      "sha256": "488368ff15630aeba34ec30a95fc082c3fe853a5525c4fe3d36bbcab64a904ae",
+      "url": "https://codeload.github.com/OpenMathLib/OpenBLAS/zip/9bdf051b96e956f848dfcef89c23e1993b0e1b3e"
+    },
+    {
+      "archive_root": "openblas-libs-db637abddcd6abb7fcb63be7fbe418deeb4729db",
+      "commit": "db637abddcd6abb7fcb63be7fbe418deeb4729db",
+      "kind": "native",
+      "name": "scipy-openblas-recipe",
+      "sha256": "eefccaf7d2c0d9bf841bbe383942df4698b14a2806c0d36136a481de44613634",
+      "url": "https://codeload.github.com/MacPython/openblas-libs/zip/db637abddcd6abb7fcb63be7fbe418deeb4729db"
+    },
+    {
+      "archive_root": "OpenBLAS-5ffbf38b41a1fe494d038efcb09cf22f4d527c22",
+      "commit": "5ffbf38b41a1fe494d038efcb09cf22f4d527c22",
+      "kind": "native",
+      "name": "scipy-openblas",
+      "sha256": "b1137db53eff7017d900d356b3d31c16f5301abc2a384f98cafa8a5836b7cdc1",
+      "url": "https://codeload.github.com/OpenMathLib/OpenBLAS/zip/5ffbf38b41a1fe494d038efcb09cf22f4d527c22"
+    },
+    {
+      "archive_root": "rtools-ucrt-c5344cc8c7e310ee4eee513b2381af2e75d65cb9",
+      "commit": "c5344cc8c7e310ee4eee513b2381af2e75d65cb9",
+      "kind": "native",
+      "name": "rtools-ucrt",
+      "sha256": "981d23d4298d42a0efed97256d38272c0273094c9021c7d635675ef3a0653a04",
+      "url": "https://codeload.github.com/r-windows/rtools-ucrt/zip/c5344cc8c7e310ee4eee513b2381af2e75d65cb9"
+    },
+    {
+      "archive_root": "mingw-w64-acc9b9d9eb63a13d8122cbac4882eb5f4ee2f679",
+      "commit": "acc9b9d9eb63a13d8122cbac4882eb5f4ee2f679",
+      "kind": "native",
+      "name": "mingw-w64",
+      "sha256": "66de60f67acf672748aec3a784c7d305b7f5288d19e55b8b33329a53e17accf9",
+      "url": "https://codeload.github.com/mingw-w64/mingw-w64/zip/acc9b9d9eb63a13d8122cbac4882eb5f4ee2f679"
+    },
+    {
+      "archive_root": "Hantek6022API-e65d52b0f2536e56eaadbb555e5d7b756409c36e",
+      "commit": "e65d52b0f2536e56eaadbb555e5d7b756409c36e",
+      "git_commit_object": "tree 118dea84f8839e4f5d34ce1718390487a5650191\nparent 909d329716562e5bd3a9cc4be8d008fa8a6858dc\nauthor Martin Homuth-Rosemann <Ho-Ro@users.noreply.github.com> 1776862064 +0200\ncommitter Martin Homuth-Rosemann <Ho-Ro@users.noreply.github.com> 1776862064 +0200\n\nfix Makefile typo\n\nSigned-off-by: Martin Homuth-Rosemann <Ho-Ro@users.noreply.github.com>\n",
+      "kind": "hantek",
+      "name": "hantek6022api",
+      "sha256": "9ffe697f85fc57e4bdd243e95db8646d0ba6b383bc33a5b96175ad6a17f97e57",
+      "url": "https://codeload.github.com/Ho-Ro/Hantek6022API/zip/e65d52b0f2536e56eaadbb555e5d7b756409c36e"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "echarts",
+      "sha256": "e1b82487dd7f8d9f0438eec1f1433051148e0095ac7a15d4db890afda45cf610",
+      "url": "https://registry.npmjs.org/echarts/-/echarts-5.6.0.tgz"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "zrender",
+      "sha256": "0a2228b558e1a4bd8f1c74d67bb492923e3f5807d03c83d1665fb97af180dc26",
+      "url": "https://registry.npmjs.org/zrender/-/zrender-5.6.1.tgz"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "tslib",
+      "sha256": "ae285639feff7e3c39de4626352181a5d73b815725e42639b411c43848abffdb",
+      "url": "https://registry.npmjs.org/tslib/-/tslib-2.3.0.tgz"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "uplot",
+      "sha256": "4b8a8191e425658e3ea8c8c1314b0fc679c861ee3a1af2b20c7b16ba50b5133d",
+      "url": "https://registry.npmjs.org/uplot/-/uplot-1.6.32.tgz"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "ibm-plex-sans-package",
+      "sha256": "c3818979c2a2c82927ea3e7c485e389a18de0b7462887dd4f7acc9a525568962",
+      "url": "https://registry.npmjs.org/@ibm/plex-sans/-/plex-sans-1.1.0.tgz"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "ibm-plex-mono-package",
+      "sha256": "55b5ffcfcd5e9db36ef2070b2b07a573434ca02c6f3be2b921c0b88fff29acad",
+      "url": "https://registry.npmjs.org/@ibm/plex-mono/-/plex-mono-2.5.0.tgz"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "fontsource-golos-text",
+      "sha256": "74df2b06deb509b4c5a8939c280aabc13e1e6917762b54e33c31be59de9652da",
+      "url": "https://registry.npmjs.org/@fontsource-variable/golos-text/-/golos-text-5.3.0.tgz"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "fontsource-inter",
+      "sha256": "d26710dd38e7217484a1d47ee76c024977ec550548876f26d06ed1844af09a14",
+      "url": "https://registry.npmjs.org/@fontsource-variable/inter/-/inter-5.3.0.tgz"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "fontsource-jetbrains-mono",
+      "sha256": "996fe6368a480c9ce15d4de22a2682b7c40b403718fee2b15e7272f244fd993f",
+      "url": "https://registry.npmjs.org/@fontsource-variable/jetbrains-mono/-/jetbrains-mono-5.3.0.tgz"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "fontsource-source-code-pro",
+      "sha256": "ad0ce660b35cd54214f105c7b85db16238e360afa800ca7c4aeae439c53cc517",
+      "url": "https://registry.npmjs.org/@fontsource-variable/source-code-pro/-/source-code-pro-5.3.0.tgz"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "fontsource-source-sans-3",
+      "sha256": "115c2d5a38a05d52c77ba02e4d939644bae30585a30a2e4657a3be2c99d5c7dc",
+      "url": "https://registry.npmjs.org/@fontsource-variable/source-sans-3/-/source-sans-3-5.3.0.tgz"
+    },
+    {
+      "archive_root": "package",
+      "kind": "frontend",
+      "name": "fontsource-source-serif-4",
+      "sha256": "4a19d3a6fda1a977f15a0ee1e60e5f53df2e6ae77f46f1ed54c7fc52d015e85a",
+      "url": "https://registry.npmjs.org/@fontsource-variable/source-serif-4/-/source-serif-4-5.3.0.tgz"
+    }
+  ],
+  "project_version": "0.1.0",
+  "required_frontend": [
+    "echarts",
+    "zrender",
+    "tslib",
+    "uplot",
+    "ibm-plex-sans-package",
+    "ibm-plex-mono-package",
+    "fontsource-golos-text",
+    "fontsource-inter",
+    "fontsource-jetbrains-mono",
+    "fontsource-source-code-pro",
+    "fontsource-source-sans-3",
+    "fontsource-source-serif-4"
+  ],
+  "required_native": [
+    "astral-python-build-standalone",
+    "cpython",
+    "openssl",
+    "libffi",
+    "bzip2",
+    "sqlite",
+    "xz",
+    "zlib",
+    "libusb",
+    "libusb1",
+    "numpy",
+    "numpy-openblas-recipe",
+    "numpy-openblas",
+    "scipy",
+    "scipy-openblas-recipe",
+    "scipy-openblas",
+    "rtools-ucrt",
+    "mingw-w64"
+  ],
+  "required_runtime": [
+    "annotated-doc",
+    "annotated-types",
+    "anyio",
+    "click",
+    "colorama",
+    "contourpy",
+    "cycler",
+    "fastapi",
+    "fonttools",
+    "h11",
+    "hantek6022api",
+    "idna",
+    "kiwisolver",
+    "libusb1",
+    "matplotlib",
+    "numpy",
+    "packaging",
+    "pillow",
+    "pydantic",
+    "pydantic-core",
+    "pyparsing",
+    "python-dateutil",
+    "python-multipart",
+    "scipy",
+    "six",
+    "starlette",
+    "typing-extensions",
+    "typing-inspection",
+    "uvicorn"
+  ],
+  "schema_version": 1
+}
