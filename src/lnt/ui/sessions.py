@@ -9,7 +9,7 @@ from typing import Final, Literal
 
 from lnt.errors import InputError
 from lnt.manifest import manifest_from_json
-from lnt.safe_paths import ensure_within_root
+from lnt.safe_paths import ensure_within_root, is_linked_path
 from lnt.series import series_dirs
 from lnt.types import SessionType
 
@@ -18,6 +18,14 @@ _MANIFEST_FILENAME: Final = "manifest.json"
 _METRICS_FILENAME: Final = "metrics.json"
 _SPECTRUM_FILENAME: Final = "spectrum.csv"
 _MAX_AUTO_NAME_ATTEMPTS: Final = 100
+
+
+class SessionNotFoundError(InputError):
+    """Безопасный ключ не соответствует ни одному каталогу сессии."""
+
+
+class SessionAmbiguousError(InputError):
+    """Ключ соответствует нескольким каталогам общей namespace сессий."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -54,10 +62,10 @@ def list_sessions(root: Path) -> tuple[SessionEntry, ...]:
 
     entries: list[SessionEntry] = []
     for session_dir in sorted(root.iterdir(), key=lambda path: path.name):
-        if session_dir.is_symlink() or not session_dir.is_dir():
+        if is_linked_path(session_dir) or not session_dir.is_dir():
             continue
         manifest_path = session_dir / _MANIFEST_FILENAME
-        if not manifest_path.is_file():
+        if is_linked_path(manifest_path) or not manifest_path.is_file():
             continue
         try:
             manifest = manifest_from_json(manifest_path.read_text(encoding="utf-8"))
@@ -109,15 +117,12 @@ def list_sessions(root: Path) -> tuple[SessionEntry, ...]:
 def resolve_session_dir(root: Path, name: str) -> Path:
     """Разрешает существующий реальный каталог сессии внутри ``root``."""
     _validate_session_name(name)
-    candidate = root / name
-    if not candidate.is_symlink() and candidate.is_dir():
-        return _checked_session_dir(root, candidate, name)
-    # D1: каталог показывает session_id из манифеста — принимаем и его.
-    # ponytail: обход корня только на промахе; индекс позже, если сессий станет много.
-    fallback = _find_by_session_id(root, name)
-    if fallback is not None:
-        return fallback
-    raise InputError(f"каталог сессии не найден или небезопасен: {name!r}")
+    matches: tuple[Path, ...] = _matching_session_dirs(root, name)
+    if not matches:
+        raise SessionNotFoundError(f"каталог сессии не найден: {name!r}")
+    if len(matches) > 1:
+        raise SessionAmbiguousError(f"неоднозначный идентификатор сессии: {name!r}")
+    return next(iter(matches))
 
 
 def _checked_session_dir(root: Path, candidate: Path, name: str) -> Path:
@@ -137,22 +142,31 @@ def _checked_session_dir(root: Path, candidate: Path, name: str) -> Path:
     return candidate
 
 
-def _find_by_session_id(root: Path, name: str) -> Path | None:
+def _matching_session_dirs(root: Path, name: str) -> tuple[Path, ...]:
     if not root.is_dir():
-        return None
+        return ()
+    matches: dict[Path, Path] = {}
+    direct = root / name
+    if not is_linked_path(direct) and direct.is_dir():
+        direct_manifest = direct / _MANIFEST_FILENAME
+        if is_linked_path(direct_manifest):
+            raise InputError(f"manifest сессии не должен быть ссылкой: {name!r}")
+        checked = _checked_session_dir(root, direct, name)
+        matches[checked.resolve(strict=True)] = checked
     for session_dir in sorted(root.iterdir(), key=lambda path: path.name):
-        if session_dir.is_symlink() or not session_dir.is_dir():
+        if is_linked_path(session_dir) or not session_dir.is_dir():
             continue
         manifest_path = session_dir / _MANIFEST_FILENAME
-        if not manifest_path.is_file():
+        if is_linked_path(manifest_path) or not manifest_path.is_file():
             continue
         try:
             manifest = manifest_from_json(manifest_path.read_text(encoding="utf-8"))
         except (InputError, UnicodeDecodeError, OSError):
             continue
         if manifest.session_id == name:
-            return _checked_session_dir(root, session_dir, name)
-    return None
+            checked = _checked_session_dir(root, session_dir, name)
+            matches[checked.resolve(strict=True)] = checked
+    return tuple(matches.values())
 
 
 def allocate_output_base(

@@ -1,6 +1,5 @@
 """Зависимости FastAPI и единое преобразование ошибок панели."""
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -17,12 +16,10 @@ from lnt.ui.jobs import (
 )
 from lnt.ui.research_jobs import ResearchJobService
 from lnt.ui.security import MUTATION_NONCE_HEADER, require_mutation_nonce
-from lnt.ui.sessions import resolve_session_dir
+from lnt.ui.sessions import SessionAmbiguousError, SessionNotFoundError, resolve_session_dir
 
 CSRF_HEADER: Final = MUTATION_NONCE_HEADER
 CSRF_VALUE: Final = "deprecated-static-value-not-authorized"
-
-_SESSION_NAME_PATTERN: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -95,16 +92,12 @@ def map_domain_error(exc: Exception) -> HTTPException:
 
 
 def resolve_session_or_404(root: Path, name: str) -> Path:
-    """Разрешает сессию: безопасное отсутствующее имя даёт 404, прочие ошибки — 422."""
+    """Разрешает сессию с явными HTTP-исходами для missing и ambiguity."""
     try:
         return resolve_session_dir(root, name)
+    except SessionNotFoundError as error:
+        raise http_not_found("сессия не найдена") from error
+    except SessionAmbiguousError as error:
+        raise http_conflict("идентификатор сессии неоднозначен") from error
     except InputError as error:
-        name_is_safe = (
-            name not in {".", ".."}
-            and "/" not in name
-            and "\\" not in name
-            and _SESSION_NAME_PATTERN.fullmatch(name) is not None
-        )
-        if name_is_safe and not (root / name).exists():
-            raise http_not_found("сессия не найдена") from error
         raise http_unprocessable(str(error)) from error

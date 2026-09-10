@@ -79,3 +79,19 @@ def test_resolve_unknown_name_still_fails(tmp_path: Path) -> None:
     write_manifest(target, session_id="syn-quiet-seed6022")
     with pytest.raises(InputError):
         resolve_session_dir(tmp_path, "no-such-session")
+
+
+def test_resolve_rejects_directory_alias_colliding_with_manifest_id(tmp_path: Path) -> None:
+    write_manifest(tmp_path / "shared", session_id="direct-id")
+    write_manifest(tmp_path / "other", session_id="shared")
+
+    with pytest.raises(InputError, match="неоднознач"):
+        resolve_session_dir(tmp_path, "shared")
+
+
+def test_resolve_rejects_duplicate_manifest_ids(tmp_path: Path) -> None:
+    write_manifest(tmp_path / "first", session_id="duplicate-id")
+    write_manifest(tmp_path / "second", session_id="duplicate-id")
+
+    with pytest.raises(InputError, match="неоднознач"):
+        resolve_session_dir(tmp_path, "duplicate-id")
