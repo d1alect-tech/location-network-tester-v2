@@ -55,7 +55,7 @@ export interface ExperimentMember extends OpenRecord {
 
 export interface Estimand {
   feature_key: string;
-  direction: "increase" | "decrease" | "two_sided";
+  direction: "lower" | "higher" | "target" | "descriptive";
   contrast: string;
 }
 
@@ -233,7 +233,7 @@ export function buildExperimentDraft(input: DraftExperimentInput): Experiment {
     members,
     interventions: [],
     primary_estimands: [
-      { feature_key: input.estimandKey.trim(), direction: "two_sided", contrast: "b_minus_a" },
+      { feature_key: input.estimandKey.trim(), direction: "descriptive", contrast: "b_minus_a" },
     ],
     secondary_estimands: [],
     confound_checklist: [],
