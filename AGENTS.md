@@ -62,9 +62,9 @@ node --test "tests/js/*.test.mjs"
 - `lnt ui` holds a single-instance lease: a second launch exits 2. Kill the first before retrying, and free ports 8765/8770.
 - Vite builds INTO `src/lnt/ui/static/v2` (base `/static/v2/`); byte-stable rebuild required by `build-check.js`.
 - Offline: vendored uPlot 1.6.32 + IBM Plex; server binds 127.0.0.1 only, Swagger/ReDoc off.
-- Repo is PUBLIC under MIT (`LICENSE`). Hantek driver is an optional extra `lnt[hantek]` pinned to git `e65d52b` (GPL), imported lazily in `scope_io.py`, so the source tree stays MIT-clean.
-- GPL attaches only to PyInstaller builds (`packaging/lnt.spec`). Releases are tags with NO attached binaries — see `docs/distribution-policy.md`. `docs/packaging-notices.md` still carries the older OWNER-INTERNAL framing; it governs binaries only, not this source tree.
-- Before publishing anything: `git grep Kirill` on tracked files must stay empty.
+- Repo is PUBLIC under `GPL-3.0-only` (`LICENSE`). Hantek6022API is pinned to git `e65d52b` and is also `GPL-3.0-only`; its import remains lazy in `scope_io.py`.
+- A Windows release publishes four assets on the same GitHub Release: `LNT-0.1.0-win64.zip`, `LNT-0.1.0-win64.zip.sha256`, `LNT-0.1.0-corresponding-source.zip`, and `LNT-0.1.0-corresponding-source.zip.sha256`. Publication is local and manual after the gates; CI uploads nothing. See `docs/distribution-policy.md`.
+- Before publishing anything, run `git grep -n -I -F -- (Split-Path $env:USERPROFILE -Leaf)` and require no tracked-file matches.
 
 ## ГРАНИЦА v1/v2 (очередь C4)
 
