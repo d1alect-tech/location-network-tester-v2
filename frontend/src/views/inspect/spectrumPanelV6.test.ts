@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { SpectrumPayload } from "../../api/types-plots";
+import type { InputReferredSpectrumPayload, SpectrumPayload } from "../../api/types-plots";
 import type { ChartHandle, ChartRenderRequest } from "../../components/charts/types";
 import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { createSpectrumPanel } from "./spectrumPanelV6";
@@ -18,6 +18,7 @@ const SPECTRUM_B: SpectrumPayload = {
 
 interface FakeView extends ChartHandle {
   renders: ChartRenderRequest[];
+  destroyed: boolean;
 }
 
 function makeFakeViewFactory(): {
@@ -31,12 +32,15 @@ function makeFakeViewFactory(): {
     const handle: FakeView = {
       root,
       renders: [],
+      destroyed: false,
       render(request) {
         this.renders.push(request);
       },
       applyTheme() {},
       getData: () => null,
-      destroy() {},
+      destroy() {
+        this.destroyed = true;
+      },
     };
     views.push(handle);
     return handle;
@@ -137,6 +141,149 @@ describe("createSpectrumPanel", () => {
     expect(request?.series[1]?.dash).toEqual([6, 4]);
     expect(request?.xLabel).toBe("");
     expect(request?.xLog).toBe(true);
+  });
+
+  it("ignores an older pair completion after a newer pair renders", async () => {
+    const pending = new Map<
+      string,
+      { promise: Promise<SpectrumPayload>; resolve: (payload: SpectrumPayload) => void }
+    >();
+    const spectrum = (name: string): Promise<SpectrumPayload> => {
+      let resolve!: (payload: SpectrumPayload) => void;
+      const promise = new Promise<SpectrumPayload>((done) => {
+        resolve = done;
+      });
+      pending.set(name, { promise, resolve });
+      return promise;
+    };
+    const { createView, views } = makeFakeViewFactory();
+    const panel = createSpectrumPanel({
+      client: { plots: { spectrum, detail: async () => ({ analysis: {} }) } },
+      createView,
+    });
+
+    const oldLoad = panel.load("old-a", "old-b");
+    const currentLoad = panel.load("new-a", "new-b");
+    pending.get("new-a")?.resolve(SPECTRUM_A);
+    pending.get("new-b")?.resolve(SPECTRUM_B);
+    await currentLoad;
+    pending.get("old-a")?.resolve(SPECTRUM_B);
+    pending.get("old-b")?.resolve(SPECTRUM_A);
+    await oldLoad;
+
+    expect(views[0]?.renders).toHaveLength(1);
+    expect(views[0]?.renders[0]?.series.map((series) => series.label)).toEqual(["new-a", "new-b"]);
+    expect(panel.payloads()).toEqual({ a: SPECTRUM_A, b: SPECTRUM_B });
+    expect(panel.root.classList.contains("is-loading")).toBe(false);
+  });
+
+  it("clears a rendered pair as soon as a different pair starts loading", async () => {
+    let release!: (payload: SpectrumPayload) => void;
+    const spectrum = vi
+      .fn<(name: string) => Promise<SpectrumPayload>>()
+      .mockResolvedValueOnce(SPECTRUM_A)
+      .mockImplementationOnce(
+        () =>
+          new Promise<SpectrumPayload>((resolve) => {
+            release = resolve;
+          }),
+      );
+    const { createView } = makeFakeViewFactory();
+    const panel = createSpectrumPanel({
+      client: { plots: { spectrum, detail: async () => ({ analysis: {} }) } },
+      createView,
+    });
+    await panel.load("old", null);
+
+    const currentLoad = panel.load("new", null);
+
+    expect(panel.payloads()).toEqual({ a: null, b: null });
+    expect(panel.root.querySelector<HTMLElement>(".frame")?.hidden).toBe(true);
+    expect(panel.root.querySelector<HTMLElement>("[data-delta-empty]")?.hidden).toBe(false);
+    release(SPECTRUM_B);
+    await currentLoad;
+  });
+
+  it("clears the old plane while the same pair reloads in a new plane", async () => {
+    let release!: (payload: InputReferredSpectrumPayload) => void;
+    const REFERRED: InputReferredSpectrumPayload = {
+      frequency_hz: [100, 1000, 10_000],
+      input_referred_excess_psd_v2_per_hz: [1e-10, 1e-8, 1e-12],
+      point_count: 3,
+      status: "available",
+      reason_code: null,
+      qualified_bin_count: 3,
+      total_bin_count: 3,
+      resolution_hz: 100,
+    };
+    const { createView } = makeFakeViewFactory();
+    const panel = createSpectrumPanel({
+      client: {
+        plots: {
+          spectrum: async () => SPECTRUM_A,
+          spectrumInputReferred: () =>
+            new Promise((resolve) => {
+              release = resolve;
+            }),
+          detail: async () => ({ analysis: { ch1_input_reference: { status: "available" } } }),
+        },
+      },
+      createView,
+    });
+    await panel.load("a", null);
+
+    panel.setPlane("input-referred");
+
+    expect(panel.root.querySelector<HTMLElement>(".frame")?.hidden).toBe(true);
+    expect(panel.payloads()).toEqual({ a: null, b: null });
+    release(REFERRED);
+    await vi.waitFor(() => expect(panel.payloads().a?.psd_v2_per_hz).toEqual([1e-10, 1e-8, 1e-12]));
+  });
+
+  it("settles loading state when the current request aborts", async () => {
+    const { createView } = makeFakeViewFactory();
+    const panel = createSpectrumPanel({
+      client: {
+        plots: {
+          spectrum: async () => {
+            throw new DOMException("отменено", "AbortError");
+          },
+          detail: async () => ({ analysis: {} }),
+        },
+      },
+      createView,
+    });
+
+    await panel.load("a", null);
+
+    expect(panel.root.classList.contains("is-loading")).toBe(false);
+    expect(panel.root.querySelector<HTMLElement>("[data-spectrum-status]")?.hidden).toBe(true);
+  });
+
+  it("invalidates a pending load when destroyed", async () => {
+    let release!: (payload: SpectrumPayload) => void;
+    const { createView, views } = makeFakeViewFactory();
+    const panel = createSpectrumPanel({
+      client: {
+        plots: {
+          spectrum: () =>
+            new Promise<SpectrumPayload>((resolve) => {
+              release = resolve;
+            }),
+          detail: async () => ({ analysis: {} }),
+        },
+      },
+      createView,
+    });
+    const load = panel.load("a", null);
+
+    panel.destroy();
+    release(SPECTRUM_A);
+    await load;
+
+    expect(views[0]?.destroyed).toBe(true);
+    expect(views[0]?.renders).toHaveLength(0);
+    expect(panel.payloads()).toEqual({ a: null, b: null });
   });
 });
 

@@ -1,8 +1,8 @@
 /** Единое сигнальное окно инспекции v6: uPlot-спектр A/B и слот спектрограммы. */
 
+import { isAbortError } from "../../api/errors";
 import type {
   InputReferredSpectrumPayload,
-  SessionDetailPayload,
   SpectrumPayload,
   SpectrumPlane,
 } from "../../api/types-plots";
@@ -16,7 +16,9 @@ import type { SeriesStyle } from "../../components/charts/viewModels";
 import { el } from "../../components/primitives/dom";
 import { createDeltaStrip } from "./deltaStrip";
 import { createSpectrumExtras } from "./spectrumExtras";
-import { createPlaneControl, planePayload } from "./spectrumPlaneControl";
+import { EMPTY_SPECTRUM, detailForPeaks } from "./spectrumPanelData";
+import { createSpectrumPanelRequests } from "./spectrumPanelRequest";
+import { createPlaneControl } from "./spectrumPlaneControl";
 
 export type SpectrumView = "spectrum" | "gram";
 
@@ -66,27 +68,7 @@ function assertNever(value: never): never {
   throw new Error(`unhandled spectrum view ${String(value)}`);
 }
 
-function recordFromUnknown(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null) return null;
-  const record: Record<string, unknown> = {};
-  for (const key of Object.keys(value)) {
-    record[key] = Reflect.get(value, key);
-  }
-  return record;
-}
-
 import { overlayRequest } from "./spectrumHoldOverlay";
-
-function detailForPeaks(name: string, raw: { readonly analysis?: unknown }): SessionDetailPayload {
-  return {
-    name,
-    manifest: {},
-    analysis: recordFromUnknown(raw.analysis),
-    spectrum_available: true,
-    waveform_available: false,
-    ch2_available: false,
-  };
-}
 
 export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHandle {
   const theme = readChartTheme();
@@ -179,38 +161,39 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
   spectrumBtn.addEventListener("click", () => setView("spectrum"));
   gramBtn.addEventListener("click", () => setView("gram"));
 
-  let lastA: string | null = null;
-  let lastB: string | null = null;
   let rendered = false;
-
-  /** Спектр в активной плоскости; вход при 404/409 откатывается на скоп. */
-  async function fetchPlaneSpectrum(name: string): Promise<SpectrumPayload> {
-    const plots = opts.client.plots;
-    if (planeControl.plane() !== "input-referred" || plots.spectrumInputReferred === undefined) {
-      return plots.spectrum(name);
-    }
-    try {
-      return planePayload(await plots.spectrumInputReferred(name));
-    } catch {
-      return plots.spectrum(name);
-    }
-  }
+  const requests = createSpectrumPanelRequests(opts.client.plots, planeControl.plane);
 
   async function load(a: string, b: string | null): Promise<void> {
-    lastA = a;
-    lastB = b;
+    const request = requests.begin(a, b, rendered);
+    if (!request.samePair) {
+      rendered = false;
+      lastPayload = null;
+      lastPayloadB = null;
+      peaksA = [];
+      frame.hidden = true;
+      planeControl.paintRbw(null);
+      extras.paint({ payloadA: EMPTY_SPECTRUM, payloadB: null, analysis: {} });
+      deltaStrip.paint(null, null);
+    }
     status.hidden = false;
     retryButton.hidden = true;
     statusText.textContent = "Загрузка спектра…";
     root.classList.add("is-loading");
     root.classList.remove("is-stale");
     try {
-      const [payloadA, payloadB, detail] = await Promise.all([
-        fetchPlaneSpectrum(a),
-        b === null ? Promise.resolve(null) : fetchPlaneSpectrum(b),
-        opts.client.plots.detail(a),
+      let [payloads, detail] = await Promise.all([
+        requests.fetchPair(a, b, request),
+        opts.client.plots.detail(a, { signal: request.signal }),
       ]);
+      if (!request.isCurrent()) return;
       planeControl.paintPlane(detail.analysis);
+      if (payloads.plane === "input-referred" && planeControl.plane() !== "input-referred") {
+        payloads = await requests.fetchScopePair(a, b, request.signal);
+        if (!request.isCurrent()) return;
+      }
+      planeControl.requestPlane(payloads.plane);
+      const { a: payloadA, b: payloadB } = payloads;
       planeControl.paintRbw(payloadA);
       extras.paint({ payloadA, payloadB, analysis: detail.analysis });
       peaksA = peaksFromDetail(detailForPeaks(a, detail));
@@ -224,10 +207,17 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
         label: `${b ?? ""}${suffix}`,
         dash: DASH_B,
       };
+      frame.hidden = false;
       chart.render(overlayRequest(payloadA, payloadB, styleA, styleB, peaksA));
       rendered = true;
+      requests.setRenderedPlane(payloads.plane);
       status.hidden = true;
     } catch (error) {
+      if (!request.isCurrent()) return;
+      if (isAbortError(error)) {
+        status.hidden = true;
+        return;
+      }
       const reason = error instanceof Error ? error.message : String(error);
       retryButton.hidden = false;
       statusText.textContent = rendered
@@ -235,13 +225,14 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
         : `Не удалось загрузить спектр: ${reason}.`;
       if (rendered) root.classList.add("is-stale");
     } finally {
-      root.classList.remove("is-loading");
+      if (request.isCurrent()) root.classList.remove("is-loading");
     }
   }
 
   reloadPlane = () => {
-    if (lastA === null) return;
-    void load(lastA, lastB);
+    const last = requests.last();
+    if (last === null) return;
+    void load(last.a, last.b);
   };
 
   function setPlane(next: SpectrumPlane): void {
@@ -262,6 +253,10 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
       viewChange = cb;
     },
     destroy() {
+      requests.dispose();
+      lastPayload = null;
+      lastPayloadB = null;
+      rendered = false;
       chart.destroy();
     },
   };

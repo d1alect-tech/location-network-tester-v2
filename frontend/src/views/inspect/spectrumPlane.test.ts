@@ -2,6 +2,7 @@
  * RED: RBW из payload-поля resolution_hz; disable по detail().analysis.ch1_input_reference.status. */
 
 import { describe, expect, it, vi } from "vitest";
+import { ApiError } from "../../api/errors";
 import type { InputReferredSpectrumPayload, SpectrumPayload } from "../../api/types-plots";
 import type { ChartHandle, ChartRenderRequest } from "../../components/charts/types";
 import type { UplotViewOptions } from "../../components/charts/uplotView";
@@ -143,7 +144,9 @@ describe("createSpectrumPanel: тумблер плоскости", () => {
 
     planeButton(panel, "input-referred")?.click();
     await vi.waitFor(() => {
-      expect(spectrumInputReferred).toHaveBeenCalledWith("a");
+      expect(spectrumInputReferred).toHaveBeenCalledWith("a", undefined, {
+        signal: expect.any(AbortSignal),
+      });
     });
     expect(panel.plane()).toBe("input-referred");
     await vi.waitFor(() => {
@@ -163,7 +166,7 @@ describe("createSpectrumPanel: тумблер плоскости", () => {
       plots: {
         spectrum: async (): Promise<SpectrumPayload> => SCOPE_A,
         spectrumInputReferred: async (): Promise<never> => {
-          throw new Error("404");
+          throw new ApiError("http", { status: 404 });
         },
         detail: async () => ({ analysis: { ch1_input_reference: { status: "available" } } }),
       },
@@ -178,4 +181,79 @@ describe("createSpectrumPanel: тумблер плоскости", () => {
     const last = views[0]?.renders[views[0]?.renders.length - 1];
     expect(last?.series[0]?.values).toEqual([1e-4, 1e-2, 1e-6]);
   });
+
+  it("если вход недоступен одной сессии, рисует всю пару в scope и правит подписи", async () => {
+    const scopeB: SpectrumPayload = {
+      ...SCOPE_A,
+      psd_v2_per_hz: [2e-4, 2e-2, 2e-6],
+    };
+    const { createView, views } = makeFakeViewFactory();
+    const spectrum = vi.fn(async (name: string) => (name === "a" ? SCOPE_A : scopeB));
+    let inputUnavailable = true;
+    const panel = createSpectrumPanel({
+      client: {
+        plots: {
+          spectrum,
+          spectrumInputReferred: async (name: string) => {
+            if (name === "b" && inputUnavailable) throw new ApiError("http", { status: 404 });
+            return REFERRED_A;
+          },
+          detail: async () => ({ analysis: { ch1_input_reference: { status: "available" } } }),
+        },
+      },
+      createView,
+    });
+    await panel.load("a", "b");
+
+    planeButton(panel, "input-referred")?.click();
+    await vi.waitFor(() => {
+      expect(views[0]?.renders).toHaveLength(2);
+    });
+
+    const last = views[0]?.renders.at(-1);
+    expect(panel.plane()).toBe("scope");
+    expect(last?.series.map((series) => series.label)).toEqual(["a", "b"]);
+    expect(last?.series.map((series) => series.values)).toEqual([
+      SCOPE_A.psd_v2_per_hz,
+      scopeB.psd_v2_per_hz,
+    ]);
+    expect(spectrum).toHaveBeenCalledTimes(4);
+
+    inputUnavailable = false;
+    planeButton(panel, "input-referred")?.click();
+    expect(panel.root.querySelector<HTMLElement>(".frame")?.hidden).toBe(true);
+    await vi.waitFor(() => expect(views[0]?.renders).toHaveLength(3));
+    expect(views[0]?.renders.at(-1)?.series.map((series) => series.label)).toEqual([
+      "a · вход",
+      "b · вход",
+    ]);
+  });
+
+  it.each([new Error("обрыв связи"), new DOMException("отменено", "AbortError")])(
+    "не откатывает неожиданный или отменённый запрос входа на scope",
+    async (failure) => {
+      const { createView } = makeFakeViewFactory();
+      const spectrum = vi.fn(async (): Promise<SpectrumPayload> => SCOPE_A);
+      const panel = createSpectrumPanel({
+        client: {
+          plots: {
+            spectrum,
+            spectrumInputReferred: async (): Promise<never> => {
+              throw failure;
+            },
+            detail: async () => ({ analysis: { ch1_input_reference: { status: "available" } } }),
+          },
+        },
+        createView,
+      });
+      await panel.load("a", null);
+
+      planeButton(panel, "input-referred")?.click();
+      await vi.waitFor(() => {
+        expect(spectrum).toHaveBeenCalledTimes(1);
+      });
+
+      expect(spectrum).toHaveBeenCalledTimes(1);
+    },
+  );
 });
