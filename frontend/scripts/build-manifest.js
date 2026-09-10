@@ -38,7 +38,8 @@ function generateManifest() {
     path.join(frontendDir, 'index.html'),
     path.join(frontendDir, 'vite.config.ts'),
     path.join(frontendDir, 'package-lock.json'),
-    ...getFilesRecursive(path.join(frontendDir, 'src'))
+    ...getFilesRecursive(path.join(frontendDir, 'src')),
+    ...getFilesRecursive(path.join(frontendDir, 'public'))
   ];
 
   const sources = {};
