@@ -18,7 +18,7 @@ This inventory is generated from `uv.lock` and the vendored static assets commit
 | fastapi | 0.140.0 | runtime | `MIT` | https://files.pythonhosted.org/packages/0d/fb/fd7671137d9fa3df1d93a2f5111eb982709201724b29f211e4beb2d58688/fastapi-0.140.0.tar.gz | `sha256:f338951b82fd74ca8f843163aec43ea1a1ce84d515415a50fa98fa25572a5544` |
 | fonttools | 4.63.0 | runtime | `MIT` | https://files.pythonhosted.org/packages/84/69/c97f2c18e0db87d2c7b15da1974dace76ae938f1cfa22e2727a648b7ed43/fonttools-4.63.0.tar.gz | `sha256:caeb583deeb5168e694b65cda8b4ee62abedfa66cf88488734466f2366b9c4e0` |
 | h11 | 0.16.0 | runtime | `MIT` | https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz | `sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1` |
-| hantek6022api | 2.10.9 | runtime | `GPL-3.0-or-later` | https://github.com/Ho-Ro/Hantek6022API | `git-commit:e65d52b0f2536e56eaadbb555e5d7b756409c36e` |
+| hantek6022api | 2.10.9 | runtime | `GPL-3.0-only` | https://github.com/Ho-Ro/Hantek6022API | `git-commit:e65d52b0f2536e56eaadbb555e5d7b756409c36e` |
 | httpcore2 | 2.9.1 | dev | `BSD-3-Clause` | https://files.pythonhosted.org/packages/39/a8/20ed1ed79cbc2ecdf5301c0968ab7c85547212e2a7bd126ddd2d986e206e/httpcore2-2.9.1.tar.gz | `sha256:4d8acbf8b306f48c9d6046591fd5ba4037d1b1b1000d140fc2c3eab1e9a0c0e2` |
 | httpx2 | 2.9.1 | dev | `BSD-3-Clause` | https://files.pythonhosted.org/packages/21/14/38128fbafd7e0ed41d874df6c9a653d47c2d111cfe59e2b4ac95161b4abd/httpx2-2.9.1.tar.gz | `sha256:1932a768737e3666291582833da748cc4e563c337cf96706fccc04fa6e58764a` |
 | idna | 3.18 | runtime | `BSD-3-Clause` | https://files.pythonhosted.org/packages/cd/63/9496c57188a2ee585e0f1db071d75089a11e98aa86eb99d9d7618fc1edce/idna-3.18.tar.gz | `sha256:ffb385a7e039654cef1ab9ef32c6fafe283c0c0467bba1d9029738ce4a14a848` |
@@ -78,9 +78,18 @@ This inventory is generated from `uv.lock` and the vendored static assets commit
 
 The IBM Plex package provenance and npm integrity values are also retained in `src/lnt/ui/static/fonts/manifest.json`; the OFL text is retained beside the fonts and in `LICENSES/OFL-1.1.txt`. uPlot identifies its version and MIT license in its committed vendor header. WOFF2 subsets for the redesign showcases (Inter, Golos Text, Source Serif 4, JetBrains Mono, Source Sans 3, Source Code Pro; copies of the vendored IBM Plex) live in `frontend/src/showcase-redesign/fonts/`, with per-file SHA-256 and npm provenance retained in `frontend/src/showcase-redesign/fonts/manifest.json`.
 
-## Frontend build toolchain
+## Frontend JavaScript dependencies
 
-No `frontend/` directory exists in this revision. The approved npm frontend toolchain inventory is **to be added by Todo 37**; no untracked frontend package is implied by this notice.
+The production frontend ships these chart libraries and their runtime dependencies. Complete package-specific license and notice texts are distributed offline at `frontend/public/third-party-licenses.txt`.
+
+| Name | Version | Relationship | License | Source |
+|---|---:|---|---|---|
+| echarts | 5.6.0 | direct runtime | `Apache-2.0` | https://registry.npmjs.org/echarts/-/echarts-5.6.0.tgz |
+| zrender | 5.6.1 | echarts runtime dependency | `BSD-3-Clause` | https://registry.npmjs.org/zrender/-/zrender-5.6.1.tgz |
+| tslib | 2.3.0 | echarts/zrender runtime dependency | `0BSD` | https://registry.npmjs.org/tslib/-/tslib-2.3.0.tgz |
+| uplot | 1.6.32 | direct runtime | `MIT` | https://registry.npmjs.org/uplot/-/uplot-1.6.32.tgz |
+
+Packages listed under `devDependencies` in `frontend/package.json` are build, test, lint, type-check, or font-source tooling. They are not shipped as JavaScript runtime dependencies. Shipped font files remain inventoried under Vendored static assets above.
 
 ## License texts
 
