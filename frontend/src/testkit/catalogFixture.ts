@@ -78,15 +78,12 @@ export function generateSessions(options: CatalogFixtureOptions): CatalogSession
 }
 
 export function contextFor(session: CatalogSession): ContextResponse {
-  if (session.health === "context_invalid" || session.health === "corrupt_manifest") {
+  if (session.health === "context_invalid") {
     return {
       session_id: session.id,
-      revision: 1,
-      health: session.health === "corrupt_manifest" ? "corrupt_manifest" : "context_invalid",
-      reason_codes:
-        session.health === "corrupt_manifest"
-          ? ["manifest_parse_error"]
-          : ["context_parse_error", "context_schema_v1"],
+      revision: 0,
+      health: "context_invalid",
+      reason_codes: ["context_cache_malformed"],
       fields: {},
       tags: [],
       notes: null,
@@ -95,7 +92,7 @@ export function contextFor(session: CatalogSession): ContextResponse {
   return {
     session_id: session.id,
     revision: 2,
-    health: session.health,
+    health: "context_valid",
     reason_codes: [],
     fields: {
       fs_hz: {

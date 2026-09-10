@@ -203,8 +203,8 @@ test("corrupt sessions stay visible with reason-coded badges and recovery explan
 
   const recovery = page.locator(".lnt-cat-recovery");
   await expect(recovery).toBeVisible();
-  await expect(recovery).toContainText("Сессия повреждена или неполна");
-  await expect(recovery).toContainText("Не удалось разобрать context.json");
+  await expect(recovery).toContainText("Контекст сессии повреждён");
+  await expect(recovery).toContainText("Не удалось прочитать context.json");
 });
 
 test("keyboard-only journey reaches list, opens detail and saves an edit", async ({ page }) => {
