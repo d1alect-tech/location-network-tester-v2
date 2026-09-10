@@ -55,7 +55,6 @@ export function isAnalysisRecipe(value: unknown): value is AnalysisRecipePayload
     isRecord(value) &&
     typeof value.recipe_id === "string" &&
     typeof value.name === "string" &&
-    typeof value.sha256 === "string" &&
     isRecord(value.recipe)
   );
 }

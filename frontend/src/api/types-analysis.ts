@@ -31,7 +31,6 @@ export interface EventInventoryPayload {
 export interface AnalysisRecipePayload {
   recipe_id: string;
   name: string;
-  sha256: string;
   recipe: Record<string, unknown>;
 }
 
