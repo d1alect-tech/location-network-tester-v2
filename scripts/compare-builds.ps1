@@ -1,4 +1,4 @@
-# Two-clean-build reproducibility comparison for the LNT private distribution
+# Two-clean-build reproducibility comparison for the public GPL LNT distribution
 # (Todo 49). Runs packaging/build.ps1 -Clean TWICE into fresh separate evidence
 # directories, preserves each production, then compares honestly:
 #   - logical file inventory must be identical (paths AND sizes),
@@ -167,6 +167,11 @@ $allowedPatterns = @(
 Log "=== LNT two-clean-build comparison ==="
 Log ("params: Evidence={0}" -f $evidenceRoot)
 
+$projectVersion = "0.0.0"
+$pyprojectText = Get-Content -LiteralPath (Join-Path $root "pyproject.toml") -Raw -Encoding UTF8
+if ($pyprojectText -match '(?m)^\s*version\s*=\s*"([^"]+)"') { $projectVersion = $Matches[1] }
+$binaryZipName = "LNT-$projectVersion-win64.zip"
+
 $runs = @(
     @{ id = "a"; buildDir = Join-Path $evidenceRoot "build-a"; artifactsDir = Join-Path $evidenceRoot "artifacts-a"; data = $null },
     @{ id = "b"; buildDir = Join-Path $evidenceRoot "build-b"; artifactsDir = Join-Path $evidenceRoot "artifacts-b"; data = $null }
@@ -208,9 +213,9 @@ foreach ($run in $runs) {
         continue
     }
     # Move the production aside so run b starts from a genuinely clean dist/.
-    $zips = @(Get-ChildItem -LiteralPath (Join-Path $root "dist") -Filter "LNT-*.zip" -File -ErrorAction SilentlyContinue)
+    $zips = @(Get-Item -LiteralPath (Join-Path $root "dist\$binaryZipName") -ErrorAction SilentlyContinue)
     if ($zips.Count -ne 1) {
-        $failures.Add("expected exactly one release ZIP after build $($run.id), found $($zips.Count)")
+        $failures.Add("expected binary ZIP $binaryZipName after build $($run.id), found $($zips.Count)")
         continue
     }
     Move-Item -LiteralPath $zips[0].FullName -Destination (Join-Path $run.artifactsDir $zips[0].Name) -Force

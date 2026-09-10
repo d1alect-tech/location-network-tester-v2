@@ -6,8 +6,8 @@
 #   dependency-manifest cross-check -> stale-asset detection ->
 #   frontend build (must be byte-stable) -> python wheel/sdist
 #   (SOURCE_DATE_EPOCH normalized) -> PyInstaller package via
-#   packaging/build.ps1 -Clean -> CycloneDX-style SBOM emission + cross-check
-#   -> per-file ZIP checksum coverage.
+#   packaging/build.ps1 -Clean -> Corresponding Source from committed HEAD ->
+#   CycloneDX-style SBOM emission + cross-check -> per-file ZIP checksum coverage.
 #
 # Reproducibility policy = project decision 16 ("define reproducibility
 # honestly"): bit-level determinism is guaranteed only for the locked Windows
@@ -22,7 +22,8 @@
 # Exit codes: 0 ok; 10 preflight; 20 stale package-lock.json; 21 stale uv.lock;
 # 22 dependency-manifest invalid/stale; 23 stale frontend assets;
 # 30 frontend build not byte-stable; 31 python wheel/sdist failed;
-# 32 package build failed; 40 SBOM failed; 50 checksum coverage failed;
+# 32 package build failed; 33 Corresponding Source failed; 40 SBOM failed;
+# 50 checksum coverage failed;
 # 60 Todo-51 ledger gate failed.
 # PowerShell 5.1 compatible (pwsh is not installed on this host); every gate
 # command appends an EXIT_CODE line to the evidence transcript.
@@ -336,7 +337,7 @@ if (-not (Test-Path -LiteralPath $pkgTranscript) -or
 $projectVersion = "0.0.0"
 $pyprojectText = Get-Content -LiteralPath (Join-Path $root "pyproject.toml") -Raw -Encoding UTF8
 if ($pyprojectText -match '(?m)^\s*version\s*=\s*"([^"]+)"') { $projectVersion = $Matches[1] }
-$zipName = "LNT-$projectVersion-win64-private-use.zip"
+$zipName = "LNT-$projectVersion-win64.zip"
 $zipPath = Join-Path $root "dist\$zipName"
 if (-not (Test-Path -LiteralPath $zipPath)) { Fail 32 "expected release ZIP missing: $zipName" }
 $zipSha256 = Get-Sha256 $zipPath
@@ -348,7 +349,42 @@ if (-not $sidecarText.StartsWith($zipSha256)) {
 }
 Record "release-zip" 0 ("{0} sha256={1}" -f $zipName, $zipSha256)
 
-# --- Step 8: CycloneDX-style SBOM emission + cross-check -------------------------
+# --- Step 8: Corresponding Source from committed HEAD ----------------------------
+$sourceName = "LNT-$projectVersion-corresponding-source.zip"
+$sourcePath = Join-Path $root "dist\$sourceName"
+$sourceSidecarName = "$sourceName.sha256"
+$sourceSidecarPath = Join-Path $root "dist\$sourceSidecarName"
+$sourceCache = Join-Path $root "build\release-source-cache"
+$sourceExit = Invoke-Native "corresponding-source-build" {
+    Push-Location $root
+    try {
+        uv run python scripts/release_sources.py `
+            --root $root --out-dir (Join-Path $root "dist") `
+            --cache-dir $sourceCache --release
+    } finally {
+        Pop-Location
+    }
+}
+Record "corresponding-source-build" $sourceExit "release_sources.py --release from committed HEAD"
+if ($sourceExit -ne 0) { Fail 33 "Corresponding Source builder failed" }
+if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+    Fail 33 "expected Corresponding Source ZIP missing: $sourceName"
+}
+if (-not (Test-Path -LiteralPath $sourceSidecarPath -PathType Leaf)) {
+    Fail 33 "expected Corresponding Source sidecar missing: $sourceSidecarName"
+}
+$sourceSha256 = Get-Sha256 $sourcePath
+$sourceSidecarText = (Get-Content -LiteralPath $sourceSidecarPath -Raw -Encoding ASCII).TrimEnd()
+$expectedSourceSidecar = "$sourceSha256  $sourceName"
+if ($sourceSidecarText -cne $expectedSourceSidecar) {
+    Fail 33 "Corresponding Source sidecar content does not exactly match ZIP bytes and filename"
+}
+Record "corresponding-source" 0 ("{0} sha256={1}" -f $sourceName, $sourceSha256)
+
+# Exactly these four files are published; SBOM and evidence remain local.
+$releaseAssets = @($zipName, "$zipName.sha256", $sourceName, $sourceSidecarName)
+
+# --- Step 9: CycloneDX-style SBOM emission + cross-check -------------------------
 $licenseManifestPath = Join-Path $packageEvidence "license-manifest.json"
 if (-not (Test-Path -LiteralPath $licenseManifestPath)) { Fail 40 "license-manifest.json missing from package evidence" }
 $licenseManifest = $null
@@ -363,6 +399,8 @@ $recipeInput = [ordered]@{
     lnt_spec = Get-Sha256 (Join-Path $root "packaging\lnt.spec")
     quality_ps1 = Get-Sha256 (Join-Path $PSScriptRoot "quality.ps1")
     release_lockcheck_py = Get-Sha256 (Join-Path $PSScriptRoot "release_lockcheck.py")
+    release_sources_py = Get-Sha256 (Join-Path $PSScriptRoot "release_sources.py")
+    release_source_inputs_json = Get-Sha256 (Join-Path $root "release-source-inputs.json")
     pyproject_toml = Get-Sha256 (Join-Path $root "pyproject.toml")
     npm_lock_fingerprint = $lockcheck.npm_lock_fingerprint
 }
@@ -382,7 +420,7 @@ $components.Add([ordered]@{
     name = "lnt"
     version = $projectVersion
     purl = "pkg:pypi/lnt@$projectVersion"
-    licenses = @(@{ license = @{ id = "MIT" } })
+    licenses = @(@{ license = @{ id = "GPL-3.0-only" } })
     hashes = @(@{ alg = "SHA-256"; content = (Get-Sha256 $wheel.FullName) })
     properties = @(@{ name = "lnt:role"; value = "application-under-test" })
 })
@@ -459,7 +497,7 @@ $sbom = [ordered]@{
             @{ name = "lnt:recipe_sha256"; value = $recipeSha256 },
             @{ name = "lnt:artifact_key_sha256"; value = $artifactKey },
             @{ name = "lnt:source_date_epoch"; value = [string]$epoch },
-            @{ name = "lnt:scope"; value = "bundle runtime components only (dev deps do not ship)" },
+            @{ name = "lnt:scope"; value = "resolved application runtime dependencies; unused optional modules may be excluded by PyInstaller" },
             @{ name = "lnt:reproducibility_policy"; value =
                 "decision 16: bit-level determinism guaranteed only for the locked Windows x64 dependency build; PyInstaller bootloader/base_library timestamp drift is documented allowed nondeterminism" }
         )
@@ -523,7 +561,7 @@ if ($sbomErrors.Count -gt 0) {
     Fail 40 ("SBOM cross-check failed: " + (($sbomErrors | Select-Object -First 5) -join "; "))
 }
 
-# --- Step 9: ZIP checksum coverage ----------------------------------------------
+# --- Step 10: ZIP checksum coverage ---------------------------------------------
 $entryHashes = Get-ZipEntryHashes -ZipPath $zipPath
 $classificationPath = Join-Path $packageEvidence "classification-report.json"
 if (-not (Test-Path -LiteralPath $classificationPath)) {
@@ -575,7 +613,7 @@ if ($coverageErrors.Count -gt 0) {
     Fail 50 ("checksum coverage incomplete: " + (($coverageErrors | Select-Object -First 5) -join "; "))
 }
 
-# --- Step 10: Todo-51 ledger gates (-Full only) ---------------------------------
+# --- Step 11: Todo-51 ledger gates (-Full only) ---------------------------------
 if ($Full) {
     $ledgerExit = Invoke-Native "ledger-regressions" {
         Push-Location $root
@@ -607,7 +645,7 @@ if ($Full) {
     Record "audit-engines-present" 0 "F1/F4 engines available"
 }
 
-# --- Step 11: verdict -------------------------------------------------------------
+# --- Step 12: verdict -------------------------------------------------------------
 $verdict = [ordered]@{
     schema_version = 1
     verdict = "PASS"
@@ -620,6 +658,7 @@ $verdict = [ordered]@{
         frontend_build_byte_stable = $true
         python_dist_source_date_epoch = $epoch
         package_build = $true
+        corresponding_source = $true
         sbom_crosschecked = $true
         checksum_coverage_complete = $true
         todo51_ledger_gates = [bool]$Full
@@ -627,6 +666,9 @@ $verdict = [ordered]@{
     artifacts = [ordered]@{
         zip_name = $zipName
         zip_sha256 = $zipSha256
+        source_zip_name = $sourceName
+        source_zip_sha256 = $sourceSha256
+        release_assets = $releaseAssets
         sbom = "dist/$zipName.sbom.cdx.json"
         wheel = $wheel.Name
         sdist = $sdist.Name
@@ -639,6 +681,9 @@ $verdict | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $eviden
 $summaryLines.Add("QUALITY OK EXIT_CODE=0")
 $summaryLines.Add("ZIP $zipName")
 $summaryLines.Add("ZIP_SHA256 $zipSha256")
+$summaryLines.Add("SOURCE_ZIP $sourceName")
+$summaryLines.Add("SOURCE_ZIP_SHA256 $sourceSha256")
 $summaryLines | Set-Content -LiteralPath (Join-Path $evidenceRoot "commands-summary.txt") -Encoding UTF8
-Log ("QUALITY OK EXIT_CODE=0 :: zip={0} sha256={1} sbom_components={2}" -f $zipName, $zipSha256, $sbomComponentCount)
+Log ("QUALITY OK EXIT_CODE=0 :: zip={0} sha256={1} source={2} source_sha256={3} sbom_components={4}" -f
+    $zipName, $zipSha256, $sourceName, $sourceSha256, $sbomComponentCount)
 exit 0
