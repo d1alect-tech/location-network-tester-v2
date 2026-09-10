@@ -100,9 +100,10 @@ def _calculate(request: StatisticsRun, experiment: Experiment, job_id: str) -> d
         seed=request.seed,
         estimator_name=estimator,
     )
+    inferential = isinstance(result, InferentialEffect)
     return {
-        "result_kind": "effect" if request.kind in {"ab", "repeated_blocks"} else "descriptive",
-        "result": asdict(result),
+        "result_kind": "effect" if inferential else "descriptive",
+        "result": {"effect": asdict(result)} if inferential else asdict(result),
         "metadata": _metadata(
             result,
             units=request.units,
@@ -123,6 +124,8 @@ def submit_statistics(
         experiment = ExperimentStore(services.root).load(experiment_id)
     except (KeyError, FileNotFoundError) as error:
         raise HTTPException(404, "эксперимент не найден") from error
+    if request.kind != experiment.protocol.kind:
+        raise HTTPException(422, "вид расчёта не совпадает с протоколом эксперимента")
     research_jobs = services.research_jobs
     if research_jobs is None:
         raise HTTPException(503, "сервис исследовательских задач не установлен")

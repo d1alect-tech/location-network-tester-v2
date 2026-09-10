@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated, ClassVar, Literal
+from typing import Annotated, ClassVar, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from lnt.experiments import Experiment
 from lnt.research import Hypothesis
@@ -35,15 +35,15 @@ class RunConfirm(StrictModel):
 
 class PairInput(StrictModel):
     unit_id: str = Field(min_length=1)
-    value_a: float
-    value_b: float
+    value_a: float = Field(allow_inf_nan=False)
+    value_b: float = Field(allow_inf_nan=False)
 
 
 class AbaInput(StrictModel):
     unit_id: str = Field(min_length=1)
-    value_a1: float
-    value_b: float
-    value_a2: float
+    value_a1: float = Field(allow_inf_nan=False)
+    value_b: float = Field(allow_inf_nan=False)
+    value_a2: float = Field(allow_inf_nan=False)
 
 
 class StatisticsRun(StrictModel):
@@ -53,6 +53,16 @@ class StatisticsRun(StrictModel):
     pairs: tuple[PairInput, ...] = Field(default=(), max_length=10_000)
     aba_units: tuple[AbaInput, ...] = Field(default=(), max_length=10_000)
     seed: Annotated[int, Field(ge=0)] = 0
+
+    @model_validator(mode="after")
+    def validate_active_units(self) -> Self:
+        """Require the nonempty input vector selected by the protocol kind."""
+        if self.kind == "aba":
+            if not self.aba_units or self.pairs:
+                raise ValueError("aba требует только непустой aba_units")
+        elif not self.pairs or self.aba_units:
+            raise ValueError(f"{self.kind} требует только непустой pairs")
+        return self
 
 
 class MetadataInput(StrictModel):
