@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Захват и спектральный анализ питающей сети для постановки и проверки гипотез об электрическом инпутлаге, сравнения локаций и условий питания"
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "MIT" }
+license = "GPL-3.0-only"
 dependencies = [
     "numpy>=2.1,<3",
     "scipy>=1.14,<2",
@@ -139,4 +139,3 @@ reportAny = false
 # Builder-стиль API (argparse add_argument и т.п.) возвращают значения,
 # которые по конвенции не используются.
 reportUnusedCallResult = false
-
