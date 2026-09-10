@@ -16,16 +16,16 @@ async function flushAll(rounds = 12): Promise<void> {
 interface Harness {
   client: Record<string, unknown>;
   failBuildWith: Error | null;
+  submit: ReturnType<typeof vi.fn>;
 }
 
-function makeHarness(): Harness {
-  const harness: Harness = { client: {}, failBuildWith: null };
+function makeHarness(featureKey = "band_mid_total"): Harness {
   const experiment = {
     experiment_id: "exp.demo",
     title: "Демо",
     revision: 1,
     protocol: { kind: "ab" },
-    primary_estimands: [{ feature_key: "band_mid_total" }],
+    primary_estimands: [{ feature_key: featureKey }],
     steps: [
       { order: 1, condition_id: "cond_a", instruction: "a" },
       { order: 2, condition_id: "cond_b", instruction: "b" },
@@ -56,8 +56,29 @@ function makeHarness(): Harness {
       exclusions: [],
       estimator: "qualified_within_run_contrast",
       interval_method: "seeded_block_bootstrap_percentile_95",
-      provenance: { experiment_id: "exp.demo", estimand: "band_mid_total", job_id: "job-1" },
+      provenance: { experiment_id: "exp.demo", estimand: featureKey, job_id: "job-1" },
     },
+  };
+  const harness: Harness = {
+    client: {},
+    failBuildWith: null,
+    submit: vi.fn(async () => {
+      if (harness.failBuildWith !== null) throw harness.failBuildWith;
+      return {
+        schema_version: 1,
+        version: 1,
+        job_id: "job-1",
+        kind: "research_analysis",
+        status: "queued",
+        stage: "queued",
+        series_index: null,
+        series_total: null,
+        written_sessions: [],
+        result: null,
+        error_code: null,
+        error_message: null,
+      };
+    }),
   };
   harness.client = {
     ensureReady: vi.fn(async () => undefined),
@@ -71,23 +92,7 @@ function makeHarness(): Harness {
       })),
     },
     statistics: {
-      submit: vi.fn(async () => {
-        if (harness.failBuildWith !== null) throw harness.failBuildWith;
-        return {
-          schema_version: 1,
-          version: 1,
-          job_id: "job-1",
-          kind: "research_analysis",
-          status: "queued",
-          stage: "queued",
-          series_index: null,
-          series_total: null,
-          written_sessions: [],
-          result: null,
-          error_code: null,
-          error_message: null,
-        };
-      }),
+      submit: harness.submit,
       result: vi.fn(async () => envelope),
     },
     plots: {
@@ -95,7 +100,7 @@ function makeHarness(): Harness {
         name: sessionId,
         manifest: {},
         analysis: {
-          metrics: { band_mid_total: 10 },
+          metrics: { [featureKey]: 10 },
           ch1_input_reference: { status: "available", model_kind: "rc_shunt_v1" },
         },
         spectrum_available: true,
@@ -134,6 +139,27 @@ async function openDetail(container: HTMLElement): Promise<void> {
   await flushAll();
 }
 
+/** Явные единицы для признака без известной единицы (band_mid_total). */
+function fillUnits(container: HTMLElement, value = UNITS): void {
+  const input = container.querySelector<HTMLInputElement>("#lnt-rep-units");
+  expect(input).not.toBeNull();
+  if (input) input.value = value;
+}
+
+function deferNextSubmit(harness: Harness): () => void {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const submit = harness.submit.getMockImplementation();
+  harness.submit.mockImplementationOnce(async () => {
+    await gate;
+    if (submit === undefined) throw new Error("submit implementation is missing");
+    return submit();
+  });
+  return release;
+}
+
 describe("mountReportsWorkspace error paths", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
@@ -147,7 +173,8 @@ describe("mountReportsWorkspace error paths", () => {
     const { container, dispose } = mount(harness);
     await openDetail(container);
     try {
-      // When: оператор нажимает «Собрать отчёт»
+      // When: оператор вводит единицы и нажимает «Собрать отчёт»
+      fillUnits(container);
       container.querySelector<HTMLButtonElement>("#lnt-rep-build")?.click();
       await flushAll();
 
@@ -249,6 +276,7 @@ describe("mountReportsWorkspace error paths", () => {
     const { container, dispose } = mount(harness);
     await openDetail(container);
     try {
+      fillUnits(container);
       container.querySelector<HTMLButtonElement>("#lnt-rep-build")?.click();
       await flushAll();
       expect(container.querySelector(".lnt-rep-preview")).not.toBeNull();
@@ -289,16 +317,182 @@ describe("mountReportsWorkspace error paths", () => {
         await flushAll();
         expect(clickSpy).toHaveBeenCalled();
       } finally {
-        const urlRecord = URL as unknown as {
+        const record = URL as unknown as {
           createObjectURL?: unknown;
           revokeObjectURL?: unknown;
         };
-        urlRecord.createObjectURL = prevCreate;
-        urlRecord.revokeObjectURL = prevRevoke;
+        record.createObjectURL = prevCreate;
+        record.revokeObjectURL = prevRevoke;
         clickSpy.mockRestore();
       }
     } finally {
       dispose();
     }
+  });
+});
+
+describe("mountReportsWorkspace units contract", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    vi.restoreAllMocks();
+  });
+
+  it("prefills known metric units and demands explicit input for unknown ones", async () => {
+    // Given: признак с известной единицей (needle_mean_v → V)
+    const known = makeHarness("needle_mean_v");
+    const mounted = mount(known);
+    await openDetail(mounted.container);
+    const knownInput = mounted.container.querySelector<HTMLInputElement>("#lnt-rep-units");
+    expect(knownInput?.value).toBe("V");
+    mounted.dispose();
+    document.body.innerHTML = "";
+
+    // Given: признак без известной единицы (band_mid_total)
+    const unknown = makeHarness("band_mid_total");
+    const second = mount(unknown);
+    try {
+      await openDetail(second.container);
+      const input = second.container.querySelector<HTMLInputElement>("#lnt-rep-units");
+
+      // Then: значение не выдумывается, поле требует явного ввода
+      expect(input?.value).toBe("");
+      expect(input?.placeholder).toContain("единицы");
+    } finally {
+      second.dispose();
+    }
+  });
+
+  it("build without units for an unknown feature shows an error and never submits", async () => {
+    // Given: band_mid_total без введённых единиц
+    const harness = makeHarness("band_mid_total");
+    const { container, dispose } = mount(harness);
+    await openDetail(container);
+    try {
+      // When: оператор жмёт сборку, не заполнив единицы
+      container.querySelector<HTMLButtonElement>("#lnt-rep-build")?.click();
+      await flushAll();
+
+      // Then: типизированная ошибка про единицы, POST статистики не выполнен
+      const banner = container.querySelector(".lnt-rep-error");
+      expect(banner?.hasAttribute("hidden")).toBe(false);
+      expect(banner?.textContent).toContain("единицы");
+      expect(harness.submit).not.toHaveBeenCalled();
+    } finally {
+      dispose();
+    }
+  });
+
+  it("changing units after a build resets the stale preview and download", async () => {
+    // Given: отчёт собран, выгрузка доступна
+    const harness = makeHarness();
+    const { container, dispose } = mount(harness);
+    await openDetail(container);
+    try {
+      fillUnits(container);
+      container.querySelector<HTMLButtonElement>("#lnt-rep-build")?.click();
+      await flushAll();
+      const download = container.querySelector<HTMLButtonElement>("#lnt-rep-download");
+      expect(container.querySelector(".lnt-rep-preview")).not.toBeNull();
+      expect(download?.disabled).toBe(false);
+
+      // When: оператор меняет единицы
+      const input = container.querySelector<HTMLInputElement>("#lnt-rep-units");
+      if (input) {
+        input.value = "V";
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      await flushAll();
+
+      // Then: старое превью и выгрузка сброшены — прежний файл не выдаётся за новый
+      expect(container.querySelector(".lnt-rep-preview")).toBeNull();
+      expect(download?.disabled).toBe(true);
+      expect(container.textContent).toContain("Соберите отчёт заново");
+      expect(container.querySelector("#lnt-rep-hint")?.textContent).toContain(
+        "Соберите отчёт заново",
+      );
+    } finally {
+      dispose();
+    }
+  });
+
+  it("changing units during a build cancels stale output and allows rebuilding", async () => {
+    const harness = makeHarness();
+    const release = deferNextSubmit(harness);
+    const { container, dispose } = mount(harness);
+    await openDetail(container);
+    try {
+      fillUnits(container);
+      const build = container.querySelector<HTMLButtonElement>("#lnt-rep-build");
+      const download = container.querySelector<HTMLButtonElement>("#lnt-rep-download");
+      build?.click();
+      await flushAll();
+      expect(harness.submit).toHaveBeenCalledTimes(1);
+      expect(build?.disabled).toBe(true);
+
+      const input = container.querySelector<HTMLInputElement>("#lnt-rep-units");
+      if (input) {
+        input.value = "V";
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      expect(build?.disabled).toBe(false);
+      expect(container.querySelector(".lnt-rep-preview")).toBeNull();
+      expect(download?.disabled).toBe(true);
+      expect(container.textContent).toContain("Соберите отчёт заново");
+
+      release();
+      await flushAll();
+      expect(container.querySelector(".lnt-rep-preview")).toBeNull();
+      expect(download?.disabled).toBe(true);
+
+      build?.click();
+      await flushAll();
+      expect(harness.submit).toHaveBeenCalledTimes(2);
+      expect(container.querySelector(".lnt-rep-preview")).not.toBeNull();
+      expect(download?.disabled).toBe(false);
+    } finally {
+      dispose();
+    }
+  });
+
+  it("ignores a pending result after the selected experiment is reloaded", async () => {
+    const harness = makeHarness();
+    const release = deferNextSubmit(harness);
+    const { container, dispose } = mount(harness);
+    await openDetail(container);
+    try {
+      fillUnits(container);
+      container.querySelector<HTMLButtonElement>("#lnt-rep-build")?.click();
+      await flushAll();
+      expect(harness.submit).toHaveBeenCalledTimes(1);
+
+      container.querySelector<HTMLButtonElement>("[data-experiment-id]")?.click();
+      await flushAll();
+      release();
+      await flushAll();
+
+      expect(container.querySelector(".lnt-rep-preview")).toBeNull();
+      expect(container.querySelector<HTMLButtonElement>("#lnt-rep-download")?.disabled).toBe(true);
+    } finally {
+      dispose();
+    }
+  });
+
+  it("ignores a pending result after disposal", async () => {
+    const harness = makeHarness();
+    const release = deferNextSubmit(harness);
+    const { container, dispose } = mount(harness);
+    await openDetail(container);
+    fillUnits(container);
+    container.querySelector<HTMLButtonElement>("#lnt-rep-build")?.click();
+    await flushAll();
+    expect(harness.submit).toHaveBeenCalledTimes(1);
+
+    dispose();
+    release();
+    await flushAll();
+
+    expect(container.querySelector(".lnt-rep-preview")).toBeNull();
+    expect(container.querySelector<HTMLButtonElement>("#lnt-rep-download")?.disabled).toBe(true);
   });
 });

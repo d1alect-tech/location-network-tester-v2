@@ -14,7 +14,9 @@ import { protocolLabel } from "../experiments/experimentModel";
 import type { ExperimentDetail } from "../experiments/experimentsStore";
 import { REPORT_EXPORT_FORMAT, buildReportFilename, downloadMarkdown } from "./reportExport";
 import { previewBlock } from "./reportPreview";
+import { resetReportResult, setReportUnits } from "./reportState";
 import { createReportsHeader, createReportsInvitation } from "./reportsHeader";
+import { renderReportsList } from "./reportsList";
 import { ReportsStore } from "./reportsStore";
 import { createWorkspaceStatusBlock, degradedReportMessage } from "./reportsWorkspaceStatus";
 import "./reports.css";
@@ -34,7 +36,7 @@ export function mountReportsWorkspace(
   const detailHost = el("div", { className: "lnt-rep-detail" });
   const unitsInput = el("input", {
     className: "ctl lnt-input",
-    attrs: { type: "text", id: "lnt-rep-units", value: "В²/Гц", "aria-label": "Единицы измерения" },
+    attrs: { type: "text", id: "lnt-rep-units", "aria-label": "Единицы измерения" },
   });
   const buildButton = el("button", {
     className: "btn lnt-btn lnt-btn-primary",
@@ -89,77 +91,59 @@ export function mountReportsWorkspace(
   const root = el("div", { className: "lnt-rep" }, [createReportsHeader(), workspace]);
   container.append(root);
 
+  let currentDetail: ExperimentDetail | null = null;
+  let currentMarkdown: string | null = null;
+  let pendingReportId: string | null = null;
+  let selectionGeneration = 0;
+  let reportGeneration = 0;
+  let disposed = false;
+  const resetResult = (): void =>
+    resetReportResult(detailHost, downloadButton, () => {
+      currentMarkdown = null;
+    });
+
   void client.ensureReady().catch((error: unknown) => {
+    if (disposed) return;
     const reason = error instanceof Error ? error.message : String(error);
     setPendingRetry(() => void refreshList());
     showError(`Сервер недоступен: ${reason}. Проверьте соединение и повторите.`);
   });
 
-  let currentDetail: ExperimentDetail | null = null;
-  let currentMarkdown: string | null = null;
-  let pendingReportId: string | null = null;
-
   root.querySelector("#lnt-rep-refresh")?.addEventListener("click", () => void refreshList());
   buildButton.addEventListener("click", () => void build());
   downloadButton.addEventListener("click", download);
+  unitsInput.addEventListener("input", () => {
+    reportGeneration += 1;
+    store.abort();
+    resetResult();
+    buildButton.disabled = currentDetail === null;
+    buildHint.textContent = "Единицы изменены. Соберите отчёт заново.";
+    setStatus("Единицы изменены. Соберите отчёт заново.");
+  });
 
   function renderListState(): void {
-    const state = store.experiments.get();
-    clearElement(listHost);
-    if (state.kind === "loading") {
-      listHost.append(
-        el("p", { className: "lnt-helper-text", text: "Загрузка списка экспериментов…" }),
-      );
-      return;
-    }
-    if (state.kind === "error") {
-      listHost.append(
-        errorWithRetry(
-          `Не удалось загрузить список экспериментов: ${state.error.message}.`,
-          () => void refreshList(),
-        ),
-      );
-      return;
-    }
-    if (state.kind !== "ready") return;
-    if (state.value.length === 0) {
-      listHost.append(
-        el("p", {
-          className: "lnt-helper-text",
-          text: "Экспериментов пока нет. Создайте их в разделе «Эксперименты».",
-        }),
-      );
-      return;
-    }
-    const list = el("ul", {
-      className: "lnt-exp-list",
-      attrs: { "aria-label": "Эксперименты для отчётов" },
+    renderReportsList(listHost, store.experiments.get(), {
+      refresh: () => void refreshList(),
+      open: (experimentId) => {
+        routes.replaceParams({ experiment: experimentId });
+        void loadDetailInto(experimentId);
+      },
     });
-    for (const item of state.value) {
-      const id = String(item.experiment_id ?? "");
-      const title = String(item.title ?? id);
-      const li = el("li", { className: "lnt-exp-list-item" });
-      const open = el("button", {
-        className: "btn btn-secondary lnt-btn lnt-exp-open",
-        text: `${title} (${id})`,
-        attrs: { type: "button", "data-experiment-id": id },
-      });
-      open.addEventListener("click", () => {
-        routes.replaceParams({ experiment: id });
-        void loadDetailInto(id);
-      });
-      li.append(open);
-      list.append(li);
-    }
-    listHost.append(list);
   }
 
   async function loadDetailInto(experimentId: string): Promise<void> {
+    const generation = ++selectionGeneration;
+    reportGeneration += 1;
+    store.abort();
     pendingReportId = experimentId;
+    currentDetail = null;
+    resetResult();
+    buildButton.disabled = true;
     invitation.hidden = true;
     clearElement(detailHost);
     detailHost.append(el("p", { className: "lnt-helper-text", text: "Загрузка эксперимента…" }));
     await store.detail.load(experimentId);
+    if (disposed || generation !== selectionGeneration) return;
     const state = store.detail.get();
     if (state.kind !== "ready" || state.key !== experimentId) {
       clearElement(detailHost);
@@ -173,9 +157,8 @@ export function mountReportsWorkspace(
       return;
     }
     currentDetail = state.value;
-    currentMarkdown = null;
-    downloadButton.disabled = true;
-    downloadButton.title = "Станет доступна после сборки отчёта";
+    resetResult();
+    setReportUnits(state.value, unitsInput);
     setStatus("Сначала соберите отчёт: выгрузка станет доступна после сборки.");
     const experiment = state.value.experiment as OpenRecord;
     clearElement(detailHost);
@@ -205,12 +188,22 @@ export function mountReportsWorkspace(
       showError("Нет выбранного эксперимента для сборки. Сначала выберите эксперимент слева.");
       return;
     }
+    const detail = currentDetail;
+    const selection = selectionGeneration;
+    const generation = ++reportGeneration;
+    const isCurrent = (): boolean =>
+      !disposed &&
+      generation === reportGeneration &&
+      selection === selectionGeneration &&
+      currentDetail === detail;
     setPendingRetry(() => void build());
+    resetResult();
     buildButton.disabled = true;
     errorBanner.setAttribute("hidden", "");
     setStatus("Сборка отчёта: расчёт статистики на сервере…");
     try {
-      const result = await store.buildReport(currentDetail, { units: unitsInput.value });
+      const result = await store.buildReport(detail, { units: unitsInput.value });
+      if (!isCurrent()) return;
       currentMarkdown = result.markdown;
       detailHost.querySelector(".lnt-rep-preview")?.remove();
       detailHost.append(previewBlock(result.draft));
@@ -222,14 +215,15 @@ export function mountReportsWorkspace(
       if (degraded !== null) return showError(degraded);
       announcePolite("Отчёт собран");
     } catch (error) {
+      if (!isCurrent()) return;
       const reason = error instanceof Error ? error.message : String(error);
       setStatus("Сборка не выполнена.");
       showError(
-        `Сборка не выполнена: ${reason}. Проверьте соединение и повторите.`,
+        `Сборка не выполнена: ${reason}. Проверьте выбранный признак и данные сессий, затем повторите.`,
         () => void build(),
       );
     } finally {
-      buildButton.disabled = false;
+      if (isCurrent()) buildButton.disabled = false;
     }
   }
 
@@ -248,14 +242,20 @@ export function mountReportsWorkspace(
     }
   }
 
-  const refreshList = (): Promise<void> => store.experiments.load("all");
+  const refreshList = async (): Promise<void> => {
+    if (!disposed) await store.experiments.load("all");
+  };
   const unsubscribe = store.experiments.subscribe(() => renderListState());
   void refreshList().then(() => {
+    if (disposed) return;
     const preset = routes.get().params.experiment;
     if (preset) void loadDetailInto(preset);
   });
 
   return () => {
+    disposed = true;
+    selectionGeneration += 1;
+    reportGeneration += 1;
     unsubscribe();
     store.abort();
   };

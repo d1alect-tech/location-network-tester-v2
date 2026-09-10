@@ -46,6 +46,7 @@ async function createDemoExperiment(page: Page): Promise<void> {
   await page.getByLabel("Идентификатор эксперимента").fill("exp.aba.demo");
   await page.getByLabel("Название").fill("Синтетика exp.aba.demo");
   await page.getByLabel("Вопрос исследования").fill("Меняется ли фон при экранировании?");
+  await page.getByLabel("Оцениваемый признак (feature key)").fill("band_mid_total");
   await page.getByLabel("Минимальный N единиц").fill("3");
   for (const [sessionId, condition] of Object.entries(DEMO_ASSIGNMENTS)) {
     await page.getByLabel(`Условие сессии ${sessionId}`).selectOption(condition);
@@ -64,6 +65,8 @@ test("report journey: experiment → build preview with provenance → download 
   await page.locator(".lnt-exp-open", { hasText: "exp.aba.demo" }).click();
   await expect(page.locator("#lnt-rep-build")).toBeEnabled();
 
+  // band_mid_total не имеет известной единицы — оператор указывает её явно.
+  await page.locator("#lnt-rep-units").fill("В²/Гц");
   await page.locator("#lnt-rep-build").click();
   const preview = page.locator(".lnt-rep-preview");
   await expect(preview).toBeVisible();
@@ -112,6 +115,7 @@ test("refusal result renders typed refusal limitation without effect numbers", a
   await createDriftExperiment(page);
   await openReports(page);
   await page.locator(".lnt-exp-open", { hasText: "exp.aba.drift" }).click();
+  await page.locator("#lnt-rep-units").fill("В²/Гц");
   await page.locator("#lnt-rep-build").click();
   const preview = page.locator(".lnt-rep-preview");
   await expect(preview).toContainText("Расчёт заблокирован бэкендом");
@@ -133,6 +137,7 @@ async function createDriftExperiment(page: Page): Promise<void> {
   await page.getByLabel("Идентификатор эксперимента").fill("exp.aba.drift");
   await page.getByLabel("Название").fill("Дрейфовый набор");
   await page.getByLabel("Вопрос исследования").fill("Есть ли дрейф между A-фазами?");
+  await page.getByLabel("Оцениваемый признак (feature key)").fill("band_mid_total");
   await page.getByLabel("Минимальный N единиц").fill("3");
   for (const [sessionId, condition] of Object.entries(assignments)) {
     await page.getByLabel(`Условие сессии ${sessionId}`).selectOption(condition);
@@ -183,6 +188,7 @@ test("axe reports no serious or critical violations on the reports workspace", a
   await createDemoExperiment(page);
   await openReports(page);
   await page.locator(".lnt-exp-open", { hasText: "exp.aba.demo" }).click();
+  await page.locator("#lnt-rep-units").fill("В²/Гц");
   await page.locator("#lnt-rep-build").click();
   await expect(page.locator(".lnt-rep-preview")).toBeVisible();
   await injectAxe(page);

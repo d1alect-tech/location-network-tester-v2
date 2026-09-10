@@ -64,6 +64,7 @@ async function createAbaExperiment(page: Page, id: string): Promise<void> {
   await page.getByLabel("Идентификатор эксперимента").fill(id);
   await page.getByLabel("Название").fill(`Синтетика ${id}`);
   await page.getByLabel("Вопрос исследования").fill("Меняется ли фон при экранировании?");
+  await page.getByLabel("Оцениваемый признак (feature key)").fill("band_mid_total");
   await page.getByLabel("Минимальный N единиц").fill("3");
   for (const [sessionId, condition] of Object.entries(ASSIGNMENTS)) {
     await page.getByLabel(`Условие сессии ${sessionId}`).selectOption(condition);
@@ -131,6 +132,8 @@ test.describe("T12.2/T12.3 поверх research-мока", () => {
 
     await page.locator(".lnt-exp-open", { hasText: "exp.aba.demo" }).click();
     await expect(page.locator("#lnt-rep-build")).toBeEnabled();
+    // band_mid_total не имеет известной единицы — оператор указывает её явно.
+    await page.locator("#lnt-rep-units").fill("В²/Гц");
     await page.locator("#lnt-rep-build").click();
     await expect(page.locator(".lnt-rep-preview")).toBeVisible();
 
