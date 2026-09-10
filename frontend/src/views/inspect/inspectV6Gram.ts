@@ -74,6 +74,7 @@ export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle 
   const oriented = createOrientedSpectrogramView();
   spectrumPanel.gramHost.append(oriented.root);
   const gramPair = createGramPair({ client });
+  let generation = 0;
 
   const buttons: HTMLButtonElement[] = [];
   for (const item of MODES) {
@@ -186,7 +187,9 @@ export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle 
   return {
     async refresh(a, b) {
       if (a === null || a === "") return;
+      const gen = ++generation;
       await gramPair.load(a, b);
+      if (gen !== generation) return;
       for (const button of buttons) button.disabled = false;
       if (gramPair.empty()) {
         // Ни у одной сессии пары нет артефакта: режимы недоступны, без ошибки.
@@ -207,6 +210,7 @@ export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle 
       if (gramPair.paired() && !matches) scale.textContent = MISMATCH_NOTE;
     },
     dispose() {
+      generation += 1;
       gramPair.dispose();
       oriented.dispose();
     },
