@@ -108,7 +108,7 @@ $outcomeProbes = @{
     3 = @{ name = "scientific_analysis_experiments"; paths = @("src/lnt/psd", "src/lnt/spectrogram", "src/lnt/statistics", "src/lnt/experiments"); tests = @("tests/science", "tests/experiments") }
     4 = @{ name = "russian_accessible_workbench"; paths = @("frontend/src/AppShell.ts", "frontend/src/components/primitives/dom.ts", "DESIGN.md"); tests = @("tests/test_design_contract.py") }
     5 = @{ name = "archives_reports_backup_restore"; paths = @("src/lnt/archive", "src/lnt/reporting"); tests = @("tests/archive", "tests/reporting") }
-    6 = @{ name = "private_one_folder_windows_package"; paths = @("packaging/build.ps1", "packaging/lnt.spec", "packaging/smoke-portable.ps1", "packaging/PRIVATE-USE.txt"); tests = @() }
+    6 = @{ name = "public_gpl_windows_package_and_source"; paths = @("LICENSE", "packaging/build.ps1", "packaging/lnt.spec", "packaging/smoke-portable.ps1", "packaging/SOURCE.txt", "scripts/release_sources.py"); tests = @("tests/test_dependency_policy.py", "tests/test_release_sources.py") }
     7 = @{ name = "original_and_sessions_preserved"; paths = @(".integrity/receipt-original.json", ".integrity/receipt-sessions.json", ".integrity/integrity-policy.json"); tests = @("tests/test_pristine_gate.py") }
 }
 $missing = New-Object System.Collections.Generic.List[string]
@@ -226,10 +226,9 @@ foreach ($script in @("packaging/build.ps1", "packaging/lnt.spec")) {
 }
 if (-not $upxDisabledSeen) { $packagingViolations.Add("packaging/lnt.spec does not explicitly disable UPX (upx=False missing)") }
 
-# Conveyance/certification claims: private-use labels present; forbidden labels absent.
-$privateUseOk = Test-Path (Join-Path $root "packaging/PRIVATE-USE.txt")
+# Conveyance/certification claims: public GPL release evidence is scoped honestly.
 $claimHits = New-Object System.Collections.Generic.List[string]
-foreach ($doc in @("README.md", "packaging/PRIVATE-USE.txt", "docs/distribution-policy.md")) {
+foreach ($doc in @("README.md", "docs/packaging-notices.md", "docs/distribution-policy.md", "packaging/SOURCE.txt")) {
     $path = Join-Path $root $doc
     if (-not (Test-Path $path)) { continue }
     $bad = @(Select-String -LiteralPath $path -Pattern "(?i)sterile|clean[- ]VM|public release certified|universally verified")
@@ -239,6 +238,10 @@ foreach ($doc in @("README.md", "packaging/PRIVATE-USE.txt", "docs/distribution-
 # Node runtime absence at product run time is proven by the frozen smoke script.
 $smokeText = Get-Content (Join-Path $root "packaging/smoke-portable.ps1") -Raw -Encoding UTF8
 $nodeScrubbed = ($smokeText -match "(?i)PATH") -and ($smokeText -match "(?i)node")
+$sanitizedReferenceHostVerified = $smokeText -match 'HostLabel\s*=\s*"sanitized-reference-host-verified"'
+$typedDeviceAbsentAllowed = ($smokeText -match '"device_absent"') -and ($smokeText -match 'fm4-device-absent-typed\.json')
+if (-not $sanitizedReferenceHostVerified) { $missing.Add("release evidence label missing: sanitized-reference-host-verified") }
+if (-not $typedDeviceAbsentAllowed) { $missing.Add("release evidence missing typed device-absent allowance") }
 
 # --- Step 5: gates (shared with F1 engine) ----------------------------------------------
 $gates = [ordered]@{}
@@ -292,7 +295,11 @@ $verdict = [ordered]@{
         plotly_absent = ($plotlyHits.Count -eq 0)
         node_runtime_absence = [ordered]@{ smoke_scrubs_path = $nodeScrubbed; dev_only_node = $true }
         conveyance_certification = [ordered]@{
-            private_use_label_present = $privateUseOk
+            license = "GPL-3.0-only"
+            release_scope = "public"
+            sanitized_reference_host_verified = $sanitizedReferenceHostVerified
+            typed_device_absent_allowed = $typedDeviceAbsentAllowed
+            physical_hardware_tested = $false
             forbidden_claim_hits = @($claimHits)
         }
         packaging_guardrails = [ordered]@{ violations = @($packagingViolations) }

@@ -98,7 +98,7 @@
   {
     "name": "hantek6022api",
     "version": "2.10.9",
-    "license": "GPL-3.0-or-later",
+    "license": "GPL-3.0-only",
     "source_url": "https://github.com/Ho-Ro/Hantek6022API",
     "hash": "git-commit:e65d52b0f2536e56eaadbb555e5d7b756409c36e",
     "scope": "runtime"
