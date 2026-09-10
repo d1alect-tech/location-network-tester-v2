@@ -13,7 +13,7 @@ const UNITS = "В²/Гц";
 const CONDITIONS = ["cond_a1", "cond_b", "cond_a2"] as const;
 const UNITS_ABA = ["u1", "u2"] as const;
 
-function abaDetail(): ExperimentDetail {
+function abaDetail(featureKey = "band_mid_total"): ExperimentDetail {
   const members = [];
   const steps = CONDITIONS.map((condition, index) => ({
     order: index + 1,
@@ -39,7 +39,7 @@ function abaDetail(): ExperimentDetail {
       title: "Демо A/B/A",
       revision: 2,
       protocol: { kind: "aba" },
-      primary_estimands: [{ feature_key: "band_mid_total" }],
+      primary_estimands: [{ feature_key: featureKey }],
       steps,
     },
     members,
@@ -80,6 +80,7 @@ interface StubOptions {
   recipesFail?: boolean;
   /** Сессии, для которых plots.detail падает (значение недоступно). */
   failDetailFor?: string[];
+  analysisFor?: (sessionId: string) => Record<string, unknown>;
 }
 
 function clientStub(
@@ -120,7 +121,7 @@ function clientStub(
         return {
           name: sessionId,
           manifest: {},
-          analysis: {
+          analysis: options.analysisFor?.(sessionId) ?? {
             metrics: { band_mid_total: 10 },
             ch1_input_reference:
               planeStatus === "available"
@@ -145,9 +146,7 @@ function clientStub(
         ? vi.fn(async () => {
             throw new Error("recipes unavailable");
           })
-        : vi.fn(async () => [
-            { recipe_id: "rec-1", name: "Базовый", sha256: "a".repeat(64), recipe: {} },
-          ]),
+        : vi.fn(async () => [{ recipe_id: "a".repeat(64), name: "Базовый", recipe: {} }]),
     } as unknown as ClientStub["analysis"],
   };
 }
@@ -161,6 +160,124 @@ function fullHealth(extra: Record<string, string> = {}): Map<string, string> {
 }
 
 describe("ReportsStore.buildReport", () => {
+  it("submits values from the persisted needle payload", async () => {
+    const client = clientStub(effectEnvelope(), {
+      health: fullHealth(),
+      analysisFor: (sessionId) => ({
+        needle: { needle_mean_v: sessionId.includes("cond_b") ? 0.25 : 0.125 },
+        line_quality: null,
+        ch1_input_reference: { status: "available", model_kind: "rc_shunt_v1" },
+      }),
+    });
+    const store = new ReportsStore({ client: client as unknown as LntApiClient });
+
+    await store.buildReport(abaDetail("needle_mean_v"));
+
+    expect(client.submitted[0]?.units).toBe("V");
+    expect(client.submitted[0]?.aba_units?.[0]).toMatchObject({
+      value_a1: 0.125,
+      value_b: 0.25,
+      value_a2: 0.125,
+    });
+  });
+
+  it("requires explicit units for an unknown metric", async () => {
+    const client = clientStub(effectEnvelope(), {
+      health: fullHealth(),
+      analysisFor: () => ({ metrics: { custom_metric: 4 } }),
+    });
+    const store = new ReportsStore({ client: client as unknown as LntApiClient });
+
+    await expect(store.buildReport(abaDetail("custom_metric"))).rejects.toThrow("единицы");
+    expect(client.submitted).toHaveLength(0);
+  });
+
+  it("rejects an absent feature before submitting empty statistics", async () => {
+    const client = clientStub(effectEnvelope(), { health: fullHealth() });
+    const store = new ReportsStore({ client: client as unknown as LntApiClient });
+
+    await expect(store.buildReport(abaDetail("missing_feature"))).rejects.toThrow(
+      "missing_feature",
+    );
+    expect(client.submitted).toHaveLength(0);
+  });
+
+  it("does not regroup a surviving half-pair with the wrong participant", async () => {
+    const detail = {
+      experiment: {
+        experiment_id: "exp.ab",
+        title: "AB",
+        revision: 1,
+        protocol: { kind: "ab" },
+        primary_estimands: [{ feature_key: "metric" }],
+        steps: [
+          { order: 1, condition_id: "a", instruction: "a" },
+          { order: 2, condition_id: "b", instruction: "b" },
+        ],
+      },
+      members: [
+        { session_id: "a1", condition_id: "a", order: 1 },
+        { session_id: "b1", condition_id: "b", order: 2 },
+        { session_id: "a2", condition_id: "a", order: 3 },
+        { session_id: "b2", condition_id: "b", order: 4 },
+      ],
+      steps: [],
+    } as unknown as ExperimentDetail;
+    const client = clientStub(effectEnvelope(), {
+      health: new Map([
+        ["a1", "ok"],
+        ["b1", "corrupt_manifest"],
+        ["a2", "corrupt_manifest"],
+        ["b2", "ok"],
+      ]),
+      failDetailFor: ["a1"],
+      analysisFor: (sessionId) => ({
+        metrics: { metric: { a2: 2, b1: 10, b2: 20 }[sessionId] },
+        ch1_input_reference: { status: "available", model_kind: "rc_shunt_v1" },
+      }),
+    });
+    const store = new ReportsStore({ client: client as unknown as LntApiClient });
+
+    await store.buildReport(detail, { units: "custom" });
+
+    expect(client.submitted[0]?.pairs).toEqual([{ unit_id: "a2~b2", value_a: 2, value_b: 20 }]);
+    const { draft } = await store.buildReport(detail, { units: "custom" });
+    expect(draft.planes.map((plane) => plane.session_id)).toEqual(["a2", "b2"]);
+    const omitted = draft.limitations.find((item) => item.code === "incomplete_observations");
+    expect(omitted?.detail).toContain("a1 (значение недоступно)");
+    expect(omitted?.detail).toContain("b1 (нет полной пары по протоколу)");
+    const notes = draft.limitations.find((item) => item.code === "sessions_with_health_notes");
+    expect(notes?.detail).toContain("a2 (corrupt_manifest)");
+    expect(notes?.detail).not.toContain("b1");
+  });
+
+  it("does not submit after cancellation during metric collection", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const client = clientStub(effectEnvelope(), { health: fullHealth() });
+    client.plots.detail = vi.fn(async (sessionId: string) => {
+      await gate;
+      return {
+        name: sessionId,
+        manifest: {},
+        analysis: { metrics: { band_mid_total: 10 } },
+        spectrum_available: true,
+        waveform_available: false,
+        ch2_available: false,
+      };
+    }) as unknown as ClientStub["plots"]["detail"];
+    const store = new ReportsStore({ client: client as unknown as LntApiClient });
+    const pending = store.buildReport(abaDetail(), { units: UNITS });
+    await Promise.resolve();
+    store.abort();
+    release();
+
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(client.submitted).toHaveLength(0);
+  });
+
   it("includes members despite QC health notes; records them as typed limitations", async () => {
     // Семантика рабочей области экспериментов: включение — решение оператора,
     // health — вердикт на экране. Значение доступно → участник в расчёте.
@@ -168,7 +285,7 @@ describe("ReportsStore.buildReport", () => {
       health: fullHealth({ "u1-cond_a2": "corrupt_manifest" }),
     });
     const store = new ReportsStore({ client: client as unknown as LntApiClient });
-    const { draft, markdown } = await store.buildReport(abaDetail());
+    const { draft, markdown } = await store.buildReport(abaDetail(), { units: UNITS });
 
     expect(draft.outcome.kind).toBe("effect");
     expect(client.submitted).toHaveLength(1);
@@ -197,7 +314,7 @@ describe("ReportsStore.buildReport", () => {
       failDetailFor: ["u2-cond_b"],
     });
     const store = new ReportsStore({ client: client as unknown as LntApiClient });
-    const { draft } = await store.buildReport(abaDetail());
+    const { draft } = await store.buildReport(abaDetail(), { units: UNITS });
 
     const request = client.submitted[0];
     if (request === undefined || request.kind !== "aba")
@@ -216,7 +333,7 @@ describe("ReportsStore.buildReport", () => {
     envelope.result = { reason_code: "a_drift_exceeds_half_effect_or_two_sd" };
     const client = clientStub(envelope, { health: fullHealth() });
     const store = new ReportsStore({ client: client as unknown as LntApiClient });
-    const { draft } = await store.buildReport(abaDetail());
+    const { draft } = await store.buildReport(abaDetail(), { units: UNITS });
     expect(draft.outcome.kind).toBe("refusal");
     const refusal = draft.limitations.find((item) => item.code === "statistics_refusal");
     expect(refusal?.detail).toContain("a_drift_exceeds_half_effect_or_two_sd");
@@ -231,7 +348,7 @@ describe("ReportsStore.buildReport", () => {
       planeStatus: "manifest_schema_v1",
     });
     const store = new ReportsStore({ client: client as unknown as LntApiClient });
-    const { draft } = await store.buildReport(abaDetail());
+    const { draft } = await store.buildReport(abaDetail(), { units: UNITS });
     expect(draft.planes.every((plane) => !plane.available)).toBe(true);
     const planes = draft.limitations.find((item) => item.code === "input_reference_unavailable");
     expect(planes?.detail).toContain("manifest_schema_v1");
@@ -240,7 +357,7 @@ describe("ReportsStore.buildReport", () => {
   it("recipes endpoint failure degrades to the honest unlinked limitation", async () => {
     const client = clientStub(effectEnvelope(), { health: fullHealth(), recipesFail: true });
     const store = new ReportsStore({ client: client as unknown as LntApiClient });
-    const { draft } = await store.buildReport(abaDetail());
+    const { draft } = await store.buildReport(abaDetail(), { units: UNITS });
     expect(draft.recipes).toHaveLength(0);
     expect(draft.limitations.map((item) => item.code)).toContain("recipes_unlinked");
   });
@@ -253,7 +370,7 @@ describe("ReportsStore.buildReport", () => {
     }) as unknown as ClientStub["catalogSessions"];
     const store = new ReportsStore({ client: client as unknown as LntApiClient });
     // When
-    const { draft } = await store.buildReport(abaDetail());
+    const { draft } = await store.buildReport(abaDetail(), { units: UNITS });
     // Then: тихой пустой карты нет — есть типизированное ограничение с причиной
     const codes = draft.limitations.map((item) => item.code);
     expect(codes).toContain("catalog_health_unavailable");
@@ -269,7 +386,7 @@ describe("ReportsStore.buildReport", () => {
     });
     const store = new ReportsStore({ client: client as unknown as LntApiClient });
     // When
-    const { draft } = await store.buildReport(abaDetail());
+    const { draft } = await store.buildReport(abaDetail(), { units: UNITS });
     // Then: ограничение хранит и сессию, и исходную причину
     const entry = draft.limitations.find((item) => item.code === "values_unavailable");
     expect(entry).toBeDefined();
@@ -282,7 +399,7 @@ describe("ReportsStore.buildReport", () => {
     const client = clientStub(effectEnvelope(), { health: fullHealth(), recipesFail: true });
     const store = new ReportsStore({ client: client as unknown as LntApiClient });
     // When
-    const { draft } = await store.buildReport(abaDetail());
+    const { draft } = await store.buildReport(abaDetail(), { units: UNITS });
     // Then: пустой список не молчит — причина зафиксирована типизированно
     const entry = draft.limitations.find((item) => item.code === "recipes_load_failed");
     expect(entry).toBeDefined();
