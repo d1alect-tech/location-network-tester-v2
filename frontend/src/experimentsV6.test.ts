@@ -162,6 +162,32 @@ describe("эксперименты V6: мастер — wizard-modal", () => {
     expect(wizard.root.getAttribute("role")).toBe("dialog");
     wizard.root.remove();
   });
+
+  it("defaults to the real needle metric without a persisted-units field", () => {
+    const wizard = new ExperimentWizard({ client: stubClient(), onCreated: () => undefined });
+    const labels = [...wizard.root.querySelectorAll<HTMLLabelElement>("label")];
+    const estimand = labels.find(
+      (label) => label.textContent === "Оцениваемый признак (feature key)",
+    );
+
+    expect((estimand?.control as HTMLInputElement | null)?.value).toBe("needle_mean_v");
+    expect(labels.some((label) => label.textContent === "Единицы измерения")).toBe(false);
+    wizard.root.remove();
+  });
+
+  it("keeps the stable wizard class on the shared modal dialog", () => {
+    const trigger = document.createElement("button");
+    document.body.append(trigger);
+    trigger.focus();
+    const wizard = new ExperimentWizard({ client: stubClient(), onCreated: () => undefined });
+
+    wizard.open(() => undefined);
+
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]');
+    expect(dialog?.classList.contains("lnt-exp-wizard")).toBe(true);
+    expect(dialog?.querySelector('[role="dialog"]')).toBeNull();
+    wizard.close();
+  });
 });
 
 describe("эксперименты V6: пины (уже зелёные)", () => {

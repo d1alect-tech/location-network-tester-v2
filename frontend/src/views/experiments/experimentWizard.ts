@@ -5,10 +5,12 @@
 import type { LntApiClient } from "../../api/client";
 import type { CatalogSession } from "../../api/types";
 import type { ExperimentWritePayload } from "../../api/types-research";
+import { type DialogHandle, openDialog } from "../../components/primitives/dialog";
 import { el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { buildExperimentDraft, protocolLabel, validateDraft } from "./experimentModel";
 import type { DraftExperimentInput, ProtocolKind } from "./experimentModel";
+import { numberField, selectField, textField } from "./experimentWizardFields";
 
 const PLANS: ("ab" | "aba" | "repeated_blocks")[] = ["ab", "aba", "repeated_blocks"];
 
@@ -26,23 +28,25 @@ export interface WizardOptions {
 export class ExperimentWizard {
   readonly root: HTMLElement;
   private readonly client: Pick<LntApiClient, "catalogSessions" | "research">;
-  private onCreated: (experimentId: string) => void;
+  private readonly onCreated: (experimentId: string) => void;
   private kind: ProtocolKind = "aba";
   /** session_id → условие; сессия ровно в одном условии. */
   private assignment = new Map<string, string>();
   private sessions: CatalogSession[] = [];
-  private sessionListHost: HTMLElement;
+  private readonly sessionListHost: HTMLElement;
+  private dialog: DialogHandle | null = null;
+  private closed = false;
+  private readonly controller = new AbortController();
 
   constructor(options: WizardOptions) {
     this.client = options.client;
     this.onCreated = options.onCreated;
-    const idInput = text("Идентификатор эксперимента", "exp.aba.demo");
-    const titleInput = text("Название", "");
-    const questionInput = text("Вопрос исследования", "");
-    const estimandInput = text("Оцениваемый признак (feature key)", "band_mid_total");
-    const unitsInput = text("Единицы измерения", "В²/Гц");
-    const minNInput = numberInput("Минимальный N единиц", 3);
-    const planSelect = select(
+    const idInput = textField("Идентификатор эксперимента", "exp.aba.demo");
+    const titleInput = textField("Название", "");
+    const questionInput = textField("Вопрос исследования", "");
+    const estimandInput = textField("Оцениваемый признак (feature key)", "needle_mean_v");
+    const minNInput = numberField("Минимальный N единиц", 3);
+    const planSelect = selectField(
       "План эксперимента",
       PLANS.map((kind) => [kind, protocolLabel(kind)]),
       "aba",
@@ -61,7 +65,6 @@ export class ExperimentWizard {
         titleInput.wrap,
         questionInput.wrap,
         estimandInput.wrap,
-        unitsInput.wrap,
         minNInput.wrap,
       ]),
     );
@@ -75,13 +78,7 @@ export class ExperimentWizard {
       text: "Создать эксперимент",
       attrs: { type: "submit" },
     });
-    const cancelButton = el("button", {
-      className: "lnt-btn btn-quiet",
-      text: "Закрыть",
-      attrs: { type: "button", "aria-label": "Закрыть мастер создания" },
-    });
-    cancelButton.addEventListener("click", () => this.root.remove());
-    form.append(el("div", { className: "form-actions cmd-actions" }, [submit, cancelButton]));
+    form.append(el("div", { className: "form-actions cmd-actions" }, [submit]));
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -93,7 +90,7 @@ export class ExperimentWizard {
         kind: this.kind,
         sessionsByCondition: this.sessionsByCondition(),
         estimandKey: estimandInput.input.value.trim(),
-        units: unitsInput.input.value.trim() || "у.е.",
+        units: "V",
         minimumN: Number(minNInput.input.value),
         nowIso: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
         actor: "user:operator",
@@ -110,13 +107,15 @@ export class ExperimentWizard {
       };
       submit.disabled = true;
       void this.client.research
-        .createExperiment(payload)
+        .createExperiment(payload, { signal: this.controller.signal })
         .then((created) => {
+          if (this.closed) return;
           announcePolite(`Эксперимент создан: ${created.experiment_id}`);
+          this.close();
           this.onCreated(created.experiment_id);
-          this.root.remove();
         })
         .catch((error: unknown) => {
+          if (this.closed) return;
           errorLine.textContent = error instanceof Error ? error.message : String(error);
           submit.disabled = false;
         });
@@ -127,8 +126,6 @@ export class ExperimentWizard {
       this.renderSessions();
     });
 
-    // V6-модалка: диалог поверх рабочей области; Esc и кнопка «Закрыть»
-    // выходят без создания (валидация и payload — без изменений).
     this.root = el(
       "section",
       {
@@ -144,18 +141,53 @@ export class ExperimentWizard {
         form,
       ],
     );
-    this.root.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") this.root.remove();
-    });
     void this.loadSessions();
+  }
+
+  open(onClosed: () => void): void {
+    if (this.dialog !== null) {
+      this.focus();
+      return;
+    }
+    this.root.classList.remove("lnt-exp-wizard", "wizard-modal", "modal");
+    this.root.removeAttribute("role");
+    this.root.removeAttribute("aria-modal");
+    this.root.removeAttribute("aria-label");
+    this.root.querySelector(".placeholder-title")?.remove();
+    const dialog = openDialog({ title: "Новый эксперимент", content: this.root });
+    const primitiveClose = dialog.close;
+    dialog.close = () => {
+      if (this.closed) return;
+      this.closed = true;
+      this.controller.abort();
+      this.dialog = null;
+      onClosed();
+      primitiveClose();
+    };
+    this.dialog = dialog;
+    const box = dialog.root.querySelector<HTMLElement>('[role="dialog"]');
+    box?.classList.add("lnt-exp-wizard", "wizard-modal", "modal");
+  }
+
+  focus(): void {
+    this.dialog?.root.querySelector<HTMLElement>("input, select, button")?.focus();
+  }
+
+  close(): void {
+    this.dialog?.close();
   }
 
   private async loadSessions(): Promise<void> {
     try {
-      const page = await this.client.catalogSessions({ page_size: 50 });
+      const page = await this.client.catalogSessions(
+        { page_size: 50 },
+        { signal: this.controller.signal },
+      );
+      if (this.closed) return;
       this.sessions = page.items;
       this.renderSessions();
     } catch {
+      if (this.closed) return;
       this.sessionListHost.replaceChildren(
         el("p", { className: "lnt-helper-text", text: "Каталог сессий недоступен." }),
       );
@@ -209,38 +241,4 @@ export class ExperimentWizard {
       );
     }
   }
-}
-
-function text(labelText: string, value: string): { wrap: HTMLElement; input: HTMLInputElement } {
-  const input = el("input", { className: "lnt-input ctl", attrs: { type: "text" } });
-  input.value = value;
-  const label = el("label", { className: "lnt-label field-label", text: labelText });
-  label.htmlFor = input.id = `wiz-${labelText.replace(/\s+/gu, "-").toLowerCase()}`;
-  return { wrap: el("div", { className: "lnt-field field" }, [label, input]), input };
-}
-
-function numberInput(
-  labelText: string,
-  value: number,
-): { wrap: HTMLElement; input: HTMLInputElement } {
-  const built = text(labelText, String(value));
-  built.input.setAttribute("type", "number");
-  built.input.min = "2";
-  return built;
-}
-
-function select(
-  labelText: string,
-  options: [string, string][],
-  selected?: string,
-): { wrap: HTMLElement; input: HTMLSelectElement } {
-  const selectEl = el("select", { className: "lnt-select ctl" });
-  for (const [value, optionText] of options) {
-    const option = el("option", { text: optionText, attrs: { value } });
-    if (value === selected) option.selected = true;
-    selectEl.append(option);
-  }
-  const label = el("label", { className: "lnt-label field-label", text: labelText });
-  label.htmlFor = selectEl.id = ` wiz-${labelText.replace(/\s+/g, "-").toLowerCase()}`.trimStart();
-  return { wrap: el("div", { className: "lnt-field field" }, [label, selectEl]), input: selectEl };
 }

@@ -197,6 +197,7 @@ tr.lnt-exp-excluded {
   left: 50%;
   transform: translate(-50%, -50%);
   width: min(680px, calc(100vw - 32px));
+  max-width: none;
   max-height: calc(100vh - 64px);
   overflow: auto;
   z-index: 50;
