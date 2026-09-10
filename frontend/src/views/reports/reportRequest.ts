@@ -2,6 +2,7 @@
  * Никакого I/O: функции принимают уже собранные данные (значения участников,
  * детали сессий) — это позволяет покрывать их юнит-тестами без сети. */
 
+import { type SessionAnalysisLike, sessionMetricValue } from "../../api/sessionMetrics";
 import type {
   AbaUnitInput,
   OpenRecord,
@@ -16,20 +17,8 @@ import type {
   ReportPlaneRow,
 } from "./reportModel";
 
-export interface SessionAnalysisLike {
-  analysis: Record<string, unknown> | null;
-}
-
 export function metricValue(detail: SessionAnalysisLike, featureKey: string): number | null {
-  const analysis = detail.analysis;
-  if (analysis === null) return null;
-  const metrics = analysis.metrics;
-  if (typeof metrics === "object" && metrics !== null) {
-    const direct = (metrics as Record<string, unknown>)[featureKey];
-    if (typeof direct === "number") return direct;
-  }
-  const flat = (analysis as Record<string, unknown>)[featureKey];
-  return typeof flat === "number" ? flat : null;
+  return sessionMetricValue(detail, featureKey);
 }
 
 /** Плоскость измерения по ch1_input_reference из metrics.json сессии. */
@@ -114,13 +103,26 @@ export function groupedInProtocolOrder(shape: ProtocolShape, members: OpenRecord
   }
   const orderedConditions =
     shape.orderedConditions.length > 0 ? shape.orderedConditions : [...byCondition.keys()];
-  return orderedConditions
-    .map((conditionId) =>
-      (byCondition.get(conditionId) ?? [])
-        .sort((a, b) => a.order - b.order)
-        .map((item) => item.sessionId),
-    )
-    .filter((ids) => ids.length > 0);
+  return orderedConditions.map((conditionId) =>
+    (byCondition.get(conditionId) ?? [])
+      .sort((a, b) => a.order - b.order)
+      .map((item) => item.sessionId),
+  );
+}
+
+export function completeObservationSessionIds(
+  protocolKind: string,
+  groups: string[][],
+  values: Map<string, number>,
+): Set<string> {
+  const complete = new Set<string>();
+  const requiredGroups = protocolKind === "aba" ? groups.slice(0, 3) : groups.slice(0, 2);
+  const count = Math.min(...requiredGroups.map((group) => group.length));
+  for (let index = 0; index < count; index += 1) {
+    const ids = requiredGroups.map((group) => group[index] ?? "");
+    if (ids.every((id) => values.has(id))) for (const id of ids) complete.add(id);
+  }
+  return complete;
 }
 
 /** Разные по размеру группы условий: пары формируются позиционно —
