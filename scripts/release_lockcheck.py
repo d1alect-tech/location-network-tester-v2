@@ -28,6 +28,26 @@ if TYPE_CHECKING:
 HASH_PATTERN: Final = re.compile(r"^(sha256:[0-9a-f]{64}|git-commit:[0-9a-f]{40})$")
 REQUIRED_FIELDS: Final = ("name", "version", "license", "source_url", "hash", "scope")
 VALID_SCOPES: Final = frozenset({"runtime", "dev", "vendored"})
+SOURCE_KINDS: Final = frozenset({"native", "frontend", "hantek"})
+REQUIRED_SOURCE_PINS: Final = {
+    "astral-python-build-standalone": ("c1991f8fc3eb8774907f0cffb93792f59079cd7a", None),
+    "cpython": (None, "c08bc65a81971c1dd5783182826503369466c7e67374d1646519adf05207b684"),
+    "openssl": (None, "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8"),
+    "libffi": (
+        "16fad4855b3d8c03b5910e405ff3a04395b39a98",
+        "257d9311f521975b2f3ee1778be732e1d7077fb3b84413d327b709b3dcc5ff90",
+    ),
+    "sqlite": (None, "83e6b2020a034e9a7ad4a72feea59e1ad52f162e09cbd26735a3ffb98359fc4f"),
+    "xz": (None, "3d3a1b973af218114f4f889bbaa2f4c037deaae0c8e815eec381c3d546b974a0"),
+    "zlib": (None, "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16"),
+    "numpy-openblas-recipe": ("befbe32a3783db3e9cfd1a9e68f5d8212a1bf8de", None),
+    "numpy-openblas": ("9bdf051b96e956f848dfcef89c23e1993b0e1b3e", None),
+    "scipy-openblas-recipe": ("db637abddcd6abb7fcb63be7fbe418deeb4729db", None),
+    "scipy-openblas": ("5ffbf38b41a1fe494d038efcb09cf22f4d527c22", None),
+    "rtools-ucrt": ("c5344cc8c7e310ee4eee513b2381af2e75d65cb9", None),
+    "mingw-w64": ("acc9b9d9eb63a13d8122cbac4882eb5f4ee2f679", None),
+    "hantek6022api": ("e65d52b0f2536e56eaadbb555e5d7b756409c36e", None),
+}
 FONT_FAMILIES: Final = {"sans": "Sans", "mono": "Mono"}
 FONT_WEIGHTS: Final = {"regular": "Regular", "medium": "Medium", "semibold": "SemiBold"}
 PLEX_PACKAGE_NAMES: Final = {"sans": "@ibm/plex-sans", "mono": "@ibm/plex-mono"}
@@ -103,6 +123,60 @@ def _validate_manifest(root: Path, errors: list[str]) -> list[dict[str, str]]:
         seen.add(key)
         entries.append(fields)
     return entries
+
+
+def _source_record(
+    item: object, where: str, errors: list[str]
+) -> tuple[str, dict[str, object]] | None:
+    if not isinstance(item, dict):
+        errors.append(f"{where}: entry is not an object")
+        return None
+    fields = ("name", "kind", "url", "sha256", "archive_root")
+    if any(not isinstance(item.get(field), str) or not item[field] for field in fields):
+        errors.append(f"{where}: required fields must be non-empty strings")
+        return None
+    name, digest = str(item["name"]), str(item["sha256"])
+    if item["kind"] not in SOURCE_KINDS:
+        errors.append(f"{where}: unknown kind '{item['kind']}'")
+    if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        errors.append(f"{where}: sha256 must be 64 lowercase hex characters")
+    commit = item.get("commit")
+    if commit is not None and not (
+        isinstance(commit, str) and re.fullmatch(r"[0-9a-f]{40}", commit)
+    ):
+        errors.append(f"{where}: commit must be 40 lowercase hex characters")
+    return name, item
+
+
+def validate_source_inputs(root: Path, errors: list[str]) -> list[dict[str, object]]:
+    """Validate immutable source records and mandatory release pins."""
+    raw = _load_json(root / "release-source-inputs.json")
+    inputs = raw.get("inputs") if isinstance(raw, dict) else None
+    if not isinstance(raw, dict) or raw.get("schema_version") != 1:
+        errors.append("release-source-inputs.json: schema_version must be 1")
+    if not isinstance(inputs, list):
+        errors.append("release-source-inputs.json: inputs must be an array")
+        inputs = []
+    records: list[dict[str, object]] = []
+    by_name: dict[str, dict[str, object]] = {}
+    for index, item in enumerate(inputs):
+        parsed = _source_record(item, f"release-source-inputs.json[inputs:{index}]", errors)
+        if parsed is None:
+            continue
+        name, record = parsed
+        if name in by_name:
+            errors.append(f"release-source-inputs.json[inputs:{index}]: duplicate name '{name}'")
+        by_name[name] = record
+        records.append(record)
+    for name, (commit, digest) in REQUIRED_SOURCE_PINS.items():
+        item = by_name.get(name)
+        if item is None:
+            errors.append(f"release-source-inputs.json: missing required source '{name}'")
+        elif commit is not None and item.get("commit") != commit:
+            errors.append(f"release-source-inputs.json: wrong commit for '{name}'")
+        elif digest is not None and item.get("sha256") != digest:
+            errors.append(f"release-source-inputs.json: wrong sha256 for '{name}'")
+    return records
 
 
 def _uv_versions(root: Path, errors: list[str]) -> dict[str, str]:
@@ -200,6 +274,7 @@ def verify(root: Path, npm_regen_dir: Path | None) -> dict[str, object]:
     """Run every lock cross-check and return the verdict payload."""
     errors: list[str] = []
     manifest = _validate_manifest(root, errors)
+    validate_source_inputs(root, errors)
     uv = _uv_versions(root, errors)
     fonts = _fonts_manifest(root, errors)
 
@@ -211,10 +286,8 @@ def verify(root: Path, npm_regen_dir: Path | None) -> dict[str, object]:
         if locked is None:
             errors.append(f"{entry['scope']} '{entry['name']}' is absent from uv.lock")
         elif locked != entry["version"]:
-            errors.append(
-                f"{entry['scope']} '{entry['name']}': manifest {entry['version']}"
-                f" != uv.lock {locked}"
-            )
+            detail = f"{entry['scope']} '{entry['name']}': manifest {entry['version']}"
+            errors.append(f"{detail} != uv.lock {locked}")
     vendored_checked = _check_vendored(root, vendored, fonts, errors)
 
     lock_path = root / "frontend/package-lock.json"
@@ -222,10 +295,8 @@ def verify(root: Path, npm_regen_dir: Path | None) -> dict[str, object]:
     if npm_regen_dir is not None:
         regen = _canonical_sha256(_load_json(npm_regen_dir / "package-lock.json"))
         if regen != fingerprint:
-            errors.append(
-                "frontend/package-lock.json is stale versus frontend/package.json"
-                " (regenerated lock differs)"
-            )
+            stale = "frontend/package-lock.json is stale versus frontend/package.json"
+            errors.append(f"{stale} (regenerated lock differs)")
 
     uplot_version = vendored_checked.get("uplot", "")
     return {
@@ -246,7 +317,7 @@ def verify(root: Path, npm_regen_dir: Path | None) -> dict[str, object]:
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point: parse args, verify, write verdict JSON, exit coded."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--root", required=True, help="repository root directory")
     parser.add_argument("--out", required=True, help="path of the JSON verdict to write")
     parser.add_argument(
@@ -265,7 +336,10 @@ def main(argv: list[str] | None = None) -> int:
         exit_code = EXIT_MALFORMED
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(verdict, indent=2, sort_keys=True), encoding="utf-8")
-    for error in verdict["errors"]:
+    verdict_errors = verdict["errors"]
+    if not isinstance(verdict_errors, list):
+        raise TypeError("verdict errors must be a list")
+    for error in verdict_errors:
         sys.stderr.write(f"LOCKCHECK ERROR: {error}\n")
     sys.stderr.write(f"LOCKCHECK EXIT_CODE={exit_code}\n")
     return exit_code
