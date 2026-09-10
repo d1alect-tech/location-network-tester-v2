@@ -1,12 +1,12 @@
-# DEFINITION ONLY - Windows CI for the private LNT repository (Todo 49).
+# DEFINITION ONLY - Windows CI quality replay for LNT (Todo 49).
 #
 # Guardrails (plan Todo 49 / decision 16):
 #   * The LOCAL gate scripts/quality.ps1 remains the single authoritative
 #     quality authority; this workflow only replays it on a hosted runner for
-#     a future PRIVATE repository. It must never become authoritative.
+#     the public repository. It must never become authoritative.
 #   * This workflow PUBLISHES, UPLOADS and RELEASES NOTHING. There are no
 #     artifact-upload steps, no release steps and no secrets by design: the
-#     private-use distribution must never leave the machine that built it.
+#     release publication remains an explicit local/manual action after gates.
 #   * Reproducibility is claimed honestly: deterministic logical builds with
 #     documented PyInstaller bootloader/base_library timestamp drift, never
 #     bit-for-bit reproducibility.
