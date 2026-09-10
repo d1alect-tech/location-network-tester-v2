@@ -8,6 +8,10 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path  # noqa: TC003 - runtime store path type
 
+from lnt.safe_paths import is_linked_path
+
+_JOB_ID_LENGTH = 32
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AnalysisJob:
@@ -44,6 +48,7 @@ class AnalysisJobStore:
 
     def create(self) -> AnalysisJob:
         """Create and persist a running analysis job."""
+        self._validate_root()
         job = AnalysisJob(
             job_id=uuid.uuid4().hex,
             status="running",
@@ -56,7 +61,12 @@ class AnalysisJobStore:
 
     def get(self, job_id: str) -> AnalysisJob:
         """Load the latest persisted snapshot."""
-        payload = json.loads((self._root / f"{job_id}.json").read_text(encoding="utf-8"))
+        self._validate_id(job_id)
+        self._validate_root()
+        path = self._root / f"{job_id}.json"
+        if is_linked_path(path):
+            raise OSError("файл задачи анализа не должен быть ссылкой")
+        payload = json.loads(path.read_text(encoding="utf-8"))
         return AnalysisJob(
             job_id=str(payload["job_id"]),
             status=str(payload["status"]),
@@ -69,8 +79,12 @@ class AnalysisJobStore:
 
     def write(self, job: AnalysisJob) -> None:
         """Atomically persist one progress transition."""
+        self._validate_id(job.job_id)
+        self._validate_root()
         self._root.mkdir(parents=True, exist_ok=True)
         path = self._root / f"{job.job_id}.json"
+        if is_linked_path(path):
+            raise OSError("файл задачи анализа не должен быть ссылкой")
         temporary = path.with_name(f".{path.name}.partial-{uuid.uuid4().hex}")
         try:
             with temporary.open("x", encoding="utf-8", newline="\n") as stream:
@@ -81,3 +95,12 @@ class AnalysisJobStore:
             os.replace(temporary, path)  # noqa: PTH105 - explicit atomic seam
         finally:
             temporary.unlink(missing_ok=True)
+
+    def _validate_root(self) -> None:
+        if is_linked_path(self._root) or is_linked_path(self._root.parent):
+            raise OSError("каталог задач анализа не должен быть ссылкой")
+
+    @staticmethod
+    def _validate_id(job_id: str) -> None:
+        if len(job_id) != _JOB_ID_LENGTH or any(char not in "0123456789abcdef" for char in job_id):
+            raise ValueError("job_id должен быть lowercase UUID hex")

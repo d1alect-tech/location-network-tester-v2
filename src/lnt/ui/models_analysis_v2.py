@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from lnt.context.json_codec import JsonValue  # noqa: TC001 - Pydantic field type
+
+SessionKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
+Sha256Key = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 
 
 class RecipeCreateRequest(BaseModel):
@@ -28,6 +31,6 @@ class AnalysisRunRequest(BaseModel):
     """Start analysis for one session and recipe identity."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-    session: str
-    recipe_id: str
+    session: SessionKey
+    recipe_id: Sha256Key
     make_default: bool = False

@@ -4,25 +4,35 @@ from __future__ import annotations
 
 import csv
 import io
-import json
-import os
-import uuid
 from dataclasses import replace
-from pathlib import Path  # noqa: TC003 - runtime response paths
 from typing import Annotated, Final
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 
-from lnt.analysis_store import AnalysisRecipe, ArtifactCorruptError, ArtifactStore
+from lnt.analysis_store import AnalysisRecipe
 from lnt.analysis_v2 import AnalysisOrchestrator, DefaultAnalysisEngine
 from lnt.analysis_v2.jobs import AnalysisJobStore
 from lnt.analysis_v2.recipes import RecipeCatalog
 from lnt.errors import InputError
-from lnt.safe_paths import ensure_safe_filename
+from lnt.ui.analysis_v2_files import (
+    read_default_pointer,
+    validate_job_id,
+    validate_session_inputs,
+    validate_sha256,
+    verified_output,
+    write_default_pointer,
+)
 from lnt.ui.decimation import min_max_envelope
-from lnt.ui.dependencies import AppServices, get_services, require_csrf
+from lnt.ui.dependencies import (
+    AppServices,
+    get_services,
+    http_not_found,
+    http_unprocessable,
+    require_csrf,
+    resolve_session_or_404,
+)
 from lnt.ui.models_analysis_v2 import (  # noqa: TC001 - FastAPI resolves request models
     AnalysisRunRequest,
     RecipeCloneRequest,
@@ -49,13 +59,12 @@ def create_recipe(request: RecipeCreateRequest, services: Services) -> dict[str,
 
 @router.get("/recipes")
 def list_recipes(services: Services) -> dict[str, object]:
-    """List all immutable recipes."""
-    return {
-        "items": [
-            item.payload()
-            for item in RecipeCatalog(services.root / ".lnt" / "analysis-recipes").list()
-        ]
-    }
+    """List all immutable recipes; a tampered catalog fails closed."""
+    try:
+        items = RecipeCatalog(services.root / ".lnt" / "analysis-recipes").list()
+    except InputError as error:
+        raise http_unprocessable(str(error)) from error
+    return {"items": [item.payload() for item in items]}
 
 
 @router.post("/recipes/{recipe_id}/clone", dependencies=[Depends(require_csrf)], status_code=201)
@@ -63,16 +72,23 @@ def clone_recipe(
     recipe_id: str, request: RecipeCloneRequest, services: Services
 ) -> dict[str, object]:
     """Clone a recipe without changing its source."""
-    return (
-        RecipeCatalog(services.root / ".lnt" / "analysis-recipes")
-        .clone(recipe_id, request.name)
-        .payload()
-    )
+    validate_sha256(recipe_id, label="recipe_id")
+    try:
+        return (
+            RecipeCatalog(services.root / ".lnt" / "analysis-recipes")
+            .clone(recipe_id, request.name)
+            .payload()
+        )
+    except FileNotFoundError as error:
+        raise http_not_found("рецепт анализа не найден") from error
+    except InputError as error:
+        raise http_unprocessable(str(error)) from error
 
 
 @router.delete("/recipes/{recipe_id}", dependencies=[Depends(require_csrf)])
 def reject_recipe_delete(recipe_id: str) -> None:
     """Reject deletion because published artifacts may reference recipes."""
+    validate_sha256(recipe_id, label="recipe_id")
     raise HTTPException(
         status.HTTP_409_CONFLICT, f"рецепт {recipe_id} неизменяем и может быть указан в artifact"
     )
@@ -81,21 +97,30 @@ def reject_recipe_delete(recipe_id: str) -> None:
 @router.post("/runs", dependencies=[Depends(require_csrf)], status_code=202)
 def run_analysis(request: AnalysisRunRequest, services: Services) -> dict[str, str | int | None]:
     """Run through the durable job seam; computation remains cooperative and bounded."""
+    session_dir = resolve_session_or_404(services.root, request.session)
+    try:
+        recipe = RecipeCatalog(services.root / ".lnt" / "analysis-recipes").get(request.recipe_id)
+    except FileNotFoundError as error:
+        raise http_not_found("рецепт анализа не найден") from error
+    except InputError as error:
+        raise http_unprocessable(str(error)) from error
+    validate_session_inputs(session_dir, recipe.recipe.channels, make_default=request.make_default)
     jobs = AnalysisJobStore(services.root / ".lnt" / "analysis-jobs")
     job = jobs.create()
-    recipe = RecipeCatalog(services.root / ".lnt" / "analysis-recipes").get(request.recipe_id)
 
     def progress(stage: str, completed: int, total: int) -> None:
         jobs.write(replace(job, stage=stage, completed=completed, total=total))
 
     try:
         result = AnalysisOrchestrator(engine=DefaultAnalysisEngine()).run(
-            services.root / request.session,
+            session_dir,
             recipe.recipe,
             progress=progress,
             project_legacy=request.make_default,
         )
-    except (OSError, ValueError) as error:
+        if request.make_default:
+            write_default_pointer(session_dir, recipe.recipe_id, result.artifact_key)
+    except (InputError, OSError, ValueError) as error:
         failed = replace(job, status="failed", stage="done", error=str(error))
         jobs.write(failed)
         return failed.payload()
@@ -108,16 +133,13 @@ def run_analysis(request: AnalysisRunRequest, services: Services) -> dict[str, s
         artifact_key=result.artifact_key,
     )
     jobs.write(succeeded)
-    if request.make_default:
-        _write_default_pointer(
-            services.root / request.session, recipe.recipe_id, result.artifact_key
-        )
     return succeeded.payload()
 
 
 @router.get("/runs/{job_id}")
 def analysis_status(job_id: str, services: Services) -> dict[str, str | int | None]:
     """Return the latest durable analysis job snapshot."""
+    validate_job_id(job_id)
     try:
         return AnalysisJobStore(services.root / ".lnt" / "analysis-jobs").get(job_id).payload()
     except OSError as error:
@@ -129,15 +151,7 @@ def artifact_file(
     session_name: str, artifact_key: str, filename: str, services: Services
 ) -> Response:
     """Serve bytes only after manifest integrity verification."""
-    artifact = _verified_artifact(services, session_name, artifact_key)
-    try:
-        # GAP-2: единый барьер путей вместо сравнения parent (defense-in-depth).
-        ensure_safe_filename(filename, label="имя файла артефакта")
-    except InputError as error:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "файл artifact не найден") from error
-    path = artifact / filename
-    if not path.is_file() or path.parent != artifact:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "файл artifact не найден")
+    path = verified_output(services, session_name, artifact_key, filename)
     media = "application/json" if filename.endswith(".json") else "application/octet-stream"
     return Response(path.read_bytes(), media_type=media)
 
@@ -168,18 +182,10 @@ def spectrum_zoom(  # noqa: PLR0913, PLR0917 - FastAPI path/query boundary
     return _spectrum_payload(services, session_name, artifact_key, start, end, max_points)
 
 
-def _verified_artifact(services: AppServices, session_name: str, artifact_key: str) -> Path:
-    store = ArtifactStore(services.root / session_name)
-    try:
-        artifact = store.find(artifact_key)
-    except ArtifactCorruptError as error:
-        store.invalidate(artifact_key)
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, "artifact повреждён и помещён в карантин"
-        ) from error
-    if artifact is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "artifact не найден")
-    return artifact
+@router.get("/sessions/{session_name}/.lnt-default-analysis.json")
+def default_analysis_pointer(session_name: str, services: Services) -> dict[str, str]:
+    """Return a default pointer only after pointer and artifact verification."""
+    return read_default_pointer(services, session_name)
 
 
 def _spectrum_payload(  # noqa: PLR0913, PLR0917 - shared route boundary
@@ -194,10 +200,8 @@ def _spectrum_payload(  # noqa: PLR0913, PLR0917 - shared route boundary
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "max_points вне предела 4..50000"
         )
-    artifact = _verified_artifact(services, session_name, artifact_key)
-    rows = tuple(
-        csv.DictReader(io.StringIO((artifact / "spectrum.csv").read_text(encoding="utf-8")))
-    )
+    spectrum_path = verified_output(services, session_name, artifact_key, "spectrum.csv")
+    rows = tuple(csv.DictReader(io.StringIO(spectrum_path.read_text(encoding="utf-8"))))
     x = np.asarray([float(row["frequency_hz"]) for row in rows], dtype=np.float64)
     y = np.asarray([float(row["psd_v2_per_hz"]) for row in rows], dtype=np.float64)
     if start is not None and end is not None:
@@ -205,19 +209,3 @@ def _spectrum_payload(  # noqa: PLR0913, PLR0917 - shared route boundary
         x, y = x[selected], y[selected]
     series = min_max_envelope(x, y, max_points=max_points)
     return {"x": series.x, "y": series.y, "point_count": series.point_count}
-
-
-def _write_default_pointer(session_dir: Path, recipe_id: str, artifact_key: str) -> None:
-    path = session_dir / ".lnt-default-analysis.json"
-    temporary = path.with_name(f".{path.name}.partial-{uuid.uuid4().hex}")
-    try:
-        with temporary.open("x", encoding="utf-8", newline="\n") as stream:
-            json.dump(
-                {"recipe_id": recipe_id, "artifact_key": artifact_key}, stream, sort_keys=True
-            )
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)  # noqa: PTH105 - explicit atomic seam
-    finally:
-        temporary.unlink(missing_ok=True)
