@@ -12,7 +12,6 @@ import type { ContextResponse, ContextUpdateRequest } from "../../api/types";
 import { el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { createMutation, createResourceLoader } from "../../state/resource";
-import { HEALTH_LABELS } from "./catalogModel";
 import { v6Field } from "./catalogV6Field";
 import { createFieldsTable, createRecoveryPanel } from "./contextFieldsView";
 import {
@@ -22,6 +21,12 @@ import {
   mergeDraftOntoFresh,
   userEditableFields,
 } from "./inspectorConflict";
+
+const CONTEXT_HEALTH_LABELS: Readonly<Record<string, string>> = {
+  context_valid: "Исправен",
+  context_absent: "Не сохранён",
+  context_invalid: "Повреждён",
+};
 
 export interface ContextInspectorOptions {
   client: LntApiClient;
@@ -188,7 +193,7 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
   }
 
   function renderReady(context: ContextResponse): void {
-    const health = HEALTH_LABELS[context.health as keyof typeof HEALTH_LABELS];
+    const healthLabel = CONTEXT_HEALTH_LABELS[context.health] ?? context.health;
     while (summary.firstChild) summary.removeChild(summary.firstChild);
     summary.append(
       el("p", {
@@ -198,14 +203,12 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
       }),
       el("p", {
         className: "t-compact",
-        text: health ? `Состояние: ${health.label}` : `Состояние: ${context.health}`,
+        text: `Состояние контекста: ${healthLabel}`,
       }),
     );
     while (recovery.firstChild) recovery.removeChild(recovery.firstChild);
-    if (context.health !== "ok" || context.reason_codes.length > 0) {
-      recovery.append(
-        createRecoveryPanel(context.reason_codes, health ? health.label : context.health),
-      );
+    if (context.health !== "context_valid" || context.reason_codes.length > 0) {
+      recovery.append(createRecoveryPanel(context.reason_codes, context.health));
     }
     while (fieldsHost.firstChild) fieldsHost.removeChild(fieldsHost.firstChild);
     fieldsHost.append(createFieldsTable(context.fields));

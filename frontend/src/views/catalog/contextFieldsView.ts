@@ -52,15 +52,23 @@ export function createFieldsTable(fields: Record<string, ContextField>): HTMLEle
   return table;
 }
 
-export function createRecoveryPanel(reasonCodes: string[], healthLabel: string): HTMLElement {
+export function createRecoveryPanel(reasonCodes: string[], health: string): HTMLElement {
   const panel = el("div", {
     className: "banner lnt-cat-recovery",
-    attrs: { role: "note", "aria-label": "Объяснение восстановления" },
+    attrs: { role: "note", "aria-label": "Состояние контекста" },
   });
+  const summary =
+    health === "context_valid"
+      ? "Контекст исправен. Журнал изменений содержит предупреждение."
+      : health === "context_absent"
+        ? "Контекст сессии ещё не сохранён. Поля ниже можно заполнить и сохранить."
+        : health === "context_invalid"
+          ? "Контекст сессии повреждён. Проблема относится только к контексту."
+          : `Контекст требует внимания (${health}).`;
   panel.append(
     el("p", {
       className: "banner-title",
-      text: `Сессия повреждена или неполна (${healthLabel}). Запись недоступна для анализа, но остаётся видимой в каталоге.`,
+      text: summary,
     }),
   );
   if (reasonCodes.length > 0) {

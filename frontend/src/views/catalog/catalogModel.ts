@@ -77,10 +77,14 @@ export function matchesTextFilter(filters: FilterValues): boolean {
 
 /** Русское объяснение кода причины из reason_codes контекста. */
 export function reasonCodeExplanation(code: string): string {
-  if (code === "context_schema_v1") return "Файл контекста устаревшей схемы — требуется миграция.";
-  if (code === "context_parse_error") return "Не удалось разобрать context.json — файл повреждён.";
-  if (code === "context_missing") return "Файл контекста отсутствует в папке сессии.";
-  if (code === "manifest_parse_error") return "Не удалось прочитать manifest.json.";
-  if (code === "missing_files") return "Отсутствуют сигнальные файлы записи (ch1.npy и другие).";
+  if (code === "context_events_torn_tail") {
+    return "Журнал изменений контекста оборван в конце; загружена последняя целая версия контекста.";
+  }
+  if (code === "context_cache_malformed") {
+    return "Не удалось прочитать context.json — файл контекста повреждён.";
+  }
+  if (code === "context_identity_mismatch") {
+    return "Идентификатор в context.json не совпадает с открытой сессией.";
+  }
   return `Причина: ${code}`;
 }
