@@ -80,6 +80,7 @@ export async function runComparability(input: ComparabilityJobInput): Promise<vo
       },
       { signal },
     );
+    if (signal.aborted) return;
     input.onReport(report);
     input.renderReport(report);
   } catch (error) {
@@ -94,8 +95,12 @@ export async function runAnalysis(input: AnalysisJobInput): Promise<void> {
     input.showBanner("Нет данных эксперимента для расчёта. Сначала выберите эксперимент.", "warn");
     return;
   }
-  if (lastReport !== null && !lastReport.comparable) {
+  if (lastReport === null || !lastReport.comparable) {
     input.showBanner("Расчёт заблокирован: сравнимость не подтверждена.", "warn");
+    return;
+  }
+  if (units.trim().length === 0) {
+    input.showBanner("Укажите единицы измерения для выбранного признака.", "warn");
     return;
   }
   const kind = String(detail.experiment.protocol.kind);
@@ -107,8 +112,13 @@ export async function runAnalysis(input: AnalysisJobInput): Promise<void> {
       seed,
       signal,
     );
+    const activeCount =
+      kind === "aba" ? (request.aba_units?.length ?? 0) : (request.pairs?.length ?? 0);
+    if (activeCount === 0) throw new Error("нет доступных сопоставленных значений признака");
+    if (signal.aborted) return;
     const snapshot = await client.statistics.submit(detail.experiment.experiment_id, request);
     const envelope = await pollResult(client, snapshot.job_id, signal);
+    if (signal.aborted) return;
     input.renderEnvelope(envelope);
     announcePolite("Результат сравнения получен");
   } catch (error) {

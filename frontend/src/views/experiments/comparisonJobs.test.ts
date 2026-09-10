@@ -81,6 +81,52 @@ describe("comparisonJobs leaf (C3c: задачи сравнения)", () => {
     expect(submit).not.toHaveBeenCalled();
   });
 
+  it("requires a completed comparability check before analysis", async () => {
+    const showBanner = vi.fn();
+    const submit = vi.fn();
+    await runAnalysis({
+      client: stubClient({ statistics: { submit } }),
+      detail: stubDetail(),
+      lastReport: null,
+      featureKey: "needle_mean_v",
+      units: "V",
+      seed: 43,
+      signal: new AbortController().signal,
+      buildStatisticsRequest: vi.fn(),
+      showBanner,
+      renderEnvelope: vi.fn(),
+    });
+
+    expect(showBanner).toHaveBeenCalledWith(
+      "Расчёт заблокирован: сравнимость не подтверждена.",
+      "warn",
+    );
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("reports missing measurement units before building a request", async () => {
+    const showBanner = vi.fn();
+    const buildStatisticsRequest = vi.fn();
+    await runAnalysis({
+      client: stubClient(),
+      detail: stubDetail(),
+      lastReport: { comparable: true, findings: [] },
+      featureKey: "unknown_metric",
+      units: "",
+      seed: 43,
+      signal: new AbortController().signal,
+      buildStatisticsRequest,
+      showBanner,
+      renderEnvelope: vi.fn(),
+    });
+
+    expect(showBanner).toHaveBeenCalledWith(
+      "Укажите единицы измерения для выбранного признака.",
+      "warn",
+    );
+    expect(buildStatisticsRequest).not.toHaveBeenCalled();
+  });
+
   it("runComparability without context shows the banner instead of a silent return", async () => {
     const showBanner = vi.fn();
     const comparabilityCheck = vi.fn();
