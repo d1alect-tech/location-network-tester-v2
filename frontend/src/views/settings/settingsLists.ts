@@ -52,7 +52,7 @@ export async function refreshRecipes(
           el("span", { text: `${recipe.name} ` }),
           el("code", {
             className: "t-mono",
-            text: `${recipe.recipe_id} · sha256 ${recipe.sha256}`,
+            text: `recipe_id / sha256 ${recipe.recipe_id}`,
           }),
         ]),
       );
