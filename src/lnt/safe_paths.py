@@ -92,3 +92,8 @@ def ensure_within_root(root: Path, candidate: Path) -> Path:
             f"путь выходит за пределы корня: {candidate}",
         ) from error
     return resolved_candidate
+
+
+def is_linked_path(path: Path) -> bool:
+    """Возвращает True для symlink и Windows junction/reparse directory."""
+    return path.is_symlink() or path.is_junction()
