@@ -1,0 +1,298 @@
+diff --git a/PyHT6022/Firmware/__init__.py b/PyHT6022/Firmware/__init__.py
+index 84b5d98..595afa3 100644
+--- a/PyHT6022/Firmware/__init__.py
++++ b/PyHT6022/Firmware/__init__.py
+@@ -1,4 +1,5 @@
+ __author__ = 'Robert Cope'
++# Modified by LNT contributors on 2026-09-10 to restrict the packaged runtime to Hantek 6022BE.
+ 
+ from collections import namedtuple
+ import os
+@@ -38,11 +38,5 @@ def fx2_ihex_to_control_packets(firmware_location):
+     return packets
+ 
+ base_path = os.path.dirname(os.path.realpath(__file__))
+-stock_firmware = fx2_ihex_to_control_packets(os.path.join(base_path, 'HEX', 'stock_fw.ihex'))
+-mod_firmware_01 = fx2_ihex_to_control_packets(os.path.join(base_path, 'HEX', 'mod_fw_01.ihex'))
+-mod_firmware_iso = fx2_ihex_to_control_packets(os.path.join(base_path, 'HEX', 'mod_fw_iso.ihex'))
+-dso6021_firmware = fx2_ihex_to_control_packets(os.path.join(base_path, 'HEX', 'dso6021-firmware.hex'))
+ dso6022be_firmware = fx2_ihex_to_control_packets(os.path.join(base_path, 'HEX', 'dso6022be-firmware.hex'))
+-dso6022bl_firmware = fx2_ihex_to_control_packets(os.path.join(base_path, 'HEX', 'dso6022bl-firmware.hex'))
+-dds120_firmware = fx2_ihex_to_control_packets(os.path.join(base_path, 'HEX', 'dds120-firmware.hex'))
+ firmware = default_firmware = dso6022be_firmware
+diff --git a/PyHT6022/LibUsbScope.py b/PyHT6022/LibUsbScope.py
+index 86d3f5c..81abe61 100644
+--- a/PyHT6022/LibUsbScope.py
++++ b/PyHT6022/LibUsbScope.py
+@@ -1,4 +1,5 @@
+ __author__ = 'Robert Cope', 'Jochen Hoenicke', 'Martin Homuth-Rosemann'
++# Modified by LNT contributors on 2026-09-10 to restrict the packaged runtime to Hantek 6022BE.
+ 
+ import array
+ import libusb1
+@@ -12,7 +12,7 @@ import numpy as np
+ 
+ from struct import pack
+ 
+-from PyHT6022.Firmware import dso6021_firmware,dso6022be_firmware, dso6022bl_firmware, fx2_ihex_to_control_packets
++from PyHT6022.Firmware import dso6022be_firmware
+ 
+ from PyHT6022.Firmware.version import firmware_version as FW_VER
+ 
+@@ -21,9 +21,7 @@ class Oscilloscope(object):
+     FIRMWARE_VERSION = FW_VER
+     NO_FIRMWARE_VENDOR_ID = 0x04B4
+     FIRMWARE_PRESENT_VENDOR_ID = 0x04B5
+-    PRODUCT_ID_21 = 0x6021
+     PRODUCT_ID_BE = 0x6022
+-    PRODUCT_ID_BL = 0x602A
+ 
+     RW_FIRMWARE_REQUEST = 0xa0
+     RW_FIRMWARE_INDEX = 0x00
+@@ -121,8 +119,7 @@ class Oscilloscope(object):
+ #                     }
+ 
+ 
+-    # defaults to 6022BE with the possibility to supply a non standard VID/PID combination
+-    def __init__(self, VID=NO_FIRMWARE_VENDOR_ID, PID=PRODUCT_ID_BE):
++    def __init__(self):
+         self.device = None
+         self.device_handle = None
+         self.context = usb1.USBContext()
+@@ -132,8 +129,6 @@ class Oscilloscope(object):
+         self.packetsize = None
+         self.num_channels = 2
+         self.ac_dc_status = 0x11
+-        self.VID=VID
+-        self.PID=PID
+         self.calibration = None
+         self.calibration_ext = None
+         self.offset1 = { 1:0, 2:0, 5:0, 10:0 }
+@@ -145,23 +140,8 @@ class Oscilloscope(object):
+     def setup(self):
+         """
+         Attempt to find a suitable scope to run.
+-        :return: True if a {6022BE, 6022BL, 6021} (or user defined) scope was found, False otherwise.
+-        """
+-        # look for a user defined device that doesn't match {6021,6022BE,6022BL}
+-        if ( ( self.VID != self.NO_FIRMWARE_VENDOR_ID and self.VID != self.FIRMWARE_PRESENT_VENDOR_ID )
+-        or ( self.PID != self.PRODUCT_ID_21
+-         and self.PID != self.PRODUCT_ID_BE
+-         and self.PID != self.PRODUCT_ID_BL ) ):
+-            self.device = (
+-                self.context.getByVendorIDAndProductID(
+-                    self.VID, self.PID, skip_on_error=True, skip_on_access_error=True
+-                )
+-            )
+-            if self.device:
+-                self.is_device_firmware_present = False
+-                return True
+-
+-        # 1st look for 6022BE
++        :return: True if a 6022BE scope was found, False otherwise.
++        """
+         self.device = (
+             self.context.getByVendorIDAndProductID(
+                 self.FIRMWARE_PRESENT_VENDOR_ID, self.PRODUCT_ID_BE, skip_on_error=True, skip_on_access_error=True
+@@ -178,40 +158,6 @@ class Oscilloscope(object):
+             ) # latest custom FW loaded
+             return True
+ 
+-        # if not found look for 6022BL
+-        self.device = (
+-            self.context.getByVendorIDAndProductID(
+-                self.FIRMWARE_PRESENT_VENDOR_ID, self.PRODUCT_ID_BL, skip_on_error=True, skip_on_access_error=True
+-            )
+-         or self.context.getByVendorIDAndProductID(
+-                self.NO_FIRMWARE_VENDOR_ID, self.PRODUCT_ID_BL, skip_on_error=True, skip_on_access_error=True
+-            )
+-        )
+-        if self.device:
+-            self.supports_single_channel = \
+-            self.is_device_firmware_present = (
+-                  self.device.getVendorID() == self.FIRMWARE_PRESENT_VENDOR_ID
+-              and self.device.getbcdDevice() == self.FIRMWARE_VERSION
+-            ) # latest custom FW loaded
+-            return True
+-
+-        # if not found look for 6021
+-        self.device = (
+-            self.context.getByVendorIDAndProductID(
+-                self.FIRMWARE_PRESENT_VENDOR_ID, self.PRODUCT_ID_21, skip_on_error=True, skip_on_access_error=True
+-            )
+-         or self.context.getByVendorIDAndProductID(
+-                self.NO_FIRMWARE_VENDOR_ID, self.PRODUCT_ID_21, skip_on_error=True, skip_on_access_error=True
+-            )
+-        )
+-        if self.device:
+-            self.supports_single_channel = \
+-            self.is_device_firmware_present = (
+-                  self.device.getVendorID() == self.FIRMWARE_PRESENT_VENDOR_ID
+-              and self.device.getbcdDevice() == self.FIRMWARE_VERSION
+-            ) # latest custom FW loaded
+-            return True
+-
+         return False
+ 
+ 
+@@ -292,29 +238,17 @@ class Oscilloscope(object):
+         self.context.handleEvents()
+ 
+ 
+-    def flash_firmware(self, firmware=None, supports_single_channel=True, timeout=60):
++    def flash_firmware(self, timeout=60):
+         """
+         Flash scope firmware to the target scope device. This needs to occur once when the device is first attached,
+         as the 6022BE does not have any persistant storage.
+-        :param firmware: (OPTIONAL) The firmware packets to send. Default: custom firmware (either BE or BL).
+-        :param supports_single_channel: (OPTIONAL) Set this to false if loading the stock firmware, as it does not
+-                                        support reducing the number of active channels.
+         :param timeout: (OPTIONAL) A timeout for each packet transfer on the firmware upload. Default: 60 seconds.
+         :return: True if the correct device vendor was found after flashing firmware, False if the default Vendor ID
+                  was present for the device. May assert or raise various libusb errors if something went wrong.
+         """
+         if not self.device_handle:
+             assert self.open_handle()
+-        if not firmware: # called without an explicit firmware parameter
+-            if self.device.getProductID() == self.PRODUCT_ID_BE:
+-                firmware = dso6022be_firmware
+-            elif self.device.getProductID() == self.PRODUCT_ID_BL:
+-                firmware = dso6022bl_firmware
+-            elif self.device.getProductID() == self.PRODUCT_ID_21:
+-                firmware = dso6021_firmware
+-            else:
+-                return False
+-        for packet in firmware:
++        for packet in dso6022be_firmware:
+             bytes_written = self.device_handle.controlWrite(0x40, self.RW_FIRMWARE_REQUEST,
+                                                             packet.value, self.RW_FIRMWARE_INDEX,
+                                                             packet.data, timeout=timeout)
+@@ -324,22 +258,11 @@ class Oscilloscope(object):
+         time.sleep(.5)
+         while not self.setup():
+             time.sleep(0.1)
+-        self.supports_single_channel = supports_single_channel
++        self.supports_single_channel = True
+         self.open_handle()
+         return self.is_device_firmware_present
+ 
+ 
+-    def flash_firmware_from_hex(self, hex_file, timeout=60):
+-        """
+-        Open an Intel hex file for the 8051 and try to flash it to the scope.
+-        :param hex_file: The hex file to load for flashing.
+-        :param timeout: (OPTIONAL) A timeout for each packet transfer on the firmware upload. Default: 60 seconds.
+-        :return: True if the correct device vendor was found after flashing firmware, False if the default Vendor ID
+-                 was present for the device. May assert or raise various libusb errors if something went wrong.
+-        """
+-        return self.flash_firmware(firmware=fx2_ihex_to_control_packets(hex_file), timeout=timeout)
+-
+-
+     def read_firmware(self, address=0, length=8192, to_ihex=True, chunk_len=16, timeout=60):
+         """
+         Read the entire device RAM, and return a raw string.
+diff --git a/PyHT6022/upload_firmware.py b/PyHT6022/upload_firmware.py
+deleted file mode 100644
+index cf45e2a..0000000
+--- a/PyHT6022/upload_firmware.py
++++ /dev/null
+@@ -1,99 +0,0 @@
+-#!/usr/bin/env python3
+-"""
+-Flash firmware into Hantek 6022 device.
+-
+-Upload either default firmware when called without arguments
+-(depending on device VID/PID), or firmware-DSO6022BE or
+-firmware-DSO6022BL with provided VID:PID.
+-"""
+-
+-import sys
+-import argparse
+-from PyHT6022.LibUsbScope import Oscilloscope
+-from PyHT6022.Firmware import dso6022be_firmware, dso6022bl_firmware
+-
+-
+-def parse_arguments(args=None):
+-    """Parse command line arguments."""
+-    parser = argparse.ArgumentParser(
+-        prog='upload_firmware_6022.py',
+-        description='Upload firmware to Hantek6022 devices with different VID:PID'
+-    )
+-    parser.add_argument(
+-        '-V', '--VID',
+-        type=lambda x: int(x, 16),
+-        default=0,
+-        help='set vendor id (hex)'
+-    )
+-    parser.add_argument(
+-        '-P', '--PID',
+-        type=lambda x: int(x, 16),
+-        default=0,
+-        help='set product id (hex)'
+-    )
+-    fw_group = parser.add_mutually_exclusive_group()
+-    fw_group.add_argument(
+-        '--be', '--6022be',
+-        action='store_true',
+-        help='use DSO-6022BE firmware'
+-    )
+-    fw_group.add_argument(
+-        '--bl', '--6022bl',
+-        action='store_true',
+-        help='use DSO-6022BL firmware'
+-    )
+-
+-    return parser.parse_args(args)
+-
+-
+-def create_scope(options):
+-    """Create and return an Oscilloscope instance based on options."""
+-    if not options.VID and not options.PID:
+-        return Oscilloscope()
+-    elif options.VID and options.PID and (options.be or options.bl):
+-        return Oscilloscope(options.VID, options.PID)
+-    else:
+-        print('--VID and --PID and one of --be or --bl must be provided', file=sys.stderr)
+-        sys.exit(1)
+-
+-
+-def select_firmware(options):
+-    """Select the appropriate firmware based on options."""
+-    if options.be:
+-        return dso6022be_firmware, 'DSO-6022BE'
+-    elif options.bl:
+-        return dso6022bl_firmware, 'DSO-6022BL'
+-    else:
+-        return None, 'default'
+-
+-
+-def main():
+-    """Upload firmware to Hantek 6022 device."""
+-    options = parse_arguments()
+-
+-    scope = create_scope(options)
+-
+-    if not scope.setup():
+-        print('scope setup error - no device?', file=sys.stderr)
+-        sys.exit(-1)
+-
+-    if not scope.open_handle():
+-        print('scope open error - no device?', file=sys.stderr)
+-        sys.exit(-1)
+-
+-    firmware, name = select_firmware(options)
+-    print(f'upload {name} firmware')
+-
+-    if firmware:
+-        scope.flash_firmware(firmware)
+-    else:
+-        scope.flash_firmware()
+-
+-    print(f'FW version {hex(scope.get_fw_version())}')
+-    print(f'Serial number {scope.get_serial_number_string()}')
+-
+-    scope.close_handle()
+-
+-
+-if __name__ == "__main__":
+-    main()
