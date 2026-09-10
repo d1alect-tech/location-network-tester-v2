@@ -57,6 +57,68 @@ describe("createCatalogColumn", () => {
     expect(onPick).toHaveBeenCalledWith("s1");
   });
 
+  it.each(["Enter", " "])("calls onPick when a focused row receives %s", async (key) => {
+    const onPick = vi.fn();
+    const column = createCatalogColumn({
+      client: fakeClient([s1, s2]),
+      pair: createPairState(),
+      onPick,
+    });
+    await column.reload();
+    const row = column.root.querySelector<HTMLElement>('[data-session="s1"]');
+    document.body.replaceChildren(column.root);
+    row?.focus();
+
+    expect(row?.tabIndex).toBe(0);
+    row?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+
+    expect(onPick).toHaveBeenCalledWith("s1");
+  });
+
+  it("uses roving tabindex for arrow navigation without changing table semantics", async () => {
+    const column = createCatalogColumn({
+      client: fakeClient([s1, s2]),
+      pair: createPairState(),
+      onPick: vi.fn(),
+    });
+    await column.reload();
+    const first = column.root.querySelector<HTMLElement>('[data-session="s2"]');
+    const second = column.root.querySelector<HTMLElement>('[data-session="s1"]');
+    document.body.replaceChildren(column.root);
+
+    expect(first?.tabIndex).toBe(0);
+    expect(second?.tabIndex).toBe(-1);
+    first?.focus();
+    first?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+
+    expect(document.activeElement).toBe(second);
+    expect(second?.tabIndex).toBe(0);
+    expect(second?.hasAttribute("role")).toBe(false);
+  });
+
+  it("keeps the recreated selected row focused after Enter so ArrowDown still works", async () => {
+    const pair = createPairState();
+    const column = createCatalogColumn({
+      client: fakeClient([s1, s2]),
+      pair,
+      onPick: (id) => pair.pick(id),
+    });
+    await column.reload();
+    document.body.replaceChildren(column.root);
+    const first = column.root.querySelector<HTMLElement>('[data-session="s2"]');
+    first?.focus();
+
+    first?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    const selected = column.root.querySelector<HTMLElement>('[data-session="s2"]');
+
+    expect(selected).not.toBe(first);
+    expect(document.activeElement).toBe(selected);
+    selected?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    expect(document.activeElement).toBe(
+      column.root.querySelector<HTMLElement>('[data-session="s1"]'),
+    );
+  });
+
   it("renders A and B role chips when the pair is filled", async () => {
     const pair = createPairState();
     const column = createCatalogColumn({

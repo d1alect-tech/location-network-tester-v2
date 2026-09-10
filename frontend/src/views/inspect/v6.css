@@ -616,6 +616,7 @@
 /* §2.3: фокус-рамка видима у каждого органа. */
 .app-v6 .cat-search:focus-visible,
 .app-v6 .cat-sort:focus-visible,
+.app-v6 .tbl-cat tbody tr[data-session]:focus-visible,
 .app-v6 .gram-mode:focus-visible,
 .app-v6 .view-toggle-btn:focus-visible,
 .app-v6 [data-cat-clear]:focus-visible,

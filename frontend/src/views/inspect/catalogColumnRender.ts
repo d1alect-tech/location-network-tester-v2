@@ -75,6 +75,32 @@ export interface CatalogRowRenderCtx {
   readonly grouped: boolean;
   readonly pair: PairStateValue;
   readonly onPick: (sessionId: string) => void;
+  readonly onFocus: (sessionId: string) => void;
+}
+
+function focusRow(row: HTMLElement, ctx: CatalogRowRenderCtx): void {
+  const rows = row.closest("tbody")?.querySelectorAll<HTMLElement>("tr[data-session]") ?? [];
+  for (const item of rows) item.tabIndex = item === row ? 0 : -1;
+  ctx.onFocus(row.getAttribute("data-session") ?? "");
+}
+
+function moveFocus(event: KeyboardEvent, row: HTMLElement): boolean {
+  const rows = [...(row.closest("tbody")?.querySelectorAll<HTMLElement>("tr[data-session]") ?? [])];
+  const index = rows.indexOf(row);
+  const target =
+    event.key === "ArrowDown"
+      ? rows[Math.min(rows.length - 1, index + 1)]
+      : event.key === "ArrowUp"
+        ? rows[Math.max(0, index - 1)]
+        : event.key === "Home"
+          ? rows[0]
+          : event.key === "End"
+            ? rows.at(-1)
+            : undefined;
+  if (target === undefined) return false;
+  event.preventDefault();
+  target.focus();
+  return true;
 }
 
 function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLTableRowElement {
@@ -95,13 +121,25 @@ function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLT
     }),
   );
   const dateText = ctx.grouped ? formatTime(session.created_utc) : day === "unknown" ? "—" : day;
-  const row = el("tr", { attrs: { "data-session": session.id, "data-cat-date": day } }, [
-    roleCell,
-    labelCell,
-    el("td", { text: session.session_type ?? "—" }),
-    el("td", { text: dateText }),
-  ]);
+  const row = el(
+    "tr",
+    { attrs: { "data-session": session.id, "data-cat-date": day, tabindex: "-1" } },
+    [
+      roleCell,
+      labelCell,
+      el("td", { text: session.session_type ?? "—" }),
+      el("td", { text: dateText }),
+    ],
+  );
+  row.addEventListener("focus", () => focusRow(row, ctx));
   row.addEventListener("click", () => {
+    row.focus();
+    ctx.onPick(session.id);
+  });
+  row.addEventListener("keydown", (event) => {
+    if (moveFocus(event, row)) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
     ctx.onPick(session.id);
   });
   return row;

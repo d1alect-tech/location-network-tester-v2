@@ -35,6 +35,7 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
   let dir: SortDir = "desc";
   let query = "";
   let sessions: readonly CatalogSession[] = [];
+  let activeSession: string | null = null;
 
   const found = el("span", { className: "cat-found", attrs: { "data-cat-found": "" } });
   const search = el("input", {
@@ -107,7 +108,26 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
     let visible = 0;
     for (const row of rows) {
       if (row.kind === "session") visible += 1;
-      tbody.append(renderCatalogRow(row, { grouped: sort === "date", pair, onPick: opts.onPick }));
+      tbody.append(
+        renderCatalogRow(row, {
+          grouped: sort === "date",
+          pair,
+          onPick: (id) => {
+            opts.onPick(id);
+            tbody.querySelector<HTMLElement>(`tr[data-session="${CSS.escape(id)}"]`)?.focus();
+          },
+          onFocus: (id) => {
+            activeSession = id;
+          },
+        }),
+      );
+    }
+    const renderedSessions = [...tbody.querySelectorAll<HTMLElement>("tr[data-session]")];
+    const active = renderedSessions.find((row) => row.dataset.session === activeSession);
+    const tabStop = active ?? renderedSessions[0];
+    if (tabStop !== undefined) {
+      tabStop.tabIndex = 0;
+      activeSession = tabStop.dataset.session ?? null;
     }
     found.textContent = String(visible);
   }
