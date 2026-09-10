@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import numpy as np
 import pytest
@@ -112,6 +112,42 @@ class _FakeScope:
             assert self._callback is not None
             raw = bytearray((np.arange(self.block_samples) * self._polls) % 256)
             self._callback(raw, raw[::-1])
+
+
+@dataclass(slots=True)
+class _LifecycleScope(_FakeScope):
+    poll_blocks: tuple[int, ...] = ()
+    _poll_index: int = 0
+
+    @override
+    def read_async(
+        self,
+        callback: Callable[[object, object], None],
+        data_size: int,
+        outstanding_transfers: int,
+        *,
+        raw: bool,
+    ) -> _Shutdown:
+        shutdown = _FakeScope.read_async(self, callback, data_size, outstanding_transfers, raw=raw)
+        callback(bytearray(), bytearray())
+        return shutdown
+
+    @override
+    def poll(self, timeout_ms: int) -> None:
+        del timeout_ms
+        assert self._callback is not None
+        size = self.poll_blocks[self._poll_index]
+        self._poll_index += 1
+        raw = bytearray(np.arange(size, dtype=np.uint8))
+        self._callback(raw, raw)
+
+    @override
+    def stop_capture(self) -> None:
+        _FakeScope.stop_capture(self)
+        assert self._callback is not None
+        self._callback(bytearray(1_492), bytearray(1_492))
+        for _ in range(10):
+            self._callback(bytearray(), bytearray())
 
 
 def _stream(
@@ -235,6 +271,49 @@ def test_spooled_collector_preserves_telemetry(
         legacy_telemetry.ch2_clip_low_count,
         legacy_telemetry.ch2_clip_high_count,
     )
+
+
+def test_stream_telemetry_excludes_callbacks_outside_acquisition_window() -> None:
+    scope = _LifecycleScope(poll_blocks=(32_768, 32_768))
+
+    result = _stream_capture(
+        scope,
+        rate_code=1,
+        ch1_range_code=1,
+        sample_rate_hz=1_000_000.0,
+        requested_samples=32_769,
+        cancellation_token=NEVER_CANCELLED,
+    )
+
+    assert isinstance(result, tuple)
+    ch1, ch2, telemetry = result
+    assert ch1.size == ch2.size == 32_769
+    assert telemetry.captured_samples == 65_536
+    assert telemetry.block_lengths == (32_768, 32_768)
+    assert telemetry.callback_count == 2
+    assert len(telemetry.callback_gaps_s) == 1
+    assert telemetry.short_block_count == 0
+
+
+def test_stream_telemetry_keeps_short_callbacks_inside_acquisition_window() -> None:
+    scope = _LifecycleScope(poll_blocks=(32_768, 0, 1_492, 32_768))
+
+    result = _stream_capture(
+        scope,
+        rate_code=1,
+        ch1_range_code=1,
+        sample_rate_hz=1_000_000.0,
+        requested_samples=65_537,
+        cancellation_token=NEVER_CANCELLED,
+    )
+
+    assert isinstance(result, tuple)
+    _ch1, _ch2, telemetry = result
+    assert telemetry.captured_samples == 67_028
+    assert telemetry.block_lengths == (32_768, 0, 1_492, 32_768)
+    assert telemetry.callback_count == 4
+    assert len(telemetry.callback_gaps_s) == 3
+    assert telemetry.short_block_count == 2
 
 
 def test_spooled_capture_equivalence_small_record(tmp_path: Path) -> None:

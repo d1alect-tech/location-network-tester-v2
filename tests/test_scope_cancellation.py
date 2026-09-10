@@ -10,11 +10,7 @@ import numpy as np
 import pytest
 
 try:
-    # Опциональный GPL-драйвер из extra `lnt[hantek]`: в MIT-дереве и dev-окружении
-    # его нет, поэтому тайпчекер не разрешает модуль по построению.
-    from PyHT6022.LibUsbScope import (  # pyright: ignore[reportMissingImports]
-        Oscilloscope,
-    )
+    from PyHT6022.LibUsbScope import Oscilloscope
 except ModuleNotFoundError:
     Oscilloscope = None
 

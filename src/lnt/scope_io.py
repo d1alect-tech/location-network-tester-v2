@@ -1,10 +1,4 @@
-"""I/O-слой Hantek 6022BE: протокол драйвера, сбор блоков, цикл захвата.
-
-Код перенесён из acquire.py без изменения семантики (гейт <=250 строк);
-сигнатуры драйвера — из репо-дайва Ho-Ro/Hantek6022API@e65d52b. Драйвер
-импортируется лениво: без библиотеки и устройства всё сводится к
-``DeviceNotFoundError`` (exit 3).
-"""
+"""I/O-слой Hantek 6022BE: протокол драйвера, сбор блоков, цикл захвата."""
 
 import time
 from collections.abc import Callable, Iterator
@@ -50,12 +44,7 @@ NEVER_CANCELLED: Final = CancellationToken()
 
 
 class ScopeProtocol(Protocol):
-    """Протокол устройства: зеркало API ``PyHT6022.LibUsbScope.Oscilloscope``.
-
-    Параметры позиционные (``/``), возвраты ``object``: у реального драйвера
-    свои имена аргументов (``alt``, ``rate_index``) и bool-возвраты, у фейков
-    тестов — свои; протокол обязан покрывать обоих структурно.
-    """
+    """Протокол устройства: зеркало API ``PyHT6022.LibUsbScope.Oscilloscope``."""
 
     is_device_firmware_present: bool
 
@@ -144,9 +133,8 @@ class SpooledBlockCollector:
 def open_real_scope() -> ScopeProtocol:
     """Лениво импортирует драйвер; его отсутствие -> ``DeviceNotFoundError``."""
     try:
-        # PyHT6022 — опциональный GPL-драйвер из extra `lnt[hantek]`: его нет ни в MIT-дереве,
-        # ни в dev-окружении — поэтому тайпчекер его не разрешает по построению.
-        from PyHT6022.LibUsbScope import (  # noqa: PLC0415 # pyright: ignore[reportMissingImports]
+        # PyHT6022 — опциональный драйвер из extra `lnt[hantek]`.
+        from PyHT6022.LibUsbScope import (  # noqa: PLC0415
             Oscilloscope,
         )
     except ImportError as exc:
@@ -245,11 +233,20 @@ def _stream_capture(  # noqa: PLR0913 - mirrors the public backend contract
     if cancellation_token.is_cancelled():
         return CancelledResult()
     collector = sink if sink is not None else _BlockCollector()
+
+    def on_block(ch1_raw: object, ch2_raw: object) -> None:
+        ch1_size = len(cast("bytearray", ch1_raw))
+        if collector.total_samples >= requested_samples or (
+            collector.total_samples == 0 and ch1_size == 0
+        ):
+            return
+        collector.on_block(ch1_raw, ch2_raw)
+
     try:
         _configure_scope(scope, rate_code, ch1_range_code)
         shutdown = cast(
             "_ShutdownEvent",
-            scope.read_async(collector.on_block, BLOCK_SAMPLES, OUTSTANDING_TRANSFERS, raw=True),
+            scope.read_async(on_block, BLOCK_SAMPLES, OUTSTANDING_TRANSFERS, raw=True),
         )
         try:
             scope.start_capture()
