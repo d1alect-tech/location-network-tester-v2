@@ -3,13 +3,15 @@ from __future__ import annotations
 import hashlib
 import json
 import zipfile
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
+import lnt.archive.export as archive_export
 from lnt.archive import (
     ArchiveError,
     ArchiveLimits,
+    ArchivePlan,
     ExportSelection,
     create_archive,
     restore_archive,
@@ -17,7 +19,10 @@ from lnt.archive import (
 from lnt.cli import main
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
+
+    from lnt.archive.models import ArchivePath
 
 
 def _hashes(root: Path) -> dict[str, str]:
@@ -61,6 +66,50 @@ def test_create_restore_round_trip_preserves_all_exported_hashes(tmp_path: Path)
         name: digest for name, digest in original.items() if not name.endswith(".log")
     }
     assert all("catalog.sqlite3" not in str(entry.path) for entry in plan.manifest.entries)
+
+
+def test_source_change_before_payload_read_does_not_publish_archive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sessions = tmp_path / "sessions"
+    source = _session(sessions, "s-1") / "ch1.npy"
+    output = tmp_path / "backup.zip"
+    original_write_file = cast(
+        "Callable[[zipfile.ZipFile, ArchivePath, Path, int], None]",
+        archive_export.__dict__["_write_file"],
+    )
+    original_inspect_archive = cast(
+        "Callable[[Path, ArchiveLimits | None], ArchivePlan]",
+        archive_export.__dict__["inspect_archive"],
+    )
+
+    def mutate_then_write(
+        archive: zipfile.ZipFile,
+        path: ArchivePath,
+        source_path: Path,
+        compression: int,
+    ) -> None:
+        if source_path == source:
+            source.write_bytes(b"changed after manifest")
+        original_write_file(archive, path, source_path, compression)
+
+    def preserve_competing_destination(
+        path: Path, limits: ArchiveLimits | None = None
+    ) -> ArchivePlan:
+        output.write_bytes(b"existing output")
+        return original_inspect_archive(path, limits)
+
+    monkeypatch.setattr(archive_export, "_write_file", mutate_then_write)
+    monkeypatch.setattr(archive_export, "inspect_archive", preserve_competing_destination)
+
+    with pytest.raises(ArchiveError, match="SHA-256"):
+        create_archive(
+            output,
+            ExportSelection(root=sessions, session_ids=("s-1",), experiment_ids=()),
+        )
+
+    assert output.read_bytes() == b"existing output"
+    assert not tuple(tmp_path.glob(".backup.zip.partial-*"))
 
 
 def test_dry_run_performs_no_write(tmp_path: Path) -> None:

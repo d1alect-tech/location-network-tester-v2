@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Final
 from lnt.analysis_store.identity import CodeIdentity
 
 from .errors import ArchiveError
+from .inspect import inspect_archive
 from .manifest import manifest_bytes
 from .models import MANIFEST_NAME, ArchiveEntry, ArchiveManifest, ArchivePath, ArchiveProvenance
 from .paths import validate_member_name
@@ -60,6 +61,7 @@ def create_archive(output: Path, selection: ExportSelection) -> ArchiveManifest:
                     else zipfile.ZIP_DEFLATED
                 )
                 _write_file(archive, archive_path, source_path, compression)
+        inspect_archive(temporary)
         temporary.rename(output)
     except (OSError, zipfile.BadZipFile) as error:
         raise ArchiveError("не удалось создать архив") from error
