@@ -70,9 +70,7 @@ export function groupedInProtocolOrder(
   rows: MemberRow[],
 ): MemberRow[][] {
   const included = includedByCondition(rows);
-  return orderedConditions(detail)
-    .map((conditionId) => included.get(conditionId) ?? [])
-    .filter((group) => group.length > 0);
+  return orderedConditions(detail).map((conditionId) => included.get(conditionId) ?? []);
 }
 
 export type PairsKind = "ab" | "repeated_blocks" | "cohort" | "longitudinal";
@@ -114,6 +112,7 @@ export interface AbaRequestInput {
   seed: number;
   signal: AbortSignal;
   valueSource: ValueSource;
+  notify?: Notify;
 }
 
 export async function buildPairsRequest(input: PairsRequestInput): Promise<PairsRequest> {
@@ -123,6 +122,7 @@ export async function buildPairsRequest(input: PairsRequestInput): Promise<Pairs
   const pairs: PairInput[] = [];
   let missing = 0;
   const count = Math.min(left.length, right.length);
+  const unmatched = Math.abs(left.length - right.length);
   for (let i = 0; i < count; i += 1) {
     const a = left[i];
     const b = right[i];
@@ -143,6 +143,23 @@ export async function buildPairsRequest(input: PairsRequestInput): Promise<Pairs
       "warn",
     );
   }
+  if (unmatched > 0) {
+    input.notify?.(
+      `${String(unmatched)} участник(а) не сопоставлены с парой в другом условии.`,
+      "warn",
+    );
+  }
+  if (pairs.length === 0) {
+    const details = [
+      missing > 0 ? `пропущено из-за отсутствующих метрик: ${String(missing)}` : "",
+      unmatched > 0 ? `не сопоставлены: ${String(unmatched)}` : "",
+    ]
+      .filter(Boolean)
+      .join("; ");
+    throw new Error(
+      `Расчёт невозможен: нет доступных пар с конечными значениями признака${details ? ` (${details})` : ""}.`,
+    );
+  }
   return {
     kind: input.kind,
     estimand: input.featureKey,
@@ -156,6 +173,8 @@ export async function buildAbaRequest(input: AbaRequestInput): Promise<AbaReques
   const [g1, g2, g3] = groupedInProtocolOrder(input.detail, input.rows);
   const abaUnits: AbaUnitInput[] = [];
   const count = Math.min(g1?.length ?? 0, g2?.length ?? 0, g3?.length ?? 0);
+  const unmatched = (g1?.length ?? 0) + (g2?.length ?? 0) + (g3?.length ?? 0) - count * 3;
+  let missing = 0;
   for (let i = 0; i < count; i += 1) {
     const s1 = g1?.[i];
     const s2 = g2?.[i];
@@ -166,8 +185,31 @@ export async function buildAbaRequest(input: AbaRequestInput): Promise<AbaReques
       input.valueSource(s2.sessionId, input.featureKey, input.signal),
       input.valueSource(s3.sessionId, input.featureKey, input.signal),
     ]);
-    if (a1 === null || b === null || a2 === null) continue;
+    if (a1 === null || b === null || a2 === null) {
+      missing += 1;
+      continue;
+    }
     abaUnits.push({ unit_id: s1.sessionId, value_a1: a1, value_b: b, value_a2: a2 });
+  }
+  if (missing > 0) {
+    input.notify?.(
+      `${String(missing)} набор(а) A/B/A пропущены: значения признака недоступны.`,
+      "warn",
+    );
+  }
+  if (unmatched > 0) {
+    input.notify?.(`${String(unmatched)} участник(а) не входят в полный набор A/B/A.`, "warn");
+  }
+  if (abaUnits.length === 0) {
+    const details = [
+      missing > 0 ? `пропущено из-за отсутствующих метрик: ${String(missing)}` : "",
+      unmatched > 0 ? `не входят в полный набор: ${String(unmatched)}` : "",
+    ]
+      .filter(Boolean)
+      .join("; ");
+    throw new Error(
+      `Расчёт невозможен: нет доступных A/B/A-наборов с конечными значениями${details ? ` (${details})` : ""}.`,
+    );
   }
   return {
     kind: "aba",

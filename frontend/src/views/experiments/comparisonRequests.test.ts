@@ -59,6 +59,21 @@ describe("comparisonRequests grouping", () => {
     const groups = groupedInProtocolOrder(detail, rows);
     expect(groups.map((g) => g.map((r) => r.sessionId))).toEqual([["s1"], ["s2"]]);
   });
+
+  it("preserves an empty protocol slot instead of shifting A/B/A roles", () => {
+    const detail = detailWithSteps(["cond_a1", "cond_b", "cond_a2"]);
+    const groups = groupedInProtocolOrder(detail, [
+      row("a1", "cond_a1", 1),
+      row("b-excluded", "cond_b", 1, true),
+      row("a2", "cond_a2", 1),
+    ]);
+
+    expect(groups.map((group) => group.map((item) => item.sessionId))).toEqual([
+      ["a1"],
+      [],
+      ["a2"],
+    ]);
+  });
 });
 
 describe("comparisonRequests builders", () => {
@@ -110,5 +125,53 @@ describe("comparisonRequests builders", () => {
     });
     expect(request.kind).toBe("aba");
     expect(request.aba_units).toHaveLength(1);
+  });
+
+  it("reports unmatched pair units instead of silently truncating them", async () => {
+    const notes: string[] = [];
+    const request = await buildPairsRequest({
+      detail: detailWithSteps(["cond_a", "cond_b"]),
+      rows: [row("a1", "cond_a", 1), row("a2", "cond_a", 2), row("b1", "cond_b", 1)],
+      kind: "ab",
+      featureKey: "needle_mean_v",
+      units: "V",
+      seed: 43,
+      signal: new AbortController().signal,
+      valueSource: async () => 1,
+      notify: (message) => notes.push(message),
+    });
+
+    expect(request.pairs).toHaveLength(1);
+    expect(notes.join(" ")).toContain("1");
+    expect(notes.join(" ")).toContain("не сопоставлены");
+  });
+
+  it("rejects an empty active pair vector", async () => {
+    await expect(
+      buildPairsRequest({
+        detail: detailWithSteps(["cond_a", "cond_b"]),
+        rows: [row("a1", "cond_a", 1), row("b1", "cond_b", 1)],
+        kind: "ab",
+        featureKey: "needle_mean_v",
+        units: "V",
+        seed: 43,
+        signal: new AbortController().signal,
+        valueSource: async () => null,
+      }),
+    ).rejects.toThrow("нет доступных пар");
+  });
+
+  it("rejects ABA when an active protocol slot is empty", async () => {
+    await expect(
+      buildAbaRequest({
+        detail: detailWithSteps(["cond_a1", "cond_b", "cond_a2"]),
+        rows: [row("a1", "cond_a1", 1), row("a2", "cond_a2", 1)],
+        featureKey: "needle_mean_v",
+        units: "V",
+        seed: 43,
+        signal: new AbortController().signal,
+        valueSource: async () => 1,
+      }),
+    ).rejects.toThrow("нет доступных A/B/A");
   });
 });
