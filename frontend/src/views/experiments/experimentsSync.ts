@@ -4,6 +4,7 @@
  * C3: загрузка здоровья переехала в experimentsDetailController — тихий
  * catch маскировал outage под вердикт health_unavailable. */
 
+import { sessionMetricValue } from "../../api/sessionMetrics";
 import type { SessionDetailPayload } from "../../api/types-plots";
 import type { ComparisonView } from "./comparisonView";
 import type { ExperimentDetail } from "./experimentsStore";
@@ -12,15 +13,7 @@ import type { MemberRow } from "./memberTableView";
 import type { TrendView } from "./trendView";
 
 export function metricValue(detail: SessionDetailPayload, featureKey: string): number | null {
-  const analysis = detail.analysis;
-  if (typeof analysis !== "object" || analysis === null) return null;
-  const metrics = (analysis as Record<string, unknown>).metrics;
-  if (typeof metrics === "object" && metrics !== null) {
-    const direct = (metrics as Record<string, unknown>)[featureKey];
-    if (typeof direct === "number") return direct;
-  }
-  const flat = (analysis as Record<string, unknown>)[featureKey];
-  return typeof flat === "number" ? flat : null;
+  return sessionMetricValue(detail, featureKey);
 }
 
 export function toTrendRows(rows: MemberRow[]): {
