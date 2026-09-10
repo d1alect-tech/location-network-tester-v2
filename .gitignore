@@ -3,6 +3,7 @@ packaging/spike/dist/
 packaging/spike/__pycache__/
 /build/
 /dist/
+/evidence/
 __pycache__/
 .omo/
 .scratch/
