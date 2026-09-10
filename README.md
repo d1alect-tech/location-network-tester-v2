@@ -158,12 +158,20 @@ cd frontend; npm run test; npm run typecheck; npm run build
 
 ## Лицензия
 
-MIT, текст в [LICENSE](LICENSE).
+Код LNT распространяется только под `GPL-3.0-only`. Полный текст находится в
+[LICENSE](LICENSE). Прежний текст MIT сохранён отдельно в
+[LICENSES/LNT-MIT.txt](LICENSES/LNT-MIT.txt) только как часть истории проекта.
 
-Опциональный extra `lnt[hantek]` тянет драйвер Hantek6022API под
-GPL-3.0-or-later. Кода этого драйвера в репозитории нет, он скачивается из
-upstream при установке, импорт ленивый. Границы распространения, включая
-условие про бинарные сборки с драйвером внутри, описаны в
-[политике распространения](docs/distribution-policy.md). Полный инвентарь
-зависимостей с лицензиями и хешами лежит в
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Hantek6022API также распространяется под `GPL-3.0-only`. Версия для LNT
+закреплена за коммитом `e65d52b0f2536e56eaadbb555e5d7b756409c36e`.
+
+Windows-релиз публикует четыре актива одной версии на одной странице GitHub
+Release: `LNT-0.1.0-win64.zip`, `LNT-0.1.0-win64.zip.sha256`,
+`LNT-0.1.0-corresponding-source.zip` и
+`LNT-0.1.0-corresponding-source.zip.sha256`. Свидетельство
+`sanitized-reference-host-verified` допускает типизированное состояние
+`device_absent`; оно не подтверждает проверку на чистой машине или работу с
+физическим осциллографом. Zadig и WinUSB в архивы не входят и устанавливаются
+отдельно. Подробности описаны в
+[политике распространения](docs/distribution-policy.md), а список компонентов
+находится в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
