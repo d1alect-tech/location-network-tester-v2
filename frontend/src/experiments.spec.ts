@@ -69,6 +69,7 @@ async function createExperiment(
   await page.getByLabel("Идентификатор эксперимента").fill(options.id);
   await page.getByLabel("Название").fill(`Синтетика ${options.id}`);
   await page.getByLabel("Вопрос исследования").fill("Меняется ли фон при экранировании?");
+  await page.getByLabel("Оцениваемый признак (feature key)").fill("band_mid_total");
   await page.getByLabel("Минимальный N единиц").fill(options.minN ?? "3");
   for (const [sessionId, condition] of Object.entries(options.assignments)) {
     await page.getByLabel(`Условие сессии ${sessionId}`).selectOption(condition);
@@ -121,6 +122,7 @@ test("A/B/A journey: create → timeline → QC exclusion undo → golden result
   await page.locator('[data-exp-tab="compare"]').click();
   await page.locator("#lnt-exp-check-comparability").click();
   await expect(page.locator(".lnt-exp-compare-status")).toContainText("Сравнимость подтверждена");
+  await page.locator("#lnt-exp-units").fill("В²/Гц");
   await page.locator("#lnt-exp-run-analysis").click();
 
   // Золотые числа (numpy-репликация бэкенда, seed 43/44).
@@ -162,6 +164,9 @@ test("low-N experiment renders explicit descriptive banner without interval", as
     },
   });
   await page.locator('[data-exp-tab="compare"]').click();
+  await page.locator("#lnt-exp-check-comparability").click();
+  await expect(page.locator(".lnt-exp-compare-status")).toContainText("Сравнимость подтверждена");
+  await page.locator("#lnt-exp-units").fill("В²/Гц");
   await page.locator("#lnt-exp-run-analysis").click();
   const result = page.locator(".lnt-exp-result");
   await expect(result).toContainText("Описательная оценка без интервала");
@@ -181,6 +186,8 @@ test("A-drift refusal shows the exact reason code and no contrast numbers", asyn
   await createExperiment(page, { id: "exp.aba.drift", assignments: driftAssignments });
   await page.locator('[data-exp-tab="compare"]').click();
   await page.locator("#lnt-exp-check-comparability").click();
+  await expect(page.locator(".lnt-exp-compare-status")).toContainText("Сравнимость подтверждена");
+  await page.locator("#lnt-exp-units").fill("В²/Гц");
   await page.locator("#lnt-exp-run-analysis").click();
   const result = page.locator(".lnt-exp-result");
   await expect(result).toContainText("a_drift_exceeds_half_effect_or_two_sd");

@@ -1,14 +1,10 @@
-/** Панель сравнения (todo 43): проверка сравнимости → расчёт через durable
- * statistics-runs → результат с обязательной маркировкой. Гейт смешанных
- * типов блокирует расчёт с точной причиной; исключённые участники не
- * входят в пары; недостающие значения — явно с кодом причины.
- * C3: здесь только каркас, состояние и оркестрация — задачи в comparisonJobs,
- * построители запросов в comparisonRequests, отрисовка в comparisonResult,
- * слоты пары в comparisonGroups. */
+// Панель сравнения: сравнимость → durable statistics-run → маркированный результат.
+// Оркестрация задач, запросы, результат и слоты пары разделены по листам C3.
 
 import type { LntApiClient } from "../../api/client";
 import type { ComparabilityReport, StatisticsRunRequest } from "../../api/types-research";
 import { el } from "../../components/primitives/dom";
+import { knownMetricUnits, labeled } from "./comparisonControls";
 import { renderPairbarSlots } from "./comparisonGroups";
 import type { ComparisonBannerTone, ComparisonProtocolKind } from "./comparisonJobs";
 import {
@@ -28,31 +24,17 @@ import type { ExperimentDetail } from "./experimentsStore";
 import type { MemberRow } from "./memberTableView";
 import type { EffectView } from "./resultPanel";
 
-/** Реэкспорт для существующих импортов (driftDisplay.test.ts). */
+// Реэкспорт для существующих импортов (driftDisplay.test.ts).
 export { effectFromPayload };
 export type { EffectView };
 
-/** Токены V6 для инлайнового баннера статуса (variantV6.css). */
+// Токены V6 для инлайнового баннера статуса (variantV6.css).
 const BANNER_TOKENS = "banner banner-inline";
-
-interface RequestInput {
-  kind: ComparisonProtocolKind;
-  featureKey: string;
-  units: string;
-  seed: number;
-  signal: AbortSignal;
-}
-
-function labeled(labelText: string, control: HTMLElement): HTMLElement {
-  return el("label", { className: "lnt-field-inline field cmd-field" }, [
-    el("span", { className: "lnt-label-text field-label cmd-label", text: labelText }),
-    control,
-  ]);
-}
+const UNKNOWN_GATE_TEXT = "Проверка сравнимости не выполнена — запустите проверку перед расчётом.";
 
 export interface ComparisonOptions {
   client: Pick<LntApiClient, "research" | "statistics">;
-  /** Значение estimand по сессии; null — значение недоступно. */
+  // Значение estimand по сессии; null — значение недоступно.
   valueSource: (
     sessionId: string,
     featureKey: string,
@@ -73,6 +55,7 @@ export class ComparisonView {
   private readonly featureInput: HTMLInputElement;
   private readonly unitsInput: HTMLInputElement;
   private readonly seedInput: HTMLInputElement;
+  private contextKey = "";
 
   constructor(options: ComparisonOptions) {
     this.options = options;
@@ -80,11 +63,12 @@ export class ComparisonView {
       className: "lnt-input ctl",
       attrs: { type: "text", id: "lnt-exp-feature", "aria-label": "Оцениваемый признак" },
     });
+    this.featureInput.value = "needle_mean_v";
     this.unitsInput = el("input", {
       className: "lnt-input ctl",
       attrs: { type: "text", id: "lnt-exp-units", "aria-label": "Единицы измерения" },
     });
-    this.unitsInput.value = "В²/Гц";
+    this.unitsInput.value = "V";
     this.seedInput = el("input", {
       className: "lnt-input ctl",
       attrs: { type: "number", id: "lnt-exp-seed", "aria-label": "Seed расчёта" },
@@ -106,7 +90,7 @@ export class ComparisonView {
       () =>
         void this.runAnalysis(
           this.featureInput.value.trim(),
-          this.unitsInput.value.trim() || "у.е.",
+          this.unitsInput.value.trim(),
           Number(this.seedInput.value) || 0,
         ),
     );
@@ -114,7 +98,7 @@ export class ComparisonView {
     this.gateHost = el("div", {
       className: "comparability-gate",
       attrs: { role: "status", "data-state": "unknown" },
-      text: "Проверка сравнимости не выполнена — запустите проверку перед расчётом.",
+      text: UNKNOWN_GATE_TEXT,
     });
     this.pairbarHost = el(
       "div",
@@ -153,23 +137,44 @@ export class ComparisonView {
   }
 
   setContext(detail: ExperimentDetail, rows: MemberRow[]): void {
+    this.controller.abort();
+    this.lastReport = null;
     this.detail = detail;
     this.rows = rows;
     const plan = protocolLabel(String(detail.experiment.protocol.kind));
     this.pairbarHost.setAttribute("aria-label", `Пара условий: ${plan}`);
-    if (this.featureInput.value === "") {
-      this.featureInput.value = String(detail.experiment.primary_estimands?.[0]?.feature_key ?? "");
+    const featureKey = String(detail.experiment.primary_estimands?.[0]?.feature_key ?? "");
+    const contextKey = `${detail.experiment.experiment_id}\u0000${featureKey}`;
+    if (contextKey !== this.contextKey) {
+      this.featureInput.value = featureKey;
+      this.unitsInput.value = knownMetricUnits(featureKey);
+      this.contextKey = contextKey;
     }
+    this.gateHost.setAttribute("data-state", "unknown");
+    this.gateHost.textContent = UNKNOWN_GATE_TEXT;
+    this.root.querySelector(".lnt-exp-compare-status")?.remove();
     renderPairbarSlots(this.pairbarHost, this.rows, this.detail);
     this.renderIntro();
   }
 
   abort(): void {
     this.controller.abort();
+    this.detail = null;
+    this.rows = [];
+    this.lastReport = null;
+    this.contextKey = "";
+    this.gateHost.setAttribute("data-state", "unknown");
+    this.gateHost.textContent = UNKNOWN_GATE_TEXT;
+    this.root.querySelector(".lnt-exp-compare-status")?.remove();
+    this.resultHost.replaceChildren();
+    renderPairbarSlots(this.pairbarHost, [], null);
   }
 
   async runComparability(): Promise<void> {
     const signal = this.restartController();
+    this.lastReport = null;
+    this.gateHost.setAttribute("data-state", "unknown");
+    this.gateHost.textContent = UNKNOWN_GATE_TEXT;
     await runComparabilityJob({
       client: this.options.client,
       detail: this.detail,
@@ -198,13 +203,7 @@ export class ComparisonView {
       seed,
       signal,
       buildStatisticsRequest: (kind, key, unit, seedValue, jobSignal) =>
-        this.buildRequest({
-          kind,
-          featureKey: key,
-          units: unit,
-          seed: seedValue,
-          signal: jobSignal,
-        }),
+        this.buildRequest(kind, key, unit, seedValue, jobSignal),
       showBanner: (message, tone) => {
         this.showBanner(message, tone);
       },
@@ -239,23 +238,29 @@ export class ComparisonView {
     );
   }
 
-  private async buildRequest(input: RequestInput): Promise<StatisticsRunRequest> {
+  private async buildRequest(
+    kind: ComparisonProtocolKind,
+    featureKey: string,
+    units: string,
+    seed: number,
+    signal: AbortSignal,
+  ): Promise<StatisticsRunRequest> {
     const shared = {
       detail: this.detail,
       rows: this.rows,
-      featureKey: input.featureKey,
-      units: input.units,
-      seed: input.seed,
-      signal: input.signal,
+      featureKey,
+      units,
+      seed,
+      signal,
       valueSource: this.options.valueSource,
-    };
-    if (input.kind === "aba") return await buildAbaRequest(shared);
-    return await buildPairsRequest({
-      ...shared,
-      kind: input.kind,
-      notify: (message, tone) => {
+      notify: (message: string, tone: ComparisonBannerTone) => {
         this.showBanner(message, tone);
       },
+    };
+    if (kind === "aba") return await buildAbaRequest(shared);
+    return await buildPairsRequest({
+      ...shared,
+      kind,
     });
   }
 
