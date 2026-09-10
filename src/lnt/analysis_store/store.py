@@ -8,9 +8,10 @@ import uuid
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING
 
-from lnt.analysis_store.errors import ArtifactConflictError
-from lnt.analysis_store.identity import ArtifactInputs, NamedDigest
+from lnt.analysis_store.errors import ArtifactConflictError, ArtifactCorruptError
+from lnt.analysis_store.identity import SHA256_LENGTH, ArtifactInputs, NamedDigest
 from lnt.analysis_store.manifest import MANIFEST_NAME, build_manifest, sha256_bytes, verify_artifact
+from lnt.safe_paths import ensure_within_root, is_linked_path
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -25,9 +26,14 @@ class ArtifactStore:
 
     def find(self, artifact_key: str) -> Path | None:
         """Возвращает только целый опубликованный artifact; partial игнорируются."""
+        self._validate_key(artifact_key)
+        self._validate_root()
         target = self._root / artifact_key
+        if is_linked_path(target):
+            raise ArtifactCorruptError(target, "linked_artifact")
         if not target.is_dir():
             return None
+        ensure_within_root(self._root, target)
         verify_artifact(target, artifact_key)
         return target
 
@@ -43,6 +49,8 @@ class ArtifactStore:
         Одинаковые байты гарантируются только в той же locked среде; метод не
         утверждает межплатформенную побитовую идентичность.
         """
+        self._validate_key(inputs.artifact_key)
+        self._validate_root()
         target = self._root / inputs.artifact_key
         if target.exists():
             verify_artifact(target, inputs.artifact_key)
@@ -74,12 +82,27 @@ class ArtifactStore:
 
     def invalidate(self, artifact_key: str) -> Path | None:
         """Явно перемещает corrupt artifact из publish namespace без удаления."""
+        self._validate_key(artifact_key)
         target = self._root / artifact_key
+        if is_linked_path(self._root) or is_linked_path(target):
+            return None
         if not target.exists():
             return None
+        ensure_within_root(self._root, target)
         invalid = self._root / f"{artifact_key}.invalid-{uuid.uuid4().hex}"
         target.rename(invalid)
         return invalid
+
+    def _validate_root(self) -> None:
+        if is_linked_path(self._root) or is_linked_path(self._root.parent):
+            raise ArtifactCorruptError(self._root, "linked_analyses")
+
+    @staticmethod
+    def _validate_key(artifact_key: str) -> None:
+        if len(artifact_key) != SHA256_LENGTH or any(
+            char not in "0123456789abcdef" for char in artifact_key
+        ):
+            raise ValueError("artifact_key должен быть lowercase SHA-256")
 
     @staticmethod
     def _validate_outputs(outputs: Mapping[str, bytes]) -> None:

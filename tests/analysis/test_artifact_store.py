@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import subprocess
 from typing import TYPE_CHECKING, TypedDict, Unpack
 
 import pytest
@@ -118,3 +120,45 @@ def test_tampered_output_is_never_served_or_overwritten(tmp_path: Path) -> None:
     with pytest.raises(ArtifactCorruptError):
         store.publish(inputs, {"metrics.json": b"replacement\n"})
     assert (artifact / "metrics.json").read_bytes() == b"tampered"
+
+
+def test_store_rejects_traversal_artifact_key_without_touching_external_path(
+    tmp_path: Path,
+) -> None:
+    store = ArtifactStore(tmp_path / "session")
+    external = tmp_path / "external"
+    external.mkdir()
+
+    with pytest.raises(ValueError, match="artifact_key"):
+        store.find("../../external")
+    with pytest.raises(ValueError, match="artifact_key"):
+        store.invalidate("../../external")
+
+    assert external.is_dir()
+
+
+def test_store_rejects_linked_artifact_without_quarantining_target(tmp_path: Path) -> None:
+    session = tmp_path / "session"
+    external = tmp_path / "external"
+    key = "a" * 64
+    external.mkdir()
+    analyses = session / "analyses"
+    analyses.mkdir(parents=True)
+    link = analyses / key
+    if os.name == "nt":
+        subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(link), str(external)],  # noqa: S607
+            check=True,
+            capture_output=True,
+        )
+    else:
+        link.symlink_to(external, target_is_directory=True)
+    store = ArtifactStore(session)
+    try:
+        with pytest.raises(ArtifactCorruptError, match="linked_artifact"):
+            store.find(key)
+
+        assert store.invalidate(key) is None
+        assert external.is_dir()
+    finally:
+        link.rmdir() if os.name == "nt" else link.unlink()
