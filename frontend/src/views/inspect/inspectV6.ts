@@ -1,6 +1,7 @@
 import "./v6.css";
 import { LntApiClient } from "../../api/client";
 import { createDeviceApi } from "../../api/client-device";
+import { isAbortError } from "../../api/errors";
 import type { CatalogQuery, CatalogSession } from "../../api/types";
 import { createChannelbar } from "../../components/channelbar/channelbar";
 import type { ChartHandle } from "../../components/charts/types";
@@ -111,8 +112,13 @@ export async function mountInspectV6(
   container.append(root);
 
   let disposed = false;
+  let pairGeneration = 0;
+  let pairController = new AbortController();
 
   async function onPairChange(): Promise<void> {
+    const gen = ++pairGeneration;
+    pairController.abort();
+    pairController = new AbortController();
     const { a, b } = pair.get();
     pairbar.setPair(
       a === null ? null : (sessionMap.get(a) ?? null),
@@ -121,15 +127,18 @@ export async function mountInspectV6(
     routes.replaceParams({ a: a ?? "", b: b ?? "" });
     if (a === null || a === "") return;
     chrome.hideError();
+    pairbar.setDelta(null);
+    paintChannelbarFromPayload(channelbar, null, null);
+    analysisBand.update({ meters: [], peaks: [] });
+    extras.setSession(null);
     try {
       const [, bandData] = await Promise.all([
         spectrumPanel.load(a, b),
-        loadAnalysisBand(client, a, b).then((data) => {
-          analysisBand.update(data);
-          return data;
-        }),
+        loadAnalysisBand(client, a, b, pairController.signal),
         gram.refresh(a, b),
       ]);
+      if (disposed || gen !== pairGeneration) return;
+      analysisBand.update(bandData);
       const payloads = spectrumPanel.payloads();
       paintChannelbarFromPayload(channelbar, payloads.a, cyclesFromMeters(bandData.meters));
       pairbar.setDelta(
@@ -139,6 +148,7 @@ export async function mountInspectV6(
       );
       extras.setSession(a);
     } catch (error) {
+      if (disposed || gen !== pairGeneration || isAbortError(error)) return;
       // no-excuse-ok: catch — inspect v6 pair-refresh boundary
       chrome.showError(errorMessage(error));
     }
@@ -175,6 +185,8 @@ export async function mountInspectV6(
 
   return () => {
     disposed = true;
+    pairGeneration += 1;
+    pairController.abort();
     stopDeviceStatus();
     unsubscribe();
     gram.dispose();

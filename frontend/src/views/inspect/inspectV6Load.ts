@@ -6,8 +6,15 @@ import { isRecord } from "./w1Parse";
 
 export type AnalysisBandClient = {
   readonly plots: {
-    detail: (name: string) => Promise<SessionDetailPayload>;
-    spectrum: (name: string) => Promise<SpectrumPayload>;
+    detail: (
+      name: string,
+      options?: { readonly signal?: AbortSignal },
+    ) => Promise<SessionDetailPayload>;
+    spectrum: (
+      name: string,
+      maxPoints?: number,
+      options?: { readonly signal?: AbortSignal },
+    ) => Promise<SpectrumPayload>;
   };
 };
 
@@ -61,14 +68,18 @@ export async function loadAnalysisBand(
   client: AnalysisBandClient,
   a: string,
   b: string | null,
+  signal?: AbortSignal,
 ): Promise<{ meters: Meter[]; peaks: PeakRow[] }> {
-  const detail = await client.plots.detail(a);
+  const detail = await client.plots.detail(a, { signal });
   const meters = metersFromDetail(detail);
   const parsed = peaksFromAnalysis(detail);
   if (b === null) {
     return { meters, peaks: parsed.map((peak) => withDelta(peak, null)) };
   }
-  const [specA, specB] = await Promise.all([client.plots.spectrum(a), client.plots.spectrum(b)]);
+  const [specA, specB] = await Promise.all([
+    client.plots.spectrum(a, undefined, { signal }),
+    client.plots.spectrum(b, undefined, { signal }),
+  ]);
   const deltas = peakDeltas(specA.frequency_hz, specA.psd_v2_per_hz, specB.psd_v2_per_hz, parsed);
   return {
     meters,

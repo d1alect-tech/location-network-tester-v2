@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "../../api/errors";
 import type { CatalogSession } from "../../api/types";
 import type { SessionDetailPayload, SpectrumPayload, WaveformPayload } from "../../api/types-plots";
 import type { ChartHandle } from "../../components/charts/types";
@@ -53,6 +54,9 @@ function fakeClient() {
     },
     analysis: {
       artifactBytes: async () => new ArrayBuffer(0),
+    },
+    requestJson: async () => {
+      throw new ApiError("http", { status: 404 });
     },
   };
 }
@@ -138,6 +142,53 @@ describe("mountInspectV6", () => {
     expect(pairbar?.querySelector('[data-pair="a"] .pair-name')?.textContent).toBe("Alpha");
     expect(pairbar?.querySelector('[data-pair="b"] .pair-name')?.textContent).toBe("Beta");
   });
+
+  it.each(["resolve", "reject"] as const)(
+    "ignores a stale first-pair analysis %s after the auto-picked pair completes",
+    async (outcome) => {
+      let settle!: (detail: SessionDetailPayload) => void;
+      let fail!: (error: Error) => void;
+      const staleDetail = new Promise<SessionDetailPayload>((resolve, reject) => {
+        settle = resolve;
+        fail = reject;
+      });
+      let detailCall = 0;
+      const currentDetail: SessionDetailPayload = {
+        ...DETAIL,
+        analysis: { needle: { cycles_analyzed: 222 } },
+      };
+      const client = {
+        ...fakeClient(),
+        plots: {
+          ...fakeClient().plots,
+          detail: vi.fn(async () => {
+            detailCall += 1;
+            if (detailCall === 2) return staleDetail;
+            return detailCall >= 4 ? currentDetail : DETAIL;
+          }),
+        },
+      };
+      const container = document.createElement("div");
+      document.body.append(container);
+      const cleanup = await mountInspectV6(container, {
+        client,
+        routes: new RouteStore(),
+        createView: fakeCreateView(),
+      });
+      cleanups.push(cleanup);
+
+      await vi.waitFor(() => {
+        expect(container.querySelector('[data-chbar="segments"]')?.textContent).toBe("222");
+      });
+      if (outcome === "resolve") settle(DETAIL);
+      else fail(new Error("старый запрос упал"));
+      await flush();
+
+      expect(container.querySelector('[data-chbar="segments"]')?.textContent).toBe("222");
+      expect(container.querySelector('[data-pair="b"] .pair-name')?.textContent).toBe("Beta");
+      expect(container.querySelector<HTMLElement>("[data-inspect-error]")?.hidden).toBe(true);
+    },
+  );
 
   it("removes the v6 root when cleanup runs", async () => {
     // Given
