@@ -7,6 +7,7 @@ from typing import Final, Literal
 import numpy as np
 from numpy.typing import NDArray
 
+from lnt.scope_io import BLOCK_SAMPLES_PER_CHANNEL, OUTSTANDING_TRANSFERS
 from lnt.types import AcquisitionTelemetry, ChannelMode, SessionType
 
 ADC_LEVELS: Final = 256.0
@@ -30,15 +31,15 @@ class QualityThresholds:
     quality_thresholds_version: int
     clipping_ratio: float
     under_range_ratio: float
-    callback_gap_factor: float
+    callback_queue_horizon_transfers: int
     minimum_effective_lsb_count: float
 
 
-QUALITY_THRESHOLDS_V1: Final = QualityThresholds(
-    quality_thresholds_version=1,
+QUALITY_THRESHOLDS_V2: Final = QualityThresholds(
+    quality_thresholds_version=2,
     clipping_ratio=0.98,
     under_range_ratio=0.1,
-    callback_gap_factor=2.0,
+    callback_queue_horizon_transfers=OUTSTANDING_TRANSFERS,
     minimum_effective_lsb_count=8.0,
 )
 
@@ -99,7 +100,7 @@ class AcquisitionQuality:
 
 def assess_acquisition_quality(
     source: AcquisitionQualityInput,
-    thresholds: QualityThresholds = QUALITY_THRESHOLDS_V1,
+    thresholds: QualityThresholds = QUALITY_THRESHOLDS_V2,
 ) -> AcquisitionQuality:
     """Диагностирует clipping, LSB usage и callback completeness без действий."""
     # Масштаб задан ChannelQualityInput; probe применяется ровно один раз.
@@ -206,15 +207,31 @@ def _stream_findings(
     thresholds: QualityThresholds,
 ) -> tuple[QualityFinding, ...]:
     findings: list[QualityFinding] = []
-    maximum_gap = max(telemetry.callback_gaps_s, default=0.0)
-    if maximum_gap > telemetry.expected_block_interval_s * thresholds.callback_gap_factor:
+    delivery_debt = 0.0
+    maximum_delivery_debt = 0.0
+    for gap_s, block_length in zip(
+        telemetry.callback_gaps_s, telemetry.block_lengths[1:], strict=False
+    ):
+        delivered_sample_time_s = (
+            telemetry.expected_block_interval_s * block_length / BLOCK_SAMPLES_PER_CHANNEL
+        )
+        delivery_debt = max(0.0, delivery_debt + gap_s - delivered_sample_time_s)
+        maximum_delivery_debt = max(maximum_delivery_debt, delivery_debt)
+    queue_horizon_s = (
+        telemetry.expected_block_interval_s * thresholds.callback_queue_horizon_transfers
+    )
+    if maximum_delivery_debt > queue_horizon_s:
         findings.append(
             QualityFinding(
                 code=QualityCode.CALLBACK_GAP,
                 channel=None,
-                message_ru="Между callback обнаружен чрезмерный временной разрыв.",
+                message_ru=(
+                    "Доставка callback на хосте отстала дальше горизонта очереди "
+                    "асинхронных передач."
+                ),
                 recovery_action_ru=(
-                    "Проверьте USB-нагрузку и фоновые процессы перед следующим ручным захватом."
+                    "Проверьте нагрузку хоста и USB перед следующим ручным захватом; "
+                    "этот признак сам по себе не доказывает потерю отсчётов АЦП."
                 ),
             )
         )

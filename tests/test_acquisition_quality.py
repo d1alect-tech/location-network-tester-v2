@@ -2,12 +2,13 @@ import numpy as np
 import pytest
 
 from lnt.acquisition_quality import (
-    QUALITY_THRESHOLDS_V1,
+    QUALITY_THRESHOLDS_V2,
     AcquisitionQualityInput,
     ChannelQualityInput,
     QualityCode,
     assess_acquisition_quality,
 )
+from lnt.scope_io import BLOCK_SAMPLES_PER_CHANNEL
 from lnt.types import AcquisitionTelemetry, ChannelMode, SessionType
 
 
@@ -73,7 +74,7 @@ def test_under_range_reports_lsb_usage_and_tighter_guidance() -> None:
     assert quality.suggested_range_v == 0.5
 
 
-def test_callback_gap_and_short_block_have_distinct_findings() -> None:
+def test_short_block_and_incomplete_capture_do_not_require_callback_debt() -> None:
     result = assess_acquisition_quality(
         AcquisitionQualityInput(
             telemetry=telemetry(
@@ -88,11 +89,63 @@ def test_callback_gap_and_short_block_have_distinct_findings() -> None:
     )
 
     codes = {finding.code for finding in result.findings}
-    assert {
-        QualityCode.CALLBACK_GAP,
-        QualityCode.SHORT_BLOCK,
-        QualityCode.INCOMPLETE_CAPTURE,
-    } <= codes
+    assert QualityCode.CALLBACK_GAP not in codes
+    assert {QualityCode.SHORT_BLOCK, QualityCode.INCOMPLETE_CAPTURE} <= codes
+
+
+def test_callback_burst_that_catches_up_stays_healthy() -> None:
+    block_interval_s = 0.004096
+    result = assess_acquisition_quality(
+        AcquisitionQualityInput(
+            telemetry=AcquisitionTelemetry(
+                requested_samples=BLOCK_SAMPLES_PER_CHANNEL * 5,
+                captured_samples=BLOCK_SAMPLES_PER_CHANNEL * 5,
+                callback_count=5,
+                block_lengths=(BLOCK_SAMPLES_PER_CHANNEL,) * 5,
+                callback_gaps_s=(block_interval_s * 4, 0.0, 0.0, 0.0),
+                expected_block_interval_s=block_interval_s,
+                short_block_count=0,
+                ch1_clip_low_count=0,
+                ch1_clip_high_count=0,
+                ch2_clip_low_count=0,
+                ch2_clip_high_count=0,
+                calibration_used=False,
+            ),
+            session_type=SessionType.MEASUREMENT,
+            channel_mode=ChannelMode.CH1_ONLY,
+            ch1=channel(np.array([-2.0, 2.0])),
+        )
+    )
+
+    assert QualityCode.CALLBACK_GAP not in {finding.code for finding in result.findings}
+
+
+def test_callback_delivery_debt_beyond_queue_horizon_is_reported() -> None:
+    block_interval_s = 0.004096
+    block_count = 12
+    result = assess_acquisition_quality(
+        AcquisitionQualityInput(
+            telemetry=AcquisitionTelemetry(
+                requested_samples=BLOCK_SAMPLES_PER_CHANNEL * block_count,
+                captured_samples=BLOCK_SAMPLES_PER_CHANNEL * block_count,
+                callback_count=block_count,
+                block_lengths=(BLOCK_SAMPLES_PER_CHANNEL,) * block_count,
+                callback_gaps_s=(block_interval_s * 2,) * (block_count - 1),
+                expected_block_interval_s=block_interval_s,
+                short_block_count=0,
+                ch1_clip_low_count=0,
+                ch1_clip_high_count=0,
+                ch2_clip_low_count=0,
+                ch2_clip_high_count=0,
+                calibration_used=False,
+            ),
+            session_type=SessionType.MEASUREMENT,
+            channel_mode=ChannelMode.CH1_ONLY,
+            ch1=channel(np.array([-2.0, 2.0])),
+        )
+    )
+
+    assert QualityCode.CALLBACK_GAP in {finding.code for finding in result.findings}
 
 
 def test_healthy_two_channel_capture_has_channel_specific_ranges() -> None:
@@ -126,5 +179,6 @@ def test_line_quality_probe_multiplier_is_applied_once() -> None:
 
 
 def test_thresholds_are_frozen_and_versioned() -> None:
-    assert QUALITY_THRESHOLDS_V1.quality_thresholds_version == 1
-    assert hash(QUALITY_THRESHOLDS_V1)
+    assert QUALITY_THRESHOLDS_V2.quality_thresholds_version == 2
+    assert QUALITY_THRESHOLDS_V2.callback_queue_horizon_transfers == 10
+    assert hash(QUALITY_THRESHOLDS_V2)
