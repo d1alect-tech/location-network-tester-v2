@@ -47,7 +47,7 @@ def show_context(
     services: Annotated[AppServices, Depends(get_services)],
 ) -> ContextResponse:
     """Читает материализованный context view сессии."""
-    directory = session_directory(session_id, services.catalog_db)
+    directory = session_directory(session_id, services.catalog_db, services.root)
     return _response(session_id, ContextStore(directory, session_id))
 
 
@@ -58,7 +58,7 @@ def update_context(
     services: Annotated[AppServices, Depends(get_services)],
 ) -> ContextResponse:
     """Записывает следующую revision при совпавшей ожидаемой revision."""
-    directory = session_directory(session_id, services.catalog_db)
+    directory = session_directory(session_id, services.catalog_db, services.root)
     store = ContextStore(directory, session_id)
     current = store.load().snapshot or ContextSnapshot.empty(session_id)
     now = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
@@ -110,7 +110,7 @@ def context_history(
     services: Annotated[AppServices, Depends(get_services)],
 ) -> ContextHistoryResponse:
     """Возвращает аудит revisions из проверенной event chain."""
-    directory = session_directory(session_id, services.catalog_db)
+    directory = session_directory(session_id, services.catalog_db, services.root)
     events = read_event_history(directory / "context.events.jsonl", session_id)
     return ContextHistoryResponse(
         items=tuple(

@@ -130,7 +130,12 @@ def _create_application(root: Path) -> FastAPI:
     from lnt.ui.app import create_app  # noqa: PLC0415 - extra ui опциональна
 
     resolved = resolve_app_paths()
-    return create_app(root=root, catalog_db=resolved.catalog_db, runtime_db=resolved.runtime_db)
+    return create_app(
+        root=root,
+        catalog_db=resolved.catalog_db,
+        runtime_db=resolved.runtime_db,
+        index_catalog=True,
+    )
 
 
 def _run_uvicorn(application: FastAPI, *, server_socket: socket.socket) -> None:

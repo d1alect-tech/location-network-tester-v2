@@ -89,6 +89,7 @@ def run_ui(*, root: Path, port: int, open_browser: bool) -> int:
                 root=root,
                 catalog_db=paths.catalog_db,
                 runtime_db=paths.runtime_db,
+                index_catalog=True,
             )
             url = UI_URL_TEMPLATE.format(port=port)
             print(f"LNT UI: {url}", flush=True)  # noqa: T201

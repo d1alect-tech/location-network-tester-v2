@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 
 from lnt.app_paths import resolve_app_paths
+from lnt.catalog.reconcile import reconcile_catalog
 from lnt.runtime.store import JobStore
 from lnt.ui import (
     routes_analysis_v2,
@@ -43,6 +44,7 @@ def create_app(
     backend: JobBackend | None = None,
     catalog_db: Path | None = None,
     runtime_db: Path | None = None,
+    index_catalog: bool = False,
 ) -> FastAPI:
     """Создаёт изолированный экземпляр панели для указанного каталога сессий."""
     security = create_security_context(_STATIC)
@@ -53,6 +55,11 @@ def create_app(
         """Устанавливает сервисы приложения и освобождает рабочий поток."""
         await anyio.Path(root).mkdir(parents=True, exist_ok=True)
         runtime_path = runtime_db if runtime_db is not None else resolve_app_paths().runtime_db
+        selected_catalog = (
+            catalog_db if catalog_db is not None else root / ".lnt" / "catalog.sqlite3"
+        )
+        if index_catalog:
+            reconcile_catalog(root, selected_catalog)
         store = JobStore(runtime_path)
         store.interrupt_nonterminal()
         manager = JobManager(
@@ -65,9 +72,7 @@ def create_app(
             app,
             AppServices(
                 root=root,
-                catalog_db=(
-                    catalog_db if catalog_db is not None else root / ".lnt" / "catalog.sqlite3"
-                ),
+                catalog_db=selected_catalog,
                 runtime_db=runtime_path,
                 jobs=manager,
                 research_jobs=research_jobs,
