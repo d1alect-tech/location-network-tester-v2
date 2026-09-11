@@ -12,7 +12,9 @@ from numpy.typing import NDArray
 from lnt.events.models import CandidateEvent, Polarity, QualificationStatus
 
 if TYPE_CHECKING:
-    from lnt.events.settings import DetectionSettings
+    from typing import Literal
+
+    from lnt.events.settings import DetectionSettings, FrequencyBand
 
 FloatArray = NDArray[np.floating]
 MINIMUM_FFT_SAMPLES = 4
@@ -82,16 +84,50 @@ def materialize_event(run: EventRun, context: MetricContext) -> CandidateEvent:
 
 
 def _dominant_band(span: NDArray[np.float64], context: MetricContext) -> str | None:
+    return dominant_band(
+        span,
+        sample_rate_hz=context.sample_rate_hz,
+        bands=context.settings.bands,
+        fft_max_samples=context.settings.fft_max_samples,
+    )
+
+
+def dominant_band(
+    span: NDArray[np.float64],
+    *,
+    sample_rate_hz: float,
+    bands: tuple[FrequencyBand, ...],
+    fft_max_samples: int,
+    interval_rule: Literal["closed", "half_open_last_closed"] = "closed",
+) -> str | None:
+    """Return the strongest declared band from a bounded native-or-strided FFT."""
     if span.size < MINIMUM_FFT_SAMPLES:
         return None
-    stride = max(1, math.ceil(span.size / context.settings.fft_max_samples))
+    stride = max(1, math.ceil(span.size / fft_max_samples))
     bounded = span[::stride]
-    effective_rate = context.sample_rate_hz / stride
+    effective_rate = sample_rate_hz / stride
     spectrum = np.fft.rfft((bounded - np.mean(bounded)) * np.hanning(bounded.size))
     power = np.square(np.abs(spectrum))
     frequencies = np.fft.rfftfreq(bounded.size, d=1.0 / effective_rate)
-    energies = [
-        float(np.sum(power[(frequencies >= band.low_hz) & (frequencies <= band.high_hz)]))
-        for band in context.settings.bands
-    ]
-    return context.settings.bands[int(np.argmax(np.asarray(energies)))].name
+    last_index = len(bands) - 1
+    energies = np.asarray(
+        [
+            float(
+                np.sum(
+                    power[
+                        (frequencies >= band.low_hz)
+                        & (
+                            (frequencies <= band.high_hz)
+                            if interval_rule == "closed"
+                            else (frequencies < band.high_hz)
+                            | ((index == last_index) & (frequencies == band.high_hz))
+                        )
+                    ]
+                )
+            )
+            for index, band in enumerate(bands)
+        ]
+    )
+    if not energies.size or not np.any(energies > 0.0):
+        return None
+    return bands[int(np.argmax(energies))].name

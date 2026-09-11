@@ -15,6 +15,7 @@ from lnt.events import (
     detect_events,
     event_preset,
 )
+from lnt.events.metrics import dominant_band
 
 SAMPLE_RATE_HZ = 100_000.0
 TIMING_TOLERANCE_SAMPLES = 8
@@ -190,3 +191,33 @@ def test_presets_are_complete_and_distinct() -> None:
     assert impulses.event_detection_version == bursts.event_detection_version == 1
     assert impulses.max_gap_samples < bursts.max_gap_samples
     assert impulses.minimum_event_samples < bursts.minimum_event_samples
+
+
+def test_public_dominant_band_uses_half_open_edges_and_rejects_empty_support() -> None:
+    bands = (
+        FrequencyBand(name="below", low_hz=0.0, high_hz=3_000.0),
+        FrequencyBand(name="at_edge", low_hz=3_000.0, high_hz=6_000.0),
+    )
+    time_s = np.arange(100, dtype=np.float64) / SAMPLE_RATE_HZ
+    edge_tone = np.sin(2.0 * np.pi * 3_000.0 * time_s)
+
+    assert (
+        dominant_band(
+            edge_tone,
+            sample_rate_hz=SAMPLE_RATE_HZ,
+            bands=bands,
+            fft_max_samples=100,
+            interval_rule="half_open_last_closed",
+        )
+        == "at_edge"
+    )
+    assert (
+        dominant_band(
+            np.ones(100),
+            sample_rate_hz=SAMPLE_RATE_HZ,
+            bands=bands,
+            fft_max_samples=100,
+            interval_rule="half_open_last_closed",
+        )
+        is None
+    )
