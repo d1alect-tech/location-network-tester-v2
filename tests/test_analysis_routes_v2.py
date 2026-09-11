@@ -15,10 +15,13 @@ from lnt.analysis_store import (
     ArtifactCorruptError,
     ArtifactInputs,
     ArtifactStore,
+    CharacterizationRecipe,
     CodeIdentity,
     NamedDigest,
+    parse_analysis_recipe,
 )
-from lnt.context.json_codec import JsonValue  # noqa: TC001 - fixture return type
+from lnt.analysis_v2.recipes import RecipeCatalog
+from lnt.context.json_codec import JsonValue, decode_object
 from lnt.ui.app import create_app
 from tests.test_ui_sessions import write_manifest
 
@@ -208,6 +211,52 @@ def test_run_rejects_ambiguous_session_without_side_effects(
     assert not (root / ".lnt" / "analysis-jobs").exists()
     assert not (root / "shared" / ".lnt-default-analysis.json").exists()
     assert not (root / "other" / ".lnt-default-analysis.json").exists()
+
+
+def test_run_rejects_characterization_recipe_before_validation_or_side_effects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = tmp_path / "s1"
+    write_manifest(session)
+    example = Path(__file__).parents[1] / "docs" / "examples" / "characterization-recipe-v2.json"
+    recipe = parse_analysis_recipe(
+        decode_object(example.read_text(encoding="utf-8"), "test characterization recipe")
+    )
+    assert isinstance(recipe, CharacterizationRecipe)
+    stored = RecipeCatalog(tmp_path / ".lnt" / "analysis-recipes").create(
+        "characterization", recipe
+    )
+    called = False
+    validated = False
+
+    def fake_validate(*_args: object, **_kwargs: object) -> None:
+        nonlocal validated
+        validated = True
+
+    def fake_run(_self: object, session_dir: Path, *_args: object, **_kwargs: object) -> object:
+        nonlocal called
+        called = True
+        artifact_key, _ = _publish_spectrum(session_dir)
+        return SimpleNamespace(artifact_key=artifact_key)
+
+    monkeypatch.setattr("lnt.ui.routes_analysis_v2.validate_session_inputs", fake_validate)
+    monkeypatch.setattr("lnt.ui.routes_analysis_v2.AnalysisOrchestrator.run", fake_run)
+    app = create_app(root=tmp_path, runtime_db=tmp_path / "runtime.sqlite3")
+    with TestClient(app) as client:
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        response = client.post(
+            "/api/analysis/runs",
+            json={"session": "s1", "recipe_id": stored.recipe_id, "make_default": True},
+            headers=headers,
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "выполнение рецепта characterization пока не подключено"
+    assert not validated
+    assert not called
+    assert not (tmp_path / ".lnt" / "analysis-jobs").exists()
+    assert not (session / "analyses").exists()
+    assert not (session / ".lnt-default-analysis.json").exists()
 
 
 def test_run_uses_manifest_alias_resolved_directory(

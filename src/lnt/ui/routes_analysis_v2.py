@@ -104,7 +104,12 @@ def run_analysis(request: AnalysisRunRequest, services: Services) -> dict[str, s
         raise http_not_found("рецепт анализа не найден") from error
     except InputError as error:
         raise http_unprocessable(str(error)) from error
-    validate_session_inputs(session_dir, recipe.recipe.channels, make_default=request.make_default)
+    analysis_recipe = recipe.recipe
+    if not isinstance(analysis_recipe, AnalysisRecipe):
+        raise http_unprocessable("выполнение рецепта characterization пока не подключено")
+    validate_session_inputs(
+        session_dir, analysis_recipe.channels, make_default=request.make_default
+    )
     jobs = AnalysisJobStore(services.root / ".lnt" / "analysis-jobs")
     job = jobs.create()
 
@@ -114,7 +119,7 @@ def run_analysis(request: AnalysisRunRequest, services: Services) -> dict[str, s
     try:
         result = AnalysisOrchestrator(engine=DefaultAnalysisEngine()).run(
             session_dir,
-            recipe.recipe,
+            analysis_recipe,
             progress=progress,
             project_legacy=request.make_default,
         )
