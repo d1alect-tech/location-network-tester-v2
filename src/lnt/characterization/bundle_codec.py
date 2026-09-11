@@ -15,6 +15,7 @@ from lnt.characterization.array_codec import (
 from lnt.characterization.errors import CharacterizationError
 from lnt.characterization.metadata_codec import decode_metadata, encode_metadata
 from lnt.characterization.table_codec import decode_tables, encode_tables
+from lnt.characterization.tables import TableValueType
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -54,7 +55,7 @@ def encode_bundle(
     _validate_references(bundle, arrays, tables)
     files = {
         METADATA_FILENAME: encode_metadata(bundle),
-        ARRAYS_FILENAME: encode_arrays(arrays),
+        ARRAYS_FILENAME: encode_arrays(arrays, maximum_uncompressed_bytes=MAX_ARRAYS_BYTES),
         TABLES_FILENAME: encode_tables(tables),
     }
     _validate_limits(files, max_artifact_bytes)
@@ -120,10 +121,16 @@ def _has_valid_output(
             return True
         if reference.validity_mask_id is not None and arrays[reference.validity_mask_id].any():
             return True
-    return any(
-        any(value is not None for row in tables[reference.table_id].rows for value in row)
-        for reference in family.table_refs
-    )
+    for reference in family.table_refs:
+        table = tables[reference.table_id]
+        if any(
+            value is not None
+            for row in table.rows
+            for column, value in zip(table.columns, row, strict=True)
+            if column.type is not TableValueType.REASON_CODE
+        ):
+            return True
+    return False
 
 
 def _validate_limits(files: Mapping[str, bytes], max_artifact_bytes: int) -> None:

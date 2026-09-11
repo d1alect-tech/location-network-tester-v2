@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import io
+import math
 import re
 import zipfile
-from typing import TYPE_CHECKING, Final
+from typing import IO, TYPE_CHECKING, Final
 
 import numpy as np
 from numpy.typing import NDArray
@@ -21,9 +22,11 @@ _NAME: Final = re.compile(r"[a-z][a-z0-9_]*\Z")
 _TIMESTAMP: Final = (1980, 1, 1, 0, 0, 0)
 
 
-def encode_arrays(arrays: Mapping[str, np.ndarray]) -> bytes:
+def encode_arrays(arrays: Mapping[str, np.ndarray], *, maximum_uncompressed_bytes: int) -> bytes:
     """Encode sorted NPY members into a pinned ZIP container."""
     validated = {name: _validate_array(name, value) for name, value in arrays.items()}
+    if sum(_npy_size(value) for value in validated.values()) > maximum_uncompressed_bytes:
+        raise CharacterizationError("artifact_limit", "NPZ expands beyond its limit")
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", allowZip64=True) as archive:
         for name in sorted(validated):
@@ -35,6 +38,12 @@ def encode_arrays(arrays: Mapping[str, np.ndarray]) -> bytes:
             info.external_attr = 0
             archive.writestr(info, payload.getvalue())
     return output.getvalue()
+
+
+def _npy_size(array: np.ndarray) -> int:
+    header = io.BytesIO()
+    np.lib.format.write_array_header_1_0(header, np.lib.format.header_data_from_array_1_0(array))
+    return header.tell() + array.nbytes
 
 
 def decode_arrays(data: bytes, *, maximum_uncompressed_bytes: int) -> dict[str, NumericArray]:
@@ -53,6 +62,7 @@ def decode_arrays(data: bytes, *, maximum_uncompressed_bytes: int) -> dict[str, 
                 name = info.filename.removesuffix(".npy")
                 _validate_name(name)
                 with archive.open(info) as stream:
+                    _validate_npy_payload(stream, info.file_size)
                     value = np.lib.format.read_array(stream, allow_pickle=False)
                 result[name] = _validate_array(name, value)
     except CharacterizationError:
@@ -105,6 +115,19 @@ def _validate_members(
         raise CharacterizationError("artifact_limit", "NPZ expands beyond its limit")
 
 
+def _validate_npy_payload(stream: IO[bytes], member_size: int) -> None:
+    version = np.lib.format.read_magic(stream)
+    if version == (1, 0):
+        shape, _, dtype = np.lib.format.read_array_header_1_0(stream)
+    elif version == (2, 0):
+        shape, _, dtype = np.lib.format.read_array_header_2_0(stream)
+    else:
+        raise CharacterizationError("array_archive", "unsupported NPY version")
+    if stream.tell() + math.prod(shape) * dtype.itemsize != member_size:
+        raise CharacterizationError("artifact_limit", "NPY payload does not match its shape")
+    stream.seek(0)
+
+
 def _invalid_member() -> None:
     raise CharacterizationError("array_members", "NPZ contains an unknown member")
 
@@ -127,7 +150,7 @@ def _validate_offsets(offsets: np.ndarray | None, size: int, name: str) -> None:
         or offsets.size == 0
         or offsets[0] != 0
         or offsets[-1] != size
-        or np.any(np.diff(offsets) < 0)
+        or np.any(offsets[1:] < offsets[:-1])
     ):
         raise CharacterizationError("array_offsets", f"invalid ragged offsets for {name}")
 
