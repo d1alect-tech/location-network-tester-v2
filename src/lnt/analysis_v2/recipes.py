@@ -8,7 +8,11 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path  # noqa: TC003 - runtime catalog paths
 
-from lnt.analysis_store import AnalysisRecipe
+from lnt.analysis_store import (
+    AnalysisRecipe,
+    AnalysisRecipeDocument,
+    parse_analysis_recipe,
+)
 from lnt.analysis_store.errors import RecipeError
 from lnt.analysis_store.identity import SHA256_LENGTH
 from lnt.safe_paths import is_linked_path
@@ -20,7 +24,7 @@ class StoredRecipe:
 
     recipe_id: str
     name: str
-    recipe: AnalysisRecipe
+    recipe: AnalysisRecipeDocument
 
     def payload(self) -> dict[str, object]:
         """Return a JSON-compatible API payload."""
@@ -34,7 +38,7 @@ class RecipeCatalog:
         """Bind the catalog to one directory."""
         self._root: Path = root
 
-    def create(self, name: str, recipe: AnalysisRecipe) -> StoredRecipe:
+    def create(self, name: str, recipe: AnalysisRecipeDocument) -> StoredRecipe:
         """Create a recipe unless its identity already exists."""
         self._validate_root()
         stored = StoredRecipe(recipe_id=recipe.recipe_sha256, name=name, recipe=recipe)
@@ -66,6 +70,8 @@ class RecipeCatalog:
     def clone(self, recipe_id: str, name: str) -> StoredRecipe:
         """Create a new identity without mutating the source."""
         source = self.get(recipe_id)
+        if not isinstance(source.recipe, AnalysisRecipe):
+            raise RecipeError("клонирование рецепта schema_version=2 не поддерживается")
         clone = source.recipe.clone(mode=f"{source.recipe.mode}:clone:{uuid.uuid4().hex[:8]}")
         return self.create(name, clone)
 
@@ -100,7 +106,7 @@ class RecipeCatalog:
         stored = StoredRecipe(
             recipe_id=str(payload["recipe_id"]),
             name=str(payload["name"]),
-            recipe=AnalysisRecipe.from_mapping(payload["recipe"]),
+            recipe=parse_analysis_recipe(payload["recipe"]),
         )
         if stored.recipe_id != path.stem or stored.recipe.recipe_sha256 != stored.recipe_id:
             raise RecipeError("identity сохранённого рецепта не совпадает с canonical hash")
