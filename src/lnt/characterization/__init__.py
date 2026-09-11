@@ -29,6 +29,7 @@ from lnt.characterization.records import (
     Unit,
     Window,
 )
+from lnt.characterization.shared import SharedComputations, prepare_shared_computations
 from lnt.characterization.tables import TableBlock, TableColumn, TableValueType
 
 __all__ = [
@@ -47,6 +48,7 @@ __all__ = [
     "LoadedCharacterization",
     "Qc",
     "ScalarSummary",
+    "SharedComputations",
     "SignalPlane",
     "Status",
     "Support",
@@ -58,4 +60,5 @@ __all__ = [
     "Window",
     "encode_bundle",
     "load_bundle",
+    "prepare_shared_computations",
 ]
