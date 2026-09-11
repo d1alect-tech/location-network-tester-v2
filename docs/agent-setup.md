@@ -1,263 +1,292 @@
-# Настройка lnt силами агента
+# Настройка LNT силами агента
 
-## Кому адресован файл и чем все закончится
+Этот файл можно передать ИИ-агенту с доступом к PowerShell на 64-битной
+Windows. По умолчанию агент устанавливает готовую переносимую сборку `v0.1.0`,
+проверяет её на синтетических данных и возвращает адрес локальной веб-панели.
 
-Этот файл адресован ИИ агенту с доступом к терминалу на свежей машине с Windows. Агент ставит проект, прогоняет синтетическую сессию через симуляцию и анализ, поднимает веб панель и отдает человеку ссылку. Агент не сможет поставить USB драйвер, для него нужен Zadig с окном. Этот шаг остается за человеком и описан в отдельном разделе ниже.
+Для этого не нужны Git, Python, uv или Node.js. Среда выполнения находится
+внутри архива. Все команды ниже выполняются без прав администратора.
 
-## Что должно стоять на машине
+Проверка на синтетике не подтверждает работу на чистой машине, установку
+WinUSB или связь с физическим осциллографом. LNT поддерживает только Hantek
+6022BE. Подготовка устройства описана в конце файла.
 
-На этой машине наблюдались такие версии. Сверь свои с ними.
+## 1. Скачай и проверь релиз
 
-- Windows 10 Домашняя. Проект рассчитан только на Windows.
-- Python 3.12.13, получен через uv. Системный Python здесь был 3.11.15, он не подходит, проекту нужен 3.12.
-- uv 0.12.3.
-- Node.js v22.23.2.
-- Дополнение ui, то есть fastapi 0.140.0 и uvicorn 0.51.0. Без него команда `lnt ui` завершается с кодом 2.
+Публичный релиз:
+<https://github.com/d1alect-tech/location-network-tester-v2/releases/tag/v0.1.0>
 
-Консоль PowerShell на этой машине показывает кириллицу как кракозябры. Сами файлы при этом валидный UTF-8. Ничего не чини, это только отображение.
+В нём опубликованы четыре файла:
 
-## Шаги настройки
+- `LNT-0.1.0-win64.zip`;
+- `LNT-0.1.0-win64.zip.sha256`;
+- `LNT-0.1.0-corresponding-source.zip`;
+- `LNT-0.1.0-corresponding-source.zip.sha256`.
 
-Все команды запускаются из каталога репозитория. Цепочки соединяй через `;`, у PowerShell нет `&&`.
+Для обычного запуска нужны только Windows-архив и его `.sha256`. Скачай их во
+временный каталог, сверь хеш и распакуй сборку на локальный диск:
 
 ```powershell
-cd <каталог-репозитория>
+$ErrorActionPreference = "Stop"
+$base = "https://github.com/d1alect-tech/location-network-tester-v2/releases/download/v0.1.0"
+$work = Join-Path $env:TEMP ("lnt-v0.1.0-" + [guid]::NewGuid().ToString("N"))
+$install = Join-Path $env:LOCALAPPDATA "Programs\LNT-0.1.0"
+$zip = Join-Path $work "LNT-0.1.0-win64.zip"
+$sidecar = "$zip.sha256"
+
+New-Item -ItemType Directory -Path $work | Out-Null
+Invoke-WebRequest "$base/LNT-0.1.0-win64.zip" -OutFile $zip -UseBasicParsing
+Invoke-WebRequest "$base/LNT-0.1.0-win64.zip.sha256" -OutFile $sidecar -UseBasicParsing
+
+$line = (Get-Content -LiteralPath $sidecar -Raw).Trim()
+if ($line -notmatch '^([0-9a-fA-F]{64})\s+LNT-0\.1\.0-win64\.zip$') {
+    throw "Некорректный файл контрольной суммы"
+}
+$expected = $Matches[1].ToLowerInvariant()
+$actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) {
+    throw "SHA-256 не совпал: ожидался $expected, получен $actual"
+}
+
+if (Test-Path -LiteralPath $install) {
+    throw "Каталог уже существует: $install"
+}
+New-Item -ItemType Directory -Path (Split-Path $install -Parent) -Force | Out-Null
+Expand-Archive -LiteralPath $zip -DestinationPath $install
+$actual
 ```
 
-### Шаг 1. Проверь uv
-
-```powershell
-uv --version
-```
-
-Успех выглядит так, код выхода 0.
+Команда должна завершиться с кодом `0` и вывести:
 
 ```text
-uv 0.12.3 (507230998 2026-08-07 x86_64-pc-windows-msvc)
+272e6b4dc57ab465f843460a0215662740aed0be54c1905ed9e757566db3dc09
 ```
 
-Частая ошибка. Команда не найдена. Это значит, что uv не в PATH. Поставь uv и перезапусти терминал.
-
-### Шаг 2. Проверь Python и Node.js
+Проверь состав распакованного каталога:
 
 ```powershell
-python --version
+$required = @(
+    "LNT.exe",
+    "LNT-cli.exe",
+    "_internal",
+    "SOURCE.txt",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "dependency-manifest.json",
+    "distribution-policy.md",
+    "licenses"
+)
+$missing = @($required | Where-Object { -not (Test-Path -LiteralPath (Join-Path $install $_)) })
+if ($missing.Count -ne 0) {
+    throw "В архиве не хватает: $($missing -join ', ')"
+}
 ```
 
-На этой машине ответ был `Python 3.11.15`, код выхода 0. Это просто системный интерпретатор, работать будем через uv.
+Если каталог установки уже существует, не удаляй и не перезаписывай его без
+разрешения владельца. Возьми другой путь или остановись.
+
+## 2. Запусти встроенную самопроверку
+
+`LNT.exe` предназначен для обычного запуска. Агент использует `LNT-cli.exe`,
+потому что тот возвращает код выхода и пишет результат в консоль.
 
 ```powershell
-uv run --no-sync --python 3.12 python --version
+$cli = Join-Path $install "LNT-cli.exe"
+& $cli selftest
+if ($LASTEXITCODE -ne 0) {
+    throw "LNT selftest завершился с кодом $LASTEXITCODE"
+}
 ```
 
-Успех выглядит так, код выхода 0.
+Успех выглядит так:
 
 ```text
-Python 3.12.13
+SELFTEST OK: пик 22385 Гц, циклов 119
 ```
 
-Частая ошибка. uv начинает качать интерпретатор или падает с сетевой ошибкой. Проверь интернет и повтори.
+Частота может отличаться на несколько герц. Проверяй префикс `SELFTEST OK` и
+код выхода `0`, а не точное число. Эта команда проверяет встроенный тракт
+синтетики и анализа, но не USB-устройство.
+
+В некоторых консолях Windows русские строки отображаются как кракозябры. Файлы
+при этом остаются корректным UTF-8. Ориентируйся на код выхода и ASCII-префиксы.
+
+## 3. Проверь рабочий цикл без осциллографа
+
+Создай две синтетические сессии: исходную и с тем же пиком на 12 дБ ниже.
 
 ```powershell
-node --version
+$demo = Join-Path $env:TEMP ("lnt-agent-check-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $demo | Out-Null
+
+& $cli simulate --profile bad --out "$demo\syn-bad-seed6022" --seed 6022 --label "before-filter"
+if ($LASTEXITCODE -ne 0) { throw "Первая симуляция не удалась" }
+
+& $cli simulate --profile bad-damped --out "$demo\syn-bad-damped-seed6022" --seed 6022 --label "after-filter"
+if ($LASTEXITCODE -ne 0) { throw "Вторая симуляция не удалась" }
+
+& $cli analyze "$demo\syn-bad-seed6022"
+if ($LASTEXITCODE -ne 0) { throw "Первый анализ не удался" }
+
+& $cli analyze "$demo\syn-bad-damped-seed6022"
+if ($LASTEXITCODE -ne 0) { throw "Второй анализ не удался" }
 ```
 
-Успех выглядит так, код выхода 0.
+После этого в каждом каталоге должны находиться `metrics.json` и
+`spectrum.csv`:
+
+```powershell
+$outputs = @(
+    "$demo\syn-bad-seed6022\metrics.json",
+    "$demo\syn-bad-seed6022\spectrum.csv",
+    "$demo\syn-bad-damped-seed6022\metrics.json",
+    "$demo\syn-bad-damped-seed6022\spectrum.csv"
+)
+$missing = @($outputs | Where-Object { -not (Test-Path -LiteralPath $_) })
+if ($missing.Count -ne 0) {
+    throw "Анализ не создал: $($missing -join ', ')"
+}
+```
+
+API умеет находить сессию и по имени каталога, и по `session_id` из
+`manifest.json`. Совпадение этих двух значений больше не требуется.
+
+## 4. Запусти и проверь веб-панель
+
+Запусти сервер отдельным процессом без автоматического открытия браузера:
+
+```powershell
+$probe = [System.Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+$probe.Start()
+$port = ([Net.IPEndPoint]$probe.LocalEndpoint).Port
+$probe.Stop()
+$url = "http://127.0.0.1:$port/"
+$stdout = Join-Path $work "lnt-ui.stdout.log"
+$stderr = Join-Path $work "lnt-ui.stderr.log"
+$arguments = 'ui --root "{0}" --port {1} --no-browser' -f $demo, $port
+$server = Start-Process -FilePath $cli -ArgumentList $arguments `
+    -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+
+$health = $null
+for ($attempt = 0; $attempt -lt 60; $attempt++) {
+    if ($server.HasExited) {
+        throw "LNT UI завершился с кодом $($server.ExitCode): $(Get-Content $stderr -Raw)"
+    }
+    try {
+        $health = Invoke-RestMethod "${url}api/health" -TimeoutSec 2
+        break
+    } catch {
+        $health = $null
+    }
+    Start-Sleep -Seconds 1
+}
+if ($null -eq $health -or $health.status -ne "ok") {
+    throw "LNT UI не ответил за 60 секунд"
+}
+```
+
+Проверь главную страницу, каталог и спектр:
+
+```powershell
+$page = Invoke-WebRequest $url -UseBasicParsing
+$catalog = Invoke-RestMethod "${url}api/catalog/sessions?page_size=200"
+$spectrum = Invoke-RestMethod "${url}api/sessions/syn-bad-seed6022/spectrum?max_points=512"
+
+if ($page.StatusCode -ne 200) { throw "Главная страница вернула $($page.StatusCode)" }
+if (@($catalog.items).Count -lt 2) { throw "В каталоге меньше двух сессий" }
+if (@($spectrum.frequency_hz).Count -eq 0 -or @($spectrum.psd_v2_per_hz).Count -eq 0) {
+    throw "API вернул пустой спектр"
+}
+
+"BUILD_ID=$($health.build_id)"
+"URL=${url}#/inspect?a=syn-bad-seed6022&b=syn-bad-damped-seed6022"
+"PID=$($server.Id)"
+```
+
+Успешная проверка даёт HTTP `200`, непустой спектр и `build_id`, который
+начинается с `0.1.0+`. Передай человеку напечатанные `URL` и `PID`. Не называй
+это проверкой чистой машины или физического Hantek.
+
+PowerShell сам запрашивает свободный локальный порт. Если другой процесс успел
+занять его до запуска LNT, повтори раздел. Если LNT сообщает о другом запущенном
+экземпляре, не завершай чужой процесс без разрешения владельца.
+
+## 5. Заверши работу или оставь панель запущенной
+
+Если человек хочет открыть панель, оставь процесс работающим. Если требовалась
+только проверка, останови свой процесс и удали созданные временные данные:
+
+```powershell
+if ($null -ne (Get-Variable server -ErrorAction SilentlyContinue) -and $null -ne $server) {
+    if (-not $server.HasExited) {
+        Stop-Process -Id $server.Id
+    }
+    Wait-Process -Id $server.Id -ErrorAction SilentlyContinue
+}
+if ($null -ne (Get-Variable demo -ErrorAction SilentlyContinue) -and
+    (Test-Path -LiteralPath $demo)) {
+    Remove-Item -LiteralPath $demo -Recurse -Force
+}
+if ($null -ne (Get-Variable demo -ErrorAction SilentlyContinue)) {
+    Test-Path -LiteralPath $demo
+} else {
+    $false
+}
+```
+
+Последняя команда должна вывести `False`. Каталог `$install` не удаляй: это
+установленная программа.
+
+## 6. Передай человеку подготовку Hantek 6022BE
+
+Zadig работает через графическое окно, поэтому этот шаг выполняет человек:
+
+1. Подключить Hantek 6022BE по USB.
+2. Открыть Zadig, включить `Options` → `List All Devices` и установить WinUSB
+   для устройства с VID `04B4`.
+3. После первого захвата устройство может получить VID `04B5`. Тогда установить
+   WinUSB и для него.
+4. Запустить `LNT.exe`, открыть экран «Захват» и нажать «Проверить устройство».
+
+Backend, `libusb-1.0.dll` и RAM-прошивка уже входят в portable-архив. Ничего
+не нужно класть рядом с системным `python.exe`. RAM-прошивка загружается только
+при явном захвате; диагностика её не меняет.
+
+Подробнее: [руководство оператора](operator-guide.md) и
+[безопасность и восстановление](safety-and-recovery.md).
+
+## 7. Если нужно изменить или пересобрать LNT
+
+Portable-сборка предназначена для запуска, а не разработки. Для работы с кодом
+клонируй тег `v0.1.0`:
+
+```powershell
+git clone --branch v0.1.0 --depth 1 https://github.com/d1alect-tech/location-network-tester-v2.git
+cd location-network-tester-v2
+uv sync --locked --python 3.12 --extra ui
+uv run --no-sync --python 3.12 lnt selftest
+```
+
+Node.js нужен только при изменении frontend. Для точного набора материалов
+сборки скачай `LNT-0.1.0-corresponding-source.zip` и его `.sha256`. SHA-256
+архива:
 
 ```text
-v22.23.2
+7c60b3575aea227228c5cc04ce415dfd966a44b1375d4bbadb12fa4255925454
 ```
 
-Частая ошибка. Команда не найдена. Поставь Node.js и перезапусти терминал.
-
-### Шаг 3. Проверь импорт пакета без синхронизации
-
-```powershell
-uv run --no-sync --python 3.12 python -c "import lnt, sys; print(sys.version)"
-```
-
-Успех выглядит так, код выхода 0.
-
-```text
-3.12.13 (main, Jul 23 2026, 14:44:57) [MSC v.1944 64 bit (AMD64)]
-```
-
-Частая ошибка. Ошибка импорта. Значит окружение `.venv` сломано. Иди к шагу 4 и выполни полную синхронизацию.
-
-### Шаг 4. Проверь зависимости с дополнением ui
-
-На этой машине `.venv` уже работал, поэтому запускалась только проверочная форма с `--dry-run`. Она ничего не ставит и ничего не меняет. На чистой машине запусти ту же команду без `--dry-run`.
-
-```powershell
-uv sync --python 3.12 --extra ui --dry-run
-```
-
-Успех выглядит так, код выхода 0.
-
-```text
-Would use project environment at: .venv
-Resolved 47 packages in 24ms
-Found up-to-date lockfile at: uv.lock
-Would download 1 package
-Would uninstall 1 package
-Would install 1 package
- - lnt==0.1.0 (from file:///<каталог-репозитория>)
- + lnt @ file:///<каталог-репозитория>
-```
-
-Частая ошибка. Ошибка резолва или сети. Проверь интернет, первый запуск качает пакеты.
-
-Затем проверь само дополнение.
-
-```powershell
-uv run --no-sync --python 3.12 python -c "import fastapi, uvicorn; print(fastapi.__version__, uvicorn.__version__)"
-```
-
-Успех выглядит так, код выхода 0.
-
-```text
-0.140.0 0.51.0
-```
-
-Частая ошибка. `ModuleNotFoundError`. Значит дополнение ui не установлено. Без него `lnt ui` завершается с кодом 2 и строкой `интерфейс не установлен: pip install 'lnt[ui]' (см. README)`.
-
-### Шаг 5. Проверь CLI
-
-```powershell
-uv run --no-sync --python 3.12 lnt --help
-```
-
-Успех, это код выхода 0 и строка использования в первой строке.
-
-```text
-usage: lnt [-h]
-           {archive,sessions,context,profiles,reindex,experiment,hypothesis,simulate,capture,analyze,compare,ui,support-bundle,selftest,catalog}
-           ...
-```
-
-Остальные строки справки содержат русские описания. В этой консоли они выглядят как кракозябры. Это нормально.
-
-## Приемочная проверка. Синтетика от симуляции до спектра
-
-Проверка считается пройденной, только если синтетическая сессия создана, проанализирована и ее спектр отдается с HTTP 200. Просто старт сервера без этого не считается.
-
-Работай во временном корне, не в рабочем каталоге владельца.
-
-```powershell
-$demo = "$env:TEMP\lnt-agent-check"
-New-Item -ItemType Directory -Path $demo
-```
-
-### Проверка 1. Симуляция
-
-```powershell
-uv run --no-sync --python 3.12 lnt simulate --profile bad --out "$demo\syn-bad-seed6022" --seed 6022 --label "проверка"
-```
-
-Успех, это код выхода 0 и каталог с файлами `ch1.npy`, `ch2.npy`, `context.events.jsonl`, `context.json`, `manifest.json`. В манифесте поле `session_id` равно `syn-bad-seed6022`. Идентификаторы синтетики строятся как `syn-<профиль>-seed<сид>`, поэтому для профиля `bad` и сида `6022` каталог должен называться ровно `syn-bad-seed6022`. Почему это важно, объяснено в проверке 5.
-
-Частая ошибка. Ненулевой код и строка `Ошибка` в stderr. Читай ее буквально, там названа причина.
-
-### Проверка 2. Анализ
-
-```powershell
-uv run --no-sync --python 3.12 lnt analyze "$demo\syn-bad-seed6022"
-```
-
-Успех, это код выхода 0 и новые файлы `metrics.json` и `spectrum.csv` в каталоге сессии. В отчете среди прочего были значения `mu_pk=0.1840`, `sigma/mu=0.205`, `P_async/P_sync=0.468` и `CV=0.0139`. Русские строки отчета в этой консоли выглядят как кракозябры. Это нормально.
-
-### Проверка 3. Панель
-
-Команда занимает терминал, поэтому запускай ее в отдельном окне. Порт 8765 на этой машине был занят другим процессом, так что здесь используется 8770. Не используй 8765, если он занят.
-
-```powershell
-uv run --no-sync --python 3.12 lnt ui --root "$demo" --port 8770 --no-browser
-```
-
-Успех, это строка в stdout.
-
-```text
-LNT UI: http://127.0.0.1:8770/
-```
-
-Дождись строки перед проверками. Без нее сервер еще не готов.
-
-Частые ошибки, каждая дает код выхода 2.
-
-- Второй экземпляр. Строка начинается с `Ошибка: аппарат уже занят` и называет PID, время запуска, сборку и время захвата. Одновременно работает только один экземпляр. Найди и останови первый или договорись с владельцем.
-- Занятый порт. Строка вида `Ошибка: порт 127.0.0.1:8773 уже занят другим сервером` означает, что порт уже слушает другая программа. В моем прогоне порт был 8773, у тебя будет твой. Возьми следующий свободный порт.
-
-### Проверка 4. Главная страница, здоровье и каталог
-
-```powershell
-Invoke-WebRequest http://127.0.0.1:8770/api/health -UseBasicParsing
-Invoke-WebRequest http://127.0.0.1:8770/ -UseBasicParsing
-Invoke-WebRequest "http://127.0.0.1:8770/api/catalog/sessions?page_size=200" -UseBasicParsing
-```
-
-Успех, это три ответа с кодом 200. Здоровье отвечает так.
-
-```json
-{"status":"ok","build_id":"0.1.0+6249fbd082a790dc"}
-```
-
-В каталоге ровно одна запись.
-
-```json
-{"items":[{"id":"syn-bad-seed6022","health":"ok","created_utc":"2026-09-05T17:35:55.606360+00:00","source":"synthetic","session_type":"measurement","profile":"bad","label":"Ð¿ÑÐ¾Ð²ÐµÑÐºÐ°"}]}
-```
-
-Поле label выглядит как мусор. Так кириллица из командной строки пережила консоль с битой кодировкой. На проверку это не влияет, спектр и метрики целы.
-
-### Проверка 5. Ловушка имени каталога
-
-HTTP API ищет сессию по имени каталога, а каталог показывает идентификатор из манифеста. Если `--out` назвать иначе, чем идентификатор в манифесте, панель покажет сессию в списке, но отдаст 404 за ее спектром. Проверено вживую в обе стороны.
-
-Совпадение дает 200.
-
-```powershell
-Invoke-WebRequest "http://127.0.0.1:8770/api/sessions/syn-bad-seed6022/spectrum?max_points=5000" -UseBasicParsing
-```
-
-Ответ 200, тело длиной 148087 байт.
-
-Несовпадение дает 404. Переименуй каталог в `oops-wrong-name` и повтори тот же запрос. Каталог при этом все еще показывает запись с `id` равным `syn-bad-seed6022`, а спектр отвечает 404. Верни имя обратно и снова получишь 200.
-
-Правило простое. С командой `--profile bad --seed 6022` каталог называй ровно `syn-bad-seed6022`.
-
-### Проверка 6. Финал и уборка
-
-Останови сервер через Ctrl+C в его окне. Удали временный корень.
-
-```powershell
-Remove-Item -Recurse -Force $demo
-```
-
-Проверь, что каталога больше нет.
-
-```powershell
-Test-Path $demo
-```
-
-Успех, это ответ `False`. Скажи человеку адрес панели, например `http://127.0.0.1:8770/`. Проверка пройдена, только если спектр вернулся с кодом 200. Так и скажи.
-
-## Передача человеку. Драйвер USB (агент, остановись)
-
-Этот раздел не для агента. Агент не может выполнить эти шаги, потому что Zadig это окно. Передай их человеку слово в слово.
-
-1. Подключи осциллограф Hantek 6022BE по USB.
-2. Открой Zadig, включи Options, затем List All Devices, выбери устройство и установи драйвер WinUSB. До прошивки устройство видно с VID 04B4, после прошивки с VID 04B5. Если устройство пропало после первого запуска, повтори установку WinUSB для нового VID.
-3. Поставь дополнение `lnt[hantek]` и положи совместимую `libusb-1.0.dll` рядом с `python.exe`.
-4. Нажми кнопку «Проверить устройство» на экране «Захват» или запусти диагностику. Приложение само скажет, какое звено цепочки backend, USB, прошивка не готово и что делать.
-5. Помни, что прошивка живет только в памяти. Она загружается лишь явной операцией захвата. Диагностика ее не трогает.
-
-Полная версия этих шагов живет в `docs/operator-guide.md`, раздел про подготовку железа. Если что то пошло не так, смотри также `docs/safety-and-recovery.md`.
-
-## Коды выхода
-
-| Код | Значение | Источник |
-|---|---|---|
-| 0 | Успех | Наблюдал сам во всех проверках выше |
-| 1 | Провал selftest | Документация и код CLI |
-| 2 | Неверный вход, битые данные, занятый порт, второй экземпляр или нет дополнения ui | Наблюдал сам на занятом порте и втором экземпляре |
-| 3 | Устройство недоступно | Документация и код CLI |
+После распаковки следуй корневому `BUILDING.md`. Не заменяй Corresponding
+Source обычным Git checkout: архив содержит дополнительные исходники и
+материалы сборки.
+
+## Коды выхода CLI
+
+| Код | Значение |
+|---|---|
+| `0` | команда выполнена |
+| `1` | встроенная самопроверка не прошла |
+| `2` | неверные параметры, повреждённые данные, занятый порт или второй экземпляр |
+| `3` | устройство недоступно |
+
+Ошибка печатается одной строкой в stderr. Для диагностики не скрывай код выхода
+и не заменяй его пересказом.
