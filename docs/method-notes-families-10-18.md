@@ -6,6 +6,8 @@ for future code and tests. It is not evidence that any family is implemented.
 Companion to `docs/electrical-signal-characterization-proposals.md` and
 `docs/method-notes-families-1-9.md`. The contract uses NumPy and SciPy 1.14,
 adds no dependency, and follows ADR-0004, ADR-0007, and ADR-0008.
+Shared phase, STFT, band, event, clipping, and resource contracts are fixed in the
+[shared computation notes](method-notes-shared-computations.md).
 
 ## Conventions shared by all nine families
 

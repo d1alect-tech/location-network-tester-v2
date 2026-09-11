@@ -6,6 +6,8 @@ Companion to `docs/electrical-signal-characterization-proposals.md` (families 1-
 the 18-family list). Grounded in the current stack: numpy/scipy only, no new
 dependencies, ADR-0004 versioned artifacts, ADR-0007 unit-suffixed fields,
 ADR-0008 reason codes for expected unavailability.
+Shared phase, STFT, band, event, clipping, and resource contracts are fixed in the
+[shared computation notes](method-notes-shared-computations.md).
 
 Language note: the operator- and science-facing docs are Russian; these algorithm
 notes are English because the downstream consumers are versioned code and tests.
@@ -72,17 +74,19 @@ resultant `phase_resultant_k` (dimensionless, `0..1`).
 4. Reference the phase: `phi_rel_k = arg(X[10k]) - k * arg(X[10])`, wrapped to
    `(-pi, pi]`. This cancels any whole-window time shift `t0`, because that shift
    multiplies `X[10k]` by `exp(-j 2 pi (10k) t0 / T)`.
-5. Across the 12 windows, vector-average `exp(j phi_rel_k)`; report
+5. Across every complete 200 ms window in the qualified record, vector-average
+   `exp(j phi_rel_k)`; report
    `phase_resultant_k` and the circular mean direction. Build the template from
    the vector-averaged complex `c_k`.
 
-**Parameters.** window `0.2 s`; windows `12`; cycles `10`; `Hmax = 40`;
-`N0 = round(0.2 * fs)`; interpolation `linear`; plausible grid band
+**Parameters.** window `0.2 s`; minimum windows `12` (`window_count = 12` in the
+frozen recipe); cycles `10`; `Hmax = 40`; `N0 = round(0.2 * fs)`; interpolation
+`linear`; plausible grid band
 `47.5..52.5 Hz`; phase-resultant floor `Rmin = 0.8`; H1 concentration ratio
 floor `0.95` [IEC-4-7].
 
-**Prerequisites and failure conditions.** At least one full 200 ms window; `f1`
-inside the plausible band; H1 above `eps_level`; a CH2 sync reference (single-
+**Prerequisites and failure conditions.** At least 12 complete 200 ms windows;
+`f1` inside the plausible band; H1 above `eps_level`; a CH2 sync reference (single-
 channel mode has none). A wrong `f1` reintroduces leakage; the harmonic-group
 energy concentration ratio is checked and trips `grid_unstable`.
 
@@ -90,8 +94,8 @@ energy concentration ratio is checked and trips `grid_unstable`.
 `phase_unstable` (resultant below floor), `no_sync_reference` (single-channel
 mode; `unavailable`, never zero phase).
 
-**Complexity.** `O(W * N0 log N0)`, `W = 12` windows; bounded, no full-record
-materialisation.
+**Complexity.** `O(W * N0 log N0)` for every complete qualified window, with
+bounded accumulators and no full-record window matrix.
 
 **Analytic validation.**
 - Positive: a synthetic waveform built from declared amplitudes and phases
