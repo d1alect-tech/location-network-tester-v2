@@ -6,9 +6,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from lnt.analysis_store import AnalysisRecipe, RecipeError
+from lnt.analysis_store import AnalysisRecipe, RecipeError, parse_analysis_recipe
+from lnt.analysis_v2.default_recipe import BUILTIN_MEASUREMENT_RECIPE
+from lnt.analysis_v2.recipes import RecipeCatalog
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from lnt.context.json_codec import JsonValue
 
 
@@ -58,6 +62,20 @@ def test_clone_on_edit_returns_new_recipe_and_preserves_original() -> None:
         AnalysisRecipe.__setattr__(original, "mode", "mutated")
 
 
+def test_catalog_clone_preserves_schema_v1_behavior(tmp_path: Path) -> None:
+    catalog = RecipeCatalog(tmp_path / "recipes")
+    created = catalog.create("standard", AnalysisRecipe.from_mapping(_recipe_mapping()))
+
+    cloned = catalog.clone(created.recipe_id, "copy")
+
+    assert cloned.recipe_id != created.recipe_id
+    assert isinstance(cloned.recipe, AnalysisRecipe)
+    assert cloned.recipe.mode.startswith("standard:clone:")
+    assert tuple(item.recipe_id for item in catalog.list()) == tuple(
+        sorted((created.recipe_id, cloned.recipe_id))
+    )
+
+
 @pytest.mark.parametrize(
     ("path", "value"),
     [("unknown", 1), ("band_grid", {"low_hz": 1.0, "high_hz": 2.0, "grid_hz": 1.0, "x": 1})],
@@ -77,3 +95,12 @@ def test_non_finite_number_is_rejected() -> None:
 
     with pytest.raises(RecipeError):
         AnalysisRecipe.from_mapping(mapping)
+
+
+def test_public_dispatcher_preserves_schema_v1_identity() -> None:
+    parsed = parse_analysis_recipe(_recipe_mapping())
+
+    assert isinstance(parsed, AnalysisRecipe)
+    assert BUILTIN_MEASUREMENT_RECIPE.recipe_sha256 == (
+        "c456a1986c5e24060696cb06b22219797b94dc6d3ca23fcf836cfc6c9473ffe6"
+    )
