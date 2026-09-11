@@ -67,14 +67,19 @@ raw-session schemas, and legacy PSD stream remain unchanged.
   is `H = max(default_sos_padlen, ceil(log(1e-6) / log(max_pole)))`, where
   `max_pole` is the largest pole magnitude. This decay scale initializes the
   convergence check; it is not a universal error guarantee.
-- Compare transforms using halos `H` and `2H` over the same actual core. Accept
-  `2H` only when `np.allclose` holds with `rtol=1e-6` and
-  `atol=1e-9 * max(1, maxabs(raw_comparison_block))`. On failure, double the
-  halo and compare again only when both expanded reads and the conservative work
-  budget fit.
-- Each core is at most `recipe.resource_limits.chunk_samples`. Shrink the core as
-  needed so a `4H` read fits `hard_max_chunk_samples`; never shrink a scientifically
-  required halo to make a read fit. At 5 MHz the 200 Hz phase filter has initial
+- Compare the filtered real transforms from halos `H` and `2H` over the same
+  actual core before any Hilbert transform. Accept `2H` only when
+  `maxabs(y_2H - y_H) <= max(1e-3 * maxabs(y_2H),
+  1e-9 * maxabs(raw_expanded_block))`. On failure, double the halo and replan a
+  smaller core only when both expanded reads and the conservative work budget
+  fit. The relative tolerance is one tenth of the 1 percent envelope criterion;
+  the raw-scale term handles strongly rejected outputs without an implicit
+  one-volt floor.
+- Each core is at most `recipe.resource_limits.chunk_samples`. For a real
+  transform, shrink it as needed so capacity `C - 4H` remains positive; for an
+  analytic transform with fixed per-side Hilbert context `A`, use
+  `C - 2A - 4H`. Never shrink a scientifically required halo to make a read fit.
+  At 5 MHz the 200 Hz phase filter has initial
   `H` about 143644 and fits the default 1048576-sample cap. At 48 MHz initial `H`
   is about 1378983, so phase is unavailable without hidden decimation.
 - Every accepted core requires real context on both sides. Record boundaries,
@@ -82,7 +87,11 @@ raw-session schemas, and legacy PSD stream remain unchanged.
   observations with reflection, zeros, interpolation, or other synthetic padding.
 - F06 applies constant detrending before its local SOS filter and Hilbert
   transform. F13 filters the raw saved volts, takes the Hilbert-envelope magnitude,
-  then subtracts the phase-conditioned envelope mean. Local Hilbert results are
+  then subtracts the phase-conditioned envelope mean. Both use fixed per-side
+  Hilbert context `A = 16384` samples: after real-filter qualification, run
+  `hilbert` once on the fixed `core +/- A` window and retain only the core. A
+  1 MHz AM qualification recovered the declared envelope with maximum absolute
+  error below `9e-5`, against the 1 percent criterion. Local Hilbert results are
   not claimed to equal one full-record Hilbert transform.
 - A repeated run with the same fixed recipe is deterministic. Chunk size is hashed
   recipe input; changing it carries no promise of bitwise-invariant output.
