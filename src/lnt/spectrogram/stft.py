@@ -12,7 +12,7 @@ from lnt.errors import InputError
 from lnt.spectrogram.errors import SpectrogramCancelledError
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from pathlib import Path
 
     from numpy.typing import NDArray
@@ -28,6 +28,14 @@ class StftChunk:
 
     first_frame: int
     power: NDArray[np.float64]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ComplexStftChunk:
+    """Комплексные коэффициенты соседних STFT-кадров."""
+
+    first_frame: int
+    coefficients: NDArray[np.complex64] | NDArray[np.complex128]
 
 
 def open_samples(path: Path) -> NDArray[np.float32]:
@@ -63,10 +71,37 @@ def stream_power(
     cancellation: CancellationToken | None = None,
 ) -> Iterator[StftChunk]:
     """Вычисляет до FRAME_CHUNK кадров за раз и проверяет отмену между порциями."""
+    for chunk in stream_complex(samples, sample_rate_hz, settings, cancellation):
+        yield StftChunk(
+            first_frame=chunk.first_frame,
+            power=np.asarray(np.abs(chunk.coefficients) ** 2, dtype=np.float64),
+        )
+
+
+def stream_complex(  # noqa: PLR0913 - public seam keeps limits and hooks explicit
+    samples: NDArray[np.float32] | NDArray[np.float64],
+    sample_rate_hz: float,
+    settings: StftSettings,
+    cancellation: CancellationToken | None = None,
+    *,
+    max_chunk_samples: int | None = None,
+    checkpoint: Callable[[], None] | None = None,
+) -> Iterator[ComplexStftChunk]:
+    """Вычисляет комплексный STFT ограниченными, глобально нумерованными порциями."""
+    if max_chunk_samples is not None and max_chunk_samples < settings.segment_samples:
+        raise InputError("спектрограмма: max_chunk_samples меньше длины окна")
     count = frame_count(int(samples.size), settings)
-    for first in range(0, count, FRAME_CHUNK):
+    chunk_limit = FRAME_CHUNK
+    if max_chunk_samples is not None:
+        chunk_limit = min(
+            FRAME_CHUNK,
+            1 + (max_chunk_samples - settings.segment_samples) // settings.hop_samples,
+        )
+    for first in range(0, count, chunk_limit):
+        if checkpoint is not None:
+            checkpoint()
         _check_cancelled(cancellation)
-        chunk_frames = min(FRAME_CHUNK, count - first)
+        chunk_frames = min(chunk_limit, count - first)
         start = first * settings.hop_samples
         stop = start + settings.segment_samples + (chunk_frames - 1) * settings.hop_samples
         stft = vars(signal)["stft"]
@@ -79,12 +114,15 @@ def stream_power(
             detrend=settings.detrend,
             boundary=None,
             padded=False,
+            return_onesided=True,
             scaling=settings.scaling,
         )
-        yield StftChunk(
+        yield ComplexStftChunk(
             first_frame=first,
-            power=np.asarray(np.abs(transformed) ** 2, dtype=np.float64),
+            coefficients=transformed,
         )
+    if checkpoint is not None:
+        checkpoint()
     _check_cancelled(cancellation)
 
 
