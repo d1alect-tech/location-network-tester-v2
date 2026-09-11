@@ -32,6 +32,7 @@ from lnt._needle_memory import (
     resample_mean_cycle,
     residual_async_power,
 )
+from lnt.cycles import rising_zero_crossings
 from lnt.errors import AnalysisError, SessionTooShortError
 
 Float32Array = NDArray[np.float32]
@@ -116,7 +117,7 @@ def compute_needle_metrics(
             f"CH2 слишком слаб для синхронизации: RMS {rms:.4f} В < {MIN_LF_RMS_V} В",
         )
     lf_clean = _apply_filter(ch2, sample_rate_hz, LF_LOWPASS_HZ, "lowpass")
-    positions = _rising_crossings(lf_clean)
+    positions = rising_zero_crossings(lf_clean)
     del lf_clean  # отфильтрованный CH2 больше не нужен — освободить до фильтра CH1
     if positions.size < MIN_CROSSINGS:
         raise AnalysisError("CH2: не найдено ни одного полного цикла сети")
@@ -228,16 +229,6 @@ def _apply_filter(
     sos = signal.butter(FILTER_ORDER, cutoff_hz, btype=kind, fs=sample_rate_hz, output="sos")
     wide = np.asarray(samples, dtype=np.float64)
     return np.asarray(signal.sosfiltfilt(sos, wide), dtype=np.float64)
-
-
-def _rising_crossings(lf: Float64Array) -> Float64Array:
-    below = lf[:-1] <= 0.0
-    above = lf[1:] > 0.0
-    indices = np.nonzero(below & above)[0]
-    if indices.size == 0:
-        return np.empty(0, dtype=np.float64)
-    fractions = -lf[indices] / (lf[indices + 1] - lf[indices])
-    return indices.astype(np.float64) + fractions
 
 
 def _needle_peaks(
