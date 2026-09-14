@@ -10,14 +10,18 @@ from numpy.typing import NDArray
 from scipy import signal
 
 from lnt.characterization.bands import ResolvedBand, resolve_characterization_bands
-from lnt.characterization.envelope_models import BandEnvelope, BandEnvelopes, EnvelopeChunk
+from lnt.characterization.envelope_models import (
+    BandEnvelope,
+    BandEnvelopes,
+    EnvelopeChunk,
+    phase_means_result,
+)
 from lnt.characterization.local_transform import (
     TransformChunk,
     TransformSpec,
     stream_local_transform,
 )
 from lnt.characterization.phase import PhaseCycles, phase_bins
-from lnt.characterization.phase_model import PhaseMeans
 from lnt.characterization.records import Status
 
 if TYPE_CHECKING:
@@ -25,12 +29,13 @@ if TYPE_CHECKING:
 
     from lnt.analysis_store.characterization_settings import ResourceLimits
     from lnt.analysis_store.recipe_v2 import CharacterizationRecipe
+    from lnt.characterization.phase_model import PhaseMeans
 
 type FloatInput = NDArray[np.float32] | NDArray[np.float64]
-type Float64Array = NDArray[np.float64]
 
 _ENVELOPE_CORE_SAMPLES = 4096
 _ANALYTIC_HALO_SAMPLES = 16_384
+_RESIDUAL_BYTES_PER_SAMPLE = 64
 
 
 def stream_band_analytic(  # noqa: PLR0913
@@ -44,8 +49,11 @@ def stream_band_analytic(  # noqa: PLR0913
     detrend: bool = False,
 ) -> Iterator[TransformChunk]:
     """Stream a band's raw analytic signal independently of phase qualification."""
+    _checkpoint(checkpoint)
     if band.effective is None:
-        yield from _unavailable_transforms(int(samples.size), resources, band.reason_code)
+        yield from _unavailable_transforms(
+            int(samples.size), resources, band.reason_code, checkpoint
+        )
         return
     if filter_order <= 0:
         raise ValueError("filter order must be positive")
@@ -85,6 +93,7 @@ def prepare_band_envelopes(
     checkpoint: Callable[[], None] | None = None,
 ) -> BandEnvelopes:
     """Build each supported band's fixed phase-envelope summary exactly once."""
+    _checkpoint(checkpoint)
     if phase.sample_count != int(samples.size) or phase.sample_rate_hz != sample_rate_hz:
         raise ValueError("phase and envelope sample grids differ")
     resolved = resolve_characterization_bands(recipe, sample_rate_hz)
@@ -124,7 +133,11 @@ def prepare_band_envelopes(
             checkpoint=replay_checkpoint,
         )
 
-    return BandEnvelopes(bands, int(samples.size), sample_rate_hz, stream_factory)
+    limits = recipe.resource_limits
+    max_residual = min(
+        limits.hard_max_chunk_samples, limits.max_work_bytes // _RESIDUAL_BYTES_PER_SAMPLE
+    )
+    return BandEnvelopes(bands, int(samples.size), sample_rate_hz, stream_factory, max_residual)
 
 
 def _compute_envelope_means(  # noqa: PLR0913
@@ -139,12 +152,15 @@ def _compute_envelope_means(  # noqa: PLR0913
     sample_rate_hz: float,
     checkpoint: Callable[[], None] | None,
 ) -> PhaseMeans:
+    _checkpoint(checkpoint)
     sums = np.zeros(bin_count, dtype=np.float64)
     counts = np.zeros(bin_count, dtype=np.int64)
     if band.effective is None:
         return _phase_means_result(sums, counts, minimum_support, band.reason_code)
     if phase.status is Status.UNAVAILABLE:
         return _phase_means_result(sums, counts, minimum_support, "phase_reference_unavailable")
+    reasons: set[str] = set()
+    supported = False
     for chunk in stream_band_analytic(
         samples,
         band,
@@ -154,37 +170,21 @@ def _compute_envelope_means(  # noqa: PLR0913
         checkpoint=checkpoint,
     ):
         if chunk.values is None:
+            if chunk.reason_code is not None:
+                reasons.add(chunk.reason_code)
             continue
+        supported = True
         envelope = np.abs(chunk.values)
         indices, valid = phase_bins(phase, chunk.start_sample, chunk.stop_sample, bin_count)
         sums += np.bincount(indices[valid], weights=envelope[valid], minlength=bin_count)
         counts += np.bincount(indices[valid], minlength=bin_count)
+    if not supported:
+        reason = next(iter(reasons)) if len(reasons) == 1 else "mixed_unavailable_support"
+        return _phase_means_result(sums, counts, minimum_support, reason)
     return _phase_means_result(sums, counts, minimum_support, None)
 
 
-def _phase_means_result(
-    sums: Float64Array, counts: NDArray[np.int64], minimum_support: int, reason: str | None
-) -> PhaseMeans:
-    valid = counts >= minimum_support
-    means = np.zeros(sums.size, dtype=np.float64)
-    means[valid] = sums[valid] / counts[valid]
-    status = (
-        Status.AVAILABLE
-        if np.all(valid)
-        else Status.PARTIAL
-        if np.any(valid)
-        else Status.UNAVAILABLE
-    )
-    result_reason = reason if reason is not None else "insuff_phase_support"
-    if status is Status.AVAILABLE:
-        result_reason = None
-    return PhaseMeans(
-        means_v=means,
-        counts=counts,
-        valid_bins=valid,
-        status=status,
-        reason_code=result_reason,
-    )
+_phase_means_result = phase_means_result
 
 
 def _stream_residuals(  # noqa: PLR0913
@@ -197,11 +197,12 @@ def _stream_residuals(  # noqa: PLR0913
     sample_rate_hz: float,
     checkpoint: Callable[[], None] | None,
 ) -> Iterator[EnvelopeChunk]:
+    _checkpoint(checkpoint)
     unavailable = (
         item.phase_means.reason_code if item.phase_means.status is Status.UNAVAILABLE else None
     )
     if unavailable is not None:
-        yield from _unavailable_residuals(int(samples.size), resources, unavailable)
+        yield from _unavailable_residuals(int(samples.size), resources, unavailable, checkpoint)
         return
     for chunk in stream_band_analytic(
         samples,
@@ -225,10 +226,19 @@ def _stream_residuals(  # noqa: PLR0913
         yield EnvelopeChunk(chunk.start_sample, chunk.stop_sample, values, valid, reason)
 
 
+def _checkpoint(checkpoint: Callable[[], None] | None) -> None:
+    if checkpoint is not None:
+        checkpoint()
+
+
 def _unavailable_transforms(
-    sample_count: int, resources: ResourceLimits, reason: str | None
+    sample_count: int,
+    resources: ResourceLimits,
+    reason: str | None,
+    checkpoint: Callable[[], None] | None,
 ) -> Iterator[TransformChunk]:
     for start in range(0, sample_count, resources.chunk_samples):
+        _checkpoint(checkpoint)
         yield TransformChunk(
             start,
             min(sample_count, start + resources.chunk_samples),
@@ -236,12 +246,17 @@ def _unavailable_transforms(
             0,
             reason or "band_above_nyquist",
         )
+    _checkpoint(checkpoint)
 
 
 def _unavailable_residuals(
-    sample_count: int, resources: ResourceLimits, reason: str
+    sample_count: int,
+    resources: ResourceLimits,
+    reason: str,
+    checkpoint: Callable[[], None] | None,
 ) -> Iterator[EnvelopeChunk]:
     for start in range(0, sample_count, resources.chunk_samples):
+        _checkpoint(checkpoint)
         stop = min(sample_count, start + resources.chunk_samples)
         yield EnvelopeChunk(
             start,
@@ -250,3 +265,4 @@ def _unavailable_residuals(
             np.zeros(stop - start, dtype=np.bool_),
             reason,
         )
+    _checkpoint(checkpoint)

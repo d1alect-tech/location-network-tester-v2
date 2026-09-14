@@ -8,11 +8,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numpy.typing import NDArray
 
+from lnt.characterization.phase_model import PhaseMeans
+from lnt.characterization.records import Status
+from lnt.errors import InputError
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
     from lnt.characterization.bands import ResolvedBand
-    from lnt.characterization.phase_model import PhaseMeans
 
 type Float64Array = NDArray[np.float64]
 type BoolArray = NDArray[np.bool_]
@@ -48,6 +51,7 @@ class BandEnvelopes:
     _stream_factory: Callable[[int, Callable[[], None] | None], Iterator[EnvelopeChunk]] = field(
         repr=False, compare=False
     )
+    _max_residual_samples: int = 0
 
     def stream_residuals(
         self, band_index: int, checkpoint: Callable[[], None] | None = None
@@ -67,6 +71,8 @@ class BandEnvelopes:
         self._require_band_index(band_index)
         if start_sample < 0 or stop_sample < start_sample or stop_sample > self.sample_count:
             raise ValueError("envelope slice is outside the sample record")
+        if stop_sample - start_sample > self._max_residual_samples:
+            raise InputError("envelope slice exceeds bounded residual span")
         values = np.zeros(stop_sample - start_sample, dtype=np.float64)
         valid = np.zeros(stop_sample - start_sample, dtype=np.bool_)
         reasons: set[str] = set()
@@ -91,3 +97,29 @@ class BandEnvelopes:
     def _require_band_index(self, band_index: int) -> None:
         if not 0 <= band_index < len(self.bands):
             raise IndexError("band index is outside the resolved band tuple")
+
+
+def phase_means_result(
+    sums: Float64Array, counts: NDArray[np.int64], minimum_support: int, reason: str | None
+) -> PhaseMeans:
+    """Combine binned envelope sums into qualified means with a preserved reason."""
+    valid = counts >= minimum_support
+    means = np.zeros(sums.size, dtype=np.float64)
+    means[valid] = sums[valid] / counts[valid]
+    status = (
+        Status.AVAILABLE
+        if np.all(valid)
+        else Status.PARTIAL
+        if np.any(valid)
+        else Status.UNAVAILABLE
+    )
+    result_reason = reason if reason is not None else "insufficient_phase_support"
+    if status is Status.AVAILABLE:
+        result_reason = None
+    return PhaseMeans(
+        means_v=means,
+        counts=counts,
+        valid_bins=valid,
+        status=status,
+        reason_code=result_reason,
+    )

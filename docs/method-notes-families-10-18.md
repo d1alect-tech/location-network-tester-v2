@@ -202,7 +202,8 @@ nonoverlapping bands below Nyquist, and positive envelope MAD. Filter padding
 and unqualified gaps are removed from support.
 
 **Reason codes.** `phase_reference_unavailable`, `band_above_nyquist`,
-`filter_support_too_short`, `scale_zero`, `insufficient_activity`,
+`filter_support_too_short`, `filter_context_unstable`, `nonfinite_input`,
+`mixed_unavailable_support`, `scale_zero`, `insufficient_activity`,
 `lag_support_too_short`, `leakage_ambiguous`.
 
 **Bounds.** Three bands, three unique pairs, and at most 2049 lags. Filtering

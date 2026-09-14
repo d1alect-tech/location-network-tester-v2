@@ -133,13 +133,25 @@ raw-session schemas, and legacy PSD stream remain unchanged.
 
 - Honor recipe chunk, work-memory, artifact, trajectory, event, surrogate, and
   stored-cell limits. Preparation retains bounded summaries and memory-map
-  references, not N-sample phase arrays or band-envelope matrices.
+  references, not N-sample phase arrays or band-envelope matrices. Public
+  residual requests are caller contracts: spans larger than
+  `min(hard_max_chunk_samples, max_work_bytes // 64)` raise `InputError` before
+  any allocation, and oversized slice requests never become `reason_code` data.
 - Resource bounds use conservative working-memory estimates, not an exact process
   RSS guarantee. Mutually inconsistent requested budgets are typed input errors.
   With valid budgets, genuinely insufficient mathematical context yields
   unavailable support with a stable `reason_code`.
 - Check cancellation during bounded scans and before expensive transforms.
-  Cancellation propagates. Unexpected exceptions also propagate as defects.
+  Supported phase-cycle refusals distinguish retained-cycle exhaustion
+  (`phase_cycle_work_budget_too_small`) from unusable SOS context
+  (`phase_transform_work_budget_too_small`); only a genuinely missing or invalid
+  CH2 reference keeps `phase_reference_unavailable`. Envelope preparation
+  preserves transform reasons (`filter_support_too_short`,
+  `filter_context_unstable`, `nonfinite_input`, `band_above_nyquist`) and uses
+  `mixed_unavailable_support` only for heterogeneous gaps. Checkpoint before
+  each unavailable chunk and once after normal exhaustion; cancellation
+  propagates by identity on unavailable as well as supported paths.
+  Unexpected exceptions also propagate as defects.
 - Only expected mathematical or domain unavailability becomes a stable
   `reason_code`. Other input contract violations keep their existing typed error
   behavior; they are not rewritten as scientific unavailability.

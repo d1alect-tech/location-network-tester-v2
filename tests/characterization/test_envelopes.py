@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -13,6 +14,7 @@ from lnt.characterization.envelopes import prepare_band_envelopes, stream_band_a
 from lnt.characterization.phase import PhaseCycles, phase_bins
 from lnt.characterization.records import Status
 from lnt.context.json_codec import decode_object
+from lnt.errors import InputError
 
 _EXAMPLE = Path(__file__).parents[2] / "docs/examples/characterization-recipe-v2.json"
 
@@ -184,7 +186,7 @@ def test_phase_locked_envelopes_are_centered_once_per_bin_and_query_is_aligned()
     assert all(item.phase_means.counts.shape == (64,) for item in prepared.bands)
     for band_index, item in enumerate(prepared.bands):
         if item.phase_means.status is not Status.AVAILABLE:
-            assert item.phase_means.reason_code == "insuff_phase_support"
+            assert item.phase_means.reason_code == "insufficient_phase_support"
             continue
         sums = np.zeros(64, dtype=np.float64)
         counts = np.zeros(64, dtype=np.int64)
@@ -223,6 +225,12 @@ def test_unsupported_high_band_does_not_hide_valid_bands_and_state_is_bounded() 
     assert prepared.bands[1].resolved.effective is not None
     assert prepared.bands[2].resolved.reason_code == "band_above_nyquist"
     assert prepared.bands[2].phase_means.reason_code == "band_above_nyquist"
+    # The fixed A=16384 Hilbert context cannot fit into a 30k record, so the
+    # first two supported bands report filter support shortage, not phase lack.
+    assert prepared.bands[0].phase_means.status is Status.UNAVAILABLE
+    assert prepared.bands[0].phase_means.reason_code == "filter_support_too_short"
+    assert prepared.bands[1].phase_means.status is Status.UNAVAILABLE
+    assert prepared.bands[1].phase_means.reason_code == "filter_support_too_short"
     assert not np.any(prepared.bands[2].phase_means.valid_bins)
     retained_cells = sum(
         item.phase_means.means_v.size
@@ -254,3 +262,139 @@ def test_input_is_unchanged_and_checkpoint_exceptions_propagate() -> None:
         )
     assert caught.value is error
     assert np.array_equal(samples, original)
+
+
+def test_oversized_residual_span_raises_input_error() -> None:
+    sample_rate_hz = 512_000.0
+    sample_count = 327_680
+    times = np.arange(sample_count, dtype=np.float64) / sample_rate_hz
+    samples = np.cos(2.0 * np.pi * 6_000.0 * times)
+    recipe = _recipe()
+    tight = replace(
+        recipe,
+        resource_limits=replace(recipe.resource_limits, max_work_bytes=262_144),
+    )
+    prepared = prepare_band_envelopes(
+        samples,
+        _phase(sample_count, sample_rate_hz),
+        tight,
+        sample_rate_hz=sample_rate_hz,
+    )
+    # Span is inside the record but exceeds min(hard_max, work_bytes//64).
+    with pytest.raises(InputError):
+        prepared.residual(0, 0, 5_000)
+    with pytest.raises(ValueError, match="outside the sample record"):
+        prepared.residual(0, 0, prepared.sample_count + 1)
+
+
+def test_always_raising_checkpoint_propagates_by_identity_before_unsupported() -> None:
+    sample_rate_hz = 100_000.0
+    sample_count = 30_000
+    times = np.arange(sample_count, dtype=np.float64) / sample_rate_hz
+    samples = np.cos(2.0 * np.pi * 6_000.0 * times)
+    prepared = prepare_band_envelopes(
+        samples,
+        _phase(sample_count, sample_rate_hz),
+        _recipe(),
+        sample_rate_hz=sample_rate_hz,
+    )
+    error = RuntimeError("cancel")
+
+    def cancel() -> None:
+        raise error
+
+    with pytest.raises(RuntimeError) as caught:
+        list(prepared.stream_residuals(2, checkpoint=cancel))
+    assert caught.value is error
+
+
+def test_always_raising_checkpoint_propagates_before_unavailable_phase_replay() -> None:
+    sample_rate_hz = 128_000.0
+    times = np.arange(65_536, dtype=np.float64) / sample_rate_hz
+    samples = np.cos(2.0 * np.pi * 24_000.0 * times)
+    prepared = prepare_band_envelopes(
+        samples,
+        _phase(samples.size, sample_rate_hz, available=False),
+        _recipe(),
+        sample_rate_hz=sample_rate_hz,
+    )
+    error = RuntimeError("cancel")
+
+    def cancel() -> None:
+        raise error
+
+    with pytest.raises(RuntimeError) as caught:
+        list(prepared.stream_residuals(1, checkpoint=cancel))
+    assert caught.value is error
+
+
+def test_cancellation_enabled_after_first_unavailable_chunk_raises_next() -> None:
+    sample_rate_hz = 100_000.0
+    sample_count = 30_000
+    times = np.arange(sample_count, dtype=np.float64) / sample_rate_hz
+    samples = np.cos(2.0 * np.pi * 6_000.0 * times)
+    prepared = prepare_band_envelopes(
+        samples,
+        _phase(sample_count, sample_rate_hz),
+        _recipe(),
+        sample_rate_hz=sample_rate_hz,
+    )
+    states: list[bool] = [False]
+    error = RuntimeError("cancel")
+
+    def gate() -> None:
+        if states[0]:
+            raise error
+
+    stream = prepared.stream_residuals(2, checkpoint=gate)
+    next(stream)
+    states[0] = True
+    with pytest.raises(RuntimeError) as caught:
+        next(stream)
+    assert caught.value is error
+
+
+def test_prepare_with_unavailable_phase_and_raising_checkpoint_propagates() -> None:
+    sample_rate_hz = 128_000.0
+    times = np.arange(32_768, dtype=np.float64) / sample_rate_hz
+    samples = np.cos(2.0 * np.pi * 24_000.0 * times).astype(np.float32)
+    error = RuntimeError("cancel")
+
+    def cancel() -> None:
+        raise error
+
+    with pytest.raises(RuntimeError) as caught:
+        prepare_band_envelopes(
+            samples,
+            _phase(samples.size, sample_rate_hz, available=False),
+            _recipe(),
+            sample_rate_hz=sample_rate_hz,
+            checkpoint=cancel,
+        )
+    assert caught.value is error
+
+
+def test_deficient_phase_bins_report_insufficient_phase_support() -> None:
+    sample_rate_hz = 512_000.0
+    sample_count = 327_680
+    times = np.arange(sample_count, dtype=np.float64) / sample_rate_hz
+    samples = np.cos(2.0 * np.pi * 6_000.0 * times)
+    # One narrow valid cycle: analytic support exists mid-record, but every
+    # bin stays below minimum_support_per_bin=20.
+    narrow_phase = PhaseCycles(
+        sample_rate_hz=sample_rate_hz,
+        sample_count=sample_count,
+        cycle_start_samples=np.array([200_000.0]),
+        cycle_end_samples=np.array([201_000.0]),
+        cycle_valid=np.array([True]),
+        status=Status.AVAILABLE,
+        reason_code=None,
+    )
+    prepared = prepare_band_envelopes(
+        samples,
+        narrow_phase,
+        _recipe(),
+        sample_rate_hz=sample_rate_hz,
+    )
+    assert prepared.bands[0].phase_means.status is Status.UNAVAILABLE
+    assert prepared.bands[0].phase_means.reason_code == "insufficient_phase_support"
