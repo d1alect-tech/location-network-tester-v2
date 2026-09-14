@@ -5,6 +5,7 @@
  * createTileLoader; ошибки тайла — типизированные русские баннеры с повтором. */
 
 import type { LntApiClient } from "../../api/client";
+import type { AnalysisArtifactApi } from "../../api/client-analysis";
 import type { CandidateEventPayload } from "../../api/types-analysis";
 import { el } from "../primitives/dom";
 import { createEventList } from "./eventList";
@@ -26,7 +27,7 @@ import { TileError } from "./tileError";
 const RECORDING = "спектрограмма записи";
 
 export interface SpectrogramPanelOptions {
-  client: Pick<LntApiClient, "catalogSessions" | "analysis">;
+  client: Pick<LntApiClient, "catalogSessions"> & { readonly analysis: AnalysisArtifactApi };
 }
 
 export interface SpectrogramPanelHandle {

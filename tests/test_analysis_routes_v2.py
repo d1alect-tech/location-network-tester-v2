@@ -213,7 +213,55 @@ def test_run_rejects_ambiguous_session_without_side_effects(
     assert not (root / "other" / ".lnt-default-analysis.json").exists()
 
 
-def test_run_rejects_characterization_recipe_before_validation_or_side_effects(
+def test_characterization_recipe_runs_through_seam_without_default_pointer(
+    tmp_path: Path,
+) -> None:
+    session = tmp_path / "s1"
+    write_manifest(session)
+    samples = np.zeros(1_200_000, dtype=np.float32)
+    np.save(session / "ch1.npy", samples)
+    np.save(session / "ch2.npy", samples)
+    example = Path(__file__).parents[1] / "docs" / "examples" / "characterization-recipe-v2.json"
+    recipe = parse_analysis_recipe(
+        decode_object(example.read_text(encoding="utf-8"), "test characterization recipe")
+    )
+    assert isinstance(recipe, CharacterizationRecipe)
+    stored = RecipeCatalog(tmp_path / ".lnt" / "analysis-recipes").create(
+        "characterization", recipe
+    )
+    app = create_app(root=tmp_path, runtime_db=tmp_path / "runtime.sqlite3")
+    with TestClient(app) as client:
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        response = client.post(
+            "/api/analysis/runs",
+            json={"session": "s1", "recipe_id": stored.recipe_id, "make_default": True},
+            headers=headers,
+        )
+        status = client.get(f"/api/analysis/runs/{response.json()['job_id']}")
+        payload = response.json()
+        artifact_key = str(payload["artifact_key"])
+        bundle = client.get(
+            f"/api/analysis/sessions/s1/artifacts/{artifact_key}/characterization.json"
+        )
+        arrays = client.get(
+            f"/api/analysis/sessions/s1/artifacts/{artifact_key}/characterization-arrays.npz"
+        )
+        tables = client.get(
+            f"/api/analysis/sessions/s1/artifacts/{artifact_key}/characterization-tables.json"
+        )
+
+    assert response.status_code == 202
+    assert payload["status"] == "succeeded"
+    assert status.json()["status"] == "succeeded"
+    assert bundle.status_code == 200
+    assert arrays.status_code == 200
+    assert tables.status_code == 200
+    assert "f01_phase_cycle" in bundle.text
+    assert not (session / ".lnt-default-analysis.json").exists()
+    assert not (session / "metrics.json").exists()
+
+
+def test_characterization_recipe_missing_channel_is_422_without_side_effects(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     session = tmp_path / "s1"
@@ -227,32 +275,23 @@ def test_run_rejects_characterization_recipe_before_validation_or_side_effects(
         "characterization", recipe
     )
     called = False
-    validated = False
 
-    def fake_validate(*_args: object, **_kwargs: object) -> None:
-        nonlocal validated
-        validated = True
-
-    def fake_run(_self: object, session_dir: Path, *_args: object, **_kwargs: object) -> object:
+    def fake_run(*_args: object, **_kwargs: object) -> object:
         nonlocal called
         called = True
-        artifact_key, _ = _publish_spectrum(session_dir)
-        return SimpleNamespace(artifact_key=artifact_key)
+        return SimpleNamespace(artifact_key="a" * 64)
 
-    monkeypatch.setattr("lnt.ui.routes_analysis_v2.validate_session_inputs", fake_validate)
-    monkeypatch.setattr("lnt.ui.routes_analysis_v2.AnalysisOrchestrator.run", fake_run)
+    monkeypatch.setattr("lnt.ui.routes_analysis_v2.run_characterization", fake_run)
     app = create_app(root=tmp_path, runtime_db=tmp_path / "runtime.sqlite3")
     with TestClient(app) as client:
         headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
         response = client.post(
             "/api/analysis/runs",
-            json={"session": "s1", "recipe_id": stored.recipe_id, "make_default": True},
+            json={"session": "s1", "recipe_id": stored.recipe_id},
             headers=headers,
         )
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "выполнение рецепта characterization пока не подключено"
-    assert not validated
     assert not called
     assert not (tmp_path / ".lnt" / "analysis-jobs").exists()
     assert not (session / "analyses").exists()

@@ -5,17 +5,18 @@ from __future__ import annotations
 import csv
 import io
 from dataclasses import replace
-from typing import Annotated, Final
+from typing import TYPE_CHECKING, Annotated, Final
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 
-from lnt.analysis_store import AnalysisRecipe
-from lnt.analysis_v2 import AnalysisOrchestrator, DefaultAnalysisEngine
+from lnt.analysis_store import AnalysisRecipe, CharacterizationRecipe
+from lnt.analysis_v2 import AnalysisOrchestrator, DefaultAnalysisEngine, run_characterization
 from lnt.analysis_v2.jobs import AnalysisJobStore
 from lnt.analysis_v2.recipes import RecipeCatalog
 from lnt.errors import InputError
+from lnt.session_store import load_session
 from lnt.ui.analysis_v2_files import (
     read_default_pointer,
     validate_job_id,
@@ -38,6 +39,9 @@ from lnt.ui.models_analysis_v2 import (  # noqa: TC001 - FastAPI resolves reques
     RecipeCloneRequest,
     RecipeCreateRequest,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 router = APIRouter(prefix="/api/analysis", tags=["analysis-v2"])
 Services = Annotated[AppServices, Depends(get_services)]
@@ -105,7 +109,11 @@ def run_analysis(request: AnalysisRunRequest, services: Services) -> dict[str, s
     except InputError as error:
         raise http_unprocessable(str(error)) from error
     analysis_recipe = recipe.recipe
-    if not isinstance(analysis_recipe, AnalysisRecipe):
+    if isinstance(analysis_recipe, CharacterizationRecipe):
+        # Wave 2 todo 8: characterization-v1 идёт через dedicated seam
+        # run_characterization; project_default и default-указатель не трогаем.
+        return _run_characterization(services, session_dir, analysis_recipe)
+    if type(analysis_recipe) is not AnalysisRecipe:
         raise http_unprocessable("выполнение рецепта characterization пока не подключено")
     validate_session_inputs(
         session_dir, analysis_recipe.channels, make_default=request.make_default
@@ -125,6 +133,45 @@ def run_analysis(request: AnalysisRunRequest, services: Services) -> dict[str, s
         )
         if request.make_default:
             write_default_pointer(session_dir, recipe.recipe_id, result.artifact_key)
+    except (InputError, OSError, ValueError) as error:
+        failed = replace(job, status="failed", stage="done", error=str(error))
+        jobs.write(failed)
+        return failed.payload()
+    succeeded = replace(
+        job,
+        status="succeeded",
+        stage="done",
+        completed=1,
+        total=1,
+        artifact_key=result.artifact_key,
+    )
+    jobs.write(succeeded)
+    return succeeded.payload()
+
+
+def _run_characterization(
+    services: AppServices,
+    session_dir: Path,
+    recipe: CharacterizationRecipe,
+) -> dict[str, str | int | None]:
+    """Запускает characterization-v1 через dedicated seam без project_default."""
+    validate_session_inputs(session_dir, recipe.channels, make_default=False)
+    try:
+        session = load_session(session_dir)
+    except (InputError, OSError, ValueError) as error:
+        raise http_unprocessable(str(error)) from error
+    channels = tuple(session.ch1 if name == "ch1" else session.ch2 for name in recipe.channels)
+    if any(channel is None for channel in channels):
+        raise http_unprocessable("канал сессии отсутствует: нет данных для characterization")
+    jobs = AnalysisJobStore(services.root / ".lnt" / "analysis-jobs")
+    job = jobs.create()
+    try:
+        result = run_characterization(
+            recipe,
+            session_dir,
+            tuple(channel for channel in channels if channel is not None),
+            session.manifest.sample_rate_hz,
+        )
     except (InputError, OSError, ValueError) as error:
         failed = replace(job, status="failed", stage="done", error=str(error))
         jobs.write(failed)

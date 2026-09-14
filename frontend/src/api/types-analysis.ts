@@ -34,6 +34,25 @@ export interface AnalysisRecipePayload {
   recipe: Record<string, unknown>;
 }
 
+/** Снимок задачи POST /api/analysis/runs → AnalysisJobStore payload. */
+export interface AnalysisRunSnapshot {
+  job_id: string;
+  kind: string;
+  status: string;
+  stage: string;
+  completed: number;
+  total: number;
+  artifact_key: string | null;
+  error: string | null;
+}
+
+/** Запрос запуска анализа: сессия + идентичность рецепта. */
+export interface AnalysisRunRequest {
+  session: string;
+  recipe_id: string;
+  make_default?: boolean;
+}
+
 /** Уровень пирамиды спектрограммы, разобранный из spectrogram.npz. Форма
  * power_db бэкенда — (полосы, время): плоский индекс = f * timeBins + t. */
 export interface SpectrogramLevel {

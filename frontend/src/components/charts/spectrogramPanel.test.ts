@@ -38,6 +38,12 @@ function missingClient(): Pick<
         throw new ApiError("http", { status: 404 });
       },
       recipes: async () => [],
+      runAnalysis: async () => {
+        throw new ApiError("http", { status: 404 });
+      },
+      runStatus: async () => {
+        throw new ApiError("http", { status: 404 });
+      },
     },
   };
 }

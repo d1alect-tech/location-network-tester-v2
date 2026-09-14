@@ -7,7 +7,13 @@ import json
 from pathlib import Path  # noqa: TC003 - runtime artifact paths
 from typing import TYPE_CHECKING, Final
 
-from lnt.analysis_store import AnalysisRecipe, ArtifactInputs, CodeIdentity, NamedDigest
+from lnt.analysis_store import (
+    AnalysisRecipe,
+    ArtifactInputs,
+    CharacterizationRecipe,
+    CodeIdentity,
+    NamedDigest,
+)
 from lnt.apd import apd_preset
 from lnt.audio_panel import audio_panel_preset
 from lnt.burst import burst_preset
@@ -63,6 +69,84 @@ def artifact_inputs(
         context = (_apd_dependency(),)
     elif kind is SessionKind.TRENDS:
         context = (_trends_dependency(),)
+    return ArtifactInputs(
+        recipe_sha256=recipe.recipe_sha256,
+        raw_inputs=raw,
+        context_dependencies=context,
+        profile_dependencies=(),
+        calibration_dependencies=(),
+        code_identity=identity,
+    )
+
+
+def characterization_inputs(
+    recipe: CharacterizationRecipe,
+    channel_paths: tuple[Path, ...],
+    identity: CodeIdentity,
+) -> ArtifactInputs:
+    """Build characterization cache inputs: raw digests plus tunable digests.
+
+    Сырые дайджесты читаются стримингом из файлов каналов; перечиcлимые
+    tunables (resource_limits/phase/stft/events) кладутся в context явно,
+    чтобы смена tunables давала новый ключ и была видна в манифесте.
+    recipe_sha256 уже связывает весь канонический рецепт; preset-хаков
+    default-пути здесь нет.
+    """
+    raw = tuple(NamedDigest(name=path.name, digest=sha256_file(path)) for path in channel_paths)
+    limits = recipe.resource_limits
+    phase = recipe.phase
+    stft = recipe.stft
+    events = recipe.events
+    context = (
+        _settings_digest(
+            "characterization_resource_limits.json",
+            {
+                "chunk_samples": limits.chunk_samples,
+                "hard_max_chunk_samples": limits.hard_max_chunk_samples,
+                "max_work_bytes": limits.max_work_bytes,
+                "max_artifact_bytes": limits.max_artifact_bytes,
+                "max_stored_trajectories": limits.max_stored_trajectories,
+                "max_surrogates": limits.max_surrogates,
+                "deterministic_seed": limits.deterministic_seed,
+            },
+        ),
+        _settings_digest(
+            "characterization_phase.json",
+            {
+                "reference_channel": phase.reference_channel,
+                "reference_event": phase.reference_event,
+                "grid_frequency_low_hz": phase.grid_frequency_low_hz,
+                "grid_frequency_high_hz": phase.grid_frequency_high_hz,
+                "phase_bins": phase.phase_bins,
+                "minimum_support_per_bin": phase.minimum_support_per_bin,
+            },
+        ),
+        _settings_digest(
+            "characterization_stft.json",
+            {
+                "window": stft.window,
+                "segment_samples": stft.segment_samples,
+                "overlap_fraction": stft.overlap_fraction,
+                "detrend": stft.detrend,
+                "analysis_low_hz": stft.analysis_low_hz,
+                "analysis_high_hz": stft.analysis_high_hz,
+                "nyquist_fraction_max": stft.nyquist_fraction_max,
+            },
+        ),
+        _settings_digest(
+            "characterization_events.json",
+            {
+                "detector": events.detector,
+                "threshold_sigma": events.threshold_sigma,
+                "minimum_snr_db": events.minimum_snr_db,
+                "dead_time_s": events.dead_time_s,
+                "dead_time_handling": events.dead_time_handling,
+                "clipping_fraction_of_range": events.clipping_fraction_of_range,
+                "maximum_events": events.maximum_events,
+                "gap_handling": events.gap_handling,
+            },
+        ),
+    )
     return ArtifactInputs(
         recipe_sha256=recipe.recipe_sha256,
         raw_inputs=raw,

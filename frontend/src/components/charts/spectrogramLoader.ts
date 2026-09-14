@@ -3,14 +3,14 @@
  * с повтором). Вынесен из spectrogramPanel.ts без изменения поведения;
  * лист без обратного импорта панели. */
 
-import type { LntApiClient } from "../../api/client";
+import type { AnalysisArtifactApi } from "../../api/client-analysis";
 import type { CandidateEventPayload } from "../../api/types-analysis";
 import { readNpzArrays } from "./npz";
 import type { SpectrogramLevel } from "./spectrogramModel";
 import { levelFromNpz } from "./spectrogramSetup";
 
 export interface SpectrogramArtifactDeps {
-  client: Pick<LntApiClient, "analysis">;
+  client: { readonly analysis: AnalysisArtifactApi };
   showError(message: string, onRetry?: () => void): void;
   hideError(): void;
   resetStatus(): void;

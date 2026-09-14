@@ -4,6 +4,7 @@ import { LntApiClient } from "../../api/client";
 import { ApiError } from "../../api/errors";
 import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
+import { createExtendedRun } from "./extendedRun";
 import { getArtifactJson } from "./panels/fetch";
 import { createPanelHost } from "./panels/host";
 import { thdVerdict } from "./thdVerdict";
@@ -109,6 +110,7 @@ export function createW1Chrome(options: { readonly client: LntApiClient }): W1Ch
   jobRail.hidden = true;
   const panelsHost = el("div", { className: "lnt-w1-panels" });
   const panels = createPanelHost({ client, root: panelsHost });
+  const extended = createExtendedRun({ client: client.analysis });
   const sessionTypes = new Map<string, string>();
 
   const root = el("section", { className: "lnt-w1-chrome", attrs: { "aria-label": "Анализ v2" } }, [
@@ -116,6 +118,7 @@ export function createW1Chrome(options: { readonly client: LntApiClient }): W1Ch
     banner,
     verdictHost,
     scalarsHost,
+    extended.root,
     panelsHost,
     jobRail,
   ]);
@@ -139,6 +142,7 @@ export function createW1Chrome(options: { readonly client: LntApiClient }): W1Ch
     clearElement(verdictHost);
     clearElement(scalarsHost);
     panels.clear();
+    extended.setSession(session === "" ? null : session);
     if (session === "") return;
     const encoded = encodeURIComponent(session);
     const detail = await client.plots.detail(session, { signal });

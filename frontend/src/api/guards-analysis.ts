@@ -3,6 +3,7 @@
 
 import type {
   AnalysisRecipePayload,
+  AnalysisRunSnapshot,
   CandidateEventPayload,
   EventInventoryPayload,
 } from "./types-analysis";
@@ -62,4 +63,19 @@ export function isAnalysisRecipe(value: unknown): value is AnalysisRecipePayload
 /** Ответ GET /api/analysis/recipes: { items: [...] }. */
 export function isRecipeListPayload(value: unknown): value is { items: AnalysisRecipePayload[] } {
   return isRecord(value) && Array.isArray(value.items) && value.items.every(isAnalysisRecipe);
+}
+
+/** Снимок POST /api/analysis/runs: идентичность задачи + ключ артефакта. */
+export function isAnalysisRunSnapshot(value: unknown): value is AnalysisRunSnapshot {
+  return (
+    isRecord(value) &&
+    typeof value.job_id === "string" &&
+    typeof value.kind === "string" &&
+    typeof value.status === "string" &&
+    typeof value.stage === "string" &&
+    isFiniteNumber(value.completed) &&
+    isFiniteNumber(value.total) &&
+    (value.artifact_key === null || typeof value.artifact_key === "string") &&
+    (value.error === null || typeof value.error === "string")
+  );
 }

@@ -4,8 +4,17 @@
 
 import type { LntApiClient, RequestOptions } from "./client";
 import { ApiError, isAbortError, normalizeThrown, parseApiError } from "./errors";
-import { isEventInventoryPayload, isRecipeListPayload } from "./guards-analysis";
-import type { AnalysisRecipePayload, EventInventoryPayload } from "./types-analysis";
+import {
+  isAnalysisRunSnapshot,
+  isEventInventoryPayload,
+  isRecipeListPayload,
+} from "./guards-analysis";
+import type {
+  AnalysisRecipePayload,
+  AnalysisRunRequest,
+  AnalysisRunSnapshot,
+  EventInventoryPayload,
+} from "./types-analysis";
 
 function artifactPath(session: string, key: string, suffix: string): string {
   return `/api/analysis/sessions/${encodeURIComponent(session)}/artifacts/${encodeURIComponent(
@@ -13,7 +22,7 @@ function artifactPath(session: string, key: string, suffix: string): string {
   )}${suffix}`;
 }
 
-export interface AnalysisApi {
+export interface AnalysisArtifactApi {
   /** GET …/artifacts/{key}/{filename} → байты (например spectrogram.npz). */
   artifactBytes(
     session: string,
@@ -25,6 +34,13 @@ export interface AnalysisApi {
   events(session: string, key: string, options?: RequestOptions): Promise<EventInventoryPayload>;
   /** GET /api/analysis/recipes → неизменяемые рецепты (только чтение). */
   recipes(options?: RequestOptions): Promise<AnalysisRecipePayload[]>;
+}
+
+export interface AnalysisApi extends AnalysisArtifactApi {
+  /** POST /api/analysis/runs → запуск по recipe_id (расширенный прогон). */
+  runAnalysis(request: AnalysisRunRequest, options?: RequestOptions): Promise<AnalysisRunSnapshot>;
+  /** GET /api/analysis/runs/{job_id} → снимок задачи запуска. */
+  runStatus(jobId: string, options?: RequestOptions): Promise<AnalysisRunSnapshot>;
 }
 
 export function createAnalysisApi(client: LntApiClient): AnalysisApi {
@@ -69,6 +85,24 @@ export function createAnalysisApi(client: LntApiClient): AnalysisApi {
       const payload = await client.requestJson("GET", "/api/analysis/recipes", undefined, options);
       if (!isRecipeListPayload(payload)) throw new ApiError("parse");
       return payload.items;
+    },
+    runAnalysis: async (request, options = {}) => {
+      const payload = await client.requestJson("POST", "/api/analysis/runs", request, {
+        ...options,
+        mutation: true,
+      });
+      if (!isAnalysisRunSnapshot(payload)) throw new ApiError("parse");
+      return payload;
+    },
+    runStatus: async (jobId, options = {}) => {
+      const payload = await client.requestJson(
+        "GET",
+        `/api/analysis/runs/${encodeURIComponent(jobId)}`,
+        undefined,
+        options,
+      );
+      if (!isAnalysisRunSnapshot(payload)) throw new ApiError("parse");
+      return payload;
     },
   };
 }
