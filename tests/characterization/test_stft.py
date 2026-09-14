@@ -137,7 +137,7 @@ def test_complete_qualified_grid_matches_scipy_without_doubling() -> None:
     samples, ch2 = _signals()
     phase, means = _phase_and_means(samples, ch2)
     settings = _stft_settings()
-    residual, valid = phase_residual(samples, phase, means, 0, samples.size)
+    residual, valid = phase_residual(samples, phase, means, 0, samples.size, resources=_resources())
     expected_frames = _qualified_frames(valid, settings.segment_samples, 64)
     scipy_stft = vars(signal)["stft"]
     scipy_frequencies, _, scipy_coefficients = scipy_stft(
@@ -184,7 +184,7 @@ def test_gap_omits_every_overlapping_frame_without_shifting_later_indices() -> N
     samples, ch2 = _signals()
     phase, means = _phase_and_means(samples, ch2)
     samples[12_000:12_100] = np.nan
-    _, valid = phase_residual(samples, phase, means, 0, samples.size)
+    _, valid = phase_residual(samples, phase, means, 0, samples.size, resources=_resources())
     expected = _qualified_frames(valid, 256, 64)
 
     chunks = list(

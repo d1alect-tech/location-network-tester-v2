@@ -14,6 +14,7 @@ from lnt.characterization.phase import (
     phase_residual,
 )
 from lnt.characterization.records import Status
+from lnt.errors import InputError
 
 
 def _settings(*, bins: int = 64, support: int = 2) -> PhaseSettings:
@@ -110,7 +111,7 @@ def test_phase_means_and_residual_use_native_piecewise_voltage() -> None:
     means = compute_phase_means(
         samples, phase, settings=_settings(support=2), resources=_resources()
     )
-    residual_v, valid = phase_residual(samples, phase, means, 0, 128)
+    residual_v, valid = phase_residual(samples, phase, means, 0, 128, resources=_resources())
 
     assert means.status is Status.AVAILABLE
     assert means.reason_code is None
@@ -152,7 +153,7 @@ def test_means_report_insufficient_phase_support_with_finite_masked_values() -> 
     )
 
     assert means.status is Status.UNAVAILABLE
-    assert means.reason_code == "insuff_phase_support"
+    assert means.reason_code == "insufficient_phase_support"
     assert np.array_equal(means.counts, np.ones(64, dtype=np.int64))
     assert not np.any(means.valid_bins)
     assert np.array_equal(means.means_v, np.zeros(64, dtype=np.float64))
@@ -178,7 +179,44 @@ def test_nonfinite_gap_separates_supported_cycles() -> None:
     assert not np.any(gap_valid)
 
 
-def test_callbacks_propagate_and_high_rate_or_tiny_budget_fail_closed() -> None:
+@pytest.mark.parametrize(
+    ("max_work_bytes", "reason_code"),
+    [
+        (382, "phase_cycle_work_budget_too_small"),
+        (384, "phase_transform_work_budget_too_small"),
+    ],
+)
+def test_phase_cycle_and_transform_budget_refusals_are_distinct(
+    max_work_bytes: int, reason_code: str
+) -> None:
+    phase = compute_phase_cycles(
+        _sine(3200.0, 1.0),
+        sample_rate_hz=3200.0,
+        settings=_settings(),
+        resources=replace(_resources(), max_work_bytes=max_work_bytes),
+    )
+
+    assert phase.status is Status.UNAVAILABLE
+    assert phase.reason_code == reason_code
+
+
+def test_phase_residual_rejects_a_slice_above_its_resource_capacity() -> None:
+    phase = _cycles([0.0, 64.0], [64.0, 128.0], [True, True], 128)
+    samples = np.zeros(128, dtype=np.float32)
+    means = compute_phase_means(samples, phase, settings=_settings(), resources=_resources())
+
+    with pytest.raises(InputError, match="phase residual"):
+        phase_residual(
+            samples,
+            phase,
+            means,
+            0,
+            128,
+            resources=replace(_resources(), max_work_bytes=64 * 127),
+        )
+
+
+def test_callbacks_propagate_and_high_rate_fail_closed() -> None:
     error = RuntimeError("cancel")
 
     def cancel() -> None:
@@ -213,12 +251,3 @@ def test_callbacks_propagate_and_high_rate_or_tiny_budget_fail_closed() -> None:
     )
     assert refused.status is Status.UNAVAILABLE
     assert refused.reason_code == "phase_reference_unavailable"
-
-    tiny = compute_phase_cycles(
-        _sine(3200.0, 1.0),
-        sample_rate_hz=3200.0,
-        settings=_settings(),
-        resources=replace(_resources(), max_work_bytes=8),
-    )
-    assert tiny.status is Status.UNAVAILABLE
-    assert "work_budget" in str(tiny.reason_code)

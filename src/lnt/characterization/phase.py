@@ -69,9 +69,8 @@ def compute_phase_cycles(
         return _empty_cycles(sample_rate_hz, sample_count, "phase_reference_unavailable")
     transform_work_bytes = resources.max_work_bytes // 2
     maximum_cycles = transform_work_bytes // _RETAINED_BYTES_PER_CYCLE
-    budget_reason = (
-        "phase_cycle_work_budget_too_small" if maximum_cycles < 1 else "phase_reference_unavailable"
-    )
+    if maximum_cycles < 1:
+        return _empty_cycles(sample_rate_hz, sample_count, "phase_cycle_work_budget_too_small")
     sos = np.asarray(
         signal.butter(
             _FILTER_ORDER,
@@ -84,15 +83,21 @@ def compute_phase_cycles(
     )
     try:
         required_halo = required_sos_halo(sos)
+        halo_failed = False
     except ValueError:
         required_halo = resources.hard_max_chunk_samples
-        budget_reason = "phase_reference_unavailable"
+        halo_failed = True
     transform_capacity = min(
         resources.hard_max_chunk_samples,
         transform_work_bytes // 64,
     )
     if transform_capacity <= 4 * required_halo:
-        return _empty_cycles(sample_rate_hz, sample_count, budget_reason)
+        reason = (
+            "phase_reference_unavailable"
+            if halo_failed
+            else "phase_transform_work_budget_too_small"
+        )
+        return _empty_cycles(sample_rate_hz, sample_count, reason)
     spec = TransformSpec(sos=sos, analytic=False, detrend=False)
     builder = CycleBuilder(sample_rate_hz, settings, maximum_cycles)
     transform_resources = replace(resources, max_work_bytes=transform_work_bytes)
@@ -135,15 +140,19 @@ def compute_phase_means(
     )
 
 
-def phase_residual(
+def phase_residual(  # noqa: PLR0913
     samples: FloatInput,
     phase: PhaseCycles,
     means: PhaseMeans,
     start_sample: int,
     stop_sample: int,
+    *,
+    resources: ResourceLimits,
 ) -> tuple[Float64Array, BoolArray]:
     """Subtract qualified phase means for one requested sample slice."""
-    return phase_residual_impl(samples, phase, means, start_sample, stop_sample)
+    return phase_residual_impl(
+        samples, phase, means, start_sample, stop_sample, resources=resources
+    )
 
 
 def _phase_result(

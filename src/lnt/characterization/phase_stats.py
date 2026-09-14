@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 
 from lnt.characterization.phase_model import PhaseCycles, PhaseMeans, phase_bins_impl
 from lnt.characterization.records import Status
+from lnt.errors import InputError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -53,14 +54,23 @@ def compute_phase_means_impl(
     return _result(sums, counts, settings, None)
 
 
-def phase_residual_impl(
+def phase_residual_impl(  # noqa: PLR0913
     samples: FloatInput,
     phase: PhaseCycles,
     means: PhaseMeans,
     start_sample: int,
     stop_sample: int,
+    *,
+    resources: ResourceLimits,
 ) -> tuple[Float64Array, BoolArray]:
     """Subtract qualified phase means for one requested sample slice."""
+    if start_sample < 0 or stop_sample < start_sample or stop_sample > phase.sample_count:
+        raise ValueError("phase slice is outside the sample record")
+    if means.means_v.size <= 0:
+        raise ValueError("phase bin count must be positive")
+    capacity = min(resources.hard_max_chunk_samples, resources.max_work_bytes // 64)
+    if stop_sample - start_sample > capacity:
+        raise InputError("phase residual: requested slice exceeds resource capacity")
     values = np.asarray(samples[start_sample:stop_sample], dtype=np.float64)
     indices, valid = phase_bins_impl(phase, start_sample, stop_sample, means.means_v.size)
     valid &= np.isfinite(values) & means.valid_bins[indices]
@@ -82,7 +92,7 @@ def _result(
         status, result_reason = Status.AVAILABLE, reason
     else:
         status = Status.PARTIAL if np.any(valid) else Status.UNAVAILABLE
-        result_reason = reason or "insuff_phase_support"
+        result_reason = reason or "insufficient_phase_support"
     return PhaseMeans(
         means_v=means,
         counts=counts,

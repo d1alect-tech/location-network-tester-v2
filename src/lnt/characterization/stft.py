@@ -95,6 +95,7 @@ def stream_phase_residual_stft(  # noqa: PLR0913
             means,
             start_sample,
             stop_sample,
+            resources=resources,
         )
         valid_frames = _valid_frames(valid_samples, transform_settings, batch_frames)
         for transformed in stream_complex(
