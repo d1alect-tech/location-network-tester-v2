@@ -65,6 +65,15 @@ def _code_identity(manifest_dir: Path) -> str:
     return payload["inputs"]["code_identity"]
 
 
+def _measured_only_recipe() -> CharacterizationRecipe:
+    mapping = decode_object(_EXAMPLE.read_text(encoding="utf-8"), "test recipe")
+    assert isinstance(mapping, dict)
+    mapping["channels"] = ["ch2", "ch1"]
+    recipe = parse_analysis_recipe(mapping)
+    assert isinstance(recipe, CharacterizationRecipe)
+    return recipe
+
+
 def test_publishes_bundle_with_manifest_code_identity(tmp_path: Path) -> None:
     session = _session(tmp_path / "session")
     identity = _identity("test")
@@ -131,6 +140,20 @@ def test_version_bump_gives_new_artifact_key(tmp_path: Path) -> None:
 
     assert second.artifact_key != first.artifact_key
     assert _code_identity(second.artifact_dir) == _identity("test-2").identity_string
+
+
+def test_second_declared_channel_selects_measured_plane(tmp_path: Path) -> None:
+    session = _session(tmp_path / "session")
+    recipe = _measured_only_recipe()
+    assert recipe.channels == ("ch2", "ch1")
+    assert recipe.phase.reference_channel == "ch2"
+    ch1, ch2 = _load(session)
+
+    result = run_characterization(recipe, session, (ch2, ch1), _FS_HZ)
+
+    files = {name: (result.artifact_dir / name).read_bytes() for name in OUTPUT_FILENAMES}
+    loaded = load_bundle(files)
+    assert loaded.bundle.families[0].signal_plane == "ch1_scope_input"
 
 
 def test_cancellation_publishes_nothing(tmp_path: Path) -> None:

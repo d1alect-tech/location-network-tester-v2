@@ -58,14 +58,16 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
         )
     _checkpoint(cancellation)
     channel_by_name = dict(zip(recipe.channels, channels, strict=True))
-    samples = channel_by_name.get("ch1", channels[0])
+    ref_name = recipe.phase.reference_channel
+    meas_name = next(name for name in recipe.channels if name != ref_name)
+    samples = channel_by_name[meas_name]
     result = compute_f01_phase_cycle(
         samples,
         sample_rate_hz=sample_rate_hz,
-        sync_reference=channel_by_name.get("ch2"),
+        sync_reference=channel_by_name[ref_name],
     )
     _checkpoint(cancellation)
-    bundle, arrays, tables = build_f01_bundle(result, recipe)
+    bundle, arrays, tables = build_f01_bundle(result, recipe, measured_channel=meas_name)
     files = encode_bundle(
         bundle, arrays, tables, max_artifact_bytes=recipe.resource_limits.max_artifact_bytes
     )

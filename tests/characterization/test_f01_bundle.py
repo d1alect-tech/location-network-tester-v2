@@ -57,6 +57,12 @@ def _available_result() -> F01Result:
 def test_bundle_has_exactly_eighteen_ordered_families() -> None:
     bundle, _, _ = build_f01_bundle(_available_result(), _recipe())
     assert tuple(family.family_id for family in bundle.families) == FAMILY_IDS
+    assert bundle.families[0].signal_plane == "ch1_scope_input"
+
+
+def test_measured_channel_selects_signal_plane() -> None:
+    bundle, _, _ = build_f01_bundle(_available_result(), _recipe(), measured_channel="ch2")
+    assert bundle.families[0].signal_plane == "ch2_transformer_secondary"
 
 
 def test_f01_available_maps_quantities_to_outputs() -> None:
@@ -72,6 +78,8 @@ def test_f01_available_maps_quantities_to_outputs() -> None:
     assert arrays["f01_c_k_v"].dtype.name == "complex128"
     assert arrays["f01_c_k_v"].shape == (40,)
     assert arrays["f01_x_template_v"].shape == (1000,)
+    assert result.c_k_v is not None
+    assert result.phi_rel_k_rad is not None
     assert np.array_equal(arrays["f01_c_k_v"], result.c_k_v)
     assert np.array_equal(arrays["f01_phi_rel_k_rad"], result.phi_rel_k_rad)
     table = tables["f01_harmonics"]

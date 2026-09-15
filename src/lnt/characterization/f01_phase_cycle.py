@@ -71,29 +71,35 @@ def estimate_grid_frequency_quinn_fernandes(
     window: FloatInput,
     *,
     sample_rate_hz: float,
+    detrend: bool = True,
 ) -> float:
     """Estimate grid frequency with one Quinn-Fernandes refinement step."""
     signal = np.asarray(window, dtype=np.float64)
     n = int(signal.size)
+    signal = signal - float(np.mean(signal)) if detrend else signal
     freqs = np.fft.rfftfreq(n, d=1.0 / float(sample_rate_hz))
-    spectrum = np.abs(np.fft.rfft(signal * np.hanning(n)))
-    mask = (freqs >= GRID_SEARCH_LOW_HZ) & (freqs <= GRID_SEARCH_HIGH_HZ)
-    idx = np.nonzero(mask)[0]
-    if idx.size < _MIN_PEAK_SEARCH_BINS:
-        return float(NOMINAL_GRID_HZ)
-    k = int(idx[int(np.argmax(spectrum[idx]))])
-    if k <= 0 or k >= spectrum.size - 1:
-        return float(freqs[k])
-    # One Quinn-Fernandes step on the rectangular-window spectrum: the
-    # magnitude ratio of the adjacent bins recovers the fractional bin offset.
+    # Quinn-Fernandes on the complex rectangular spectrum [QUINN91, Fredenhagen
+    # form]: Hann peak selects the bin, complex ratios give the fraction.
     rect = np.fft.rfft(signal)
-    magnitude_peak = abs(rect[k])
-    if magnitude_peak < EPS_LEVEL:
-        return float(freqs[k])
-    r_prev = float(abs(rect[k - 1]) / magnitude_peak)
-    r_next = float(abs(rect[k + 1]) / magnitude_peak)
-    delta = r_next / (1.0 + r_next) if r_next >= r_prev else -r_prev / (1.0 + r_prev)
-    return float(freqs[k] + delta * (freqs[1] - freqs[0]))
+    freqs_rect = freqs
+    hann = np.abs(np.fft.rfft(signal * np.hanning(n)))
+    idx_h = np.nonzero((freqs >= GRID_SEARCH_LOW_HZ) & (freqs <= GRID_SEARCH_HIGH_HZ))[0]
+    if idx_h.size < _MIN_PEAK_SEARCH_BINS:
+        return float(NOMINAL_GRID_HZ)
+    kh = int(idx_h[int(np.argmax(hann[idx_h]))])
+    k = int(np.argmin(np.abs(freqs_rect - freqs[kh])))
+    if k <= 0 or k >= rect.size - 1:
+        return float(freqs_rect[k])
+    center = rect[k]
+    if abs(center) < EPS_LEVEL:
+        return float(freqs_rect[k])
+    ratio_next = rect[k + 1] / center
+    ratio_prev = rect[k - 1] / center
+    denom = 2.0 - ratio_next - ratio_prev
+    if abs(denom) < EPS_LEVEL:
+        return float(freqs_rect[k])
+    delta = (ratio_prev - ratio_next) / denom
+    return float(freqs_rect[k] + float(delta.real) * (freqs_rect[1] - freqs_rect[0]))
 
 
 def _resampled_window(
@@ -121,7 +127,8 @@ def _assess_window(
     fs: float,
 ) -> tuple[float | None, bool, bool]:
     """Return measured f1 plus grid-unstable and fundamental-absent flags."""
-    raw_spec = np.fft.rfft(win)
+    centered = win - float(np.mean(win))
+    raw_spec = np.fft.rfft(centered)
     freqs = np.fft.rfftfreq(win.size, d=1.0 / fs)
     search = (freqs >= GRID_SEARCH_LOW_HZ) & (freqs <= GRID_SEARCH_HIGH_HZ)
     idx = np.nonzero(search)[0]
@@ -131,13 +138,13 @@ def _assess_window(
     f1 = estimate_grid_frequency_quinn_fernandes(win, sample_rate_hz=fs)
     if not GRID_BAND_LOW_HZ <= f1 <= GRID_BAND_HIGH_HZ:
         return f1, True, False
-    h_bin = round(f1 / _BIN_WIDTH_HZ)
-    if h_bin < 1 or h_bin >= raw_spec.size - 1:
+    hb = int(np.argmin(np.abs(freqs - f1)))
+    if hb < 1 or hb >= raw_spec.size - 1:
         return f1, True, False
-    lo = max(0, h_bin - _CONCENTRATION_NEIGHBOR_BINS)
-    hi = min(int(raw_spec.size) - 1, h_bin + _CONCENTRATION_NEIGHBOR_BINS)
+    lo = max(0, hb - _CONCENTRATION_NEIGHBOR_BINS)
+    hi = min(int(raw_spec.size) - 1, hb + _CONCENTRATION_NEIGHBOR_BINS)
     total_energy = float(np.sum(np.abs(raw_spec[lo : hi + 1]) ** 2))
-    center_energy = float(np.abs(raw_spec[h_bin]) ** 2)
+    center_energy = float(np.abs(raw_spec[hb]) ** 2)
     unstable = (
         total_energy > EPS_LEVEL and center_energy / total_energy < H1_CONCENTRATION_RATIO_MIN
     )

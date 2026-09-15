@@ -44,6 +44,8 @@ _TABLE_ID = "f01_harmonics"
 def build_f01_bundle(
     result: F01Result,
     recipe: CharacterizationRecipe,
+    *,
+    measured_channel: str = "ch1",
 ) -> tuple[CharacterizationBundle, dict[str, np.ndarray], dict[str, TableBlock]]:
     """Assemble F01 outputs with seventeen not_computed placeholders."""
     families = recipe.families
@@ -59,7 +61,9 @@ def build_f01_bundle(
         family = _unavailable_f01(result, families[0], support, window_s, band)
         rest = tuple(_placeholder(item, band) for item in families[1:])
         return CharacterizationBundle(families=(family, *rest)), {}, {}
-    family, arrays, tables = _mapped_f01(result, families[0], support, window_s, band)
+    family, arrays, tables = _mapped_f01(
+        result, families[0], support, window_s, band, measured_channel
+    )
     rest = tuple(_placeholder(item, band) for item in families[1:])
     return CharacterizationBundle(families=(family, *rest)), arrays, tables
 
@@ -89,10 +93,11 @@ class _Spec:
     band: Band
 
 
-def _envelope(
+def _envelope(  # noqa: PLR0913 - envelope несёт весь инвариант FamilyResult
     spec: _Spec,
     support: Support,
     *,
+    measured_channel: str = "ch1",
     array_refs: tuple[ArrayReference, ...] = (),
     table_refs: tuple[TableReference, ...] = (),
     comparison_summary: tuple[ScalarSummary, ...] = (),
@@ -105,7 +110,8 @@ def _envelope(
         units=(Unit.HZ, Unit.V, Unit.RAD, Unit.RATIO), window=window, band=spec.band,
         filter=Filter(kind="none", order=None, phase="none"), n=support.observation_count,
         support=support, missing_rule=_MISSING_RULE, qc=qc,
-        signal_plane=SignalPlane.CH1_SCOPE_INPUT, inference=Inference(),
+        signal_plane=(SignalPlane.CH1_SCOPE_INPUT if measured_channel == "ch1"
+            else SignalPlane.CH2_TRANSFORMER_SECONDARY), inference=Inference(),
         array_refs=array_refs, table_refs=table_refs, comparison_summary=comparison_summary
     )  # fmt: skip
 
@@ -140,12 +146,13 @@ def _unavailable_f01(
     return _envelope(spec, support)
 
 
-def _mapped_f01(
+def _mapped_f01(  # noqa: PLR0913, PLR0917 - маппинг F01 несёт контекст семейства
     result: F01Result,
     family: CharacterizationFamily,
     support: Support,
     window_s: float,
     band: Band,
+    measured_channel: str,
 ) -> tuple[FamilyResult, dict[str, np.ndarray], dict[str, TableBlock]]:
     f1_hz = result.f1_hz
     c_k_raw = result.c_k_v
@@ -207,6 +214,7 @@ def _mapped_f01(
     envelope = _envelope(
         spec,
         support,
+        measured_channel=measured_channel,
         array_refs=tuple(refs),
         table_refs=(TableReference(table_id=_TABLE_ID, role="harmonic_inventory"),),
         comparison_summary=(ScalarSummary(name="f1_hz", value=float(f1_hz), unit=Unit.HZ),),
