@@ -232,11 +232,13 @@ def compute_f01_phase_cycle(
     for i in range(total):
         start = i * n_nominal
         f1, unstable, absent = _assess_window(signal[start : start + n_nominal], fs)
-        window_f1.append(f1)
-        if absent:
+        if absent or f1 is None:
             fundamental_absent += 1
-        elif unstable:
+            window_f1.append(None)
+            continue
+        if unstable:
             grid_unstable += 1
+        window_f1.append(f1)
 
     codes: list[str] = []
     if fundamental_absent:
@@ -245,7 +247,7 @@ def compute_f01_phase_cycle(
         codes.append("grid_unstable")
     f1_values = [float(value) for value in window_f1 if value is not None]
     if not f1_values:
-        return _unavailable(tuple(codes), total, total)
+        return _unavailable(tuple(codes), total, 0)
     f1_global = float(np.median(f1_values))
 
     avg_c, resultant = _average_windows(signal, fs, n_nominal, window_f1, f1_global)
