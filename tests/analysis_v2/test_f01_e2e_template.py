@@ -84,7 +84,12 @@ def test_f01_e2e_reference_template_run_read_cache_rehash_raw(tmp_path: Path) ->
     assert f01.signal_plane == "ch1_scope_input"
     assert f01.comparison_summary[0].name == "f1_hz"
     assert 47.5 <= float(f01.comparison_summary[0].value) <= 52.5
-    rest = loaded.bundle.families[1:]
+    f02 = loaded.bundle.families[1]
+    assert f02.family_id == "f02_amplitude_time_shape"
+    # F02 must have actually run: the placeholder code is what an unimplemented
+    # family carries, so its presence here would mean the seam skipped the slice.
+    assert f02.reason_codes != ("not_computed",)
+    rest = loaded.bundle.families[2:]
     assert all(family.status is Status.UNAVAILABLE for family in rest)
     assert all(family.reason_codes == ("not_computed",) for family in rest)
 

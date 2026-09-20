@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path  # noqa: TC003 - runtime artifact paths
+from typing import TYPE_CHECKING, Final, cast
 
 from lnt.analysis_store import (
     ArtifactCorruptError,
@@ -11,14 +12,75 @@ from lnt.analysis_store import (
     CodeIdentity,
 )
 from lnt.characterization import encode_bundle
-from lnt.characterization.f01_bundle import build_f01_bundle
+from lnt.characterization.clipping import resolve_clipping
+from lnt.characterization.events import compute_root_events
 from lnt.characterization.f01_phase_cycle import compute_f01_phase_cycle
+from lnt.characterization.f02_amplitude_shape import (
+    compute_f02_amplitude_time_shape,
+    resample_cycle_template,
+)
+from lnt.characterization.f02_bundle import build_f01_f02_bundle
+from lnt.manifest import manifest_from_json
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
+from lnt.session_store import MANIFEST_FILENAME
 
 from .artifact_inputs import characterization_inputs
 from .types import AnalysisCancelledError, AnalysisRunResult, Float32Array
 
+if TYPE_CHECKING:
+    from lnt.analysis_store.characterization_family import CharacterizationFamily
+    from lnt.characterization.clipping import ChannelName
+    from lnt.characterization.f01_phase_cycle import F01Result
+    from lnt.characterization.f02_amplitude_shape import F02Result
+
 __all__ = ["run_characterization"]
+
+_F02_INDEX: Final = 1
+
+
+def _num(family: CharacterizationFamily, name: str) -> float:
+    """Числовое поле рецепта: домены проверены numeric-rules при разборе."""
+    return float(cast("int | float", family.value(name)))
+
+
+def _compute_f02(  # noqa: PLR0913, PLR0917 - явные параметры среза, без скрытого контекста
+    f01: F01Result,
+    samples: Float32Array,
+    sample_rate_hz: float,
+    recipe: CharacterizationRecipe,
+    session_dir: Path,
+    measured_name: str,
+    cancellation: CancellationToken,
+) -> F02Result:
+    """Инвентарь корневых событий и подгонка шаблона F01 по измеренному каналу."""
+    if f01.x_template_v is None or f01.f1_hz is None:
+        # Шаблона нет: F02 объявлен недоступным, а не подобран по нулям.
+        return compute_f02_amplitude_time_shape(samples, None, (), sample_rate_hz=sample_rate_hz)
+    manifest = manifest_from_json((session_dir / MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    clipping = resolve_clipping(
+        manifest,
+        cast("ChannelName", measured_name),
+        recipe.events.clipping_fraction_of_range,
+    )
+    _checkpoint(cancellation)
+    root_events = compute_root_events(
+        samples,
+        sample_rate_hz=sample_rate_hz,
+        recipe=recipe,
+        clipping=clipping,
+        checkpoint=lambda: _checkpoint(cancellation),
+    )
+    family = recipe.families[_F02_INDEX]
+    return compute_f02_amplitude_time_shape(
+        samples,
+        resample_cycle_template(f01.x_template_v, f1_hz=f01.f1_hz, sample_rate_hz=sample_rate_hz),
+        root_events.events,
+        sample_rate_hz=sample_rate_hz,
+        subsample_divisor=int(_num(family, "subsample_divisor")),
+        minimum_event_snr_db=_num(family, "minimum_event_snr_db"),
+        residual_fraction_max=_num(family, "residual_fraction_max"),
+        maximum_events=int(_num(family, "maximum_events")),
+    )
 
 
 def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch, параметры явные
@@ -32,6 +94,7 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
 ) -> AnalysisRunResult:
     """Выполняет characterization поверх ArtifactStore без SessionKind-dispatch.
 
+    Считает F01, затем F02 по его шаблону и корневому инвентарю событий.
     Ключ строится из recipe_sha256, sha256_file сырых каналов, явных
     digest tunables и CodeIdentity; повторный прогон возвращает cache_hit.
     project_default не вызывается, BranchContext не используется.
@@ -67,7 +130,11 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
         sync_reference=channel_by_name[ref_name],
     )
     _checkpoint(cancellation)
-    bundle, arrays, tables = build_f01_bundle(result, recipe, measured_channel=meas_name)
+    f02 = _compute_f02(
+        result, samples, sample_rate_hz, recipe, session_dir, meas_name, cancellation
+    )
+    _checkpoint(cancellation)
+    bundle, arrays, tables = build_f01_f02_bundle(result, f02, recipe, measured_channel=meas_name)
     files = encode_bundle(
         bundle, arrays, tables, max_artifact_bytes=recipe.resource_limits.max_artifact_bytes
     )

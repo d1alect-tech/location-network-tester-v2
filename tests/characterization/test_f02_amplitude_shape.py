@@ -19,6 +19,7 @@ from lnt.characterization.f02_amplitude_shape import (
     TEMPLATE_FIELD,
     F02Result,
     compute_f02_amplitude_time_shape,
+    resample_cycle_template,
 )
 from lnt.characterization.records import Status
 from lnt.events.models import Polarity
@@ -286,3 +287,26 @@ def test_declared_subsample_divisor_sets_the_lattice_step() -> None:
         steps = delay_s * FS_HZ * divisor
         assert steps == pytest.approx(round(steps), abs=1e-6)
         assert delay_s == pytest.approx(50.0 / FS_HZ)
+
+
+def test_resample_cycle_template_maps_one_cycle_onto_the_record_grid() -> None:
+    # The F01 template is one cycle on a 1000-point theta grid, independent of fs.
+    # An event span lives on the record grid, where one cycle is fs / f1 samples,
+    # so v(t) must be resampled before any correlation means anything.
+    template = _build_template()
+    resampled = resample_cycle_template(template, f1_hz=50.0, sample_rate_hz=FS_HZ)
+    assert resampled.size == round(FS_HZ / 50.0)
+    assert resampled[0] == pytest.approx(template[0])
+    quarter = resampled.size // 4
+    assert resampled[quarter] == pytest.approx(template[250], rel=1e-3)
+    assert float(np.max(np.abs(resampled))) == pytest.approx(
+        float(np.max(np.abs(template))), rel=1e-2
+    )
+
+
+def test_resample_cycle_template_is_deterministic_and_finite() -> None:
+    template = _build_template()
+    first = resample_cycle_template(template, f1_hz=50.0, sample_rate_hz=FS_HZ)
+    second = resample_cycle_template(template, f1_hz=50.0, sample_rate_hz=FS_HZ)
+    assert np.array_equal(first, second)
+    assert np.all(np.isfinite(first))

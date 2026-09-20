@@ -42,6 +42,7 @@ __all__ = [
     "TEMPLATE_FIELD",
     "F02Result",
     "compute_f02_amplitude_time_shape",
+    "resample_cycle_template",
 ]
 
 
@@ -83,6 +84,29 @@ def _snr_db(snr_ratio: float) -> float:
     """Event SNR in dB; a non-positive ratio carries no signal at all."""
     ratio = float(snr_ratio)
     return 20.0 * float(np.log10(ratio)) if ratio > 0.0 else -float("inf")
+
+
+def resample_cycle_template(
+    template: FloatInput,
+    *,
+    f1_hz: float,
+    sample_rate_hz: float,
+) -> Float64Array:
+    """Map the F01 unit-cycle template onto one f1 cycle of the record grid.
+
+    ``x_template_v`` is one cycle on a 1000-point theta grid, independent of fs,
+    while an event span lives on the record grid where one cycle holds
+    ``fs / f1`` samples. Linear interpolation, the F01-locked rule.
+    """
+    source = np.asarray(template, dtype=np.float64)
+    cycle_samples = round(float(sample_rate_hz) / float(f1_hz))
+    # The template is periodic with endpoint=False, so one cycle spans exactly
+    # `size` points; the wrap-around segment needs the first sample repeated.
+    size = int(source.size)
+    grid = np.arange(size + 1, dtype=np.float64)
+    values = np.concatenate((source, source[:1]))
+    target = np.arange(cycle_samples, dtype=np.float64) * (float(size) / float(cycle_samples))
+    return np.interp(target, grid, values).astype(np.float64)
 
 
 def _baseline_median(record: Float64Array, start: int, end: int, length: int) -> float | None:

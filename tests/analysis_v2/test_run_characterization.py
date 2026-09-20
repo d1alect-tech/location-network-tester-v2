@@ -14,6 +14,7 @@ from lnt.analysis_v2 import AnalysisCancelledError, run_characterization
 from lnt.characterization import OUTPUT_FILENAMES, Status, load_bundle
 from lnt.context.json_codec import decode_object
 from lnt.scope_io import CancellationToken
+from tests.test_ui_sessions import write_manifest
 
 if TYPE_CHECKING:
     from lnt.analysis_v2.types import Float32Array
@@ -39,11 +40,14 @@ def _changed_recipe(field: str, value: JsonValue) -> CharacterizationRecipe:
     return recipe
 
 
-def _session(path: Path) -> Path:
-    n = round(_FS_HZ * 2.4)
+def _session(path: Path, *, duration_s: float = 2.4) -> Path:
+    # resolve_clipping reads only channel meta, source and telemetry from the
+    # manifest, so the shared fixture's declared sample_count need not match the
+    # arrays written here.
+    write_manifest(path)
+    n = round(_FS_HZ * duration_s)
     t = np.arange(n, dtype=np.float64) / _FS_HZ
     signal = (6.0 * np.sin(2.0 * np.pi * 50.0 * t + 0.4)).astype(np.float32)
-    path.mkdir()
     np.save(path / "ch1.npy", signal)
     np.save(path / "ch2.npy", signal)
     return path
@@ -89,10 +93,45 @@ def test_publishes_bundle_with_manifest_code_identity(tmp_path: Path) -> None:
     files = {name: (result.artifact_dir / name).read_bytes() for name in OUTPUT_FILENAMES}
     loaded = load_bundle(files)
     assert loaded.bundle.families[0].status is Status.AVAILABLE
-    unavailable = loaded.bundle.families[1:]
+    unavailable = loaded.bundle.families[2:]
     assert unavailable
     assert all(family.status is Status.UNAVAILABLE for family in unavailable)
     assert all(family.reason_codes == ("not_computed",) for family in unavailable)
+
+
+def test_seam_publishes_f02_beside_f01(tmp_path: Path) -> None:
+    session = _session(tmp_path / "session")
+
+    result = run_characterization(
+        _recipe(), session, _load(session), _FS_HZ, code_identity=_identity("test")
+    )
+
+    files = {name: (result.artifact_dir / name).read_bytes() for name in OUTPUT_FILENAMES}
+    loaded = load_bundle(files)
+    f02 = loaded.bundle.families[1]
+    assert f02.family_id == "f02_amplitude_time_shape"
+    # A clean sine delimits no root event, so the baseline the method requires
+    # does not exist for any event: declared code, never a fabricated (a, tau).
+    assert f02.status is Status.UNAVAILABLE
+    assert f02.reason_codes == ("baseline_unavailable",)
+    assert f02.array_refs == ()
+    assert loaded.bundle.families[2].reason_codes == ("not_computed",)
+
+
+def test_seam_reports_f02_template_unavailable_when_f01_is_unavailable(tmp_path: Path) -> None:
+    # 1.0 s at 8 kHz gives 5 complete 0.2 s windows, below the 12-window minimum.
+    session = _session(tmp_path / "session", duration_s=1.0)
+
+    result = run_characterization(
+        _recipe(), session, _load(session), _FS_HZ, code_identity=_identity("test")
+    )
+
+    files = {name: (result.artifact_dir / name).read_bytes() for name in OUTPUT_FILENAMES}
+    loaded = load_bundle(files)
+    assert loaded.bundle.families[0].reason_codes == ("window_too_short",)
+    f02 = loaded.bundle.families[1]
+    assert f02.status is Status.UNAVAILABLE
+    assert f02.reason_codes == ("template_unavailable",)
 
 
 def test_identical_rerun_is_cache_hit_without_recompute(tmp_path: Path) -> None:
