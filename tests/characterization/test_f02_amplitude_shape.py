@@ -211,3 +211,59 @@ def test_event_count_caps_at_maximum_events_with_accounting() -> None:
     result = compute_f02_amplitude_time_shape(record, template, events, sample_rate_hz=FS_HZ)
     assert result.evaluated_event_count == MAXIMUM_EVENTS
     assert result.omitted_event_count == 1
+
+
+def test_declared_snr_gate_rejects_a_fit_the_default_gate_accepts() -> None:
+    template = _build_template()
+    record = _embed(template, amplitude=1.7, delay_samples=37, noise_sigma=0.05, seed=6022)
+    event = _event(TEMPLATE_SAMPLES, 2 * TEMPLATE_SAMPLES - 1, snr_ratio=100.0)
+    accepted = compute_f02_amplitude_time_shape(record, template, (event,), sample_rate_hz=FS_HZ)
+    rejected = compute_f02_amplitude_time_shape(
+        record, template, (event,), sample_rate_hz=FS_HZ, minimum_event_snr_db=200.0
+    )
+    assert accepted.status is Status.AVAILABLE
+    assert rejected.status is Status.UNAVAILABLE
+    assert rejected.reason_codes == ("below_snr",)
+
+
+def test_declared_residual_ceiling_rejects_a_fit_the_default_ceiling_accepts() -> None:
+    template = _build_template()
+    record = _embed(template, amplitude=1.7, delay_samples=37, noise_sigma=0.05, seed=6022)
+    event = _event(TEMPLATE_SAMPLES, 2 * TEMPLATE_SAMPLES - 1, snr_ratio=100.0)
+    accepted = compute_f02_amplitude_time_shape(record, template, (event,), sample_rate_hz=FS_HZ)
+    rejected = compute_f02_amplitude_time_shape(
+        record, template, (event,), sample_rate_hz=FS_HZ, residual_fraction_max=1e-9
+    )
+    assert accepted.status is Status.AVAILABLE
+    assert rejected.status is Status.UNAVAILABLE
+    assert rejected.reason_codes == ("below_snr",)
+
+
+def test_declared_maximum_events_caps_the_evaluated_inventory() -> None:
+    template = _build_template()
+    span = TEMPLATE_SAMPLES
+    record = _embed(template, amplitude=1.7, delay_samples=37, noise_sigma=0.05, seed=6022)
+    events = (_event(span, 2 * span - 1, snr_ratio=100.0), _event(2 * span, 3 * span - 1, 100.0))
+    capped = compute_f02_amplitude_time_shape(
+        record, template, events, sample_rate_hz=FS_HZ, maximum_events=1
+    )
+    assert capped.evaluated_event_count == 1
+    assert capped.omitted_event_count == 1
+    assert len(capped.amplitudes) == 2
+    assert capped.amplitudes[1] is None
+
+
+def test_declared_subsample_divisor_sets_the_lattice_step() -> None:
+    template = _build_template()
+    record = _embed(template, amplitude=1.0, delay_samples=50, noise_sigma=0.0, seed=7)
+    event = _event(TEMPLATE_SAMPLES, 2 * TEMPLATE_SAMPLES - 1, snr_ratio=100.0)
+    for divisor in (1, SUBSAMPLE_DIVISOR):
+        result = compute_f02_amplitude_time_shape(
+            record, template, (event,), sample_rate_hz=FS_HZ, subsample_divisor=divisor
+        )
+        assert result.status is Status.AVAILABLE
+        # The delay must land on the declared lattice: an integer number of
+        # 1/divisor steps, whatever the divisor is.
+        steps = result.delays_s[0] * FS_HZ * divisor
+        assert steps == pytest.approx(round(steps), abs=1e-6)
+        assert result.delays_s[0] == pytest.approx(50.0 / FS_HZ)

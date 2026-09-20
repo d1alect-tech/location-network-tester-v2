@@ -69,6 +69,16 @@ class _Fit:
     residual_v2: float
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Limits:
+    """The declared recipe gates applied to every event fit."""
+
+    subsample_divisor: int
+    minimum_event_snr_db: float
+    residual_fraction_max: float
+    maximum_events: int
+
+
 def _snr_db(snr_ratio: float) -> float:
     """Event SNR in dB; a non-positive ratio carries no signal at all."""
     ratio = float(snr_ratio)
@@ -84,13 +94,15 @@ def _baseline_median(record: Float64Array, start: int, end: int, length: int) ->
     return float(np.median(np.concatenate((before, after))))
 
 
-def _span(record: Float64Array, event: RootEvent) -> tuple[Float64Array | None, str | None]:
+def _span(
+    record: Float64Array, event: RootEvent, limits: _Limits
+) -> tuple[Float64Array | None, str | None]:
     """Baseline-removed event span, or the declared reason it cannot be fitted."""
     start = int(event.start_sample)
     end = int(event.end_sample)
     if start < 0 or end >= int(record.size):
         return None, "event_truncated"
-    if _snr_db(event.snr_ratio) < MINIMUM_EVENT_SNR_DB:
+    if _snr_db(event.snr_ratio) < limits.minimum_event_snr_db:
         return None, "below_snr"
     baseline = _baseline_median(record, start, end, end - start + 1)
     if baseline is None:
@@ -120,12 +132,12 @@ def _cost(y: Float64Array, v_tau: Float64Array) -> tuple[float, float, float]:
     return y_energy - dot * dot / norm, gain, float(np.dot(residual, residual))
 
 
-def _lattice(y: Float64Array, template: Float64Array, coarse: float) -> _Fit:
-    """Best fit on the 1/(64 fs) lattice within one sample of the coarse lag."""
+def _lattice(y: Float64Array, template: Float64Array, coarse: float, limits: _Limits) -> _Fit:
+    """Best fit on the declared sub-sample lattice within one sample of the coarse lag."""
     size = int(y.size)
-    step = 1.0 / float(SUBSAMPLE_DIVISOR)
+    step = 1.0 / float(limits.subsample_divisor)
     best = _Fit(cost=float("inf"), tau_samples=float(coarse), gain=0.0, residual_v2=float("inf"))
-    for offset in range(-SUBSAMPLE_DIVISOR, SUBSAMPLE_DIVISOR + 1):
+    for offset in range(-limits.subsample_divisor, limits.subsample_divisor + 1):
         cost, gain, residual = _cost(y, _shifted(template, coarse + offset * step, size))
         if cost < best.cost:
             best = _Fit(
@@ -137,9 +149,9 @@ def _lattice(y: Float64Array, template: Float64Array, coarse: float) -> _Fit:
     return best
 
 
-def _refine(y: Float64Array, template: Float64Array, fit: _Fit) -> _Fit:
+def _refine(y: Float64Array, template: Float64Array, fit: _Fit, limits: _Limits) -> _Fit:
     """Parabolic vertex, kept only when it lowers J: an exact fit stays on the lattice."""
-    step = 1.0 / float(SUBSAMPLE_DIVISOR)
+    step = 1.0 / float(limits.subsample_divisor)
     size = int(y.size)
     minus = _cost(y, _shifted(template, fit.tau_samples - step, size))[0]
     plus = _cost(y, _shifted(template, fit.tau_samples + step, size))[0]
@@ -168,12 +180,13 @@ def _fit_event(
     template: Float64Array,
     event: RootEvent,
     sample_rate_hz: float,
+    limits: _Limits,
 ) -> tuple[tuple[float, float, float, float] | None, str | None]:
     """(tau_samples, gain, residual fraction, residual energy V^2 s) or a rejection code."""
-    y, code = _span(record, event)
+    y, code = _span(record, event, limits)
     if y is None:
         return None, code
-    fit = _refine(y, template, _lattice(y, template, _coarse_lag(y, template)))
+    fit = _refine(y, template, _lattice(y, template, _coarse_lag(y, template), limits), limits)
     y_norm = float(np.sqrt(float(np.dot(y, y))))
     rho = float(np.sqrt(fit.residual_v2)) / y_norm
     return (fit.tau_samples, fit.gain, rho, fit.residual_v2 / sample_rate_hz), None
@@ -202,15 +215,25 @@ def _unavailable(codes: tuple[str, ...], total: int, evaluated: int, omitted: in
     )
 
 
-def compute_f02_amplitude_time_shape(
+def compute_f02_amplitude_time_shape(  # noqa: PLR0913 - declared recipe gates are explicit knobs
     record: FloatInput,
     template: FloatInput | None,
     events: tuple[RootEvent, ...],
     *,
     sample_rate_hz: float,
+    subsample_divisor: int = SUBSAMPLE_DIVISOR,
+    minimum_event_snr_db: float = MINIMUM_EVENT_SNR_DB,
+    residual_fraction_max: float = RESIDUAL_FRACTION_MAX,
+    maximum_events: int = MAXIMUM_EVENTS,
 ) -> F02Result:
     """Fit the F01 cycle template gain and delay to every delimited root event."""
     total = len(events)
+    limits = _Limits(
+        subsample_divisor=int(subsample_divisor),
+        minimum_event_snr_db=float(minimum_event_snr_db),
+        residual_fraction_max=float(residual_fraction_max),
+        maximum_events=int(maximum_events),
+    )
     if template is None or int(np.asarray(template).size) == 0:
         return _unavailable(("template_unavailable",), total, 0, 0)
     if _overlaps(events):
@@ -218,16 +241,16 @@ def compute_f02_amplitude_time_shape(
     samples = np.asarray(record, dtype=np.float64)
     shape = np.asarray(template, dtype=np.float64)
     fs = float(sample_rate_hz)
-    kept = events[:MAXIMUM_EVENTS]
+    kept = events[: limits.maximum_events]
     omitted = total - len(kept)
-    outcomes = [_fit_event(samples, shape, event, fs) for event in kept]
+    outcomes = [_fit_event(samples, shape, event, fs, limits) for event in kept]
     codes: set[str] = set()
     accepted: list[tuple[float, float, float, float] | None] = []
     for fit, code in outcomes:
         # rho above the declared ceiling means the template explains too little of the
         # span, so the fit's own signal-to-residual ratio is below threshold: the event
         # is dropped under below_snr instead of reported as a plausible (a, tau) pair.
-        if fit is None or fit[2] > RESIDUAL_FRACTION_MAX:
+        if fit is None or fit[2] > limits.residual_fraction_max:
             codes.add("below_snr" if code is None else code)
             accepted.append(None)
             continue
