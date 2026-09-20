@@ -1,8 +1,23 @@
 # Покрытие 18 семейств дескрипторов (characterization program)
 
-Статус: Wave 3 todo 10 — F01 реализован end-to-end, остальные 17 — `not_computed`.
-Реализовано семейств: 1/18 (F01 `synchronous_relative_harmonic_dft` через `run_characterization` seam + бандл 18 + API/UI). Готовы 8 shared-корней (`src/lnt/characterization/shared.py:64`).
+Статус: Wave 4 todo 11 — F01 и F02 реализованы end-to-end, остальные 16 — `not_computed`.
+Реализовано семейств: 2/18 (F01 `synchronous_relative_harmonic_dft` и F02
+`template_gain_delay_least_squares` через один `run_characterization` seam + бандл 18 + API/UI).
+Готовы 8 shared-корней (`src/lnt/characterization/shared.py:64`).
 E2E-шаблон: `tests/analysis_v2/test_f01_e2e_template.py` (эталон `simulate_session(profile=bad, 500 кГц, 2.4 с, seed 6022)`, `dirname == session_id`; прогон → чтение бандла → cache-hit → recipe-change ⇒ новый ключ → raw-хеши неизменны; переиспользовать для Phase 2+). На эталоне CH1 F01 PARTIAL (`grid_unstable`, `phase_unstable`) — ожидаемо: CH1 — иголки без несущей 50 Гц; AVAILABLE требует analytic-синтетика (`tests/characterization/test_f01_phase_cycle.py`). fs-матрица: 500 кГц — эталон, 8 МГц — declared codes halo-семейств (`.omo/evidence/task-3-characterization-18-families.md:68-89`).
+F02 на эталоне PARTIAL с подобранными значениями (`baseline_unavailable`, `below_snr`; 319 из 927
+событий подобраны) — иголки CH1 детектор размечает как корневые события, поэтому это не codes-only
+путь (`tests/analysis_v2/test_f02_e2e_reduced.py`). AVAILABLE-путь проверяется импульсной
+periodic-волной 50 Гц, где шаблон цикла совпадает с разметкой детектора (медиана `a` = 1,0;
+среднее 0,866 утянуто краевыми событиями с урезанным спаном). Шаблон F01 — один цикл на сетке
+`theta` из 1000 точек, независимой от `fs`, поэтому перед корреляцией он ресэмплируется на сетку
+записи (`fs/f1` сэмплов, линейная интерполяция — залоченное правило F01):
+`f02_amplitude_shape.resample_cycle_template`.
+Пробел спеки: при пустом инвентаре событий объявленный словарь из пяти кодов
+(`method-notes-families-1-9.md:145-146`) не содержит кода «событий не размечено вовсе». Выбран
+`baseline_unavailable` — без события нет пары интервалов длины события для медианы; `below_snr`
+заявлял бы измерение, которого не было. Решение закреплено тестом
+`test_empty_event_inventory_is_unavailable_without_fabricated_values`.
 Метод F01 `synchronous_relative_harmonic_dft` зафиксирован (`src/lnt/analysis_store/characterization_contract.py:13-17`):
 окно 0,2 с, минимум 12 окон, Hmax 40, Rmin 0,8, H1 ratio ≥ 0,95.
 
