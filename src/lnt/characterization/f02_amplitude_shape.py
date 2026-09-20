@@ -236,6 +236,11 @@ def compute_f02_amplitude_time_shape(  # noqa: PLR0913 - declared recipe gates a
     )
     if template is None or int(np.asarray(template).size) == 0:
         return _unavailable(("template_unavailable",), total, 0, 0)
+    if not events:
+        # No delimited event means no pair of flanking event-length intervals, so
+        # the baseline the method requires does not exist for any event to be
+        # fitted against. Declared code, never a fabricated (a, tau) pair.
+        return _unavailable(("baseline_unavailable",), total, 0, 0)
     if _overlaps(events):
         return _unavailable(("overlapping_events",), total, 0, 0)
     samples = np.asarray(record, dtype=np.float64)

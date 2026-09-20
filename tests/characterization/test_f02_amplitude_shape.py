@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from numpy.typing import NDArray
+
+from lnt.characterization.event_models import RootEvent
 from lnt.characterization.f02_amplitude_shape import (
     COARSE_DELAY_METHOD,
     DELAY_REFINEMENT,
@@ -17,9 +20,6 @@ from lnt.characterization.f02_amplitude_shape import (
     F02Result,
     compute_f02_amplitude_time_shape,
 )
-from numpy.typing import NDArray
-
-from lnt.characterization.event_models import RootEvent
 from lnt.characterization.records import Status
 from lnt.events.models import Polarity
 
@@ -253,6 +253,23 @@ def test_declared_maximum_events_caps_the_evaluated_inventory() -> None:
     assert capped.amplitudes[1] is None
 
 
+def test_empty_event_inventory_is_unavailable_without_fabricated_values() -> None:
+    # The declared F02 vocabulary (method-notes-families-1-9.md:145-146) lists five
+    # codes and none of them names "the detector delimited no event at all". With no
+    # event there is no pair of flanking event-length intervals to take a median of,
+    # so the baseline the method requires does not exist: of the five declared codes
+    # only baseline_unavailable stays true. below_snr would claim a measurement that
+    # never happened. Spec gap, surfaced to the owner rather than papered over.
+    template = _build_template()
+    record = _embed(template, amplitude=1.7, delay_samples=37, noise_sigma=0.05, seed=6022)
+    result = compute_f02_amplitude_time_shape(record, template, (), sample_rate_hz=FS_HZ)
+    assert result.status is Status.UNAVAILABLE
+    assert result.reason_codes == ("baseline_unavailable",)
+    assert result.evaluated_event_count == 0
+    assert result.omitted_event_count == 0
+    _assert_no_bare_values(result)
+
+
 def test_declared_subsample_divisor_sets_the_lattice_step() -> None:
     template = _build_template()
     record = _embed(template, amplitude=1.0, delay_samples=50, noise_sigma=0.0, seed=7)
@@ -264,6 +281,8 @@ def test_declared_subsample_divisor_sets_the_lattice_step() -> None:
         assert result.status is Status.AVAILABLE
         # The delay must land on the declared lattice: an integer number of
         # 1/divisor steps, whatever the divisor is.
-        steps = result.delays_s[0] * FS_HZ * divisor
+        delay_s = result.delays_s[0]
+        assert delay_s is not None
+        steps = delay_s * FS_HZ * divisor
         assert steps == pytest.approx(round(steps), abs=1e-6)
-        assert result.delays_s[0] == pytest.approx(50.0 / FS_HZ)
+        assert delay_s == pytest.approx(50.0 / FS_HZ)
