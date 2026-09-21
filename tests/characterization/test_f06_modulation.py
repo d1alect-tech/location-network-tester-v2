@@ -196,7 +196,8 @@ def test_band_above_nyquist_folds_into_band_invalid() -> None:
     assert result.snr_db is None
 
 
-def test_nonfinite_tail_keeps_the_largest_contiguous_span() -> None:
+def test_nonfinite_tail_keeps_the_first_contiguous_span() -> None:
+    """Публикуется ПЕРВЫЙ непрерывный спан: наибольший требует второго прохода."""
     samples = _am(0.5)
     samples[-20_000:] = np.nan
     result = _evaluate(samples)
