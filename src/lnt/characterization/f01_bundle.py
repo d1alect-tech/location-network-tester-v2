@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from lnt.characterization.errors import CharacterizationError
+from lnt.characterization.family_envelope import (
+    FamilySpec,
+    family_envelope,
+    not_computed_family,
+    signal_plane_for,
+)
 from lnt.characterization.models import (
     ArrayReference,
     CharacterizationBundle,
@@ -16,11 +21,7 @@ from lnt.characterization.models import (
 )
 from lnt.characterization.records import (
     Band,
-    Filter,
-    Inference,
-    Qc,
     ScalarSummary,
-    SignalPlane,
     Status,
     Support,
     Unit,
@@ -36,8 +37,8 @@ if TYPE_CHECKING:
     from lnt.characterization.f01_phase_cycle import F01Result
 
 _F01_ID = "f01_phase_cycle"
-_NOT_COMPUTED = ("not_computed",)
-_MISSING_RULE = "exclude_and_count"
+_WINDOW_KIND = "fixed"
+_UNITS = (Unit.HZ, Unit.V, Unit.RAD, Unit.RATIO)
 _TABLE_ID = "f01_harmonics"
 
 
@@ -58,13 +59,13 @@ def build_f01_bundle(
     band = Band(low_hz=recipe.stft.analysis_low_hz, high_hz=recipe.stft.analysis_high_hz)
     support = _support(result, window_s)
     if result.status is Status.UNAVAILABLE:
-        family = _unavailable_f01(result, families[0], support, window_s, band)
-        rest = tuple(_placeholder(item, band) for item in families[1:])
+        family = _unavailable_f01(result, families[0], support, window_s, band, measured_channel)
+        rest = tuple(not_computed_family(item, band) for item in families[1:])
         return CharacterizationBundle(families=(family, *rest)), {}, {}
     family, arrays, tables = _mapped_f01(
         result, families[0], support, window_s, band, measured_channel
     )
-    rest = tuple(_placeholder(item, band) for item in families[1:])
+    rest = tuple(not_computed_family(item, band) for item in families[1:])
     return CharacterizationBundle(families=(family, *rest)), arrays, tables
 
 
@@ -82,46 +83,36 @@ def _support(result: F01Result, window_s: float) -> Support:
     )  # fmt: skip
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _Spec:
-    family_id: str
-    method: str
-    method_version: int
-    status: Status
-    reasons: tuple[str, ...]
-    window_s: float
-    band: Band
+def _spec(  # noqa: PLR0913, PLR0917 - конверт несёт весь инвариант семейства
+    family: CharacterizationFamily,
+    band: Band,
+    window_s: float,
+    measured_channel: str,
+    status: Status,
+    reasons: tuple[str, ...],
+) -> FamilySpec:
+    return FamilySpec(
+        family_id=_F01_ID,
+        method=family.method,
+        method_version=family.method_version,
+        status=status,
+        reasons=reasons,
+        units=_UNITS,
+        window=Window(
+            kind=_WINDOW_KIND, duration_s=window_s, sample_count=None, overlap_fraction=0.0
+        ),
+        band=band,
+        signal_plane=signal_plane_for(measured_channel),
+    )
 
 
-def _envelope(  # noqa: PLR0913 - envelope несёт весь инвариант FamilyResult
-    spec: _Spec,
-    support: Support,
-    *,
-    measured_channel: str = "ch1",
-    array_refs: tuple[ArrayReference, ...] = (),
-    table_refs: tuple[TableReference, ...] = (),
-    comparison_summary: tuple[ScalarSummary, ...] = (),
-) -> FamilyResult:
-    window = Window(kind="fixed", duration_s=spec.window_s, sample_count=None, overlap_fraction=0.0)
-    qc = Qc(passed=spec.status is Status.AVAILABLE, reason_codes=spec.reasons)
-    return FamilyResult(
-        family_id=spec.family_id, status=spec.status, reason_codes=spec.reasons,
-        method=spec.method, method_version=spec.method_version,
-        units=(Unit.HZ, Unit.V, Unit.RAD, Unit.RATIO), window=window, band=spec.band,
-        filter=Filter(kind="none", order=None, phase="none"), n=support.observation_count,
-        support=support, missing_rule=_MISSING_RULE, qc=qc,
-        signal_plane=(SignalPlane.CH1_SCOPE_INPUT if measured_channel == "ch1"
-            else SignalPlane.CH2_TRANSFORMER_SECONDARY), inference=Inference(),
-        array_refs=array_refs, table_refs=table_refs, comparison_summary=comparison_summary
-    )  # fmt: skip
-
-
-def _unavailable_f01(
+def _unavailable_f01(  # noqa: PLR0913, PLR0917 - маппинг F01 несёт контекст семейства
     result: F01Result,
     family: CharacterizationFamily,
     support: Support,
     window_s: float,
     band: Band,
+    measured_channel: str,
 ) -> FamilyResult:
     if not result.reason_codes:
         raise CharacterizationError("status_invariant", "unavailable f01 needs reasons")
@@ -134,16 +125,8 @@ def _unavailable_f01(
     )
     if any(value is not None for value in outputs):
         raise CharacterizationError("status_invariant", "unavailable f01 must have no outputs")
-    spec = _Spec(
-        family_id=_F01_ID,
-        method=family.method,
-        method_version=family.method_version,
-        status=Status.UNAVAILABLE,
-        reasons=result.reason_codes,
-        window_s=window_s,
-        band=band,
-    )
-    return _envelope(spec, support)
+    spec = _spec(family, band, window_s, measured_channel, Status.UNAVAILABLE, result.reason_codes)
+    return family_envelope(spec, support)
 
 
 def _mapped_f01(  # noqa: PLR0913, PLR0917 - маппинг F01 несёт контекст семейства
@@ -202,19 +185,10 @@ def _mapped_f01(  # noqa: PLR0913, PLR0917 - маппинг F01 несёт ко�
             )
         )
     table = _harmonics_table(c_k, phi, resultant)
-    spec = _Spec(
-        family_id=_F01_ID,
-        method=family.method,
-        method_version=family.method_version,
-        status=result.status,
-        reasons=result.reason_codes,
-        window_s=window_s,
-        band=band,
-    )
-    envelope = _envelope(
+    spec = _spec(family, band, window_s, measured_channel, result.status, result.reason_codes)
+    envelope = family_envelope(
         spec,
         support,
-        measured_channel=measured_channel,
         array_refs=tuple(refs),
         table_refs=(TableReference(table_id=_TABLE_ID, role="harmonic_inventory"),),
         comparison_summary=(ScalarSummary(name="f1_hz", value=float(f1_hz), unit=Unit.HZ),),
@@ -245,26 +219,3 @@ def _harmonics_table(
         stored_count=count,
         selection_rule="all",
     )
-
-
-def _placeholder(family: CharacterizationFamily, band: Band) -> FamilyResult:
-    support = Support(
-        start_s=0.0,
-        end_s=0.0,
-        duration_s=0.0,
-        sample_count=0,
-        observation_count=0,
-        missing_count=0,
-        stored_count=0,
-        selection_rule="all",
-    )
-    spec = _Spec(
-        family_id=family.id,
-        method=family.method,
-        method_version=family.method_version,
-        status=Status.UNAVAILABLE,
-        reasons=_NOT_COMPUTED,
-        window_s=0.2,
-        band=band,
-    )
-    return _envelope(spec, support)
