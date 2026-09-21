@@ -19,7 +19,9 @@ from lnt.characterization.f02_amplitude_shape import (
     compute_f02_amplitude_time_shape,
     resample_cycle_template,
 )
-from lnt.characterization.f02_bundle import build_f01_f02_bundle
+from lnt.characterization.f05_bundle import build_f01_f02_f05_bundle
+from lnt.characterization.f05_phase_stats import compute_f05_phase_conditioned_statistics
+from lnt.characterization.phase import compute_phase_cycles
 from lnt.manifest import manifest_from_json
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 from lnt.session_store import MANIFEST_FILENAME
@@ -30,12 +32,16 @@ from .types import AnalysisCancelledError, AnalysisRunResult, Float32Array
 if TYPE_CHECKING:
     from lnt.analysis_store.characterization_family import CharacterizationFamily
     from lnt.characterization.clipping import ChannelName
+    from lnt.characterization.event_models import RootEvents
     from lnt.characterization.f01_phase_cycle import F01Result
     from lnt.characterization.f02_amplitude_shape import F02Result
+    from lnt.characterization.f05_phase_stats import F05Result
+    from lnt.characterization.phase import PhaseCycles
 
 __all__ = ["run_characterization"]
 
 _F02_INDEX: Final = 1
+_F05_INDEX: Final = 4
 
 
 def _num(family: CharacterizationFamily, name: str) -> float:
@@ -43,19 +49,15 @@ def _num(family: CharacterizationFamily, name: str) -> float:
     return float(cast("int | float", family.value(name)))
 
 
-def _compute_f02(  # noqa: PLR0913, PLR0917 - явные параметры среза, без скрытого контекста
-    f01: F01Result,
+def _root_events(  # noqa: PLR0913, PLR0917 - явные параметры среза, без скрытого контекста
     samples: Float32Array,
     sample_rate_hz: float,
     recipe: CharacterizationRecipe,
     session_dir: Path,
     measured_name: str,
     cancellation: CancellationToken,
-) -> F02Result:
-    """Инвентарь корневых событий и подгонка шаблона F01 по измеренному каналу."""
-    if f01.x_template_v is None or f01.f1_hz is None:
-        # Шаблона нет: F02 объявлен недоступным, а не подобран по нулям.
-        return compute_f02_amplitude_time_shape(samples, None, (), sample_rate_hz=sample_rate_hz)
+) -> RootEvents:
+    """Инвентарь корневых событий: один расчёт на оба семейства, читающие события."""
     manifest = manifest_from_json((session_dir / MANIFEST_FILENAME).read_text(encoding="utf-8"))
     clipping = resolve_clipping(
         manifest,
@@ -63,13 +65,26 @@ def _compute_f02(  # noqa: PLR0913, PLR0917 - явные параметры ср
         recipe.events.clipping_fraction_of_range,
     )
     _checkpoint(cancellation)
-    root_events = compute_root_events(
+    return compute_root_events(
         samples,
         sample_rate_hz=sample_rate_hz,
         recipe=recipe,
         clipping=clipping,
         checkpoint=lambda: _checkpoint(cancellation),
     )
+
+
+def _compute_f02(
+    f01: F01Result,
+    samples: Float32Array,
+    sample_rate_hz: float,
+    recipe: CharacterizationRecipe,
+    root_events: RootEvents,
+) -> F02Result:
+    """Подгонка шаблона F01 по измеренному каналу и готовому инвентарю событий."""
+    if f01.x_template_v is None or f01.f1_hz is None:
+        # Шаблона нет: F02 объявлен недоступным, а не подобран по нулям.
+        return compute_f02_amplitude_time_shape(samples, None, (), sample_rate_hz=sample_rate_hz)
     family = recipe.families[_F02_INDEX]
     return compute_f02_amplitude_time_shape(
         samples,
@@ -80,6 +95,26 @@ def _compute_f02(  # noqa: PLR0913, PLR0917 - явные параметры ср
         minimum_event_snr_db=_num(family, "minimum_event_snr_db"),
         residual_fraction_max=_num(family, "residual_fraction_max"),
         maximum_events=int(_num(family, "maximum_events")),
+    )
+
+
+def _compute_f05(
+    samples: Float32Array,
+    phase: PhaseCycles,
+    root_events: RootEvents,
+    recipe: CharacterizationRecipe,
+    cancellation: CancellationToken,
+) -> F05Result:
+    """Моменты фазовых бинов измеренного канала по циклам опорного CH2."""
+    family = recipe.families[_F05_INDEX]
+    return compute_f05_phase_conditioned_statistics(
+        samples,
+        phase,
+        root_events.events,
+        phase_bins=int(_num(family, "phase_bins")),
+        minimum_support_per_bin=int(_num(family, "minimum_support_per_bin")),
+        variance_ddof=int(_num(family, "variance_ddof")),
+        checkpoint=lambda: _checkpoint(cancellation),
     )
 
 
@@ -94,15 +129,16 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
 ) -> AnalysisRunResult:
     """Выполняет characterization поверх ArtifactStore без SessionKind-dispatch.
 
-    Считает F01, затем F02 по его шаблону и корневому инвентарю событий.
+    Считает F01, один общий корневой инвентарь событий, корень фазы по CH2,
+    затем F02 по шаблону F01 и F05 по готовым событиям и циклам.
     Ключ строится из recipe_sha256, sha256_file сырых каналов, явных
     digest tunables и CodeIdentity; повторный прогон возвращает cache_hit.
 
     Предусловие: session_dir содержит читаемый manifest.json — он нужен
-    resolve_clipping внутри F02. Маршрут валидирует сессию через load_session
-    до вызова seam, поэтому отсутствующий манифест сюда не доходит; прямой
-    вызов seam с битым манифестом получит OSError, который маршрут уже
-    переводит в failed-job (`routes_analysis_v2.py:175`).
+    resolve_clipping на шаге корневых событий. Маршрут валидирует сессию через
+    load_session до вызова seam, поэтому отсутствующий манифест сюда не
+    доходит; прямой вызов seam с битым манифестом получит OSError, который
+    маршрут уже переводит в failed-job (`routes_analysis_v2.py:175`).
 
     project_default не вызывается, BranchContext не используется.
     """
@@ -137,11 +173,29 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
         sync_reference=channel_by_name[ref_name],
     )
     _checkpoint(cancellation)
-    f02 = _compute_f02(
-        result, samples, sample_rate_hz, recipe, session_dir, meas_name, cancellation
+    root_events = _root_events(
+        samples, sample_rate_hz, recipe, session_dir, meas_name, cancellation
     )
     _checkpoint(cancellation)
-    bundle, arrays, tables = build_f01_f02_bundle(result, f02, recipe, measured_channel=meas_name)
+    phase = compute_phase_cycles(
+        channel_by_name.get("ch2"),
+        sample_rate_hz=sample_rate_hz,
+        settings=recipe.phase,
+        resources=recipe.resource_limits,
+        checkpoint=lambda: _checkpoint(cancellation),
+    )
+    _checkpoint(cancellation)
+    f02 = _compute_f02(result, samples, sample_rate_hz, recipe, root_events)
+    f05 = _compute_f05(samples, phase, root_events, recipe, cancellation)
+    _checkpoint(cancellation)
+    bundle, arrays, tables = build_f01_f02_f05_bundle(
+        result,
+        f02,
+        f05,
+        recipe,
+        measured_channel=meas_name,
+        record_duration_s=samples.size / sample_rate_hz,
+    )
     files = encode_bundle(
         bundle, arrays, tables, max_artifact_bytes=recipe.resource_limits.max_artifact_bytes
     )

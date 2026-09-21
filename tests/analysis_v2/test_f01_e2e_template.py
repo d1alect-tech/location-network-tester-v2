@@ -24,6 +24,7 @@ _EXAMPLE = Path(__file__).parents[2] / "docs/examples/characterization-recipe-v2
 _FS_HZ = 500000.0
 _DURATION_S = 2.4
 _SEED = 6022
+_F05_INDEX = 4
 
 
 def _recipe() -> CharacterizationRecipe:
@@ -89,7 +90,17 @@ def test_f01_e2e_reference_template_run_read_cache_rehash_raw(tmp_path: Path) ->
     # F02 must have actually run: the placeholder code is what an unimplemented
     # family carries, so its presence here would mean the seam skipped the slice.
     assert f02.reason_codes != ("not_computed",)
-    rest = loaded.bundle.families[2:]
+    f05 = loaded.bundle.families[_F05_INDEX]
+    assert f05.family_id == "f05_phase_conditioned_statistics"
+    assert f05.reason_codes != ("not_computed",)
+    # F05 считает CH1 по циклам CH2, поэтому на эталоне она не заглушка;
+    # заглушками остаётся всё, кроме трёх работающих семейств.
+    rest = tuple(
+        family
+        for index, family in enumerate(loaded.bundle.families)
+        if index not in {0, 1, _F05_INDEX}
+    )
+    assert rest
     assert all(family.status is Status.UNAVAILABLE for family in rest)
     assert all(family.reason_codes == ("not_computed",) for family in rest)
 

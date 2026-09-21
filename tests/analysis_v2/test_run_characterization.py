@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 _EXAMPLE = Path(__file__).parents[2] / "docs/examples/characterization-recipe-v2.json"
 _FS_HZ = 8000.0
+_F05_INDEX = 4
 
 
 def _recipe() -> CharacterizationRecipe:
@@ -93,10 +94,19 @@ def test_publishes_bundle_with_manifest_code_identity(tmp_path: Path) -> None:
     files = {name: (result.artifact_dir / name).read_bytes() for name in OUTPUT_FILENAMES}
     loaded = load_bundle(files)
     assert loaded.bundle.families[0].status is Status.AVAILABLE
-    unavailable = loaded.bundle.families[2:]
-    assert unavailable
-    assert all(family.status is Status.UNAVAILABLE for family in unavailable)
-    assert all(family.reason_codes == ("not_computed",) for family in unavailable)
+    f05 = loaded.bundle.families[_F05_INDEX]
+    assert f05.family_id == "f05_phase_conditioned_statistics"
+    # F05 считается по циклам CH2, поэтому заглушками остаются только
+    # семейства, которые ещё не реализованы.
+    assert f05.reason_codes != ("not_computed",)
+    placeholder = tuple(
+        family
+        for index, family in enumerate(loaded.bundle.families)
+        if index not in {0, 1, _F05_INDEX}
+    )
+    assert placeholder
+    assert all(family.status is Status.UNAVAILABLE for family in placeholder)
+    assert all(family.reason_codes == ("not_computed",) for family in placeholder)
 
 
 def test_seam_publishes_f02_beside_f01(tmp_path: Path) -> None:
