@@ -262,3 +262,39 @@ def test_available_f02_with_reasons_is_rejected() -> None:
     broken = dataclasses.replace(_f02_result(), reason_codes=("below_snr",))
     with pytest.raises(CharacterizationError, match="status_invariant"):
         build_f01_f02_bundle(_f01_result(), broken, _recipe())
+
+
+def _capped_result() -> F02Result:
+    """Два непересекающихся события при maximum_events=1: случай усечённого хвоста."""
+    template = _template()
+    span = _TEMPLATE_SAMPLES
+    rng = np.random.default_rng(6022)
+    record = rng.standard_normal(5 * span) * 0.05
+    delayed = np.zeros(span, dtype=np.float64)
+    delayed[37:] = 1.7 * template[: span - 37]
+    record[span : 2 * span] += delayed
+    record[3 * span : 4 * span] += delayed
+    result = compute_f02_amplitude_time_shape(
+        record,
+        template,
+        (_event(span, 2 * span - 1, ordinal=1), _event(3 * span, 4 * span - 1, ordinal=2)),
+        sample_rate_hz=_FS_HZ,
+        maximum_events=1,
+    )
+    assert result.evaluated_event_count == 1
+    assert result.omitted_event_count == 1
+    return result
+
+
+def test_capped_event_inventory_stays_visible_in_support() -> None:
+    """Усечённый хвост за maximum_events не исчезает из учёта поддержки."""
+    bundle, arrays, _tables = build_f01_f02_bundle(_f01_result(), _capped_result(), _recipe())
+    f02 = bundle.families[1]
+    assert f02.support.sample_count == 2
+    assert f02.support.observation_count == 1
+    assert f02.support.missing_count == 1
+    assert f02.support.stored_count == 1
+    summary = {item.name: item.value for item in f02.comparison_summary}
+    assert summary["f02_event_count"] == 1.0
+    assert summary["f02_omitted_event_count"] == 1.0
+    assert arrays["f02_a"].size == 1

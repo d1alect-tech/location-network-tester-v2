@@ -97,6 +97,13 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
     Считает F01, затем F02 по его шаблону и корневому инвентарю событий.
     Ключ строится из recipe_sha256, sha256_file сырых каналов, явных
     digest tunables и CodeIdentity; повторный прогон возвращает cache_hit.
+
+    Предусловие: session_dir содержит читаемый manifest.json — он нужен
+    resolve_clipping внутри F02. Маршрут валидирует сессию через load_session
+    до вызова seam, поэтому отсутствующий манифест сюда не доходит; прямой
+    вызов seam с битым манифестом получит OSError, который маршрут уже
+    переводит в failed-job (`routes_analysis_v2.py:175`).
+
     project_default не вызывается, BranchContext не используется.
     """
     if len(channels) != len(recipe.channels):

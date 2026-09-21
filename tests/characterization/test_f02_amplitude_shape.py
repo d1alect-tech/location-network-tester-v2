@@ -7,6 +7,7 @@ import pytest
 from numpy.typing import NDArray
 
 from lnt.characterization.event_models import RootEvent
+from lnt.characterization.f01_phase_cycle import compute_f01_phase_cycle
 from lnt.characterization.f02_amplitude_shape import (
     COARSE_DELAY_METHOD,
     DELAY_REFINEMENT,
@@ -143,7 +144,7 @@ def test_overlapping_events_trip_overlapping_events() -> None:
         record, template, (first, second), sample_rate_hz=FS_HZ
     )
     assert "overlapping_events" in result.reason_codes
-    assert result.status is Status.UNAVAILABLE or result.status is not Status.AVAILABLE
+    assert result.status is Status.UNAVAILABLE
     _assert_no_bare_values(result)
 
 
@@ -310,3 +311,28 @@ def test_resample_cycle_template_is_deterministic_and_finite() -> None:
     second = resample_cycle_template(template, f1_hz=50.0, sample_rate_hz=FS_HZ)
     assert np.array_equal(first, second)
     assert np.all(np.isfinite(first))
+
+
+def test_f01_template_grid_is_endpoint_false_on_the_real_producer() -> None:
+    """Допущение resample_cycle_template прибито к выходу F01, не к локальному шаблону.
+
+    ``x_template_v`` — один цикл на сетке ``theta`` с ``endpoint=False``
+    (`f01_phase_cycle.py:191`), поэтому период равен ровно ``size`` точкам, и
+    wrap-around повторяет первый отсчёт. Смена сетки у продюсера молча сдвинула
+    бы каждую задержку F02 на один отсчёт.
+    """
+    n = round(FS_HZ * 3.0)
+    t = np.arange(n, dtype=np.float64) / FS_HZ
+    sync = (6.0 * np.sin(2.0 * np.pi * 50.0 * t + 0.4)).astype(np.float32)
+    result = compute_f01_phase_cycle(sync, sample_rate_hz=FS_HZ, sync_reference=sync)
+    template = result.x_template_v
+    f1_hz = result.f1_hz
+    assert template is not None
+    assert f1_hz is not None
+    # endpoint=True дал бы дубликат точки 2pi: последний отсчёт равен первому.
+    seam = abs(float(template[0] - template[-1]))
+    interior = float(np.max(np.abs(np.diff(template))))
+    assert seam > 0.0
+    assert seam <= interior * 1.5
+    resampled = resample_cycle_template(template, f1_hz=float(f1_hz), sample_rate_hz=FS_HZ)
+    assert resampled.size == round(FS_HZ / float(f1_hz))

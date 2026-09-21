@@ -106,13 +106,20 @@ def _mapped_f02(
     if result.status is Status.PARTIAL and not result.reason_codes:
         raise CharacterizationError("status_invariant", "partial f02 needs reasons")
     fitted = [index for index, value in enumerate(result.amplitudes) if value is not None]
-    total = int(result.evaluated_event_count)
+    evaluated = int(result.evaluated_event_count)
+    omitted = int(result.omitted_event_count)
+    # Полный инвентарь: подогнанные + отвергнутые + усечённый хвост за
+    # maximum_events. Хвост обязан быть виден в учёте поддержки, иначе запись
+    # длиннее капа публикует семейство как полное.
+    population = evaluated + omitted
     observation = len(fitted)
     partial = result.status is Status.PARTIAL
     arrays: dict[str, np.ndarray] = {}
     refs: list[ArrayReference] = []
+    columns: list[np.ndarray] = []
     for array_id, role, unit in _ENTRIES:
         column = _column(result, array_id, fitted)
+        columns.append(column)
         mask_id = f"{array_id}_valid" if partial else None
         if mask_id is not None:
             arrays[mask_id] = np.ones(column.shape, dtype=np.uint8)
@@ -128,12 +135,19 @@ def _mapped_f02(
                 offsets_id=None,
             )
         )
+    # _column фильтрует None независимо по каждому массиву, поэтому несогласованная
+    # F02Result дала бы столбцы разной длины и битый бандл.
+    if len({int(column.size) for column in columns}) != 1:
+        raise CharacterizationError("status_invariant", "f02 arrays must stay aligned")
     support = Support(
-        start_s=0.0, end_s=0.0, duration_s=0.0, sample_count=total,
-        observation_count=observation, missing_count=total - observation,
+        start_s=0.0, end_s=0.0, duration_s=0.0, sample_count=population,
+        observation_count=observation, missing_count=population - observation,
         stored_count=observation, selection_rule="all"
     )  # fmt: skip
     spec = _spec(family, band, measured_channel, result.status, result.reason_codes)
-    summary = (ScalarSummary(name="f02_event_count", value=float(observation), unit=Unit.COUNT),)
+    summary = (
+        ScalarSummary(name="f02_event_count", value=float(observation), unit=Unit.COUNT),
+        ScalarSummary(name="f02_omitted_event_count", value=float(omitted), unit=Unit.COUNT),
+    )
     envelope = family_envelope(spec, support, array_refs=tuple(refs), comparison_summary=summary)
     return envelope, arrays
