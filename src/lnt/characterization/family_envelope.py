@@ -44,6 +44,7 @@ class FamilySpec:
     window: Window
     band: Band
     signal_plane: SignalPlane
+    filter: Filter = NO_FILTER
 
 
 def signal_plane_for(measured_channel: str) -> SignalPlane:
@@ -75,7 +76,7 @@ def family_envelope(
     return FamilyResult(
         family_id=spec.family_id, status=spec.status, reason_codes=spec.reasons,
         method=spec.method, method_version=spec.method_version,
-        units=spec.units, window=spec.window, band=spec.band, filter=NO_FILTER,
+        units=spec.units, window=spec.window, band=spec.band, filter=spec.filter,
         n=support.observation_count, support=support, missing_rule=MISSING_RULE,
         qc=Qc(passed=spec.status is Status.AVAILABLE, reason_codes=spec.reasons),
         signal_plane=spec.signal_plane, inference=Inference(),
