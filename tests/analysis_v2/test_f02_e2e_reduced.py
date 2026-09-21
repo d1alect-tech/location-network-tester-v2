@@ -23,6 +23,7 @@ _REFERENCE_SEED = 6022
 _PULSE_FS_HZ = 8000.0
 _F02_INDEX = 1
 _F05_INDEX = 4
+_F06_INDEX = 5
 
 
 def _recipe() -> CharacterizationRecipe:
@@ -112,10 +113,13 @@ def test_reference_session_publishes_f02_with_cache_and_stable_raw(tmp_path: Pat
     f05 = bundle.families[_F05_INDEX]
     assert f05.family_id == "f05_phase_conditioned_statistics"
     assert f05.reason_codes != ("not_computed",)
+    f06 = bundle.families[_F06_INDEX]
+    assert f06.family_id == "f06_modulation_trajectories"
+    assert f06.reason_codes != ("not_computed",)
     rest = tuple(
         family
         for index, family in enumerate(bundle.families)
-        if index not in {0, _F02_INDEX, _F05_INDEX}
+        if index not in {0, _F02_INDEX, _F05_INDEX, _F06_INDEX}
     )
     assert rest
     assert all(family.status is Status.UNAVAILABLE for family in rest)

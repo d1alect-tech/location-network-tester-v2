@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 _EXAMPLE = Path(__file__).parents[2] / "docs/examples/characterization-recipe-v2.json"
 _FS_HZ = 8000.0
 _F05_INDEX = 4
+_F06_INDEX = 5
 
 
 def _recipe() -> CharacterizationRecipe:
@@ -99,10 +100,13 @@ def test_publishes_bundle_with_manifest_code_identity(tmp_path: Path) -> None:
     # F05 считается по циклам CH2, поэтому заглушками остаются только
     # семейства, которые ещё не реализованы.
     assert f05.reason_codes != ("not_computed",)
+    f06 = loaded.bundle.families[_F06_INDEX]
+    assert f06.family_id == "f06_modulation_trajectories"
+    assert f06.reason_codes != ("not_computed",)
     placeholder = tuple(
         family
         for index, family in enumerate(loaded.bundle.families)
-        if index not in {0, 1, _F05_INDEX}
+        if index not in {0, 1, _F05_INDEX, _F06_INDEX}
     )
     assert placeholder
     assert all(family.status is Status.UNAVAILABLE for family in placeholder)

@@ -19,8 +19,9 @@ from lnt.characterization.f02_amplitude_shape import (
     compute_f02_amplitude_time_shape,
     resample_cycle_template,
 )
-from lnt.characterization.f05_bundle import build_f01_f02_f05_bundle
 from lnt.characterization.f05_phase_stats import compute_f05_phase_conditioned_statistics
+from lnt.characterization.f06_bundle import build_f01_f02_f05_f06_bundle
+from lnt.characterization.f06_modulation import compute_f06_modulation_trajectories
 from lnt.characterization.phase import compute_phase_cycles
 from lnt.manifest import manifest_from_json
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
@@ -36,12 +37,14 @@ if TYPE_CHECKING:
     from lnt.characterization.f01_phase_cycle import F01Result
     from lnt.characterization.f02_amplitude_shape import F02Result
     from lnt.characterization.f05_phase_stats import F05Result
+    from lnt.characterization.f06_modulation import F06Result
     from lnt.characterization.phase import PhaseCycles
 
 __all__ = ["run_characterization"]
 
 _F02_INDEX: Final = 1
 _F05_INDEX: Final = 4
+_F06_INDEX: Final = 5
 
 
 def _num(family: CharacterizationFamily, name: str) -> float:
@@ -118,6 +121,31 @@ def _compute_f05(
     )
 
 
+def _compute_f06(
+    samples: Float32Array,
+    sample_rate_hz: float,
+    recipe: CharacterizationRecipe,
+    cancellation: CancellationToken,
+) -> F06Result:
+    """Траектории огибающей, фазы и мгновенной частоты по объявленной полосе несущей."""
+    family = recipe.families[_F06_INDEX]
+    return compute_f06_modulation_trajectories(
+        samples,
+        sample_rate_hz=sample_rate_hz,
+        band_low_hz=_num(family, "band_low_hz"),
+        band_high_hz=_num(family, "band_high_hz"),
+        nyquist_fraction_max=recipe.stft.nyquist_fraction_max,
+        filter_order=int(_num(family, "filter_order")),
+        minimum_snr_db=_num(family, "minimum_snr_db"),
+        maximum_components_in_band=int(_num(family, "maximum_components_in_band")),
+        phase_increment_max_rad=_num(family, "phase_increment_max_rad"),
+        envelope_zero_fraction_of_median=_num(family, "envelope_zero_fraction_of_median"),
+        maximum_stored_samples=int(_num(family, "maximum_stored_samples")),
+        resources=recipe.resource_limits,
+        checkpoint=lambda: _checkpoint(cancellation),
+    )
+
+
 def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch, параметры явные
     recipe: CharacterizationRecipe,
     session_dir: Path,
@@ -130,7 +158,8 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
     """Выполняет characterization поверх ArtifactStore без SessionKind-dispatch.
 
     Считает F01, один общий корневой инвентарь событий, корень фазы по CH2,
-    затем F02 по шаблону F01 и F05 по готовым событиям и циклам.
+    затем F02 по шаблону F01, F05 по готовым событиям и циклам и F06 по
+    объявленной полосе несущей.
     Ключ строится из recipe_sha256, sha256_file сырых каналов, явных
     digest tunables и CodeIdentity; повторный прогон возвращает cache_hit.
 
@@ -187,13 +216,16 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
     _checkpoint(cancellation)
     f02 = _compute_f02(result, samples, sample_rate_hz, recipe, root_events)
     f05 = _compute_f05(samples, phase, root_events, recipe, cancellation)
+    f06 = _compute_f06(samples, sample_rate_hz, recipe, cancellation)
     _checkpoint(cancellation)
-    bundle, arrays, tables = build_f01_f02_f05_bundle(
+    bundle, arrays, tables = build_f01_f02_f05_f06_bundle(
         result,
         f02,
         f05,
+        f06,
         recipe,
         measured_channel=meas_name,
+        sample_rate_hz=sample_rate_hz,
         record_duration_s=samples.size / sample_rate_hz,
     )
     files = encode_bundle(
