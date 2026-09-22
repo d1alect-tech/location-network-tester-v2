@@ -9,6 +9,13 @@ import numpy as np
 from numpy.typing import NDArray
 
 from lnt.characterization.records import Status
+from lnt.characterization.sync_grid import (
+    CYCLES_PER_WINDOW,
+    complete_window_count,
+    nominal_window_samples,
+    resampled_window,
+    window_start_sample,
+)
 from lnt.harmonics.constants import (
     EPS_LEVEL,
     GRID_SEARCH_HIGH_HZ,
@@ -19,7 +26,6 @@ from lnt.harmonics.constants import (
 METHOD: Final = "synchronous_relative_harmonic_dft"
 WINDOW_S: Final = 0.2
 MIN_WINDOW_COUNT: Final = 12
-CYCLES_PER_WINDOW: Final = 10
 MAXIMUM_HARMONIC_ORDER: Final = 40
 PHASE_RESULTANT_MIN: Final = 0.8
 H1_CONCENTRATION_RATIO_MIN: Final = 0.95
@@ -102,26 +108,6 @@ def estimate_grid_frequency_quinn_fernandes(
     return float(freqs_rect[k] + float(delta.real) * (freqs_rect[1] - freqs_rect[0]))
 
 
-def _resampled_window(
-    signal: Float64Array,
-    fs: float,
-    f1: float,
-    start_sample: int,
-    n_nominal: int,
-) -> Float64Array:
-    """Resample exactly 10 cycles from ``start_sample`` by linear interpolation."""
-    span = CYCLES_PER_WINDOW / f1 * fs
-    source = np.linspace(
-        float(start_sample),
-        float(start_sample) + span,
-        n_nominal,
-        endpoint=False,
-    )
-    clipped = np.clip(source, 0.0, float(signal.size - 1) - 1e-9)
-    indices = np.arange(signal.size, dtype=np.float64)
-    return np.interp(clipped, indices, signal).astype(np.float64)
-
-
 def _assess_window(
     win: Float64Array,
     fs: float,
@@ -165,8 +151,8 @@ def _average_windows(
     for i, f1_i in enumerate(window_f1):
         if f1_i is None:
             continue
-        start = i * n_nominal
-        resampled = _resampled_window(signal, fs, f1_global, start, n_nominal)
+        start = window_start_sample(i, n_nominal)
+        resampled = resampled_window(signal, fs, f1_global, start, n_nominal)
         spec = np.fft.rfft(resampled)
         c_k = (2.0 / n_nominal) * spec[10 * orders]
         phi_rel = np.angle(spec[10 * orders]) - orders * np.angle(spec[10])
@@ -221,8 +207,8 @@ def compute_f01_phase_cycle(
         return _unavailable(("no_sync_reference",), 0, 0)
     signal = np.asarray(samples, dtype=np.float64)
     fs = float(sample_rate_hz)
-    n_nominal = round(WINDOW_S * fs)
-    total = int(np.floor(float(signal.size) / float(n_nominal)))
+    n_nominal = nominal_window_samples(WINDOW_S, fs)
+    total = complete_window_count(int(signal.size), n_nominal)
     if total < MIN_WINDOW_COUNT:
         return _unavailable(("window_too_short",), total, 0)
 
@@ -230,7 +216,7 @@ def compute_f01_phase_cycle(
     grid_unstable = 0
     fundamental_absent = 0
     for i in range(total):
-        start = i * n_nominal
+        start = window_start_sample(i, n_nominal)
         f1, unstable, absent = _assess_window(signal[start : start + n_nominal], fs)
         if absent or f1 is None:
             fundamental_absent += 1
