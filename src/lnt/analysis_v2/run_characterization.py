@@ -26,6 +26,7 @@ from .characterization_slices import (
     _compute_f06,
     _root_events,
 )
+from .characterization_slices_extended import _compute_f07
 from .types import AnalysisRunResult, Float32Array
 
 __all__ = ["run_characterization"]
@@ -45,7 +46,7 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
     Считает F01, один общий корневой инвентарь событий, корень фазы по CH2,
     затем F02 по шаблону F01, F03 по сетке F01, F05 по готовым событиям
     и циклам, F06 по объявленной полосе несущей и F04 по корням фазы
-    и несущей F06.
+    и несущей F06, F07 по ведущему кадру записи.
     Ключ строится из recipe_sha256, sha256_file сырых каналов, явных
     digest tunables и CodeIdentity; повторный прогон возвращает cache_hit.
 
@@ -110,6 +111,7 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
         session_dir,
         cancellation,
     )
+    f07 = _compute_f07(result, samples, sample_rate_hz, recipe, cancellation)
     _checkpoint(cancellation)
     bundle, arrays, tables = build_characterization_bundle(
         result,
@@ -118,6 +120,7 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
         f04,
         f05,
         f06,
+        f07,
         recipe,
         measured_channel=meas_name,
         sample_rate_hz=sample_rate_hz,

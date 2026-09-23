@@ -1,4 +1,4 @@
-"""Characterization bundle assembly: mapped F03 and F04 beside F01, F02, F05, F06."""
+"""Characterization bundle assembly: mapped F03, F04 and F07 beside F01, F02, F05, F06."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from lnt.characterization.errors import CharacterizationError
 from lnt.characterization.f03_bundle import F03_ID, F03_INDEX, build_f03_family
 from lnt.characterization.f04_bundle import F04_ID, F04_INDEX, build_f04_family
 from lnt.characterization.f06_bundle import build_f01_f02_f05_f06_bundle
+from lnt.characterization.f07_bundle import F07_ID, F07_INDEX, build_f07_family
 from lnt.characterization.models import CharacterizationBundle
 from lnt.characterization.records import Band
 
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
     from lnt.characterization.f04_periodicity import F04Result
     from lnt.characterization.f05_phase_stats import F05Result
     from lnt.characterization.f06_modulation import F06Result
+    from lnt.characterization.f07_result import F07Result
     from lnt.characterization.tables import TableBlock
 
 
@@ -32,20 +34,24 @@ def build_characterization_bundle(  # noqa: PLR0913, PLR0917 - рецепт, к�
     f04_result: F04Result,
     f05_result: F05Result,
     f06_result: F06Result,
+    f07_result: F07Result,
     recipe: CharacterizationRecipe,
     *,
     measured_channel: str = "ch1",
     sample_rate_hz: float,
     record_duration_s: float,
 ) -> tuple[CharacterizationBundle, dict[str, np.ndarray], dict[str, TableBlock]]:
-    """Assemble mapped F03 and F04 beside F01, F02, F05, F06 and ten placeholders."""
+    """Assemble mapped F03, F04 and F07 beside F01, F02, F05, F06 and nine placeholders."""
     families = recipe.families
     if (
-        len(families) <= F04_INDEX
+        len(families) <= F07_INDEX
         or families[F03_INDEX].id != F03_ID
         or families[F04_INDEX].id != F04_ID
+        or families[F07_INDEX].id != F07_ID
     ):
-        raise CharacterizationError("family_order", "recipe must declare f03 third and f04 fourth")
+        raise CharacterizationError(
+            "family_order", "recipe must declare f03 third, f04 fourth and f07 seventh"
+        )
     previous, arrays, tables = build_f01_f02_f05_f06_bundle(
         f01_result,
         f02_result,
@@ -71,15 +77,25 @@ def build_characterization_bundle(  # noqa: PLR0913, PLR0917 - рецепт, к�
         measured_channel=measured_channel,
         record_duration_s=float(record_duration_s),
     )
+    f07_family, f07_arrays = build_f07_family(
+        f07_result,
+        families[F07_INDEX],
+        band,
+        measured_channel=measured_channel,
+        record_duration_s=float(record_duration_s),
+        sample_rate_hz=float(sample_rate_hz),
+    )
     bundle = CharacterizationBundle(
         families=(
             *previous.families[:F03_INDEX],
             f03_family,
             f04_family,
-            *previous.families[F04_INDEX + 1 :],
+            *previous.families[F04_INDEX + 1 : F07_INDEX],
+            f07_family,
+            *previous.families[F07_INDEX + 1 :],
         )
     )
-    return bundle, {**arrays, **f03_arrays, **f04_arrays}, dict(tables)
+    return bundle, {**arrays, **f03_arrays, **f04_arrays, **f07_arrays}, dict(tables)
 
 
 def _window_s(family: CharacterizationFamily) -> float:
