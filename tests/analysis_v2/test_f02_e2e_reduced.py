@@ -26,6 +26,7 @@ _F03_INDEX = 2
 _F04_INDEX = 3
 _F05_INDEX = 4
 _F06_INDEX = 5
+_F07_INDEX = 6
 
 
 def _recipe() -> CharacterizationRecipe:
@@ -124,10 +125,22 @@ def test_reference_session_publishes_f02_with_cache_and_stable_raw(tmp_path: Pat
     f04 = bundle.families[_F04_INDEX]
     assert f04.family_id == "f04_multicycle_periodicity"
     assert f04.reason_codes != ("not_computed",)
+    f07 = bundle.families[_F07_INDEX]
+    assert f07.family_id == "f07_comb_sideband_cepstrum"
+    assert f07.reason_codes != ("not_computed",)
     rest = tuple(
         family
         for index, family in enumerate(bundle.families)
-        if index not in {0, _F02_INDEX, _F03_INDEX, _F04_INDEX, _F05_INDEX, _F06_INDEX}
+        if index
+        not in {
+            0,
+            _F02_INDEX,
+            _F03_INDEX,
+            _F04_INDEX,
+            _F05_INDEX,
+            _F06_INDEX,
+            _F07_INDEX,
+        }
     )
     assert rest
     assert all(family.status is Status.UNAVAILABLE for family in rest)

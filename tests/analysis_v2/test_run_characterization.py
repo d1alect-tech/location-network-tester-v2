@@ -26,6 +26,7 @@ _F03_INDEX = 2
 _F04_INDEX = 3
 _F05_INDEX = 4
 _F06_INDEX = 5
+_F07_INDEX = 6
 
 
 def _recipe() -> CharacterizationRecipe:
@@ -111,10 +112,13 @@ def test_publishes_bundle_with_manifest_code_identity(tmp_path: Path) -> None:
     f04 = loaded.bundle.families[_F04_INDEX]
     assert f04.family_id == "f04_multicycle_periodicity"
     assert f04.reason_codes != ("not_computed",)
+    f07 = loaded.bundle.families[_F07_INDEX]
+    assert f07.family_id == "f07_comb_sideband_cepstrum"
+    assert f07.reason_codes != ("not_computed",)
     placeholder = tuple(
         family
         for index, family in enumerate(loaded.bundle.families)
-        if index not in {0, 1, _F03_INDEX, _F04_INDEX, _F05_INDEX, _F06_INDEX}
+        if index not in {0, 1, _F03_INDEX, _F04_INDEX, _F05_INDEX, _F06_INDEX, _F07_INDEX}
     )
     assert placeholder
     assert all(family.status is Status.UNAVAILABLE for family in placeholder)
