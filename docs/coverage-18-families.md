@@ -1,15 +1,19 @@
 # Покрытие 18 семейств дескрипторов (characterization program)
 
-Статус: Wave 5 todos 14–15 — F01–F06 реализованы end-to-end, остальные 12 — `not_computed`.
-Реализовано семейств: 6/18 (F01 `synchronous_relative_harmonic_dft`, F02
+Статус: Wave 5 закрыт (todos 14–16) — F01–F07 реализованы end-to-end, остальные 11 — `not_computed`.
+Реализовано семейств: 7/18 (F01 `synchronous_relative_harmonic_dft`, F02
 `template_gain_delay_least_squares`, F03 `synchronous_bin_nearest_neighbor_tracks`,
 F04 `overlapping_allan_deviation_and_cycle_autocorrelation`, F05
-`uniform_phase_bin_moments` и F06 `butterworth_hilbert_analytic_trajectory`
+`uniform_phase_bin_moments`, F06 `butterworth_hilbert_analytic_trajectory` и F07
+`two_window_real_cepstrum_and_sideband_symmetry`
 через один `run_characterization` seam + бандл 18 + API/UI).
 Seam считает F03 по сетке F01 и F04 по корням фазы и несущей F06
 (`characterization_slices.py` — вычисления семейств вынесены из
 `run_characterization.py` ради лимита 250 LOC); композер
-`characterization_bundle.py` сплайсит индексы 2–3 поверх цепочки F01/F02/F05/F06.
+`characterization_bundle.py` сплайсит индексы 2, 3 и 6 поверх цепочки
+F01/F02/F05/F06. Модуль слайсов упёрся в лимит на седьмом семействе, поэтому
+F07 и следующие семейства считаются в ``characterization_slices_extended.py``
+(общие читатели рецепта переиспользуются импортом).
 Готовы 8 shared-корней (`src/lnt/characterization/shared.py:64`); корневые события
 считаются в seam один раз и обслуживают оба семейства, читающие события (F02, F05).
 E2E-шаблон: `tests/analysis_v2/test_f01_e2e_template.py` (эталон `simulate_session(profile=bad, 500 кГц, 2.4 с, seed 6022)`, `dirname == session_id`; прогон → чтение бандла → cache-hit → recipe-change ⇒ новый ключ → raw-хеши неизменны; переиспользовать для Phase 2+). На эталоне CH1 F01 PARTIAL (`grid_unstable`, `phase_unstable`) — ожидаемо: CH1 — иголки без несущей 50 Гц; AVAILABLE требует analytic-синтетика (`tests/characterization/test_f01_phase_cycle.py`). fs-матрица: 500 кГц — эталон, 8 МГц — declared codes halo-семейств (`.omo/evidence/task-3-characterization-18-families.md:68-89`).
@@ -153,6 +157,38 @@ F04-3 — первое различие дало бы неверный `tau0` п
 AVAILABLE, отношение 600 в 1e-3, слип < 0,01 цикла, АКФ конечна (нули при
 нулевой дисперсии); два тона — PARTIAL `carrier_unavailable` с опубликованным
 путём сети.
+
+F07 (`two_window_real_cepstrum_and_sideband_symmetry`; гейты из
+`docs/examples/characterization-recipe-v2.json:122-132`: `fft_samples=16384`,
+окна Hann и Blackman (залочены), пол `20 dB` ниже максимума, минимальное
+квефренси `2` отсчёта, смещения боковых `{1..5}` бинов, кроссчек
+`magnitude_spectrum_autocorrelation` (залочен), допуск сдвига пика `1` бин)
+считает вещественный кепстр ведущего кадра `c[q] = Re(IFFT(log|X| - mean))`
+с полом как объявленной долей `max|X|`, извлекает квефренси `q*` и шаг
+`df = fs/q*`, а также агрегирует асимметрию боковых полос вокруг несущей `k0`
+(сильнейший не-DC бин). Семейство скалярное: массивов нет, величины едут
+сводками `comparison_summary` (`f07_df_hz`, `f07_sym_db`, `f07_q_s`,
+`f07_quefrency_amplitude`, `f07_carrier_bin`), окно `kind="fixed"` длиной
+`fft_samples/fs`. Сводка публикуется только при живом поле: пустая агрегация
+боковых оставляет семейство AVAILABLE без `f07_sym_db`, потому что боковые —
+не первичная величина.
+Двухоконный протокол бракует пик, сдвинувшийся между Hann и Blackman
+(`window_dependent`); гребёнка сети опознаётся сравнением `q*` с `round(fs/f1)`
+(`harmonic_comb_only`); шаг на границе разрешения бана (двухбиновый запас) —
+`below_resolution`; смена пола на объявленные 40 дБ — `log_floor_unstable`.
+Открытые пробелы, требующие решения владельца: числовой порог
+`no_dominant_quefrency` спека не задаёт (принято отношение пика к 99-му
+процентилю зоны поиска, порог 10 — замеренный на прототипе, не выведенный);
+операционализация `log_floor_unstable` взята из анекдота спеки про 40 дБ.
+Замеренная граница положительного пути: пик модуляции доминирует в кепстре
+только пока гребёнка сети его не перебивает — при уровне сети `3e-3` В
+импульсная гребёнка `T=100` даёт AVAILABLE с `df=80` Гц (`= fs/T`), при `8e-3` В
+тот же сигнал уже `window_dependent`. Это свойство метода, а не дефект:
+F01 оценивает `f1` из измеренного канала, поэтому сеть в кадре обязательна, и её
+собственная гребёнка конкурирует с модуляционной. E2E
+`tests/analysis_v2/test_f07_e2e_reduced.py` закрепляет обе стороны: AVAILABLE
+с `q_s = T/fs` и согласованным `df = 1/q_s`, и отказ `harmonic_comb_only` на
+чистой гармонической гребёнке сети.
 
 Метод F01 `synchronous_relative_harmonic_dft` зафиксирован (`src/lnt/analysis_store/characterization_contract.py:13-17`):
 окно 0,2 с, минимум 12 окон, Hmax 40, Rmin 0,8, H1 ratio ≥ 0,95.
