@@ -1,10 +1,15 @@
 # Покрытие 18 семейств дескрипторов (characterization program)
 
-Статус: Wave 5 todo 13 — F01, F02, F05 и F06 реализованы end-to-end, остальные 14 — `not_computed`.
-Реализовано семейств: 4/18 (F01 `synchronous_relative_harmonic_dft`, F02
-`template_gain_delay_least_squares`, F05 `uniform_phase_bin_moments` и F06
-`butterworth_hilbert_analytic_trajectory` через один `run_characterization` seam
-+ бандл 18 + API/UI).
+Статус: Wave 5 todos 14–15 — F01–F06 реализованы end-to-end, остальные 12 — `not_computed`.
+Реализовано семейств: 6/18 (F01 `synchronous_relative_harmonic_dft`, F02
+`template_gain_delay_least_squares`, F03 `synchronous_bin_nearest_neighbor_tracks`,
+F04 `overlapping_allan_deviation_and_cycle_autocorrelation`, F05
+`uniform_phase_bin_moments` и F06 `butterworth_hilbert_analytic_trajectory`
+через один `run_characterization` seam + бандл 18 + API/UI).
+Seam считает F03 по сетке F01 и F04 по корням фазы и несущей F06
+(`characterization_slices.py` — вычисления семейств вынесены из
+`run_characterization.py` ради лимита 250 LOC); композер
+`characterization_bundle.py` сплайсит индексы 2–3 поверх цепочки F01/F02/F05/F06.
 Готовы 8 shared-корней (`src/lnt/characterization/shared.py:64`); корневые события
 считаются в seam один раз и обслуживают оба семейства, читающие события (F02, F05).
 E2E-шаблон: `tests/analysis_v2/test_f01_e2e_template.py` (эталон `simulate_session(profile=bad, 500 кГц, 2.4 с, seed 6022)`, `dirname == session_id`; прогон → чтение бандла → cache-hit → recipe-change ⇒ новый ключ → raw-хеши неизменны; переиспользовать для Phase 2+). На эталоне CH1 F01 PARTIAL (`grid_unstable`, `phase_unstable`) — ожидаемо: CH1 — иголки без несущей 50 Гц; AVAILABLE требует analytic-синтетика (`tests/characterization/test_f01_phase_cycle.py`). fs-матрица: 500 кГц — эталон, 8 МГц — declared codes halo-семейств (`.omo/evidence/task-3-characterization-18-families.md:68-89`).
@@ -104,6 +109,50 @@ E2E: `tests/analysis_v2/test_f06_e2e_reduced.py` — AM 30 кГц с глуби�
 мгновенная частота на несущей, фаза монотонна, позиции хранимых отсчётов
 восстановлены из опубликованной поддержки; второй тест доводит отказ
 `multiple_components` (два тона 20 и 32 кГц) до артефакта без массивов.
+
+F03 (`synchronous_bin_nearest_neighbor_tracks`; гейты из
+`docs/examples/characterization-recipe-v2.json:69-81`: окно 0,2 с, бин 5 Гц,
+допуск 2 бина, порог 6 дБ, медиана 11 бинов, жизнь ≥3 окон, субпорядки {2,3,4},
+`gap_interpolation="none"` залочено, треков ≤4096) собирает треки линий IHG и
+субгармоник на сетке F01 трекером ближайшего соседа. Сетка берётся из
+`F01Result` целиком (читается только `f1_hz`); окно ресэмплируется общим
+`sync_grid.py` (вынесен из F01 отдельным коммитом, поведение F01 не менялось).
+Группа трекера квантуется измеренным бином `f1/10`, а не допуском ассоциации:
+граница кванта по допуску легла ровно на 125 Гц и рвала трек на 5 кусков
+(замерено 4+4 окна вместо 12). Публикация трека — медианы центра/амплитуды/
+ширины, жизнь = число окон × `window_s`; капс детерминирован (дольше живущие,
+тай-брейк по центру). Учёт по образцу F02: `sample_count` — кандидаты,
+`observation_count` — опубликованные, `missing_count` — разница (уточнение F03-15:
+оконные пропуски внутрь `missing_count` не складываются — Support требует
+`sample == observation + missing`, пропуски живут только в массиве
+`windows_missing`). Окно `kind="fixed"`, массивов шесть, единицы
+`(HZ, V, S, COUNT)`, сводки `f03_track_count`/`f03_omitted_track_count`.
+E2E: `tests/analysis_v2/test_f03_e2e_reduced.py` — тон 0,5 В на 125 Гц (k=25)
+при сети 50 Гц даёт AVAILABLE с треком на RMS `0.5/sqrt(2)`; чистые 50 Гц —
+UNAVAILABLE `peak_not_observed` без массивов. Замерено на сеансовом пути
+(float32): детерминированные квантовые шпоры тоже ассоциируются в треки
+(40 вместо 1) — движковые тесты на float64 этого не видели; E2E проверяет
+совпадение объявленного тона. Открытый пункт: чувствительность детектора
+к численным шпорам (пол `RMS_FLOOR_V = EPS_LEVEL` их не режет).
+
+F04 (`overlapping_allan_deviation_and_cycle_autocorrelation`; гейты из
+`docs/examples/characterization-recipe-v2.json:83-93`: `base_interval="one_cycle"`,
+`m={1,2,4,8,16,32}`, доля ≤1/3, циклов ≥100, несущая из F06, SNR ≥10 дБ, лаги
+1..32) считает перекрывающуюся ADEV сети и несущей и АКФ длительностей циклов.
+Путь (b) «сеть»: границы из готового `PhaseCycles`, `f0` — номинал манифеста,
+`y=(f−f0)/f0` (расхождение с буквальным текстом спеки:215-216 зафиксировано как
+F04-3 — первое различие дало бы неверный `tau0` при пропущенных циклах).
+Путь (a) «несущая»: средняя частота F06 по хранимым отсчётам внутри каждого
+цикла сети (развёрнутая фаза F06 непригодна — между хранимыми отсчётами ≈111
+рад); цикл без отсчётов — отказ без интерполяции. ADEV дословно по спеке:218-220.
+Сетки разной длины (tau vs лаги), поэтому маски — на каждый массив (идиома F02,
+не общая маска F05). Массивов пять (`adev_carrier` отсутствует при `None`),
+единицы `(S, RATIO, COUNT)`, окно `kind="record"`, сводки `f04_phase_slip_cycles`
+и `f04_carrier_to_mains_ratio` только при значениях не-None. E2E:
+`tests/analysis_v2/test_f04_e2e_reduced.py` — AM 30 кГц на 500 кГц/2,4 с даёт
+AVAILABLE, отношение 600 в 1e-3, слип < 0,01 цикла, АКФ конечна (нули при
+нулевой дисперсии); два тона — PARTIAL `carrier_unavailable` с опубликованным
+путём сети.
 
 Метод F01 `synchronous_relative_harmonic_dft` зафиксирован (`src/lnt/analysis_store/characterization_contract.py:13-17`):
 окно 0,2 с, минимум 12 окон, Hmax 40, Rmin 0,8, H1 ratio ≥ 0,95.
