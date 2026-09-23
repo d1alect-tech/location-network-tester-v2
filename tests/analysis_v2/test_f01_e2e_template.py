@@ -24,6 +24,8 @@ _EXAMPLE = Path(__file__).parents[2] / "docs/examples/characterization-recipe-v2
 _FS_HZ = 500000.0
 _DURATION_S = 2.4
 _SEED = 6022
+_F03_INDEX = 2
+_F04_INDEX = 3
 _F05_INDEX = 4
 _F06_INDEX = 5
 
@@ -97,12 +99,18 @@ def test_f01_e2e_reference_template_run_read_cache_rehash_raw(tmp_path: Path) ->
     f06 = loaded.bundle.families[_F06_INDEX]
     assert f06.family_id == "f06_modulation_trajectories"
     assert f06.reason_codes != ("not_computed",)
+    f03 = loaded.bundle.families[_F03_INDEX]
+    assert f03.family_id == "f03_interharmonic_tracking"
+    assert f03.reason_codes != ("not_computed",)
+    f04 = loaded.bundle.families[_F04_INDEX]
+    assert f04.family_id == "f04_multicycle_periodicity"
+    assert f04.reason_codes != ("not_computed",)
     # F05 считает CH1 по циклам CH2, поэтому на эталоне она не заглушка;
-    # заглушками остаётся всё, кроме четырёх работающих семейств.
+    # заглушками остаётся всё, кроме шести работающих семейств.
     rest = tuple(
         family
         for index, family in enumerate(loaded.bundle.families)
-        if index not in {0, 1, _F05_INDEX, _F06_INDEX}
+        if index not in {0, 1, _F03_INDEX, _F04_INDEX, _F05_INDEX, _F06_INDEX}
     )
     assert rest
     assert all(family.status is Status.UNAVAILABLE for family in rest)
