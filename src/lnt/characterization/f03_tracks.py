@@ -147,6 +147,9 @@ def _publish(
     status: Status,
 ) -> F03Result:
     """Опубликованные треки в порядке центров; учёт по образцу F02 (F03-15)."""
+    # Пропуски окон живут только в массиве windows_missing: Support требует
+    # sample == observation + missing, поэтому missing это разница кандидатов
+    # и опубликованных, без сложения оконных пропусков.
     centers_out = np.asarray([item[0] for item in stored], dtype=np.float64)
     order = np.argsort(centers_out, kind="stable")
     final = [stored[i] for i in order]
@@ -164,7 +167,7 @@ def _publish(
         omitted_track_count=int(candidates - len(stored)),
         sample_count=int(candidates),
         observation_count=len(stored),
-        missing_count=int(candidates - len(stored) + sum(item[5] for item in stored)),
+        missing_count=int(candidates - len(stored)),
         stored_count=len(stored),
     )
 
