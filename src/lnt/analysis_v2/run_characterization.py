@@ -18,6 +18,7 @@ from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 from .artifact_inputs import characterization_inputs
 from .characterization_slices import (
     _checkpoint,
+    _clipping_for,
     _compute_f01,
     _compute_f02,
     _compute_f03,
@@ -25,6 +26,7 @@ from .characterization_slices import (
     _compute_f05,
     _compute_f06,
     _root_events,
+    _session_manifest,
 )
 from .characterization_slices_extended import _compute_f07
 from .types import AnalysisRunResult, Float32Array
@@ -83,11 +85,11 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
     ref_name = recipe.phase.reference_channel
     meas_name = next(name for name in recipe.channels if name != ref_name)
     samples = channel_by_name[meas_name]
+    manifest = _session_manifest(session_dir)
+    clipping = _clipping_for(manifest, meas_name, recipe)
     result = _compute_f01(samples, channel_by_name[ref_name], sample_rate_hz)
     _checkpoint(cancellation)
-    root_events = _root_events(
-        samples, sample_rate_hz, recipe, session_dir, meas_name, cancellation
-    )
+    root_events = _root_events(samples, sample_rate_hz, recipe, clipping, cancellation)
     _checkpoint(cancellation)
     phase = compute_phase_cycles(
         channel_by_name.get("ch2"),
@@ -108,7 +110,7 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
         f06,
         sample_rate_hz,
         recipe,
-        session_dir,
+        manifest,
         cancellation,
     )
     f07 = _compute_f07(result, samples, sample_rate_hz, recipe, cancellation)

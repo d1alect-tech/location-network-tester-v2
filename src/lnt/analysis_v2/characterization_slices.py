@@ -25,7 +25,7 @@ from .types import AnalysisCancelledError, Float32Array
 if TYPE_CHECKING:
     from lnt.analysis_store import CharacterizationRecipe
     from lnt.analysis_store.characterization_family import CharacterizationFamily
-    from lnt.characterization.clipping import ChannelName
+    from lnt.characterization.clipping import ChannelName, ClippingBounds
     from lnt.characterization.event_models import RootEvents
     from lnt.characterization.f01_phase_cycle import F01Result
     from lnt.characterization.f02_amplitude_shape import F02Result
@@ -35,9 +35,11 @@ if TYPE_CHECKING:
     from lnt.characterization.f06_modulation import F06Result
     from lnt.characterization.phase import PhaseCycles
     from lnt.scope_io import CancellationToken
+    from lnt.types import SessionManifest
 
 __all__ = [
     "_checkpoint",
+    "_clipping_for",
     "_compute_f01",
     "_compute_f02",
     "_compute_f03",
@@ -47,6 +49,7 @@ __all__ = [
     "_int_tuple",
     "_num",
     "_root_events",
+    "_session_manifest",
 ]
 
 _F02_INDEX: Final = 1
@@ -82,21 +85,14 @@ def _checkpoint(cancellation: CancellationToken) -> None:
         raise AnalysisCancelledError("characterization")
 
 
-def _root_events(  # noqa: PLR0913, PLR0917 - явные параметры среза, без скрытого контекста
+def _root_events(
     samples: Float32Array,
     sample_rate_hz: float,
     recipe: CharacterizationRecipe,
-    session_dir: Path,
-    measured_name: str,
+    clipping: ClippingBounds,
     cancellation: CancellationToken,
 ) -> RootEvents:
     """Инвентарь корневых событий: один расчёт на оба семейства, читающие события."""
-    manifest = manifest_from_json((session_dir / MANIFEST_FILENAME).read_text(encoding="utf-8"))
-    clipping = resolve_clipping(
-        manifest,
-        cast("ChannelName", measured_name),
-        recipe.events.clipping_fraction_of_range,
-    )
     _checkpoint(cancellation)
     return compute_root_events(
         samples,
@@ -104,6 +100,29 @@ def _root_events(  # noqa: PLR0913, PLR0917 - явные параметры ср
         recipe=recipe,
         clipping=clipping,
         checkpoint=lambda: _checkpoint(cancellation),
+    )
+
+
+def _session_manifest(session_dir: Path) -> SessionManifest:
+    """Манифест сессии: один парсинг на все семейства, которым нужны его поля."""
+    return manifest_from_json((session_dir / MANIFEST_FILENAME).read_text(encoding="utf-8"))
+
+
+def _clipping_for(
+    manifest: SessionManifest,
+    measured_name: str,
+    recipe: CharacterizationRecipe,
+) -> ClippingBounds:
+    """Границы клиппирования измеренного канала: один расчёт на все семейства.
+
+    Вынесено из ``_root_events``, потому что границы нужны не только инвентарю
+    событий: F10 исключает клипированные интервалы (спека F10:57). Манифест
+    приходит готовым, чтобы второй парсинг не завёл второй источник истины.
+    """
+    return resolve_clipping(
+        manifest,
+        cast("ChannelName", measured_name),
+        recipe.events.clipping_fraction_of_range,
     )
 
 
@@ -177,14 +196,13 @@ def _compute_f04(  # noqa: PLR0913, PLR0917 - явные параметры ср
     f06: F06Result,
     sample_rate_hz: float,
     recipe: CharacterizationRecipe,
-    session_dir: Path,
+    manifest: SessionManifest,
     cancellation: CancellationToken,
 ) -> F04Result:
     """ADEV сети и несущей и АКФ циклов по корням фазы и траектории F06."""
     family = recipe.families[_F04_INDEX]
     if family.value("carrier_source_family_id") != "f06_modulation_trajectories":
         raise CharacterizationError("status_invariant", "f04 carrier must come from f06")
-    manifest = manifest_from_json((session_dir / MANIFEST_FILENAME).read_text(encoding="utf-8"))
     return compute_f04_multicycle_periodicity(
         mains,
         sample_rate_hz=sample_rate_hz,
