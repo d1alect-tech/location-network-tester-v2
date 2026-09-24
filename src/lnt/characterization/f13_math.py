@@ -45,7 +45,13 @@ def declared_lag_samples(
         return np.zeros(1, dtype=np.int64)
     span = min(-lower, upper)
     decimation = max(1, math.ceil((2 * span + 1) / (maximum_points - 1)))
-    reach = min(span // decimation, (maximum_points - 1) // 2)
+    # Шаг обязан ДЕЛИТЬ span, иначе сетка не достигнет объявленных границ: при
+    # floor-делении на 51 250 Гц получалось ±0.019980 с вместо ±0.02 с, на 5 МГц —
+    # ±0.019992 с. Поиск идёт вверх от минимума и всегда завершается делителем
+    # `span` (он делит сам себя), поэтому цикл ограничен `span` итерациями.
+    while span % decimation:
+        decimation += 1
+    reach = span // decimation
     return np.arange(-reach, reach + 1, dtype=np.int64) * decimation
 
 

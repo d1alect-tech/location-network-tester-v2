@@ -332,6 +332,23 @@ def test_lag_grid_keeps_sample_spacing_when_the_range_fits_the_cap() -> None:
     assert np.all(np.diff(lags) == 1)
 
 
+def test_lag_grid_reaches_declared_endpoints_at_awkward_rates() -> None:
+    """Прореживание обязано ДОХОДИТЬ до объявленных границ, а не обрезаться на шаг.
+
+    При шаге, не делящем полупролёт, floor-деление давало ±0.019980 с на 51 250 Гц и
+    ±0.019992 с на 5 МГц. Сетка измеряет фазовую задержку между полосами, поэтому
+    усечение края — это потеря объявленного диапазона, пусть и малая.
+    """
+    for rate in (51_250.0, 5_000_000.0, 48_000_000.0):
+        lags = declared_lag_samples(-0.02, 0.02, rate, 2_049)
+
+        assert lags.size <= 2_049, rate
+        assert int(lags[-1]) / rate == 0.02, rate
+        assert int(lags[0]) / rate == -0.02, rate
+        assert np.all(np.diff(lags) == int(np.diff(lags)[0])), rate
+        assert 0 in {int(value) for value in lags}, rate
+
+
 def test_lag_peak_tie_prefers_smallest_absolute_then_negative() -> None:
     """Locked tie-break разрешает ничью по abs корреляции без данных о фазе."""
     lags = np.asarray((-2, -1, 0, 1), dtype=np.int64)
