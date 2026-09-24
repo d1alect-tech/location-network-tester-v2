@@ -159,9 +159,61 @@ def test_f15_adapter_expands_retained_rows_to_complete_window_labels() -> None:
     assert assign_mode(model, 79 * 20) == source.window_labels[79]
     assert assign_mode(model, 80 * 20) is None
     assert source.canonical_standardized_features == tuple(
-        tuple(float(value) for value in f15.standardized_features[int(index)])
-        for index in f15.medoid_indices
+        tuple(float(value) for value in f15.standardized_features[_row_of(f15, int(window))])
+        for window in f15.medoid_indices
     )
+
+
+def _row_of(result: F15Result, window_index: int) -> int:
+    """Номер компактной строки F15 по индексу окна полной сетки."""
+    rows = {int(window): row for row, window in enumerate(result.window_indices)}
+    return rows[window_index]
+
+
+def _f15_result_high_indices() -> F15Result:
+    """F15, сохранивший только окна 80..159: индекс сетки больше номера строки."""
+    centres = np.asarray(
+        [
+            (0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0),
+            (1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0),
+            (2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0),
+            (3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0),
+        ],
+        dtype=np.float64,
+    )
+    return fit_f15_pam(
+        np.tile(centres, (20, 1)),
+        np.arange(80, 160, dtype=np.int64),
+        settings=F15Settings.locked(),
+        source_window_count=160,
+    )
+
+
+def test_adapter_maps_medoid_grid_indices_onto_compact_retained_rows() -> None:
+    """Given retained windows late in the grid, medoid indices must not index the row matrix.
+
+    `F15Result.medoid_indices` holds COMPLETE-GRID window indices while
+    `standardized_features` holds only the retained rows. When qualification drops
+    early windows the two numbering spaces diverge, and indexing rows by a grid
+    index raises `IndexError` on real profiles such as `async-heavy`. This pins the
+    mapping through `window_indices` instead.
+    """
+    f15 = _f15_result_high_indices()
+    retained = f15.standardized_features.shape[0]
+    assert retained == 80
+    assert int(f15.medoid_indices.min()) >= retained, "fixture must diverge from row numbering"
+
+    source = build_f15_mode_source(
+        f15, sample_count=160 * 20, sample_rate_hz=_FS_HZ, overlap_fraction=0.0
+    )
+
+    assert source.canonical_standardized_features == tuple(
+        tuple(float(value) for value in f15.standardized_features[_row_of(f15, int(window))])
+        for window in f15.medoid_indices
+    )
+    assert len(source.window_labels) == 160
+    assert source.window_labels[:80] == (None,) * 80
+    assert source.window_labels[159] == f"mode_{int(f15.labels[-1])}"
 
 
 def test_event_adapter_preserves_root_fields_and_accounts_for_gaps() -> None:

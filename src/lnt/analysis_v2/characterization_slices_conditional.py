@@ -48,6 +48,17 @@ def build_f15_mode_source(
         if not 0 <= window_index < total:
             raise ValueError("F15 retained window is outside the complete window grid")
         labels[window_index] = f"mode_{int(label)}"
+    # `medoid_indices` — индексы ПОЛНОЙ сетки окон, а `standardized_features` —
+    # компактные строки сохранённых окон, где строка `i` принадлежит сетке
+    # `window_indices[i]`. Индексировать строки индексом сетки нельзя: когда часть
+    # окон не квалифицировалась, строк меньше, чем максимальный индекс медиоида.
+    rows_by_window = {int(window): row for row, window in enumerate(f15.window_indices)}
+    medoid_rows: list[int] = []
+    for window in f15.medoid_indices:
+        row = rows_by_window.get(int(window))
+        if row is None:
+            raise ValueError("F15 medoid window is missing from the retained rows")
+        medoid_rows.append(row)
     return F15ModeSource(
         status=f15.status,
         window_s=f15.window_s,
@@ -56,8 +67,7 @@ def build_f15_mode_source(
         feature_mads=tuple(float(value) for value in f15.feature_mads),
         canonical_labels=tuple(f"mode_{index}" for index in range(f15.medoid_indices.size)),
         canonical_standardized_features=tuple(
-            tuple(float(value) for value in f15.standardized_features[int(index)])
-            for index in f15.medoid_indices
+            tuple(float(value) for value in f15.standardized_features[row]) for row in medoid_rows
         ),
         # F15 считает признаки только для even-floor-selected окон; сохранённая
         # метка нужна F11 без повторного вычисления. Неограниченная W×7 матрица
