@@ -195,7 +195,7 @@ def test_phase_and_frequency_edges_use_declared_interval_rules() -> None:
         window_features=(None, None, None, None, feature, feature),
         window_labels=(None, None, None, None, "mode_0", "mode_0"),
     )
-    result = _run(events, modes=modes)
+    result = _run(events, modes=modes, minimum_support=1)  # правила полос, не порог
     observed = {
         (item.phase_bin, item.band_index) for item in result.cells if item.support_count > 0
     }
@@ -217,7 +217,7 @@ def test_unretained_window_uses_lowest_label_on_medoid_distance_tie() -> None:
         window_labels=(None,),
     )
 
-    result = _run(_events(1), modes=modes)
+    result = _run(_events(1), modes=modes, minimum_support=1)  # правило ничьей, не порог
     observed = {item.mode_label for item in result.cells if item.support_count == 1}
 
     assert observed == {"mode_0"}
@@ -227,23 +227,22 @@ def test_retained_f15_window_label_wins_without_recomputed_features() -> None:
     """Given retained label and absent features, when F11 assigns mode, then label is used."""
     modes = replace(_modes(), window_features=(None,), window_labels=("mode_1",))
 
-    result = _run(_events(1), modes=modes)
+    result = _run(_events(1), modes=modes, minimum_support=1)  # приоритет метки, не порог
 
     assert {item.mode_label for item in result.cells if item.support_count} == {"mode_1"}
     assert result.n_mode_missing == 0
 
 
 def test_nineteen_events_report_insufficient_support_without_extrapolation() -> None:
-    """Given 19 events in one cell, when support is checked, then quantiles and CDF stay absent."""
+    """Given 19 events, when support is below the minimum, then nothing is published."""
     result = _run(_events(19))
-    cell = next(item for item in result.cells if item.support_count == 19)
 
     assert result.status is Status.UNAVAILABLE
     assert result.reason_codes == ("insufficient_support",)
-    assert cell.status is Status.UNAVAILABLE
-    assert cell.reason_codes == ("insufficient_support",)
-    assert all(item.quantiles == (None,) * len(QUANTILES) for item in cell.distributions)
-    assert all(item.cdf_probabilities is None for item in cell.distributions)
+    # Дом: UNAVAILABLE публикует пустые домены, поэтому ни 19-элементной ячейки,
+    # ни квантилей, ни CDF не экстраполируется — правду несёт сам код.
+    assert result.cells == ()
+    assert all(len(grid) == 0 for grid in result.cdf_grids)
 
 
 def test_empty_cells_stay_explicit_without_degrading_supported_family() -> None:
@@ -292,7 +291,7 @@ def test_missing_f15_feature_vector_excludes_event_and_counts_mode_missing() -> 
     assert result.reason_codes == ("mode_assignment_unavailable",)
     assert result.n_mode_missing == 20
     assert result.n_missing == 0
-    assert all(item.support_count == 0 for item in result.cells)
+    assert result.cells == ()
 
 
 # Конец аналитических срезов F11.

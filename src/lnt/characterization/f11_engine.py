@@ -100,16 +100,22 @@ def compute_f11_conditional_distributions(
     status = (
         Status.UNAVAILABLE if not has_supported else Status.PARTIAL if codes else Status.AVAILABLE
     )
+    # Дом: UNAVAILABLE публикует пустые домены (наследованный инвариант
+    # status_invariant, закреплён тестом F10). Поэтому 192 явные ячейки с
+    # per-cell кодами bin_empty/insufficient_support относятся только к
+    # AVAILABLE/PARTIAL; при отказе маппер иначе обязан отвергнуть результат.
+    published_cells = cells if status is not Status.UNAVAILABLE else ()
+    published_grids = grids if status is not Status.UNAVAILABLE else tuple(() for _ in grids)
     return F11Result(
         status=status,
         reason_codes=codes if status is not Status.AVAILABLE else (),
-        cells=cells,
+        cells=published_cells,
         phase_bin_edges_rad=phase_edges(settings.phase_bins),
         bands_hz=settings.bands_hz,
         mode_labels=model.canonical_labels,
         quantiles=settings.quantiles,
         cdf_probabilities=settings.cdf_probabilities,
-        cdf_grids=grids,
+        cdf_grids=published_grids,
         event_count=len(ordered),
         evaluated_event_count=len(kept),
         omitted_event_count=len(ordered) - len(kept),
