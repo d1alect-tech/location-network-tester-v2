@@ -10,6 +10,7 @@ import numpy as np
 from lnt.characterization.f13_math import (
     PAIR_INDICES,
     LagAccumulator,
+    declared_chunk_reason,
     declared_lag_samples,
     envelope_mad,
     select_peak_lag,
@@ -142,7 +143,7 @@ def _collect_segments(
     for _, _, values, valid, chunk_reasons in _aligned_chunks(source, checkpoint):
         if checkpoint is not None:
             checkpoint()
-        reasons.update(chunk_reasons)
+        reasons.update(declared_chunk_reason(code) for code in chunk_reasons)
         common = np.all(valid, axis=0)
         bounds = np.flatnonzero(np.diff(np.concatenate(([False], common, [False]))))
         for low, high in bounds.reshape(-1, 2).tolist():
@@ -197,7 +198,7 @@ def _aligned_chunks(  # noqa: C901 - выравнивание трёх неза�
             if not bool(np.all(finite)):
                 reasons.add(NONFINITE_INPUT)
             if chunk.reason_code is not None:
-                reasons.add(chunk.reason_code)
+                reasons.add(declared_chunk_reason(chunk.reason_code))
         yield cursor, stop, values, valid, reasons
         cursor = stop
 

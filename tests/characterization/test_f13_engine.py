@@ -30,6 +30,7 @@ from lnt.characterization.f13_result import (
     F13Declarations,
     F13Result,
 )
+from lnt.characterization.phase import PHASE_ROOT_REASON_CODES
 from lnt.characterization.phase_model import PhaseCycles, PhaseMeans
 from lnt.characterization.records import Status
 from lnt.context.json_codec import decode_object
@@ -201,6 +202,25 @@ def test_machine_reason_without_common_support_stays_exact(code: str) -> None:
     assert result.reason_codes == (code,)
     assert result.qualified_sample_count == 0
     assert result.maximum_lag_s.size == 0
+
+
+@pytest.mark.parametrize("code", sorted(PHASE_ROOT_REASON_CODES))
+def test_phase_root_reason_normalizes_to_declared_reference_code(code: str) -> None:
+    """Код фазового корня нормализуется в объявленный, а не роняет результат.
+
+    Слой огибающих пробрасывает `phase.reason_code`, которого нет в объявленном
+    словаре F13. Без нормализации валидатор результата отверг бы его падением вместо
+    статуса — это и вызывало отказ F13 на профиле `async-heavy`. Набор кодов берётся
+    из владельца фазового корня, а не из локального списка.
+    """
+    valid = np.zeros((3, 128), dtype=np.bool_)
+    source = _source(np.zeros((3, 128)), valid=valid, reasons=(code,) * 3)
+
+    result = _run(source)
+
+    assert result.status is Status.UNAVAILABLE
+    assert result.reason_codes == (PHASE_REFERENCE_UNAVAILABLE,)
+    assert result.qualified_sample_count == 0
 
 
 def test_heterogeneous_unavailable_chunks_publish_mixed_support_code() -> None:

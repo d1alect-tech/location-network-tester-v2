@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import numpy as np
 from numpy.typing import NDArray
@@ -41,7 +41,23 @@ _FILTER_ORDER = 4
 _FILTER_CUTOFF_HZ = 200.0
 _RETAINED_BYTES_PER_CYCLE = 192
 
+# Полный набор кодов, которыми фазовый корень сообщает о себе. Экспортируется,
+# чтобы семейства с собственным объявленным словарём (F13 —
+# `phase_reference_unavailable`) нормализовали их по одному источнику истины,
+# а не держали свой список в вызывающем слое.
+PHASE_ROOT_REASON_CODES: Final = frozenset(
+    {
+        "no_sync_reference",
+        "grid_unstable",
+        "insufficient_phase_support",
+        "phase_transform_work_budget_too_small",
+        "phase_cycle_work_budget_too_small",
+        "phase_cycle_work_budget_exceeded",
+    }
+)
+
 __all__ = [
+    "PHASE_ROOT_REASON_CODES",
     "PhaseCycles",
     "PhaseMeans",
     "compute_phase_cycles",

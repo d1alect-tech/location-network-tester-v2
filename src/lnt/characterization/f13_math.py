@@ -10,10 +10,25 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy import signal
 
+from lnt.characterization.f13_result import PHASE_REFERENCE_UNAVAILABLE
+from lnt.characterization.phase import PHASE_ROOT_REASON_CODES
+
 type Float64Array = NDArray[np.float64]
 type Int64Array = NDArray[np.int64]
 
 PAIR_INDICES: Final = ((0, 1), (0, 2), (1, 2))
+
+
+def declared_chunk_reason(code: str) -> str:
+    """Перевести общий код фазового корня в объявленный словарь F13.
+
+    Слой огибающих пробрасывает `phase.reason_code`, а F13 объявляет для отказа
+    фазовой опоры один код — `phase_reference_unavailable`. Без нормализации
+    валидатор результата отверг бы код вне словаря падением, а не статусом.
+    Остальные коды слоя огибающих (`band_above_nyquist`, `mixed_unavailable_support`)
+    уже входят в словарь F13 и проходят без изменения.
+    """
+    return PHASE_REFERENCE_UNAVAILABLE if code in PHASE_ROOT_REASON_CODES else code
 
 
 def declared_lag_samples(
