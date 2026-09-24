@@ -1,27 +1,35 @@
 # Покрытие 18 семейств дескрипторов (characterization program)
 
-Статус: Wave 6 закрыт (todos 17–19) — F01–F10 реализованы end-to-end, остальные 8 — `not_computed`.
-Реализовано семейств: 10/18 (F01 `synchronous_relative_harmonic_dft`, F02
-`template_gain_delay_least_squares`, F03 `synchronous_bin_nearest_neighbor_tracks`,
+Статус: F01-F10 закрыты end-to-end. F11 и F15 реализованы, собраны в бандлы,
+подключены к seam и композеру и закрыты E2E-reduced. F12-F14 и F16-F18 остаются
+`not_computed`.
+Реализовано семейств: 12/18 (F01-F10, F11 и F15): F01
+`synchronous_relative_harmonic_dft`, F02 `template_gain_delay_least_squares`,
+F03 `synchronous_bin_nearest_neighbor_tracks`,
 F04 `overlapping_allan_deviation_and_cycle_autocorrelation`, F05
-`uniform_phase_bin_moments`, F06 `butterworth_hilbert_analytic_trajectory` и F07
-`two_window_real_cepstrum_and_sideband_symmetry`, F08 `bounded_single_damped_sinusoid_fit`,
-F09 `typed_transition_and_waiting_time_inventory` и F10
-`phase_residual_threshold_duration_v2s_surface`
-через один `run_characterization` seam + бандл 18 + API/UI).
+`uniform_phase_bin_moments`, F06 `butterworth_hilbert_analytic_trajectory`, F07
+`two_window_real_cepstrum_and_sideband_symmetry`, F08
+`bounded_single_damped_sinusoid_fit`, F09
+`typed_transition_and_waiting_time_inventory`, F10
+`phase_residual_threshold_duration_v2s_surface`, F11
+`fixed_phase_band_f15_mode_empirical_distributions` и F15
+`deterministic_pam_fixed_k_medoids`
+через один `run_characterization` seam + композер + бандл 18 + API/UI.
 Seam считает F03 по сетке F01, F04 по корням фазы и несущей F06, F08 по событиям,
-F09 по инвентарю событий и F10 по корню фазы, фазовым средним и клиппированию
-(`characterization_slices.py` — вычисления семейств вынесены из
-`run_characterization.py` ради лимита 250 LOC); композер
-`characterization_bundle.py` сплайсит реализованные семейства общим проходом по
-позиции (`_DECLARED_ORDER` + карта индекс→конверт), а не ручными срезами по
-каждому индексу — это масштабируется на оставшиеся 8 семейств без копий. Модуль
-слайсов упёрся в лимит на седьмом семействе, поэтому F07–F10 считаются в
-``characterization_slices_extended.py`` (общие читатели рецепта переиспользуются
-импортом). Манифест парсится в seam один раз (`_session_manifest`), а границы
-клиппирования (`_clipping_for`) делятся между инвентарём событий и F10.
+F09 по инвентарю событий и F10 по корню фазы, фазовым средним и клиппированию.
+Затем F15 использует опубликованную шкалу MAD из F10, разрешённые полосы и тот же
+инвентарь событий, а F11 выполняется после F15 по его каноническим меткам и
+тому же инвентарю. Базовые вычисления вынесены из `run_characterization.py`
+ради лимита 250 LOC. Композер `characterization_bundle.py` сплайсит реализованные
+семейства общим проходом по позиции (`_DECLARED_ORDER` + карта индекс→конверт),
+а не ручными срезами по каждому индексу; схема остаётся пригодной для оставшихся
+6 семейств без копий.
+F07-F10 и F15 считаются в `characterization_slices_extended.py`, F11 делегирует
+полный расчёт в `characterization_slices_conditional.py`; общие читатели рецепта
+переиспользуются импортом. Манифест парсится в seam один раз (`_session_manifest`),
+границы клиппирования (`_clipping_for`) делятся между инвентарём событий и F10.
 Готовы 8 shared-корней (`src/lnt/characterization/shared.py:64`); корневые события
-считаются в seam один раз и обслуживают оба семейства, читающие события (F02, F05).
+считаются в seam один раз и обслуживают F02, F05, F15 и F11.
 E2E-шаблон: `tests/analysis_v2/test_f01_e2e_template.py` (эталон `simulate_session(profile=bad, 500 кГц, 2.4 с, seed 6022)`, `dirname == session_id`; прогон → чтение бандла → cache-hit → recipe-change ⇒ новый ключ → raw-хеши неизменны; переиспользовать для Phase 2+). На эталоне CH1 F01 PARTIAL (`grid_unstable`, `phase_unstable`) — ожидаемо: CH1 — иголки без несущей 50 Гц; AVAILABLE требует analytic-синтетика (`tests/characterization/test_f01_phase_cycle.py`). fs-матрица: 500 кГц — эталон, 8 МГц — declared codes halo-семейств (`.omo/evidence/task-3-characterization-18-families.md:68-89`).
 F02 на эталоне PARTIAL с подобранными значениями (`baseline_unavailable`, `below_snr`; 319 из 927
 событий подобраны) — иголки CH1 детектор размечает как корневые события, поэтому это не codes-only
@@ -283,6 +291,92 @@ F10 (`phase_residual_threshold_duration_v2s_surface`; гейты из
 публикует полную поверхность AVAILABLE (формы 4×5×64 и ×3, occupancy в [0,1]),
 `bad` @60 кГц — PARTIAL `artifact_limit` с `full > stored` и `omitted > 0`.
 
+F15 (`deterministic_pam_fixed_k_medoids`; слот 14; гейты из
+`docs/examples/characterization-recipe-v2.json:246-266`: окно 0,02 с, семь
+признаков, `median_mad`, `k=4`, `pam_build` + `pam_swap`, не более 100
+проходов, 8 блоков, окон ≥80, меток ≤4096) делит запись на неперекрывающиеся
+окна и считает RMS, crest factor, три полосовых RMS, число событий и
+`f10_occupancy_5mad`. Каждая колонка стандартизуется по медиане и MAD по
+квалифицированным окнам; нулевой MAD даёт `feature_scale_zero`.
+`f10_occupancy_5mad` сравнивает окно с `5 * F10Result.scale`, то есть с
+опубликованной шкалой MAD F10; второй MAD-оценщик не заводится. Решение по
+F15-0 закрыто публикацией этой шкалы в F10.
+
+`pam_build` выбирает четыре начальных медиоида, при равенстве расстояний берёт
+меньший индекс окна; `pam_swap` ограничен 100 проходами; канонический порядок
+меток задан `medoid_rms_then_index`. Публикуются медиоиды, стандартизованные
+векторы, метки окон, времена пребывания, матрица переходов и adjusted Rand index
+восьми переподгонок по блокам с убывающим индексом. ГСЧ и seed не используются:
+рецепт их не объявляет, а детерминизм задают правила BUILD, SWAP и канонизации.
+Метка F15 описывает группу объявленных измеренных признаков, а не источник,
+режим сети или причинную связь.
+
+F11 (`fixed_phase_band_f15_mode_empirical_distributions`; слот 10; гейты из
+`docs/examples/characterization-recipe-v2.json:175-190`) выполняется после F15
+и деградирует через `mode_unavailable`, если F15 недоступен. Каждое событие
+один раз попадает в ячейку по фазе пика, метке полосы и канонической метке F15
+для неперекрывающегося окна 0,02 с, содержащего пик. Сетка остаётся явной:
+16 фазовых бинов × 3 объявленные полосы × 4 канонические моды F15 = 192 ячейки.
+Для измеренных величин семейство публикует квантили с `quantile_method="linear"`
+и 129-точечную эмпирическую CDF на объединённой сетке значений по всему семейству,
+а также счётчики полярности и поддержку. Порог поддержки равен 20, кап событий
+4096. Объявленные интервалы полос: `[3000,10000)`, `[10000,50000)` и
+`[50000,200000] Hz`; F11 не восстанавливает числовую частоту из метки.
+
+Открытый пробел F11-1: персистентный корневой инвентарь хранит только метку
+`dominant_band`, без числовой `dominant_frequency_hz`; байтовый формат сессии
+заморожен, поэтому поле добавить нельзя. По решению владельца
+`dominant_frequency_hz` публикуется как отсутствующее распределение в каждой
+ячейке, учитывается в её `n_missing` и не деградирует статус ячейки или семейства.
+Квантили и CDF для этой величины отсутствуют, а не заменяются нулём или NaN:
+действует правило `unavailable, never fabricated`. F11 публикует три из четырёх
+объявленных непрерывных величин: `absolute_peak_v`, `duration_s` и `v2_s`.
+
+Открытый межсемейный пробел F11-2 со стороны F15: правило для окна, не
+сохранённого в ограниченной подгонке F15, текущей поверхностью F15 не
+проверяется. F15 считает семь признаков только для окон, выбранных правилом
+`even_floor_index`; сырых векторов остальных окон в артефакте нет. Потолок
+субдискретизации равен `maximum_labels * window_s = 4096 * 0.02 s = 81.92 s`.
+Каноническая запись 2,4 с содержит 120 окон, поэтому этот путь недостижим в
+объявленном режиме. За его пределами события честно учитываются как
+`mode_assignment_unavailable` / `n_mode_missing`. Неограниченная матрица
+признаков нарушила бы кап `maximum_labels`, поэтому потолок зафиксирован, а
+не обойдён. Подробное решение владельца и замеры:
+`.omo/evidence/task-21-characterization-f11-engine.md:131-217`.
+
+Проверка состояния F11/F15 на момент обновления: полный набор
+`2116 passed, 1 skipped`; `ruff check .`, `ruff format --check .`, `basedpyright`
+и гейт размера модулей чисты. `# fmt: skip` не используется, `_GRANDFATHERED`
+не расширен, ни один допуск не расширен, значения golden и corpus не менялись.
+
+E2E-reduced F11/F15 закрыты: `tests/analysis_v2/test_f15_e2e_reduced.py` и
+`tests/analysis_v2/test_f11_e2e_reduced.py`. Замерено на синтетике до фиксации
+ожиданий, не подгонкой:
+
+- F15 на `bad` — `AVAILABLE` без кодов: 120 полных окон, 114 квалифицированных,
+  4 медиоида, метки `{0,1,2,3}`, 8 блоков стабильности. На `quiet` —
+  `UNAVAILABLE` с `feature_scale_zero`: тихая запись не даёт непостоянных признаков,
+  и это объявленный отказ, а не подгонка порога.
+- F11 на `bad` — `PARTIAL` с кодами `dominant_band_unavailable`,
+  `mode_assignment_unavailable`, `phase_reference_unavailable`: 927 событий, 563
+  распределены, 80 непустых ячеек, 6 ячеек с опорой ≥ 20. Отсутствующая
+  `dominant_frequency_hz` не добавляет семейный код и не деградирует поддержанные
+  ячейки. На `quiet` — `UNAVAILABLE` с `mode_unavailable`, потому что F15 выше по
+  цепочке отказал в `feature_scale_zero`.
+- Аналитические истины, а не самосогласие движка: окно F15 равно
+  `500000 * 0.02 = 10000` отсчётам, полных окон `1200000 / 10000 = 120`, сумма
+  переходов равна числу меток минус один; геометрия F11 равна `16 * 3 * 4 = 192`
+  явные ячейки, сетки CDF — 129 точек, сетка частот пуста.
+- Оба теста проверяют cache-hit второго прогона, байт-идентичность имён выходных
+  файлов и неизменность SHA-256 для `ch1.npy`, `ch2.npy`, `manifest.json`.
+
+E2E-разведка на `async-heavy` вскрыла дефект адаптера F15→F11: `medoid_indices`
+хранит индексы полной сетки окон, а `standardized_features` — компактные строки
+сохранённых окон, поэтому индексирование строк индексом сетки давало `IndexError`
+на профилях, где ранние окна не квалифицируются. Исправлено сопоставлением через
+`window_indices`; регрессия закреплена в `tests/analysis_v2/test_f11_wiring.py`
+(проверено: на старом коде тест падает с `IndexError`).
+
 Метод F01 `synchronous_relative_harmonic_dft` зафиксирован (`src/lnt/analysis_store/characterization_contract.py:13-17`):
 окно 0,2 с, минимум 12 окон, Hmax 40, Rmin 0,8, H1 ratio ≥ 0,95.
 
@@ -304,7 +398,7 @@ F10 (`phase_residual_threshold_duration_v2s_surface`; гейты из
 | F08 | Время фронта `t_rise_s`; пик `v_peak_v`; интеграл `v2s`; пересечения нуля `n_zc`; частота звона `f_d_hz`; постоянная `tau_d_s`; декремент `zeta` (`docs/method-notes-families-1-9.md:391-393`) | `bounded_single_damped_sinusoid_fit` (`characterization_contract.py:50`) | с; В; В²·с (не джоули); целое; Гц; с; безразмерная | Событие из корневого инвентаря, без клиппинга; baseline-детренд в границах + guard 1 длительность с каждой стороны (`method-notes-families-1-9.md:396-397`); клиппинг/полоса/наложения искажают (`proposals.md:108-113`) | `f_d` 100..100000 Гц; `tau_d` `1/fs..0,1` с; амплитуда `0..2·v_peak`; фаза `−pi..pi`; ≤200 evals; SNR ≥10 дБ; `rho_max=0,25`; событий ≤4096 (`method-notes-families-1-9.md:409-414`) | Инициализация `f_d` по zero-crossing, `tau_d` по логарифмическому декременту; bounded `least_squares`; >1 моды → `multimode`, без мульти-модового фолбэка (`method-notes-families-1-9.md:398-405`) | `clipped`, `single_exponential_poor`, `below_snr`, `too_few_samples`, `overlapping_events`, `multimode` (`method-notes-families-1-9.md:419-420`) | Плюс: `A·exp(−t/tau)·sin` — `f` точно (2000,0 Гц), `tau` в 1% (0,002000 vs 0,002). Контроль: одиночный импульс без звона — кода, не частота. Лимит: две моды → высокий остаток `single_exponential_poor` (`method-notes-families-1-9.md:424-432`) |
 | F09 | Типовая последовательность (полярность, доминантная полоса); переходы `n_ij`; межсобытийные `dt_s`; длины серий полярности; разброс в кластере `spread_s` (`docs/method-notes-families-1-9.md:438-440`) | `typed_transition_and_waiting_time_inventory` (`characterization_contract.py:57`) | целое/смешанные; с; целое; с | Инвентарь `events.detector.detect_events`, сортировка по пику; явные dead time, границы, `unqualified_gaps` (`method-notes-families-1-9.md:443-451`); различает независимые/пачки/порядок (`proposals.md:115-120`) | Порог кластера 0,02 с; событий ≥5; правило dead-time `exclude_intervals`; хранимых ≤4096 (`method-notes-families-1-9.md:453-454`) | Пропуски исключены из времён ожидания, не считаются событиями; циклы одной записи — не независимые повторы: без p-value/CI из одних циклов (`method-notes-families-1-9.md:456-459`) | `insufficient_events`, `dead_time_overlap`, `single_cycle_record`, `gaps_present` (`method-notes-families-1-9.md:461-462`) | Плюс: синтез с известными типами/интервалами — точные переходы и `dt`. Контроль: пуассоновские события — равномерные переходы, геометрические серии. Лимит: события в dead time — сокращение поддержки с флагом (`method-notes-families-1-9.md:466-472`) |
 | F10 | На канал/бин фазы/порог/мин. длительность: доля occupancy; число эпизодов; сводка длительностей; суммарный `v2_s`; квантили `v2_s`; поддержка (`docs/method-notes-families-10-18.md:37-39`) | `phase_residual_threshold_duration_v2s_surface` (`characterization_contract.py:62`) | безразмерная; целое; с; В²·с (не джоули, ток/импеданс не измерены — `proposals.md:122-127`) | Конечный канал; частота дискретизации; квалифицированная фаза CH2; маска пропусков; клиппированные интервалы исключены (`method-notes-families-10-18.md:55-58`) | `threshold_sigma=[3,5,8,12]`; `minimum_duration_s=[0, 0.00002, 0.0001, 0.001, 0.01]`; `phase_bins=64`; MAD-масштаб; квантили [0.5,0.9,0.99]; эпизодов ≤4096 (`method-notes-families-10-18.md:51-53`) | Удаление 64-бинного фазового среднего; масштаб `1.4826·MAD`; граничные/усечённые эпизоды — в occupancy, вне квантилей (`method-notes-families-10-18.md:41-49`) | `phase_reference_unavailable`, `insufficient_phase_support`, `scale_zero`, `duration_below_sample_resolution`, `clipped`, `artifact_limit` (`method-notes-families-10-18.md:59-60`) | Плюс: прямоугольные импульсы известной амплитуды/ширины — точные occupancy/длина/число, `V²s=A²T` на сетке. Контроль: фазо-независимый гауссов шум — без систематических межфазных различий. Лимит: односэмпловый импульс при минимуме 2 сэмпла отсутствует в ячейке; граничный — truncated (`method-notes-families-10-18.md:66-71`) |
-| F11 | Условные эмпирические CDF и квантили: абсолютный пик, длительность, доминантная частота, `v2_s` + счётчики полярности и поддержка — на каждую ячейку фаза×полоса×режим F15 (`docs/method-notes-families-10-18.md:78-82`) | `fixed_phase_band_f15_mode_empirical_distributions` (`characterization_contract.py:67`) | В; с; Гц; В²·с; полярность — категориальная (не режим) | Квалифицированная фаза; пик/полярность/доминантная частота/длина/`v2_s` событий; успешный результат F15 (стандартизация, канонические медоиды, окна 20 мс) (`method-notes-families-10-18.md:104-109`); показывает хвосты при неизменном итоге (`proposals.md:129-133`) | `phase_bins=16`; полосы `[3000,10000)`, `[10000,50000)`, `[50000,200000]` Гц; режимов 4; квантили [0.1,0.25,0.5,0.75,0.9,0.99]; CDF 129 точек; поддержка ≥20; событий ≤4096 (`method-notes-families-10-18.md:96-102`) | F15 исполняется раньше F11; привязка события — окно 20 мс пика → ближайший канонический медоид (ничьи — младшая метка); сортировка со стабильными тай-брейками; пустые/недодержанные ячейки явны (`method-notes-families-10-18.md:84-94`) | `phase_reference_unavailable`, `insufficient_support`, `bin_empty`, `dominant_band_unavailable`, `mode_unavailable`, `mode_assignment_unavailable`, `event_limit`, `gaps_present` (`method-notes-families-10-18.md:111-113`) | Плюс: события у 4 известных медоидов F15 — верные ячейки, медианы, CDF, полярности. Контроль: одинаковые мультимножества во всех стратах — одинаковые сводки. Лимит: нет F15 → `mode_unavailable`; 19 событий → `insufficient_support` (`method-notes-families-10-18.md:119-125`) |
+| F11 | Объявлены условные CDF и квантили для `absolute_peak_v`, `duration_s`, `dominant_frequency_hz`, `v2_s`, плюс счётчики полярности и поддержка в каждой ячейке фаза×полоса×мода F15. Артефакт публикует три измеренные величины; распределение `dominant_frequency_hz` отсутствует в каждой ячейке по решению владельца | `fixed_phase_band_f15_mode_empirical_distributions` (`characterization_contract.py:67`) | В; с; Гц объявлена, но распределение отсутствует; В²·с; полярность — категориальная | Квалифицированная фаза; пик, полярность, длительность и `v2_s` события; метка `dominant_band`; успешный F15 со стандартизацией, каноническими медоидами и окнами 20 мс | `phase_bins=16`; полосы `[3000,10000)`, `[10000,50000)`, `[50000,200000]` Гц; режимов 4; квантили [0.1,0.25,0.5,0.75,0.9,0.99]; CDF 129 точек; поддержка ≥20; событий ≤4096 | F15 выполняется раньше F11; событие привязывается к окну пика и канонической метке F15; 192 явные ячейки; отсутствующая числовая частота учитывается в `n_missing` и не деградирует ячейку или семейство | `phase_reference_unavailable`, `insufficient_support`, `bin_empty`, `dominant_band_unavailable`, `mode_unavailable`, `mode_assignment_unavailable`, `event_limit`, `gaps_present` | Плюс: события у четырёх известных медоидов F15 дают соответствующие ячейки, медианы, CDF и полярности. Контроль: одинаковые мультимножества во всех режимах дают одинаковые сводки. Лимиты: 19 событий дают `insufficient_support`; недоступный F15 даёт `mode_unavailable`. E2E-reduced ожидает отдельного fixture |
 | F12 | Спектральный куртозис `SK` и скорректированное p на масштаб×бин; максимум `SK`; выбранная полоса; поддержки (`docs/method-notes-families-10-18.md:135-137`) | `antoni_multiscale_stft_max_search_surrogate` (`characterization_contract.py:73`) | безразмерные (не глобальный куртозис APD — `proposals.md:135-140`) | Конечный канал; частота; квалифицированная фаза; ≥32 полных фреймов на масштабе; клиппированные данные отвергнуты (`method-notes-families-10-18.md:157-158`) | Сегменты STFT [256,1024,4096,16384]; Hann, overlap 0,5; детренд constant; полоса 3000..200000 Гц (Nyquist clamp); суррогатов 199; seed 6022; `q=0,05`; фреймов ≥32; хранимых бинов ≤4096 (`method-notes-families-10-18.md:151-155`) | Оценка Антони `SK(f)=M/(M−1)·((M+1)·Σ\|X\|⁴/(Σ\|X\|²)²−2)`; нуль — сохранение модулей FFT + seeded случайные фазы; BH один раз по всем кандидатам; полоса — связный значимый прогон вокруг максимума (`method-notes-families-10-18.md:139-149`) | `phase_reference_unavailable`, `scale_unsupported`, `insufficient_frames`, `zero_power`, `no_significant_bin`, `clipped`, `artifact_limit` (`method-notes-families-10-18.md:160-162`) | Плюс: периодические полосовые импульсы — значимый `SK` в полосе ввода. Контроль: стационарный гауссов шум — значимых бинов нет (фиксированный seed). Лимит: 31 фрейм → `insufficient_frames` (`method-notes-families-10-18.md:168-172`) |
 | F13 | Попарные: нуллаговая корреляция огибающих; вероятность совпадения и lift; лаг максимума норм. кросскорреляции; лаг-матрица (`docs/method-notes-families-10-18.md:180-182`) | `phase_residual_hilbert_envelope_coactivity` (`characterization_contract.py:80`) | безразмерные; лаг — с | Конечный канал; частота; квалифицированная фаза; неперекрывающиеся полосы ниже Найквиста; положительный MAD огибающей (`method-notes-families-10-18.md:200-202`); показывает совместность, не средние уровни (`proposals.md:142-146`) | Полосы [3000,10000],[10000,50000],[50000,200000] Гц (верх — clamp `0.45·fs`); Баттерворт 4, zero-phase; бинов фазы 64; порог активности 5 MAD; лаги [−0.02,0.02] с, ≤2049; активных сэмплов ≥20 (`method-notes-families-10-18.md:194-198`) | Огибающие — `hilbert`-модуль минус 64-бинное фазовое среднее (сырые сохранённые вольты — `shared-computations.md:88-91`); FFT-корреляция только на declared лагах; тай-брейк: меньший `\|лаг\|`, затем отрицательный (`method-notes-families-10-18.md:184-192`) | `phase_reference_unavailable`, `band_above_nyquist`, `filter_support_too_short`, `filter_context_unstable`, `nonfinite_input`, `mixed_unavailable_support`, `scale_zero`, `insufficient_activity`, `lag_support_too_short`, `leakage_ambiguous` (`method-notes-families-10-18.md:204-208`) | Плюс: две AM-полосы с задержкой огибающей 2 мс — лаг в 1 сэмпл, lift>1. Контроль: независимые seeded огибающие — lift≈1 без стабильного лага. Лимит: перекрывающиеся полосы отвергнуты; фазо-синхронные независимые огибающие расходятся после вычитания среднего (`method-notes-families-10-18.md:213-217`) |
 | F14 | Средние осциллограммы CH1↔CH2 вокруг событий + вероятности; распределения лагов ближайших событий; поддержки; нуль-базовые вероятности (`docs/method-notes-families-10-18.md:222-226`) | `bidirectional_event_triggered_cross_channel_association` (`characterization_contract.py:86`) | В (плоскость осциллографа CH1 / вторички трансформатора CH2); вероятности безразм.; лаги — с | Синхронные CH1+CH2; квалифицированная фаза CH2; оба инвентаря событий; полные окна (граничные/через пропуски исключены и посчитаны) (`method-notes-families-10-18.md:242-245`); ассоциация, не причинность (`proposals.md:148-154`) | Окно триггера −0.02..0.02 с; 401 бин относительного времени; лаг ближайшего −0.02..0.02 с; бинов фазы 64; сдвиги циклов [1..32]; триггеров ≥20, ≤4096 на направление (`method-notes-families-10-18.md:238-240`) | Вычитание 64-бинного фазового среднего; триггер↔цель в обе стороны; нуль — сдвиги времён цели на целые циклы (32 фиксированных); без популяционных CI (`method-notes-families-10-18.md:228-236`) | `channel_missing`, `channels_not_synchronous`, `phase_reference_unavailable`, `insufficient_triggers`, `window_truncated`, `gaps_present`, `event_limit` (`method-notes-families-10-18.md:247-249`) | Плюс: парные события CH1/CH2 с известным delay — лаги и пики в обе стороны. Контроль: независимые равномерно-цикловые события — совпадение с cycle-shift baseline. Лимит: края записи сокращают поддержку, нулей-подстановок нет (`method-notes-families-10-18.md:254-257`) |
