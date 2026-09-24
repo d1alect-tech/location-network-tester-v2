@@ -16,12 +16,15 @@ from lnt.characterization.f07_cepstrum import compute_f07_comb_cepstrum
 from lnt.characterization.f08_transient import compute_f08_transient_morphology
 from lnt.characterization.f09_ordering import compute_f09_event_ordering
 from lnt.characterization.f10_threshold_surface import compute_f10_threshold_surface
+from lnt.characterization.f15_modes import compute_f15_modes
+from lnt.characterization.f15_result import F15Settings
 
 from .characterization_slices import _checkpoint, _int_tuple, _num
 
 if TYPE_CHECKING:
     from lnt.analysis_store import CharacterizationRecipe
     from lnt.analysis_store.characterization_family import CharacterizationFamily
+    from lnt.characterization.bands import ResolvedBand
     from lnt.characterization.clipping import ClippingBounds
     from lnt.characterization.event_models import RootEvent, RootEvents
     from lnt.characterization.f01_phase_cycle import F01Result
@@ -29,17 +32,27 @@ if TYPE_CHECKING:
     from lnt.characterization.f08_result import F08Result
     from lnt.characterization.f09_result import F09Result
     from lnt.characterization.f10_result import F10Result
+    from lnt.characterization.f15_result import F15Result
     from lnt.characterization.phase import PhaseCycles, PhaseMeans
     from lnt.scope_io import CancellationToken
 
     from .types import Float32Array
 
-__all__ = ["_compute_f07", "_compute_f08", "_compute_f09", "_compute_f10", "_float_tuple"]
+__all__ = [
+    "_compute_f07",
+    "_compute_f08",
+    "_compute_f09",
+    "_compute_f10",
+    "_compute_f15",
+    "_float_tuple",
+]
 
 _F07_INDEX: Final = 6
 _F08_INDEX: Final = 7
 _F09_INDEX: Final = 8
 _F10_INDEX: Final = 9
+_F13_INDEX: Final = 12
+_F15_INDEX: Final = 14
 
 
 def _text(family: CharacterizationFamily, name: str) -> str:
@@ -192,5 +205,51 @@ def _compute_f10(  # noqa: PLR0913, PLR0917 - явные параметры ср
         maximum_episodes=int(_num(family, "maximum_episodes")),
         resources=recipe.resource_limits,
         clipping=clipping,
+        checkpoint=lambda: _checkpoint(cancellation),
+    )
+
+
+def _compute_f15(  # noqa: PLR0913, PLR0917 - явные параметры среза, без скрытого контекста
+    samples: Float32Array,
+    phase: PhaseCycles,
+    means: PhaseMeans,
+    f10: F10Result,
+    inventory: RootEvents,
+    bands: tuple[ResolvedBand, ...],
+    sample_rate_hz: float,
+    recipe: CharacterizationRecipe,
+    cancellation: CancellationToken,
+) -> F15Result:
+    """Детерминированные моды F15 по общим корням, F10 и полосам F13."""
+    family = recipe.families[_F15_INDEX]
+    f13 = recipe.families[_F13_INDEX]
+    return compute_f15_modes(
+        samples,
+        phase,
+        means,
+        f10,
+        inventory,
+        bands,
+        sample_rate_hz=sample_rate_hz,
+        band_filter_order=int(_num(f13, "filter_order")),
+        settings=F15Settings(
+            window_s=_num(family, "window_s"),
+            overlap_fraction=_num(family, "overlap_fraction"),
+            features=_str_tuple(family, "features"),
+            standardization=_text(family, "standardization"),
+            distance=_text(family, "distance"),
+            cluster_count=int(_num(family, "cluster_count")),
+            initialization=_text(family, "initialization"),
+            optimization=_text(family, "optimization"),
+            maximum_swap_passes=int(_num(family, "maximum_swap_passes")),
+            tie_break=_text(family, "tie_break"),
+            label_order=_text(family, "label_order"),
+            stability_blocks=int(_num(family, "stability_blocks")),
+            stability_metric=_text(family, "stability_metric"),
+            minimum_windows=int(_num(family, "minimum_windows")),
+            maximum_labels=int(_num(family, "maximum_labels")),
+            subsampling=_text(family, "subsampling"),
+        ),
+        resources=recipe.resource_limits,
         checkpoint=lambda: _checkpoint(cancellation),
     )

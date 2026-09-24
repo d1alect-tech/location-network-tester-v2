@@ -11,6 +11,7 @@ from lnt.analysis_store import (
     CodeIdentity,
 )
 from lnt.characterization import encode_bundle
+from lnt.characterization.bands import resolve_characterization_bands
 from lnt.characterization.characterization_bundle import build_characterization_bundle
 from lnt.characterization.phase import compute_phase_cycles, compute_phase_means
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
@@ -33,6 +34,7 @@ from .characterization_slices_extended import (
     _compute_f08,
     _compute_f09,
     _compute_f10,
+    _compute_f15,
 )
 from .types import AnalysisRunResult, Float32Array
 
@@ -54,7 +56,7 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
     фазовые средние, затем F02 по шаблону F01, F03 по сетке F01, F05 по готовым
     событиям и циклам, F06 по объявленной полосе несущей, F04 по корням фазы
     и несущей F06, F07 по ведущему кадру, F08 по событиям, F09 по инвентарю
-    событий и F10 по корню фазы, средним и клиппированию.
+    событий, F10 по корню фазы, средним и клиппированию и F15 по тем же корням.
     Ключ строится из recipe_sha256, sha256_file сырых каналов, явных
     digest tunables и CodeIdentity; повторный прогон возвращает cache_hit.
 
@@ -139,6 +141,19 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
         clipping,
         cancellation,
     )
+    bands = resolve_characterization_bands(recipe, sample_rate_hz)
+    _checkpoint(cancellation)
+    f15 = _compute_f15(
+        samples,
+        phase,
+        means,
+        f10,
+        root_events,
+        bands,
+        sample_rate_hz,
+        recipe,
+        cancellation,
+    )
     _checkpoint(cancellation)
     bundle, arrays, tables = build_characterization_bundle(
         result,
@@ -151,6 +166,7 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
         f08,
         f09,
         f10,
+        f15,
         recipe,
         measured_channel=meas_name,
         sample_rate_hz=sample_rate_hz,
