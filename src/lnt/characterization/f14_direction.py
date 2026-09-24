@@ -112,15 +112,23 @@ def empty_f14_direction(
 def unavailable_f14_directions(
     directions: tuple[F14DirectionResult, F14DirectionResult],
 ) -> tuple[F14DirectionResult, F14DirectionResult]:
-    """Удалить только измерения, сохранив счётчики отказа."""
+    """Удалить измерения, сохранив учёт отказа.
+
+    Правило бандла для UNAVAILABLE: `stored_trigger_count == 0` при
+    `omitted_trigger_count == qualified_trigger_count`, все массивы пустые. Так
+    информативный учёт остаётся («квалифицировали N триггеров, не сохранили ни
+    одного»), а измерительных выходов нет — `FamilyResult` запрещает их при отказе.
+    Прежняя версия сохраняла `stored_trigger_count`, из-за чего легитимный отказ
+    движка не персистировался: маппер отвергал результат вместо публикации статуса.
+    """
     cleared = tuple(
         F14DirectionResult(
             trigger_channel=direction.trigger_channel,
             response_channel=direction.response_channel,
             total_event_count=direction.total_event_count,
             qualified_trigger_count=direction.qualified_trigger_count,
-            stored_trigger_count=direction.stored_trigger_count,
-            omitted_trigger_count=direction.omitted_trigger_count,
+            stored_trigger_count=0,
+            omitted_trigger_count=direction.qualified_trigger_count,
             boundary_trigger_count=direction.boundary_trigger_count,
             gap_crossing_trigger_count=direction.gap_crossing_trigger_count,
             window_truncated_count=direction.window_truncated_count,
