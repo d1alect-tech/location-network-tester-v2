@@ -29,6 +29,24 @@ _F04_INDEX = 3
 _F05_INDEX = 4
 _F06_INDEX = 5
 _F07_INDEX = 6
+_F08_INDEX = 7
+_F09_INDEX = 8
+_F10_INDEX = 9
+# Реализованные семейства (индекс -> объявленный ID). Один источник истины на
+# проверку «семейство реально считалось» и на множество заглушек ниже.
+_COMPUTED_IDS = {
+    0: "f01_phase_cycle",
+    1: "f02_amplitude_time_shape",
+    _F03_INDEX: "f03_interharmonic_tracking",
+    _F04_INDEX: "f04_multicycle_periodicity",
+    _F05_INDEX: "f05_phase_conditioned_statistics",
+    _F06_INDEX: "f06_modulation_trajectories",
+    _F07_INDEX: "f07_comb_sideband_cepstrum",
+    _F08_INDEX: "f08_transient_morphology",
+    _F09_INDEX: "f09_event_ordering",
+    _F10_INDEX: "f10_threshold_episode_surface",
+}
+_COMPUTED_INDICES = frozenset(_COMPUTED_IDS)
 
 
 def _recipe() -> CharacterizationRecipe:
@@ -89,32 +107,19 @@ def test_f01_e2e_reference_template_run_read_cache_rehash_raw(tmp_path: Path) ->
     assert f01.signal_plane == "ch1_scope_input"
     assert f01.comparison_summary[0].name == "f1_hz"
     assert 47.5 <= float(f01.comparison_summary[0].value) <= 52.5
-    f02 = loaded.bundle.families[1]
-    assert f02.family_id == "f02_amplitude_time_shape"
-    # F02 must have actually run: the placeholder code is what an unimplemented
-    # family carries, so its presence here would mean the seam skipped the slice.
-    assert f02.reason_codes != ("not_computed",)
-    f05 = loaded.bundle.families[_F05_INDEX]
-    assert f05.family_id == "f05_phase_conditioned_statistics"
-    assert f05.reason_codes != ("not_computed",)
-    f06 = loaded.bundle.families[_F06_INDEX]
-    assert f06.family_id == "f06_modulation_trajectories"
-    assert f06.reason_codes != ("not_computed",)
-    f03 = loaded.bundle.families[_F03_INDEX]
-    assert f03.family_id == "f03_interharmonic_tracking"
-    assert f03.reason_codes != ("not_computed",)
-    f04 = loaded.bundle.families[_F04_INDEX]
-    assert f04.family_id == "f04_multicycle_periodicity"
-    assert f04.reason_codes != ("not_computed",)
-    f07 = loaded.bundle.families[_F07_INDEX]
-    assert f07.family_id == "f07_comb_sideband_cepstrum"
-    assert f07.reason_codes != ("not_computed",)
+    # Каждое реализованное семейство обязано реально считаться: код заглушки
+    # ``not_computed`` — признак пропущенного среза, поэтому его наличие здесь
+    # означало бы, что seam не вызвал вычисление семейства.
+    for index, family_id in _COMPUTED_IDS.items():
+        family = loaded.bundle.families[index]
+        assert family.family_id == family_id
+        assert family.reason_codes != ("not_computed",)
     # F05 считает CH1 по циклам CH2, поэтому на эталоне она не заглушка;
-    # заглушками остаётся всё, кроме семи работающих семейств.
+    # заглушками остаётся всё, кроме десяти работающих семейств.
     rest = tuple(
         family
         for index, family in enumerate(loaded.bundle.families)
-        if index not in {0, 1, _F03_INDEX, _F04_INDEX, _F05_INDEX, _F06_INDEX, _F07_INDEX}
+        if index not in _COMPUTED_INDICES
     )
     assert rest
     assert all(family.status is Status.UNAVAILABLE for family in rest)

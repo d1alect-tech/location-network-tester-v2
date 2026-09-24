@@ -27,6 +27,23 @@ _F04_INDEX = 3
 _F05_INDEX = 4
 _F06_INDEX = 5
 _F07_INDEX = 6
+_F08_INDEX = 7
+_F09_INDEX = 8
+_F10_INDEX = 9
+_COMPUTED_INDICES = frozenset(
+    {
+        0,
+        1,
+        _F03_INDEX,
+        _F04_INDEX,
+        _F05_INDEX,
+        _F06_INDEX,
+        _F07_INDEX,
+        _F08_INDEX,
+        _F09_INDEX,
+        _F10_INDEX,
+    }
+)
 
 
 def _recipe() -> CharacterizationRecipe:
@@ -115,10 +132,19 @@ def test_publishes_bundle_with_manifest_code_identity(tmp_path: Path) -> None:
     f07 = loaded.bundle.families[_F07_INDEX]
     assert f07.family_id == "f07_comb_sideband_cepstrum"
     assert f07.reason_codes != ("not_computed",)
+    f08 = loaded.bundle.families[_F08_INDEX]
+    assert f08.family_id == "f08_transient_morphology"
+    assert f08.reason_codes != ("not_computed",)
+    f09 = loaded.bundle.families[_F09_INDEX]
+    assert f09.family_id == "f09_event_ordering"
+    assert f09.reason_codes != ("not_computed",)
+    f10 = loaded.bundle.families[_F10_INDEX]
+    assert f10.family_id == "f10_threshold_episode_surface"
+    assert f10.reason_codes != ("not_computed",)
     placeholder = tuple(
         family
         for index, family in enumerate(loaded.bundle.families)
-        if index not in {0, 1, _F03_INDEX, _F04_INDEX, _F05_INDEX, _F06_INDEX, _F07_INDEX}
+        if index not in _COMPUTED_INDICES
     )
     assert placeholder
     assert all(family.status is Status.UNAVAILABLE for family in placeholder)
