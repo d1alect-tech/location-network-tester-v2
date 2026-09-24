@@ -1,19 +1,25 @@
 # Покрытие 18 семейств дескрипторов (characterization program)
 
-Статус: Wave 5 закрыт (todos 14–16) — F01–F07 реализованы end-to-end, остальные 11 — `not_computed`.
-Реализовано семейств: 7/18 (F01 `synchronous_relative_harmonic_dft`, F02
+Статус: Wave 6 закрыт (todos 17–19) — F01–F10 реализованы end-to-end, остальные 8 — `not_computed`.
+Реализовано семейств: 10/18 (F01 `synchronous_relative_harmonic_dft`, F02
 `template_gain_delay_least_squares`, F03 `synchronous_bin_nearest_neighbor_tracks`,
 F04 `overlapping_allan_deviation_and_cycle_autocorrelation`, F05
 `uniform_phase_bin_moments`, F06 `butterworth_hilbert_analytic_trajectory` и F07
-`two_window_real_cepstrum_and_sideband_symmetry`
+`two_window_real_cepstrum_and_sideband_symmetry`, F08 `bounded_single_damped_sinusoid_fit`,
+F09 `typed_transition_and_waiting_time_inventory` и F10
+`phase_residual_threshold_duration_v2s_surface`
 через один `run_characterization` seam + бандл 18 + API/UI).
-Seam считает F03 по сетке F01 и F04 по корням фазы и несущей F06
+Seam считает F03 по сетке F01, F04 по корням фазы и несущей F06, F08 по событиям,
+F09 по инвентарю событий и F10 по корню фазы, фазовым средним и клиппированию
 (`characterization_slices.py` — вычисления семейств вынесены из
 `run_characterization.py` ради лимита 250 LOC); композер
-`characterization_bundle.py` сплайсит индексы 2, 3 и 6 поверх цепочки
-F01/F02/F05/F06. Модуль слайсов упёрся в лимит на седьмом семействе, поэтому
-F07 и следующие семейства считаются в ``characterization_slices_extended.py``
-(общие читатели рецепта переиспользуются импортом).
+`characterization_bundle.py` сплайсит реализованные семейства общим проходом по
+позиции (`_DECLARED_ORDER` + карта индекс→конверт), а не ручными срезами по
+каждому индексу — это масштабируется на оставшиеся 8 семейств без копий. Модуль
+слайсов упёрся в лимит на седьмом семействе, поэтому F07–F10 считаются в
+``characterization_slices_extended.py`` (общие читатели рецепта переиспользуются
+импортом). Манифест парсится в seam один раз (`_session_manifest`), а границы
+клиппирования (`_clipping_for`) делятся между инвентарём событий и F10.
 Готовы 8 shared-корней (`src/lnt/characterization/shared.py:64`); корневые события
 считаются в seam один раз и обслуживают оба семейства, читающие события (F02, F05).
 E2E-шаблон: `tests/analysis_v2/test_f01_e2e_template.py` (эталон `simulate_session(profile=bad, 500 кГц, 2.4 с, seed 6022)`, `dirname == session_id`; прогон → чтение бандла → cache-hit → recipe-change ⇒ новый ключ → raw-хеши неизменны; переиспользовать для Phase 2+). На эталоне CH1 F01 PARTIAL (`grid_unstable`, `phase_unstable`) — ожидаемо: CH1 — иголки без несущей 50 Гц; AVAILABLE требует analytic-синтетика (`tests/characterization/test_f01_phase_cycle.py`). fs-матрица: 500 кГц — эталон, 8 МГц — declared codes halo-семейств (`.omo/evidence/task-3-characterization-18-families.md:68-89`).
@@ -189,6 +195,93 @@ F01 оценивает `f1` из измеренного канала, поэто
 `tests/analysis_v2/test_f07_e2e_reduced.py` закрепляет обе стороны: AVAILABLE
 с `q_s = T/fs` и согласованным `df = 1/q_s`, и отказ `harmonic_comb_only` на
 чистой гармонической гребёнке сети.
+
+F08 (`bounded_single_damped_sinusoid_fit`; гейты из
+`docs/examples/characterization-recipe-v2.json:133-150`: baseline `linear_detrend`
+(залочен), частота звона 100..100000 Гц, затухание от 1 отсчёта до 0.1 с,
+амплитуда до `2 * v_peak_v`, фаза `-pi..pi`, `maximum_function_evaluations=200`,
+`minimum_snr_db=10`, `residual_fraction_max=0.25`, `minimum_zero_crossings=2`,
+`maximum_events=4096`) для каждого объявленного события снимает базовую линию
+в пределах спана плюс guard по одной длительности события с каждой стороны,
+инициализирует частоту по пересечениям нуля и затухание по логарифмическому
+декременту (`delta = ln(a_n/a_{n+1})`, `zeta = delta/sqrt(4pi^2 + delta^2)`,
+`tau_d = T_d/delta`), затем делает ограниченный МНК-фит
+`y = A exp(-t/tau_d) sin(2 pi f_d t + phi) + c` через `scipy.optimize.least_squares`.
+Величины делятся на измеренные (`t_rise_s`, `v_peak_v`, `v2_s`, `n_zc` —
+публикуются, когда спан измерим) и фитовые (`f_d_hz`, `tau_d_s`, `zeta`,
+`residual_fraction` — `None` при отказе, никогда не подменяются нулём).
+Семейство пер-событийное: `None` исключается из массива и уходит в
+`Support.missing_count`, маски частичности свои у каждой из двух групп
+разной длины (идиома F04). `v2_s` публикуется в единице `Unit.V2_S` — та же,
+что у `f02_e_res_v2_s`; V2s не энергия и не джоули.
+Открытые пробелы, требующие решения владельца (замерены, не выдуманы):
+F08-7 (граница константы `c`), F08-12 (правило разрешения `multimode`:
+-15 дБ / 2 бина, граница проверена на w=0.15 против 0.18), F08-27 (код при
+пустом инвентаре). E2E `tests/analysis_v2/test_f08_e2e_reduced.py`: профиль
+`bad-damped` (ring_f0=22400 Гц, ring_q=16) восстанавливает `f_d` в 2%, `tau`
+в 5% от `q/(pi*f0)` и `zeta` в 10% от `1/(2q)`; тихий профиль отказывает
+кодами без подогнанных параметров.
+
+F09 (`typed_transition_and_waiting_time_inventory`; гейты из
+`docs/examples/characterization-recipe-v2.json:151-160`: `event_type_fields`
+`["polarity","dominant_band"]` (залочены), `cluster_gap_s=0.02`,
+`minimum_event_count=5`, `dead_time_handling="exclude_intervals"` (залочен),
+`gap_handling="exclude_waiting_intervals"` (залочен), `maximum_events=4096`)
+берёт готовый корневой инвентарь `RootEvents` (детектор повторно не вызывается),
+сортирует по пиковому времени, строит категориальную последовательность из
+объявленных полей и считает переходы `n_ij` между соседними событиями, ряды
+ожиданий `dt`, серии полярности и кластеры по `cluster_gap_s`. Матрица переходов
+публикуется таблицей `f09_transitions` (`source_label`/`target_label` TEXT +
+`n_ij` INTEGER). Мёртвое время, границы и пропуски объявляются явно: инвентарь
+несёт `dead_time_rejected_count`, `boundary`, `gaps` — коды отказов берутся из
+этих полей, а не из выдуманных правил.
+ТЕЗИС-ГРАНИЦА (спека:456-459) закреплён существующим полем конверта `inference`
+(`population_inference="withheld"`, `estimate_scope="single_session_descriptive"`,
+`reason_code="independent_capture_units_required"`): циклы одной записи не
+независимые повторы, p-значений и доверительных интервалов из циклов нет.
+Открытые пробелы (замерены): F09-9 (`dead_time_overlap` — флаг при любом
+отклонении мёртвым временем), F09-10 (краевые события считаются, не
+выбрасываются), F09-11 (`single_cycle_record` — ровно один кластер).
+**Следствие F09-11, требующее внимания владельца:** на любой плотной записи
+(шаг между событиями < `cluster_gap_s`) весь поток лежит в одном кластере,
+поэтому F09 практически всегда PARTIAL с `single_cycle_record` — на эталоне
+`bad` 970 интервалов и 383 отклонения мёртвым временем уходят в один кластер.
+Это не дефект, а прямое следствие открытого пробела; альтернативы (доля событий
+в крупнейшем кластере, отношение spread к длительности) названы в evidence.
+E2E `tests/analysis_v2/test_f09_e2e_reduced.py`: PARTIAL с обоими кодами,
+непустой неотрицательный `dt`, таблица переходов и закреплённая граница вывода.
+
+F10 (`phase_residual_threshold_duration_v2s_surface`; гейты из
+`docs/examples/characterization-recipe-v2.json:162-173`: `phase_bins=64`,
+`scale="mad_times_1.4826"` (залочен), `threshold_sigma=[3,5,8,12]` (залочены),
+`minimum_duration_s=[0, 2e-5, 1e-4, 1e-3, 1e-2]`, `quantiles=[0.5,0.9,0.99]`,
+`edge_episode_handling="occupancy_only_truncated"` (залочен),
+`maximum_episodes=4096`) убирает 64-бинное фазовое среднее из измеренного ряда,
+оценивает масштаб как `1.4826 * median(abs(r - median(r)))`, для каждого порога
+`u = sigma * scale` находит максимальные прогоны `abs(r) >= u` и держит прогон
+в ячейке длительности, если его длительность не меньше минимума ячейки.
+Поверхность публикуется истинной 3-D сеткой `(4, 5, 64)` = 1280 ячеек (кодек
+поддерживает N-D end-to-end, проверено), квантили — `(4, 5, 64, 3)`; оси
+публикуются рядом (`f10_threshold_sigma`, `f10_minimum_duration_s`,
+`f10_phase_bin`, `f10_quantile_level`), чтобы ячейки оставались адресуемыми.
+`quantile_valid` публикуется всегда (и в AVAILABLE): он несёт область
+определения квантиля, а не частичность — неопределённый квантиль никогда не
+читается как настоящий 0.0. Прогоны, касающиеся края записи или пропуска,
+помечаются усечёнными: они входят только в occupancy и `truncated_samples`,
+а не в счётчики длительностей и квантили. Один стриминг-проход на порог
+(`O((2 + n_thresholds) * N)`), пик памяти плоский ~39 МБ от N=1M до N=4M —
+замерено. `v2_s` в `Unit.V2_S`; ГРАНИЦА ЗАЯВКИ: поверхность описывает превышение
+порога на одной плоскости канала и не измеряет энергию, повреждение, источник
+или полезность.
+Открытый пробел (замерен): F10-12 (трансляция `quantile_valid` на 4-D форму
+квантилей из-за требования `mask.shape == array.shape`); эпизоды публикуются
+(кап 4096 × 5 строк = 163840 байт, на два порядка ниже `MAX_ARRAYS_BYTES`).
+**Следствие капа, требующее внимания владельца:** `maximum_episodes=4096`
+связывает почти всегда — на эталоне `bad` 13247..34087 эпизодов дают PARTIAL
+`artifact_limit`; AVAILABLE достижим на тихой записи (`quiet` @60 кГц: 987
+эпизодов). E2E `tests/analysis_v2/test_f10_e2e_reduced.py`: `quiet` @60 кГц
+публикует полную поверхность AVAILABLE (формы 4×5×64 и ×3, occupancy в [0,1]),
+`bad` @60 кГц — PARTIAL `artifact_limit` с `full > stored` и `omitted > 0`.
 
 Метод F01 `synchronous_relative_harmonic_dft` зафиксирован (`src/lnt/analysis_store/characterization_contract.py:13-17`):
 окно 0,2 с, минимум 12 окон, Hmax 40, Rmin 0,8, H1 ratio ≥ 0,95.
