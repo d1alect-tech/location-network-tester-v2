@@ -1,14 +1,17 @@
-"""Characterization bundle assembly: mapped F03, F04 and F07 beside F01, F02, F05, F06."""
+"""Characterization bundle assembly: mapped families beside the F01, F02, F05, F06 chain."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from lnt.characterization.errors import CharacterizationError
 from lnt.characterization.f03_bundle import F03_ID, F03_INDEX, build_f03_family
 from lnt.characterization.f04_bundle import F04_ID, F04_INDEX, build_f04_family
 from lnt.characterization.f06_bundle import build_f01_f02_f05_f06_bundle
 from lnt.characterization.f07_bundle import F07_ID, F07_INDEX, build_f07_family
+from lnt.characterization.f08_bundle import F08_ID, F08_INDEX, build_f08_family
+from lnt.characterization.f09_bundle import F09_ID, F09_INDEX, build_f09_family
+from lnt.characterization.f10_bundle import F10_ID, F10_INDEX, build_f10_family
 from lnt.characterization.models import CharacterizationBundle
 from lnt.characterization.records import Band
 
@@ -24,6 +27,10 @@ if TYPE_CHECKING:
     from lnt.characterization.f05_phase_stats import F05Result
     from lnt.characterization.f06_modulation import F06Result
     from lnt.characterization.f07_result import F07Result
+    from lnt.characterization.f08_result import F08Result
+    from lnt.characterization.f09_result import F09Result
+    from lnt.characterization.f10_result import F10Result
+    from lnt.characterization.models import FamilyResult
     from lnt.characterization.tables import TableBlock
 
 
@@ -35,23 +42,18 @@ def build_characterization_bundle(  # noqa: PLR0913, PLR0917 - рецепт, к�
     f05_result: F05Result,
     f06_result: F06Result,
     f07_result: F07Result,
+    f08_result: F08Result,
+    f09_result: F09Result,
+    f10_result: F10Result,
     recipe: CharacterizationRecipe,
     *,
     measured_channel: str = "ch1",
     sample_rate_hz: float,
     record_duration_s: float,
 ) -> tuple[CharacterizationBundle, dict[str, np.ndarray], dict[str, TableBlock]]:
-    """Assemble mapped F03, F04 and F07 beside F01, F02, F05, F06 and nine placeholders."""
+    """Assemble the mapped families beside F01, F02, F05, F06 and eight placeholders."""
     families = recipe.families
-    if (
-        len(families) <= F07_INDEX
-        or families[F03_INDEX].id != F03_ID
-        or families[F04_INDEX].id != F04_ID
-        or families[F07_INDEX].id != F07_ID
-    ):
-        raise CharacterizationError(
-            "family_order", "recipe must declare f03 third, f04 fourth and f07 seventh"
-        )
+    _require_declared_order(families)
     previous, arrays, tables = build_f01_f02_f05_f06_bundle(
         f01_result,
         f02_result,
@@ -85,17 +87,70 @@ def build_characterization_bundle(  # noqa: PLR0913, PLR0917 - рецепт, к�
         record_duration_s=float(record_duration_s),
         sample_rate_hz=float(sample_rate_hz),
     )
+    f08_family, f08_arrays = build_f08_family(
+        f08_result,
+        families[F08_INDEX],
+        band,
+        measured_channel=measured_channel,
+        record_duration_s=float(record_duration_s),
+    )
+    f09_family, f09_arrays, f09_tables = build_f09_family(
+        f09_result,
+        families[F09_INDEX],
+        band,
+        measured_channel=measured_channel,
+        record_duration_s=float(record_duration_s),
+    )
+    f10_family, f10_arrays = build_f10_family(
+        f10_result,
+        families[F10_INDEX],
+        band,
+        measured_channel=measured_channel,
+        record_duration_s=float(record_duration_s),
+    )
+    # Сплайс один на все семейства: позиция -> конверт, остальное остаётся
+    # заглушкой ``previous``. Ручные срезы по каждому индексу не масштабируются
+    # на оставшиеся 8 семейств, поэтому порядок собирается общим проходом.
+    mapped: tuple[tuple[int, FamilyResult, dict[str, np.ndarray], dict[str, TableBlock]], ...] = (
+        (F03_INDEX, f03_family, f03_arrays, {}),
+        (F04_INDEX, f04_family, f04_arrays, {}),
+        (F07_INDEX, f07_family, f07_arrays, {}),
+        (F08_INDEX, f08_family, f08_arrays, {}),
+        (F09_INDEX, f09_family, f09_arrays, f09_tables),
+        (F10_INDEX, f10_family, f10_arrays, {}),
+    )
+    envelope_by_index = {position: family for position, family, _, _ in mapped}
     bundle = CharacterizationBundle(
-        families=(
-            *previous.families[:F03_INDEX],
-            f03_family,
-            f04_family,
-            *previous.families[F04_INDEX + 1 : F07_INDEX],
-            f07_family,
-            *previous.families[F07_INDEX + 1 :],
+        families=tuple(
+            envelope_by_index.get(position, previous.families[position])
+            for position in range(len(families))
         )
     )
-    return bundle, {**arrays, **f03_arrays, **f04_arrays, **f07_arrays}, dict(tables)
+    merged_arrays = {**arrays}
+    merged_tables = dict(tables)
+    for _, _, family_arrays, family_tables in mapped:
+        merged_arrays.update(family_arrays)
+        merged_tables.update(family_tables)
+    return bundle, merged_arrays, merged_tables
+
+
+_DECLARED_ORDER: Final = (
+    (F03_INDEX, F03_ID),
+    (F04_INDEX, F04_ID),
+    (F07_INDEX, F07_ID),
+    (F08_INDEX, F08_ID),
+    (F09_INDEX, F09_ID),
+    (F10_INDEX, F10_ID),
+)
+
+
+def _require_declared_order(families: tuple[CharacterizationFamily, ...]) -> None:
+    """Отказ, если рецепт объявил семейства не на своих позициях."""
+    for position, family_id in _DECLARED_ORDER:
+        if len(families) <= position or families[position].id != family_id:
+            raise CharacterizationError(
+                "family_order", f"recipe must declare {family_id} at position {position}"
+            )
 
 
 def _window_s(family: CharacterizationFamily) -> float:

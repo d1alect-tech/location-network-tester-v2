@@ -12,7 +12,7 @@ from lnt.analysis_store import (
 )
 from lnt.characterization import encode_bundle
 from lnt.characterization.characterization_bundle import build_characterization_bundle
-from lnt.characterization.phase import compute_phase_cycles
+from lnt.characterization.phase import compute_phase_cycles, compute_phase_means
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken
 
 from .artifact_inputs import characterization_inputs
@@ -28,7 +28,12 @@ from .characterization_slices import (
     _root_events,
     _session_manifest,
 )
-from .characterization_slices_extended import _compute_f07
+from .characterization_slices_extended import (
+    _compute_f07,
+    _compute_f08,
+    _compute_f09,
+    _compute_f10,
+)
 from .types import AnalysisRunResult, Float32Array
 
 __all__ = ["run_characterization"]
@@ -45,10 +50,11 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
 ) -> AnalysisRunResult:
     """Выполняет characterization поверх ArtifactStore без SessionKind-dispatch.
 
-    Считает F01, один общий корневой инвентарь событий, корень фазы по CH2,
-    затем F02 по шаблону F01, F03 по сетке F01, F05 по готовым событиям
-    и циклам, F06 по объявленной полосе несущей и F04 по корням фазы
-    и несущей F06, F07 по ведущему кадру записи.
+    Считает F01, один общий корневой инвентарь событий, корень фазы по CH2 и его
+    фазовые средние, затем F02 по шаблону F01, F03 по сетке F01, F05 по готовым
+    событиям и циклам, F06 по объявленной полосе несущей, F04 по корням фазы
+    и несущей F06, F07 по ведущему кадру, F08 по событиям, F09 по инвентарю
+    событий и F10 по корню фазы, средним и клиппированию.
     Ключ строится из recipe_sha256, sha256_file сырых каналов, явных
     digest tunables и CodeIdentity; повторный прогон возвращает cache_hit.
 
@@ -99,6 +105,14 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
         checkpoint=lambda: _checkpoint(cancellation),
     )
     _checkpoint(cancellation)
+    means = compute_phase_means(
+        samples,
+        phase,
+        settings=recipe.phase,
+        resources=recipe.resource_limits,
+        checkpoint=lambda: _checkpoint(cancellation),
+    )
+    _checkpoint(cancellation)
     f02 = _compute_f02(result, samples, sample_rate_hz, recipe, root_events)
     f03 = _compute_f03(result, samples, sample_rate_hz, recipe, cancellation)
     f05 = _compute_f05(samples, phase, root_events, recipe, cancellation)
@@ -114,6 +128,17 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
         cancellation,
     )
     f07 = _compute_f07(result, samples, sample_rate_hz, recipe, cancellation)
+    f08 = _compute_f08(samples, root_events.events, sample_rate_hz, recipe, cancellation)
+    f09 = _compute_f09(root_events, recipe, cancellation)
+    f10 = _compute_f10(
+        samples,
+        phase,
+        means,
+        sample_rate_hz,
+        recipe,
+        clipping,
+        cancellation,
+    )
     _checkpoint(cancellation)
     bundle, arrays, tables = build_characterization_bundle(
         result,
@@ -123,6 +148,9 @@ def run_characterization(  # noqa: PLR0913 - seam параллелен dispatch,
         f05,
         f06,
         f07,
+        f08,
+        f09,
+        f10,
         recipe,
         measured_channel=meas_name,
         sample_rate_hz=sample_rate_hz,
