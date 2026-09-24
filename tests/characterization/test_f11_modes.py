@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 
+from lnt.analysis_store import CharacterizationRecipe, parse_analysis_recipe
+from lnt.characterization.bands import ResolvedBand, resolve_characterization_bands
 from lnt.characterization.f11_contract import F11Declarations
 from lnt.characterization.f11_engine import compute_f11_conditional_distributions
 from lnt.characterization.f11_result import (
@@ -19,11 +22,21 @@ from lnt.characterization.f11_result import (
 )
 from lnt.characterization.phase_model import PhaseCycles
 from lnt.characterization.records import Status
+from lnt.context.json_codec import decode_object
 from lnt.events.models import Polarity
 
 FS_HZ = 1000.0
 BANDS = ((3000.0, 10000.0), (10000.0, 50000.0), (50000.0, 200000.0))
 LABELS = ("mode_0", "mode_1", "mode_2", "mode_3")
+_EXAMPLE = Path(__file__).parents[2] / "docs/examples/characterization-recipe-v2.json"
+
+
+def _resolved_bands() -> tuple[ResolvedBand, ...]:
+    recipe = parse_analysis_recipe(
+        decode_object(_EXAMPLE.read_text(encoding="utf-8"), "test recipe")
+    )
+    assert isinstance(recipe, CharacterizationRecipe)
+    return resolve_characterization_bands(recipe, 1_000_000.0)
 
 
 def _phase() -> PhaseCycles:
@@ -62,7 +75,7 @@ def _events() -> tuple[F11Event, ...]:
             polarity=Polarity.POSITIVE if index % 2 == 0 else Polarity.NEGATIVE,
             absolute_peak_v=float(index + 1),
             duration_s=float(index + 1) / 1000.0,
-            dominant_frequency_hz=5000.0 + index,
+            dominant_band="band_0001",
             v2_s=0.5 * float(index + 1),
         )
         for index in range(20)
@@ -86,7 +99,7 @@ def _run(events: tuple[F11Event, ...], modes: F15ModeSource) -> F11Result:
         maximum_events=4096,
     )
     return compute_f11_conditional_distributions(
-        _phase(), F11EventInventory(events=events), modes, declarations
+        _phase(), F11EventInventory(events=events), modes, declarations, _resolved_bands()
     )
 
 

@@ -9,14 +9,13 @@ from typing import TYPE_CHECKING, Final
 
 import numpy as np
 
-from lnt.characterization.bands import ResolvedBand
 from lnt.characterization.f11_result import QUANTITIES, F11Result
 from lnt.characterization.records import Status
-from lnt.features.bands import BandDefinition, BandSet, EstimandDirection, FrequencyUnit
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from lnt.characterization.bands import ResolvedBand
     from lnt.characterization.f11_result import F11EventInventory, F15ModeSource
 
 
@@ -63,8 +62,10 @@ class F11Settings:
     maximum_events: int
 
 
-def build_settings(declarations: F11Declarations) -> F11Settings:
-    """Проверить числовые гейты и собрать общую полосовую сетку."""
+def build_settings(
+    declarations: F11Declarations, resolved_bands: tuple[ResolvedBand, ...]
+) -> F11Settings:
+    """Проверить числовые гейты и принять общую полосовую сетку."""
     bins = int(declarations.phase_bins)
     modes = int(declarations.mode_count)
     points = int(declarations.cdf_points)
@@ -89,22 +90,20 @@ def build_settings(declarations: F11Declarations) -> F11Settings:
         raise ValueError("F11 requires three finite ordered frequency bands")
     if any(left[1] > right[0] for left, right in pairwise(pairs)):
         raise ValueError("F11 bands must not overlap")
-    definitions = tuple(
-        BandDefinition(
-            name=f"f11_band_{index:04d}",
-            low=low,
-            high=high,
-            unit=FrequencyUnit.HZ,
-            direction=EstimandDirection.DESCRIPTIVE,
+    labels = tuple(band.requested.name for band in resolved_bands)
+    if (
+        len(resolved_bands) != _BAND_COUNT
+        or len(set(labels)) != _BAND_COUNT
+        or any(
+            (band.requested.low_hz, band.requested.high_hz) != pair
+            for band, pair in zip(resolved_bands, pairs, strict=True)
         )
-        for index, (low, high) in enumerate(pairs)
-    )
-    BandSet(bands=definitions)
-    resolved = tuple(ResolvedBand(item, item, None) for item in definitions)
+    ):
+        raise ValueError("F11 bands must match the shared resolved characterization bands")
     return F11Settings(
         phase_bins=bins,
         bands_hz=pairs,
-        resolved_bands=resolved,
+        resolved_bands=resolved_bands,
         mode_count=modes,
         quantiles=selected_quantiles,
         cdf_probabilities=tuple(
@@ -117,6 +116,9 @@ def build_settings(declarations: F11Declarations) -> F11Settings:
 
 def check_rules(declarations: F11Declarations) -> None:
     """Отклонить не объявленные правила F11."""
+    # ``dominant_band(..., interval_rule="half_open_last_closed")`` в
+    # ``lnt.events.metrics`` применяет то же left-closed/right-open-last-closed
+    # правило до сохранения метки; использование метки в F11 не меняет полосу.
     if declarations.band_interval_rule != _BAND_RULE:
         raise ValueError(f"band_interval_rule must be {_BAND_RULE!r}")
     if declarations.mode_source_family_id != _MODE_SOURCE:

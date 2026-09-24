@@ -62,7 +62,7 @@ CLAIM_BOUNDARY: Final = (
 
 type FeatureVector = tuple[float, ...]
 type CellKey = tuple[int, int, str]
-type EventValues = tuple[float | None, float | None, float | None, float | None]
+type EventValues = tuple[float | None, float | None, float | None]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -75,7 +75,7 @@ class F11Event:
     polarity: Polarity
     absolute_peak_v: float | None
     duration_s: float | None
-    dominant_frequency_hz: float | None
+    dominant_band: str | None
     v2_s: float | None
 
 

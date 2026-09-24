@@ -134,13 +134,26 @@ def _cdf(first: float = 0.05, middle: float = 0.5, last: float = 1.0) -> tuple[f
     return tuple(values)
 
 
+def _absent_frequency(quantity: str, support_count: int) -> F11QuantityResult:
+    assert quantity == "dominant_frequency_hz"
+    return F11QuantityResult(
+        quantity=quantity,
+        observed_count=0,
+        missing_count=support_count,
+        status=Status.UNAVAILABLE,
+        reason_codes=(INSUFFICIENT_SUPPORT,),
+        quantiles=(None,) * len(QUANTILES),
+        cdf_probabilities=None,
+    )
+
+
 def _available_distribution(quantity: str, count: int = 20) -> F11QuantityResult:
+    if quantity == "dominant_frequency_hz":
+        return _absent_frequency(quantity, count)
     if quantity == "absolute_peak_v":
         quantiles = (2.9, 5.75, 10.5, 15.25, 18.1, 19.81)
     elif quantity == "duration_s":
         quantiles = (0.0029, 0.00575, 0.0105, 0.01525, 0.0181, 0.01981)
-    elif quantity == "dominant_frequency_hz":
-        quantiles = (5002.9, 5005.75, 5010.5, 5015.25, 5018.1, 5019.81)
     else:
         quantiles = (1.45, 2.875, 5.25, 7.625, 9.05, 9.905)
     selected = (
@@ -158,6 +171,8 @@ def _available_distribution(quantity: str, count: int = 20) -> F11QuantityResult
 
 
 def _empty_distribution(quantity: str) -> F11QuantityResult:
+    if quantity == "dominant_frequency_hz":
+        return _absent_frequency(quantity, 0)
     return F11QuantityResult(
         quantity=quantity,
         observed_count=0,
@@ -178,7 +193,9 @@ def _supported_cell(
     available: bool = True,
 ) -> F11Cell:
     distributions = tuple(
-        _available_distribution(quantity, support)
+        _absent_frequency(quantity, support)
+        if quantity == "dominant_frequency_hz"
+        else _available_distribution(quantity, support)
         if available
         else F11QuantityResult(
             quantity=quantity,
@@ -231,10 +248,8 @@ def _cells(
 
 
 def _grids() -> tuple[tuple[float, ...], ...]:
-    return tuple(
-        tuple(float(value) for value in np.linspace(1.0, 20.0, CDF_PROBABILITIES.size))
-        for _ in QUANTITIES[:-1]
-    )
+    grid = tuple(float(value) for value in np.linspace(1.0, 20.0, CDF_PROBABILITIES.size))
+    return grid, grid, (), grid
 
 
 def _available() -> F11Result:
@@ -395,12 +410,30 @@ def test_axes_and_one_pooled_grid_per_quantity_make_cdfs_addressable() -> None:
     assert np.array_equal(arrays["f11_cdf_probability"], np.asarray(CDF_PROBABILITIES))
     assert arrays["f11_cdf_grid_absolute_peak_v"].shape == (CDF_PROBABILITIES.size,)
     assert arrays["f11_cdf_grid_duration_s"].shape == (CDF_PROBABILITIES.size,)
-    assert arrays["f11_cdf_grid_dominant_frequency_hz"].shape == (CDF_PROBABILITIES.size,)
+    assert arrays["f11_cdf_grid_dominant_frequency_hz"].shape == (0,)
     assert arrays["f11_cdf_grid_v2_s"].shape == (CDF_PROBABILITIES.size,)
     assert refs["f11_cdf_absolute_peak_v"].shape == _CDF_SHAPE
+    assert refs["f11_cdf_dominant_frequency_hz"].shape == (_CELL_COUNT, 0)
     assert refs["f11_absolute_peak_v"].shape == _QUANTILE_SHAPE
     assert np.array_equal(arrays["f11_cdf_grid_absolute_peak_v"], result.cdf_grids[0])
     assert np.array_equal(arrays["f11_cdf_grid_v2_s"], result.cdf_grids[3])
+
+
+def test_frequency_quantity_is_absent_at_every_cell_without_degrading_status() -> None:
+    """Given supported cells, when frequency is structural absence, then masks and table say so."""
+    family, arrays, tables = _build(_available())
+    table = tables[_TABLE_ID]
+    columns = {column.name: index for index, column in enumerate(table.columns)}
+
+    assert family.status is Status.AVAILABLE
+    assert np.count_nonzero(arrays["f11_dominant_frequency_hz_valid"]) == 0
+    assert arrays["f11_cdf_dominant_frequency_hz"].shape == (_CELL_COUNT, 0)
+    assert arrays["f11_cdf_grid_dominant_frequency_hz"].shape == (0,)
+    for row, support in zip(table.rows, arrays["f11_cell_support_count"].flat, strict=True):
+        assert row[columns["f11_dominant_frequency_observed_count"]] == 0
+        assert row[columns["f11_dominant_frequency_missing_count"]] == support
+        assert row[columns["f11_dominant_frequency_status"]] == Status.UNAVAILABLE.value
+        assert row[columns["f11_dominant_frequency_reason_code"]] == INSUFFICIENT_SUPPORT
 
 
 def test_every_cell_is_explicit_and_empty_cells_keep_bin_empty() -> None:
@@ -511,6 +544,17 @@ def test_round_trip_preserves_family_arrays_tables_and_dtypes() -> None:
     loaded_table = loaded.tables[_TABLE_ID]
     assert loaded_table is not None
     assert loaded_table.rows == tables[_TABLE_ID].rows
+    columns = {column.name: index for index, column in enumerate(loaded_table.columns)}
+    for row, support in zip(
+        loaded_table.rows, all_arrays["f11_cell_support_count"].flat, strict=True
+    ):
+        assert row[columns["f11_dominant_frequency_observed_count"]] == 0
+        assert row[columns["f11_dominant_frequency_missing_count"]] == support
+        assert row[columns["f11_dominant_frequency_status"]] == Status.UNAVAILABLE.value
+        assert row[columns["f11_dominant_frequency_reason_code"]] == INSUFFICIENT_SUPPORT
+    assert np.count_nonzero(loaded.arrays["f11_dominant_frequency_hz_valid"]) == 0
+    assert loaded.arrays["f11_cdf_dominant_frequency_hz"].shape == (_CELL_COUNT, 0)
+    assert loaded.arrays["f11_cdf_grid_dominant_frequency_hz"].shape == (0,)
 
 
 def test_wrong_recipe_slot_is_rejected() -> None:
@@ -608,6 +652,28 @@ def test_broken_cell_accounting_is_rejected() -> None:
         result,
         cells=(
             dataclasses.replace(cell, support_count=19),
+            *result.cells[1:],
+        ),
+    )
+    with pytest.raises(CharacterizationError, match="status_invariant"):
+        _build(broken)
+
+
+def test_structurally_absent_frequency_distribution_is_validated() -> None:
+    result = _available()
+    cell = result.cells[0]
+    frequency = cell.distributions[2]
+    broken = _replace(
+        result,
+        cells=(
+            dataclasses.replace(
+                cell,
+                distributions=(
+                    *cell.distributions[:2],
+                    dataclasses.replace(frequency, missing_count=frequency.missing_count - 1),
+                    cell.distributions[3],
+                ),
+            ),
             *result.cells[1:],
         ),
     )

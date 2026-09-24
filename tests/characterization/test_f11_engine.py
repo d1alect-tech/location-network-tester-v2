@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pytest
 
+from lnt.analysis_store import CharacterizationRecipe, parse_analysis_recipe
 from lnt.characterization import f11_result
+from lnt.characterization.bands import ResolvedBand, resolve_characterization_bands
 from lnt.characterization.f11_contract import F11Declarations
 from lnt.characterization.f11_engine import compute_f11_conditional_distributions
 from lnt.characterization.f11_result import (
@@ -21,13 +24,24 @@ from lnt.characterization.f11_result import (
 )
 from lnt.characterization.phase_model import PhaseCycles
 from lnt.characterization.records import Status, Unit, validate_unit_name
+from lnt.context.json_codec import decode_object
 from lnt.events.models import Polarity
 
 FS_HZ = 1000.0
 WINDOW_S = 0.02
 PHASE_BINS = 16
 BANDS = ((3000.0, 10000.0), (10000.0, 50000.0), (50000.0, 200000.0))
+BAND_LABELS = ("band_0001", "band_0002", "band_0003")
 MODE_LABELS = ("mode_0", "mode_1", "mode_2", "mode_3")
+_EXAMPLE = Path(__file__).parents[2] / "docs/examples/characterization-recipe-v2.json"
+
+
+def _resolved_bands() -> tuple[ResolvedBand, ...]:
+    recipe = parse_analysis_recipe(
+        decode_object(_EXAMPLE.read_text(encoding="utf-8"), "test recipe")
+    )
+    assert isinstance(recipe, CharacterizationRecipe)
+    return resolve_characterization_bands(recipe, 1_000_000.0)
 
 
 def _phase(count: int = 1600, *, status: Status = Status.AVAILABLE) -> PhaseCycles:
@@ -66,7 +80,7 @@ def _events(count: int = 20) -> tuple[F11Event, ...]:
             polarity=Polarity.POSITIVE if index % 2 == 0 else Polarity.NEGATIVE,
             absolute_peak_v=float(index + 1),
             duration_s=float(index + 1) / 1000.0,
-            dominant_frequency_hz=5000.0 + index,
+            dominant_band=BAND_LABELS[0],
             v2_s=0.5 * float(index + 1),
         )
         for index in range(count)
@@ -109,7 +123,62 @@ def _run(
         F11EventInventory(events=events, gap_count=gaps),
         modes or _modes(),
         declarations,
+        _resolved_bands(),
     )
+
+
+def _fully_supported_phase() -> PhaseCycles:
+    starts = np.arange(20, dtype=np.float64) * 80.0
+    return PhaseCycles(
+        sample_rate_hz=FS_HZ,
+        sample_count=1600,
+        cycle_start_samples=starts,
+        cycle_end_samples=starts + 80.0,
+        cycle_valid=np.ones(20, dtype=np.bool_),
+        status=Status.AVAILABLE,
+        reason_code=None,
+    )
+
+
+def _fully_supported_modes() -> F15ModeSource:
+    labels = tuple(MODE_LABELS[(index // 4 + index % 4) % 4] for index in range(80))
+    return F15ModeSource(
+        status=Status.AVAILABLE,
+        window_s=WINDOW_S,
+        overlap_fraction=0.0,
+        feature_medians=(0.0,) * 7,
+        feature_mads=(1.0,) * 7,
+        canonical_labels=MODE_LABELS,
+        canonical_standardized_features=tuple(
+            tuple(float(index == axis) for index in range(7)) for axis in range(4)
+        ),
+        window_features=(None,) * 80,
+        window_labels=labels,
+    )
+
+
+def _fully_supported_events() -> tuple[F11Event, ...]:
+    events: list[F11Event] = []
+    ordinal = 0
+    for phase_bin in range(PHASE_BINS):
+        for label in BAND_LABELS:
+            for cycle in range(20):
+                peak_sample = phase_bin * 5 + cycle * 80
+                for _repeat in range(4):
+                    events.append(
+                        F11Event(
+                            ordinal=ordinal,
+                            peak_sample=peak_sample,
+                            peak_time_s=peak_sample / FS_HZ,
+                            polarity=Polarity.POSITIVE if ordinal % 2 == 0 else Polarity.NEGATIVE,
+                            absolute_peak_v=float(ordinal + 1),
+                            duration_s=float(ordinal + 1) / 1000.0,
+                            dominant_band=label,
+                            v2_s=0.5 * float(ordinal + 1),
+                        )
+                    )
+                    ordinal += 1
+    return tuple(events)
 
 
 def test_twenty_linear_events_recover_exact_distribution_truth() -> None:
@@ -126,12 +195,27 @@ def test_twenty_linear_events_recover_exact_distribution_truth() -> None:
     )
     assert cell.status is Status.AVAILABLE
     assert (cell.support_count, cell.positive_count, cell.negative_count) == (20, 10, 10)
-    peak = cell.distributions[0]
-    assert peak.quantiles == pytest.approx((2.9, 5.75, 10.5, 15.25, 18.1, 19.81))
-    assert peak.cdf_probabilities is not None
-    assert peak.cdf_probabilities[0] == pytest.approx(0.05)
-    assert peak.cdf_probabilities[64] == pytest.approx(0.5)
-    assert peak.cdf_probabilities[-1] == 1.0
+    expected_quantiles = (
+        (2.9, 5.75, 10.5, 15.25, 18.1, 19.81),
+        (0.0029, 0.00575, 0.0105, 0.01525, 0.0181, 0.01981),
+        (1.45, 2.875, 5.25, 7.625, 9.05, 9.905),
+    )
+    for index, expected in zip((0, 1, 3), expected_quantiles, strict=True):
+        distribution = cell.distributions[index]
+        assert distribution.status is Status.AVAILABLE
+        assert distribution.quantiles == pytest.approx(expected)
+        assert distribution.cdf_probabilities is not None
+        assert distribution.cdf_probabilities[0] == pytest.approx(0.05)
+        assert distribution.cdf_probabilities[64] == pytest.approx(0.5)
+        assert distribution.cdf_probabilities[-1] == 1.0
+    frequency = cell.distributions[2]
+    assert frequency.observed_count == 0
+    assert frequency.missing_count == 20
+    assert frequency.status is Status.UNAVAILABLE
+    assert frequency.reason_codes == ("insufficient_support",)
+    assert frequency.quantiles == (None,) * len(QUANTILES)
+    assert frequency.cdf_probabilities is None
+    assert result.cdf_grids[2] == ()
 
 
 def test_nonfinite_quantity_is_excluded_only_from_its_distribution() -> None:
@@ -178,29 +262,61 @@ def test_method_locked_recipe_and_reason_vocabulary_match_sources() -> None:
     )
 
 
-def test_phase_and_frequency_edges_use_declared_interval_rules() -> None:
-    """Given exact edges, when F11 bins peaks, then phase and bands are left-closed."""
-    base = _events(4)
-    events = (
-        replace(base[0], peak_sample=99, dominant_frequency_hz=3000.0),
-        replace(base[1], peak_sample=100, dominant_frequency_hz=9999.0),
-        replace(base[2], peak_sample=100, dominant_frequency_hz=10000.0),
-        replace(base[3], peak_sample=100, dominant_frequency_hz=200000.0),
-    )
+@pytest.mark.parametrize(
+    ("label", "expected_band"),
+    tuple(zip(BAND_LABELS, range(len(BAND_LABELS)), strict=True)),
+)
+def test_declared_band_label_selects_matching_resolved_band(label: str, expected_band: int) -> None:
+    """Given each persisted band label, when F11 bins it, then requested name selects the band."""
+    event = replace(_events(1)[0], dominant_band=label)
 
-    feature = _modes().window_features[0]
-    assert feature is not None
-    modes = replace(
-        _modes(),
-        window_features=(None, None, None, None, feature, feature),
-        window_labels=(None, None, None, None, "mode_0", "mode_0"),
-    )
-    result = _run(events, modes=modes, minimum_support=1)  # правила полос, не порог
+    result = _run((event,), minimum_support=1)
+
     observed = {
-        (item.phase_bin, item.band_index) for item in result.cells if item.support_count > 0
+        (item.phase_bin, item.band_index, item.mode_label)
+        for item in result.cells
+        if item.support_count
     }
+    assert observed == {(0, expected_band, "mode_0")}
 
-    assert observed == {(0, 0), (1, 0), (1, 1), (1, 2)}
+
+@pytest.mark.parametrize("label", ["band_9999", None])
+def test_unavailable_band_label_excludes_event_and_counts_declared_code(
+    label: str | None,
+) -> None:
+    """Given unknown or absent label, when F11 bins it, then event is excluded and counted."""
+    valid = _events()
+    excluded = replace(valid[0], ordinal=20, dominant_band=label)
+
+    result = _run((*valid, excluded))
+
+    assert result.status is Status.PARTIAL
+    assert result.reason_codes == ("dominant_band_unavailable",)
+    assert result.n_dominant_band_unavailable == 1
+    assert sum(item.support_count for item in result.cells) == 20
+    assert {item.band_index for item in result.cells if item.support_count} == {0}
+
+
+def test_all_cells_remain_available_when_frequency_distribution_is_structurally_absent() -> None:
+    """Given 20 events per cell, when frequency is absent, then all 192 cells stay available."""
+    result = _run(
+        _fully_supported_events(),
+        modes=_fully_supported_modes(),
+        phase=_fully_supported_phase(),
+    )
+
+    assert result.status is Status.AVAILABLE
+    assert result.reason_codes == ()
+    assert len(result.cells) == 192
+    assert {item.support_count for item in result.cells} == {20}
+    assert {item.status for item in result.cells} == {Status.AVAILABLE}
+    frequency = tuple(item.distributions[2] for item in result.cells)
+    assert {item.status for item in frequency} == {Status.UNAVAILABLE}
+    assert {item.observed_count for item in frequency} == {0}
+    assert {item.missing_count for item in frequency} == {20}
+    assert {item.reason_codes for item in frequency} == {("insufficient_support",)}
+    assert {item.cdf_probabilities for item in frequency} == {None}
+    assert result.cdf_grids[2] == ()
 
 
 def test_unretained_window_uses_lowest_label_on_medoid_distance_tie() -> None:

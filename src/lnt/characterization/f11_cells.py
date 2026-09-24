@@ -25,7 +25,8 @@ if TYPE_CHECKING:
 
     from lnt.characterization.f11_contract import F11Settings
 
-_CONTINUOUS_QUANTITIES: Final = QUANTITIES[:-1]
+_MEASURED_QUANTITY_INDICES: Final = (0, 1, 3)
+_FREQUENCY_INDEX: Final = 2
 
 
 @dataclass(slots=True)
@@ -35,13 +36,15 @@ class CellAccumulator:
     support_count: int = 0
     positive_count: int = 0
     negative_count: int = 0
-    values: list[list[float]] = field(default_factory=lambda: [[] for _ in _CONTINUOUS_QUANTITIES])
+    values: list[list[float]] = field(
+        default_factory=lambda: [[] for _ in _MEASURED_QUANTITY_INDICES]
+    )
 
 
 def add_event(
     members: dict[CellKey, CellAccumulator], key: CellKey, event: F11Event, values: EventValues
 ) -> None:
-    """Добавить событие в ячейку и четыре непрерывные величины."""
+    """Добавить событие в ячейку и три измеренные непрерывные величины."""
     cell = members.setdefault(key, CellAccumulator())
     cell.support_count += 1
     cell.positive_count += int(event.polarity is Polarity.POSITIVE)
@@ -75,17 +78,18 @@ def build_cells(
 def _grids(
     members: Mapping[CellKey, CellAccumulator], points: int
 ) -> tuple[tuple[float, ...], ...]:
-    """Построить один пул значений на величину и общую сетку F11."""
+    """Построить общие сетки трёх измеренных величин; частотная сетка пуста."""
     grids: list[tuple[float, ...]] = []
-    for index in range(len(_CONTINUOUS_QUANTITIES)):
-        pooled = [value for cell in members.values() for value in cell.values[index]]
+    for index in _MEASURED_QUANTITY_INDICES:
+        values_index = _MEASURED_QUANTITY_INDICES.index(index)
+        pooled = [value for cell in members.values() for value in cell.values[values_index]]
         if not pooled:
             grids.append(())
             continue
         low, high = min(pooled), max(pooled)
         grid = np.linspace(low, high, points, dtype=np.float64)
         grids.append(tuple(float(value) for value in grid))
-    return tuple(grids)
+    return grids[0], grids[1], (), grids[2]
 
 
 def _cell(
@@ -96,18 +100,24 @@ def _cell(
 ) -> F11Cell:
     """Опубликовать одну ячейку без выдуманных квантилей."""
     distributions = tuple(
-        _distribution(
+        _absent_frequency(member.support_count, settings)
+        if index == _FREQUENCY_INDEX
+        else _distribution(
             quantity,
-            member.values[index],
+            member.values[_MEASURED_QUANTITY_INDICES.index(index)],
             member.support_count,
             grids[index],
             settings,
         )
-        for index, quantity in enumerate(_CONTINUOUS_QUANTITIES)
+        for index, quantity in enumerate(QUANTITIES[:-1])
     )
     empty = member.support_count == 0
     under = member.support_count < settings.minimum_support
-    partial = any(item.status is not Status.AVAILABLE for item in distributions)
+    partial = any(
+        item.status is not Status.AVAILABLE
+        for index, item in enumerate(distributions)
+        if index != _FREQUENCY_INDEX
+    )
     if empty:
         status, codes = Status.UNAVAILABLE, (BIN_EMPTY,)
     elif under or partial:
@@ -125,6 +135,19 @@ def _cell(
         status=status,
         reason_codes=codes,
         distributions=distributions,
+    )
+
+
+def _absent_frequency(support_count: int, settings: F11Settings) -> F11QuantityResult:
+    """Опубликовать структурно недоступную частотную величину без выдуманных значений."""
+    return F11QuantityResult(
+        quantity="dominant_frequency_hz",
+        observed_count=0,
+        missing_count=support_count,
+        status=Status.UNAVAILABLE,
+        reason_codes=(INSUFFICIENT_SUPPORT,),
+        quantiles=(None,) * len(settings.quantiles),
+        cdf_probabilities=None,
     )
 
 

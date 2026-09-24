@@ -6,7 +6,6 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from lnt.characterization.bands import band_index
 from lnt.characterization.f11_cells import CellAccumulator, add_event, build_cells
 from lnt.characterization.f11_contract import (
     F11Declarations,
@@ -39,6 +38,7 @@ from lnt.characterization.records import Status
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from lnt.characterization.bands import ResolvedBand
     from lnt.characterization.phase_model import PhaseCycles
 
 
@@ -47,9 +47,10 @@ def compute_f11_conditional_distributions(
     inventory: F11EventInventory,
     mode_source: F15ModeSource,
     declarations: F11Declarations,
+    resolved_bands: tuple[ResolvedBand, ...],
 ) -> F11Result:
     """Посчитать 192 условные ячейки и четыре эмпирические CDF на общей сетке."""
-    settings = build_settings(declarations)
+    settings = build_settings(declarations, resolved_bands)
     check_rules(declarations)
     if phase.status is Status.UNAVAILABLE:
         return unavailable_result(
@@ -67,6 +68,9 @@ def compute_f11_conditional_distributions(
     ordered = sorted(inventory.events, key=lambda event: (event.peak_sample, event.ordinal))
     kept = ordered[: settings.maximum_events]
     members: dict[CellKey, CellAccumulator] = {}
+    band_indices = {
+        band.requested.name: index for index, band in enumerate(settings.resolved_bands)
+    }
     n_missing = 0
     n_mode_missing = 0
     n_band_missing = 0
@@ -75,8 +79,9 @@ def compute_f11_conditional_distributions(
         values = _event_values(event)
         n_missing += int(any(value is None for value in values))
         event_phase = _event_phase(phase, event.peak_sample, settings.phase_bins)
-        frequency = values[2]
-        event_band = None if frequency is None else band_index(frequency, settings.resolved_bands)
+        # RootEvent уже применил half_open_last_closed upstream; метка сохраняет
+        # тот же результат, поэтому F11 не пересчитывает и не подменяет частоту.
+        event_band = None if event.dominant_band is None else band_indices.get(event.dominant_band)
         event_mode = assign_mode(model, event.peak_sample)
         n_phase_missing += int(event_phase is None)
         n_band_missing += int(event_band is None)
@@ -135,11 +140,10 @@ def _event_phase(phase: PhaseCycles, peak_sample: int, bins: int) -> int | None:
 
 
 def _event_values(event: F11Event) -> EventValues:
-    """Нормализовать четыре непрерывные величины; недоступное значение равно None."""
+    """Нормализовать три измеренные величины; недоступное значение равно None."""
     return (
         _quantity(event.absolute_peak_v, "absolute_peak_v"),
         _quantity(event.duration_s, "duration_s"),
-        _quantity(event.dominant_frequency_hz, "dominant_frequency_hz"),
         _quantity(event.v2_s, "v2_s"),
     )
 
