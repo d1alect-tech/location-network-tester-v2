@@ -130,6 +130,7 @@ def _available() -> F10Result:
     return F10Result(
         status=Status.AVAILABLE,
         reason_codes=(),
+        scale=0.000487,
         threshold_sigma=np.array(_SIGMAS, dtype=np.float64),
         minimum_duration_s=np.array(_DURATIONS, dtype=np.float64),
         quantiles=np.array(_QUANTILES, dtype=np.float64),
@@ -299,6 +300,7 @@ def test_unavailable_publishes_no_arrays_and_zero_support() -> None:
         _available(),
         status=Status.UNAVAILABLE,
         reason_codes=("phase_reference_unavailable",),
+        scale=None,
     )
     family, arrays = _build(result)
 

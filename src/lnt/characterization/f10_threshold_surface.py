@@ -121,7 +121,7 @@ def compute_f10_threshold_surface(  # noqa: C901, PLR0913 - объявленны
         return _refused(surface, surface.qualified, observation, DURATION_BELOW_SAMPLE_RESOLUTION)
     _episodes(surface, cuts, estimated, checkpoint)
     surface.clipped = clipped > 0
-    return surface.publish(observation)
+    return surface.publish(observation, estimated)
 
 
 def _refused(

@@ -136,6 +136,12 @@ class F10Result:
 
     status: Status
     reason_codes: tuple[str, ...]
+    # Масштаб ``1.4826 * median(abs(r - median(r)))``, которым построены все
+    # пороги и occupancy этой поверхности. Публикуется, чтобы F15 считал свой
+    # признак ``f10_occupancy_5mad`` тем же порогом, а не вторым MAD-оценщиком,
+    # который разъехался бы с occupancy на гистограммной погрешности F10.
+    # ``None`` при отказе: выдуманного порога у пустой записи нет.
+    scale: float | None
     threshold_sigma: Float64Array
     minimum_duration_s: Float64Array
     quantiles: Float64Array
@@ -166,7 +172,7 @@ def _unavailable(
     empty_float = np.empty(0, dtype=np.float64)
     empty_int = np.empty(0, dtype=np.int64)
     return F10Result(
-        status=Status.UNAVAILABLE, reason_codes=codes, threshold_sigma=axes.sigmas,
+        status=Status.UNAVAILABLE, reason_codes=codes, scale=None, threshold_sigma=axes.sigmas,
         minimum_duration_s=axes.durations, quantiles=axes.quantiles, occupancy=empty_float,
         episode_count=empty_int, total_v2_s=empty_float, retained_samples=empty_int,
         truncated_samples=empty_int, duration_quantile_s=empty_float,
@@ -265,7 +271,7 @@ class F10Surface:
         self.members.setdefault(cell, []).append(member)
         self.member_total += 1
 
-    def publish(self, observation: int) -> F10Result:
+    def publish(self, observation: int, scale: float) -> F10Result:
         """Собрать результат: occupancy, счётчики, суммы и квантили с маской."""
         axes = self.axes
         shape = self.counts.shape
@@ -283,6 +289,7 @@ class F10Surface:
         )
         return F10Result(
             status=Status.PARTIAL if codes else Status.AVAILABLE, reason_codes=codes,
+            scale=float(scale),
             threshold_sigma=axes.sigmas, minimum_duration_s=axes.durations,
             quantiles=axes.quantiles, episode_count=self.counts, total_v2_s=self.total_v2,
             occupancy=(self.retained + self.truncated) / safe[None, None, :],

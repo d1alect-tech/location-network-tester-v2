@@ -40,9 +40,10 @@ FS_HZ = 100_000.0
 BINS = 64
 CYCLE_SAMPLES = 64
 CYCLES = 32
-# Фоновая величина u даёт положительный MAD ровно u/2 (половина отсчётов нулевая,
-# половина u), поэтому порог 3·1.4826·MAD ≈ 2.22·u стоит НАД максимумом фона и
-# НИЖЕ импульса A — occupancy точна аналитически, а не подогнана по движку.
+# Фоновая величина u даёт положительный MAD: 8 импульсных отсчётов замещают фон,
+# поэтому нулей и значений u оказывается по 1020 из 2048, а медиана |r| равна
+# ровно u. Порог 3·1.4826·MAD ≈ 4.45·u стоит НАД максимумом фона и НИЖЕ импульса
+# A — occupancy точна аналитически, а не подогнана по движку.
 BACKGROUND_V = 1.0 / 1024.0
 PULSE_V = 5.0
 PULSE_SAMPLES = 4
@@ -184,6 +185,29 @@ def _cells(result: F10Result) -> tuple[np.ndarray, ...]:
         result.retained_samples,
         result.truncated_samples,
     )
+
+
+def test_published_scale_is_the_declared_mad_scale() -> None:
+    """Результат публикует масштаб: аналитическая истина ``1.4826 * u``.
+
+    Фикстура ``_pulse_signal`` даёт величину фона ``u = BACKGROUND_V`` ровно у
+    1020 квалифицированных отсчётов и ноль у 1020 остальных (8 заняты импульсом),
+    поэтому ``median(abs(r - median(r))) = u`` и объявленный масштаб равен
+    ``MAD_FACTOR * u``. Движок оценивает медиану по гистограмме, а не точным
+    ранжированием, поэтому допуск покрывает замеренное отклонение 0.87 %.
+    F15 читает это поле как порог ``5 * scale`` вместо второго, разъезжающегося
+    MAD-оценщика: масштаб обязан быть тем же числом, которым F10 строил occupancy.
+    """
+    phase = _phase(CYCLES)
+    means = _means(support=CYCLES)
+    result = _run(_pulse_signal(CYCLES), phase, means)
+    assert result.status is Status.AVAILABLE
+    expected_scale = MAD_FACTOR * BACKGROUND_V
+    assert result.scale == pytest.approx(expected_scale, rel=0.02)
+    # Отказ публикует масштаб как ``None``: выдумывать порог на пустой записи нельзя.
+    refused = _run(np.zeros(CYCLES * CYCLE_SAMPLES), phase, means)
+    assert refused.status is Status.UNAVAILABLE
+    assert refused.scale is None
 
 
 def test_locked_parameters_match_the_frozen_contract() -> None:
