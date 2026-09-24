@@ -30,6 +30,7 @@ _F07_INDEX = 6
 _F08_INDEX = 7
 _F09_INDEX = 8
 _F10_INDEX = 9
+_F11_INDEX = 10
 _F15_INDEX = 14
 _COMPUTED_INDICES = frozenset(
     {
@@ -43,6 +44,7 @@ _COMPUTED_INDICES = frozenset(
         _F08_INDEX,
         _F09_INDEX,
         _F10_INDEX,
+        _F11_INDEX,
         _F15_INDEX,
     }
 )
@@ -143,6 +145,9 @@ def test_publishes_bundle_with_manifest_code_identity(tmp_path: Path) -> None:
     f10 = loaded.bundle.families[_F10_INDEX]
     assert f10.family_id == "f10_threshold_episode_surface"
     assert f10.reason_codes != ("not_computed",)
+    f11 = loaded.bundle.families[_F11_INDEX]
+    assert f11.family_id == "f11_conditional_distributions"
+    assert f11.reason_codes != ("not_computed",)
     placeholder = tuple(
         family
         for index, family in enumerate(loaded.bundle.families)

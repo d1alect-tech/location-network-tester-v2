@@ -1,11 +1,4 @@
-"""Family slice computations added after the initial six (module size split).
-
-Слайсы первых шести семейств живут в ``characterization_slices.py``. Лимит 250
-чистых LOC на модуль (``tests/test_module_size.py``) не даёт дописывать туда
-дальше, поэтому новые семейства идут сюда, пока и этот модуль не потребует
-своего сплита; общие читатели рецепта и ``_checkpoint`` переиспользуются
-импортом, а не копированием.
-"""
+"""Слайсы после F06; F11 делегирует отдельному модулю."""
 
 from __future__ import annotations
 
@@ -32,6 +25,7 @@ if TYPE_CHECKING:
     from lnt.characterization.f08_result import F08Result
     from lnt.characterization.f09_result import F09Result
     from lnt.characterization.f10_result import F10Result
+    from lnt.characterization.f11_result import F11Result
     from lnt.characterization.f15_result import F15Result
     from lnt.characterization.phase import PhaseCycles, PhaseMeans
     from lnt.scope_io import CancellationToken
@@ -43,6 +37,7 @@ __all__ = [
     "_compute_f08",
     "_compute_f09",
     "_compute_f10",
+    "_compute_f11",
     "_compute_f15",
     "_float_tuple",
 ]
@@ -98,13 +93,7 @@ def _compute_f07(
     recipe: CharacterizationRecipe,
     cancellation: CancellationToken,
 ) -> F07Result:
-    """Кепстр, боковые полосы и гребёнка по ведущему кадру объявленной длины.
-
-    Окна и кроссчек шага залочены рецептом (``characterization_locked.py``:
-    ``windows=("hann","blackman")``, ``spacing_crosscheck=``
-    ``"magnitude_spectrum_autocorrelation"``), но читаются из блока семейства
-    как объявленные параметры: свободных ручек здесь нет.
-    """
+    """Кепстр и боковые полосы по ведущему кадру."""
     family = recipe.families[_F07_INDEX]
     return compute_f07_comb_cepstrum(
         samples,
@@ -182,14 +171,7 @@ def _compute_f10(  # noqa: PLR0913, PLR0917 - явные параметры ср
     clipping: ClippingBounds,
     cancellation: CancellationToken,
 ) -> F10Result:
-    """Поверхность порог × длительность × бин фазы по общему корню фазы.
-
-    ``phase`` и ``means`` — готовые общие корни (спека F10:55 требует
-    квалифицированную фазу CH2); ``clipping`` объявлен спекой:57 — клипированные
-    интервалы исключаются, поэтому границы приходят из манифеста, а не
-    выдумываются. ``gap_mask`` не передаётся: фазовые пропуски уже выражены
-    корнем циклов (F10-решение в evidence task-19).
-    """
+    """Порог × длительность × фаза по общему корню."""
     family = recipe.families[_F10_INDEX]
     return compute_f10_threshold_surface(
         samples,
@@ -252,4 +234,31 @@ def _compute_f15(  # noqa: PLR0913, PLR0917 - явные параметры ср
         ),
         resources=recipe.resource_limits,
         checkpoint=lambda: _checkpoint(cancellation),
+    )
+
+
+def _compute_f11(  # noqa: PLR0913, PLR0917 - делегирование полного набора входов seam
+    phase: PhaseCycles,
+    inventory: RootEvents,
+    f15: F15Result,
+    bands: tuple[ResolvedBand, ...],
+    sample_count: int,
+    sample_rate_hz: float,
+    recipe: CharacterizationRecipe,
+    cancellation: CancellationToken,
+) -> F11Result:
+    from .characterization_slices_conditional import _compute_f11 as compute  # noqa: PLC0415
+
+    f15_family = recipe.families[_F15_INDEX]
+    return compute(
+        phase,
+        inventory,
+        f15,
+        recipe,
+        (_text, _str_tuple, _float_tuple),
+        bands,
+        sample_count,
+        sample_rate_hz,
+        _num(f15_family, "overlap_fraction"),
+        cancellation,
     )
