@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from lnt.analysis_store.characterization_family import CharacterizationFamily
     from lnt.characterization.bands import ResolvedBand
     from lnt.characterization.clipping import ClippingBounds
+    from lnt.characterization.envelope_models import BandEnvelopes
     from lnt.characterization.event_models import RootEvent, RootEvents
     from lnt.characterization.f01_phase_cycle import F01Result
     from lnt.characterization.f07_result import F07Result
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from lnt.characterization.f09_result import F09Result
     from lnt.characterization.f10_result import F10Result
     from lnt.characterization.f11_result import F11Result
+    from lnt.characterization.f13_result import F13Result
     from lnt.characterization.f15_result import F15Result
     from lnt.characterization.phase import PhaseCycles, PhaseMeans
     from lnt.scope_io import CancellationToken
@@ -38,6 +40,7 @@ __all__ = [
     "_compute_f09",
     "_compute_f10",
     "_compute_f11",
+    "_compute_f13",
     "_compute_f15",
     "_float_tuple",
 ]
@@ -262,3 +265,14 @@ def _compute_f11(  # noqa: PLR0913, PLR0917 - делегирование пол�
         _num(f15_family, "overlap_fraction"),
         cancellation,
     )
+
+
+def _compute_f13(
+    source: BandEnvelopes,
+    bands: tuple[ResolvedBand, ...],
+    recipe: CharacterizationRecipe,
+    cancellation: CancellationToken,
+) -> F13Result:
+    from .characterization_slices_envelope import _compute_f13 as compute  # noqa: PLC0415
+
+    return compute(source, bands, recipe, _text, cancellation)

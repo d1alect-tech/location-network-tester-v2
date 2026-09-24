@@ -31,6 +31,7 @@ _F08_INDEX = 7
 _F09_INDEX = 8
 _F10_INDEX = 9
 _F11_INDEX = 10
+_F13_INDEX = 12
 _F15_INDEX = 14
 _COMPUTED_INDICES = frozenset(
     {
@@ -45,6 +46,7 @@ _COMPUTED_INDICES = frozenset(
         _F09_INDEX,
         _F10_INDEX,
         _F11_INDEX,
+        _F13_INDEX,
         _F15_INDEX,
     }
 )

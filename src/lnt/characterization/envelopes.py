@@ -84,19 +84,24 @@ def stream_band_analytic(  # noqa: PLR0913
     )
 
 
-def prepare_band_envelopes(
+def prepare_band_envelopes(  # noqa: PLR0913 - явный источник общих полос
     samples: FloatInput,
     phase: PhaseCycles,
     recipe: CharacterizationRecipe,
     *,
     sample_rate_hz: float,
+    resolved_bands: tuple[ResolvedBand, ...] | None = None,
     checkpoint: Callable[[], None] | None = None,
 ) -> BandEnvelopes:
     """Build each supported band's fixed phase-envelope summary exactly once."""
     _checkpoint(checkpoint)
     if phase.sample_count != int(samples.size) or phase.sample_rate_hz != sample_rate_hz:
         raise ValueError("phase and envelope sample grids differ")
-    resolved = resolve_characterization_bands(recipe, sample_rate_hz)
+    resolved = (
+        resolve_characterization_bands(recipe, sample_rate_hz)
+        if resolved_bands is None
+        else resolved_bands
+    )
     family = next(item for item in recipe.families if item.id == "f13_band_envelope_coactivity")
     filter_order = cast("int", family.value("filter_order"))
     bin_count = recipe.phase.phase_bins
