@@ -37,6 +37,7 @@ from .characterization_slices_extended import (
     _compute_f10,
     _compute_f11,
     _compute_f13,
+    _compute_f14,
     _compute_f15,
 )
 from .types import AnalysisRunResult, Float32Array
@@ -60,8 +61,8 @@ def run_characterization(  # noqa: PLR0913, PLR0915 - seam параллелен 
     событиям и циклам, F06 по объявленной полосе несущей, F04 по корням фазы
     и несущей F06, F07 по ведущему кадру, F08 по событиям, F09 по инвентарю
     событий, F10 по корню фазы, средним и клиппированию, F13 по общим
-    band-envelope остаткам и F15 по тем же корням, затем F11 по результату F15,
-    корневому инвентарю и общей сетке полос.
+    band-envelope остаткам, затем F14 по двум каналам, F15 по тем же корням
+    и F11 по результату F15, корневому инвентарю и общей сетке полос.
     Ключ строится из recipe_sha256, sha256_file сырых каналов, явных
     digest tunables и CodeIdentity; повторный прогон возвращает cache_hit.
 
@@ -158,6 +159,44 @@ def run_characterization(  # noqa: PLR0913, PLR0915 - seam параллелен 
     )
     f13 = _compute_f13(band_envelopes, bands, recipe, cancellation)
     _checkpoint(cancellation)
+    # F14 получает тот же фазовый корень и измеренный инвентарь; для второго
+    # канала его means и replay-инвентарь строятся здесь ровно один раз.
+    phase_means_by_name = {meas_name: means}
+    events_by_name = {meas_name: root_events}
+    for name in ("ch1", "ch2"):
+        if name == meas_name:
+            continue
+        channel = channel_by_name.get(name)
+        if channel is None:
+            continue
+        channel_clipping = _clipping_for(manifest, name, recipe)
+        phase_means_by_name[name] = compute_phase_means(
+            channel,
+            phase,
+            settings=recipe.phase,
+            resources=recipe.resource_limits,
+            checkpoint=lambda: _checkpoint(cancellation),
+        )
+        events_by_name[name] = _root_events(
+            channel,
+            sample_rate_hz,
+            recipe,
+            channel_clipping,
+            cancellation,
+        )
+        _checkpoint(cancellation)
+    f14 = _compute_f14(
+        phase,
+        channel_by_name.get("ch1"),
+        phase_means_by_name.get("ch1"),
+        events_by_name.get("ch1"),
+        channel_by_name.get("ch2"),
+        phase_means_by_name.get("ch2"),
+        events_by_name.get("ch2"),
+        recipe,
+        cancellation,
+    )
+    _checkpoint(cancellation)
     f15 = _compute_f15(
         samples,
         phase,
@@ -194,6 +233,7 @@ def run_characterization(  # noqa: PLR0913, PLR0915 - seam параллелен 
         f10,
         f11,
         f13,
+        f14,
         f15,
         recipe,
         measured_channel=meas_name,

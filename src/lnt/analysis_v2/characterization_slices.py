@@ -50,6 +50,7 @@ __all__ = [
     "_num",
     "_root_events",
     "_session_manifest",
+    "_text",
 ]
 
 _F02_INDEX: Final = 1
@@ -62,6 +63,14 @@ _F06_INDEX: Final = 5
 def _num(family: CharacterizationFamily, name: str) -> float:
     """Числовое поле рецепта: домены проверены numeric-rules при разборе."""
     return float(cast("int | float", family.value(name)))
+
+
+def _text(family: CharacterizationFamily, name: str) -> str:
+    """Текстовое поле рецепта: отказ вместо приведения к строке."""
+    raw = family.value(name)
+    if not isinstance(raw, str) or not raw:
+        raise CharacterizationError("status_invariant", f"{family.id} {name} must be text")
+    return raw
 
 
 def _int_tuple(family: CharacterizationFamily, name: str) -> tuple[int, ...]:

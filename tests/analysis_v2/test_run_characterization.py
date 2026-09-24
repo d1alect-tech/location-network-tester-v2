@@ -32,6 +32,7 @@ _F09_INDEX = 8
 _F10_INDEX = 9
 _F11_INDEX = 10
 _F13_INDEX = 12
+_F14_INDEX = 13
 _F15_INDEX = 14
 _COMPUTED_INDICES = frozenset(
     {
@@ -47,6 +48,7 @@ _COMPUTED_INDICES = frozenset(
         _F10_INDEX,
         _F11_INDEX,
         _F13_INDEX,
+        _F14_INDEX,
         _F15_INDEX,
     }
 )
@@ -153,12 +155,15 @@ def test_publishes_bundle_with_manifest_code_identity(tmp_path: Path) -> None:
     f13 = loaded.bundle.families[_F13_INDEX]
     assert f13.family_id == "f13_band_envelope_coactivity"
     assert f13.reason_codes != ("not_computed",)
+    f14 = loaded.bundle.families[_F14_INDEX]
+    assert f14.family_id == "f14_cross_channel_event_association"
+    assert f14.reason_codes != ("not_computed",)
     placeholder = tuple(
         family
         for index, family in enumerate(loaded.bundle.families)
         if index not in _COMPUTED_INDICES
     )
-    assert placeholder
+    assert len(placeholder) == 4
     assert all(family.status is Status.UNAVAILABLE for family in placeholder)
     assert all(family.reason_codes == ("not_computed",) for family in placeholder)
 

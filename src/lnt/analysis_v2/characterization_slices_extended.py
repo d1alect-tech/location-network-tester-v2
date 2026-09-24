@@ -12,7 +12,8 @@ from lnt.characterization.f10_threshold_surface import compute_f10_threshold_sur
 from lnt.characterization.f15_modes import compute_f15_modes
 from lnt.characterization.f15_result import F15Settings
 
-from .characterization_slices import _checkpoint, _int_tuple, _num
+from .characterization_slices import _checkpoint, _int_tuple, _num, _text
+from .characterization_slices_cross_channel import _compute_f14
 
 if TYPE_CHECKING:
     from lnt.analysis_store import CharacterizationRecipe
@@ -41,6 +42,7 @@ __all__ = [
     "_compute_f10",
     "_compute_f11",
     "_compute_f13",
+    "_compute_f14",
     "_compute_f15",
     "_float_tuple",
 ]
@@ -51,14 +53,6 @@ _F09_INDEX: Final = 8
 _F10_INDEX: Final = 9
 _F13_INDEX: Final = 12
 _F15_INDEX: Final = 14
-
-
-def _text(family: CharacterizationFamily, name: str) -> str:
-    """Текстовое поле рецепта: отказ вместо приведения к строке."""
-    raw = family.value(name)
-    if not isinstance(raw, str) or not raw:
-        raise CharacterizationError("status_invariant", f"{family.id} {name} must be text")
-    return raw
 
 
 def _str_tuple(family: CharacterizationFamily, name: str) -> tuple[str, ...]:

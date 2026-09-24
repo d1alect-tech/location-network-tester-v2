@@ -34,6 +34,7 @@ _F09_INDEX = 8
 _F10_INDEX = 9
 _F11_INDEX = 10
 _F13_INDEX = 12
+_F14_INDEX = 13
 _F15_INDEX = 14
 # Реализованные семейства (индекс -> объявленный ID). Один источник истины на
 # проверку «семейство реально считалось» и на множество заглушек ниже.
@@ -50,6 +51,7 @@ _COMPUTED_IDS = {
     _F10_INDEX: "f10_threshold_episode_surface",
     _F11_INDEX: "f11_conditional_distributions",
     _F13_INDEX: "f13_band_envelope_coactivity",
+    _F14_INDEX: "f14_cross_channel_event_association",
     _F15_INDEX: "f15_interpretable_modes",
 }
 _COMPUTED_INDICES = frozenset(_COMPUTED_IDS)
@@ -121,13 +123,13 @@ def test_f01_e2e_reference_template_run_read_cache_rehash_raw(tmp_path: Path) ->
         assert family.family_id == family_id
         assert family.reason_codes != ("not_computed",)
     # F05 считает CH1 по циклам CH2, поэтому на эталоне она не заглушка;
-    # заглушками остаётся всё, кроме тринадцати работающих семейств.
+    # заглушками остаётся всё, кроме четырнадцати работающих семейств.
     rest = tuple(
         family
         for index, family in enumerate(loaded.bundle.families)
         if index not in _COMPUTED_INDICES
     )
-    assert rest
+    assert len(rest) == 4
     assert all(family.status is Status.UNAVAILABLE for family in rest)
     assert all(family.reason_codes == ("not_computed",) for family in rest)
 
