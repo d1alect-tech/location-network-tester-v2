@@ -31,10 +31,13 @@ _F08_INDEX = 7
 _F09_INDEX = 8
 _F10_INDEX = 9
 _F11_INDEX = 10
+_F12_INDEX = 11
 _F13_INDEX = 12
 _F14_INDEX = 13
 _F15_INDEX = 14
 _F16_INDEX = 15
+_F17_INDEX = 16
+_F18_INDEX = 17
 _COMPUTED_INDICES = frozenset(
     {
         0,
@@ -48,10 +51,13 @@ _COMPUTED_INDICES = frozenset(
         _F09_INDEX,
         _F10_INDEX,
         _F11_INDEX,
+        _F12_INDEX,
         _F13_INDEX,
         _F14_INDEX,
         _F15_INDEX,
         _F16_INDEX,
+        _F17_INDEX,
+        _F18_INDEX,
     }
 )
 
@@ -110,7 +116,9 @@ def _measured_only_recipe() -> CharacterizationRecipe:
     return recipe
 
 
-def test_publishes_bundle_with_manifest_code_identity(tmp_path: Path) -> None:
+def test_publishes_bundle_with_manifest_code_identity(  # noqa: PLR0915 - по три строки на семейство
+    tmp_path: Path,
+) -> None:
     session = _session(tmp_path / "session")
     identity = _identity("test")
 
@@ -154,6 +162,9 @@ def test_publishes_bundle_with_manifest_code_identity(tmp_path: Path) -> None:
     f11 = loaded.bundle.families[_F11_INDEX]
     assert f11.family_id == "f11_conditional_distributions"
     assert f11.reason_codes != ("not_computed",)
+    f12 = loaded.bundle.families[_F12_INDEX]
+    assert f12.family_id == "f12_spectral_kurtosis"
+    assert f12.reason_codes != ("not_computed",)
     f13 = loaded.bundle.families[_F13_INDEX]
     assert f13.family_id == "f13_band_envelope_coactivity"
     assert f13.reason_codes != ("not_computed",)
@@ -163,12 +174,18 @@ def test_publishes_bundle_with_manifest_code_identity(tmp_path: Path) -> None:
     f16 = loaded.bundle.families[_F16_INDEX]
     assert f16.family_id == "f16_multiscale_memory"
     assert f16.reason_codes != ("not_computed",)
+    f17 = loaded.bundle.families[_F17_INDEX]
+    assert f17.family_id == "f17_cyclic_spectral_coherence"
+    assert f17.reason_codes != ("not_computed",)
+    f18 = loaded.bundle.families[_F18_INDEX]
+    assert f18.family_id == "f18_bicoherence_triads"
+    assert f18.reason_codes != ("not_computed",)
     placeholder = tuple(
         family
         for index, family in enumerate(loaded.bundle.families)
         if index not in _COMPUTED_INDICES
     )
-    assert len(placeholder) == 3
+    assert len(placeholder) == 0
     assert all(family.status is Status.UNAVAILABLE for family in placeholder)
     assert all(family.reason_codes == ("not_computed",) for family in placeholder)
 

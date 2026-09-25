@@ -30,6 +30,8 @@ from .characterization_slices import (
     _root_events,
     _session_manifest,
 )
+from .characterization_slices_bicoherence import _compute_f18
+from .characterization_slices_coherence import _compute_f17
 from .characterization_slices_cross_channel import build_channel_roots
 from .characterization_slices_extended import (
     _compute_f07,
@@ -41,6 +43,7 @@ from .characterization_slices_extended import (
     _compute_f14,
     _compute_f15,
 )
+from .characterization_slices_kurtosis import _compute_f12
 from .characterization_slices_memory import _compute_f16
 from .types import AnalysisRunResult, Float32Array
 
@@ -211,6 +214,12 @@ def run_characterization(  # noqa: PLR0913, PLR0915 - seam параллелен 
     _checkpoint(cancellation)
     f16 = _compute_f16(samples, phase, means, root_events, recipe, cancellation)
     _checkpoint(cancellation)
+    f12 = _compute_f12(samples, phase, means, clipping, recipe, cancellation)
+    _checkpoint(cancellation)
+    f17 = _compute_f17(channel_by_name, phase, phase_means_by_name, recipe, cancellation)
+    _checkpoint(cancellation)
+    f18 = _compute_f18(samples, phase, means, recipe, cancellation)
+    _checkpoint(cancellation)
     bundle, arrays, tables = build_characterization_bundle(
         result,
         f02,
@@ -223,10 +232,13 @@ def run_characterization(  # noqa: PLR0913, PLR0915 - seam параллелен 
         f09,
         f10,
         f11,
+        f12,
         f13,
         f14,
         f15,
         f16,
+        f17,
+        f18,
         recipe,
         measured_channel=meas_name,
         sample_rate_hz=sample_rate_hz,
