@@ -30,6 +30,7 @@ from .characterization_slices import (
     _root_events,
     _session_manifest,
 )
+from .characterization_slices_cross_channel import build_channel_roots
 from .characterization_slices_extended import (
     _compute_f07,
     _compute_f08,
@@ -160,32 +161,19 @@ def run_characterization(  # noqa: PLR0913, PLR0915 - seam параллелен 
     )
     f13 = _compute_f13(band_envelopes, bands, recipe, cancellation)
     _checkpoint(cancellation)
-    # F14 получает тот же фазовый корень и измеренный инвентарь; для второго
-    # канала его means и replay-инвентарь строятся здесь ровно один раз.
-    phase_means_by_name = {meas_name: means}
-    events_by_name = {meas_name: root_events}
-    for name in ("ch1", "ch2"):
-        if name == meas_name:
-            continue
-        channel = channel_by_name.get(name)
-        if channel is None:
-            continue
-        channel_clipping = _clipping_for(manifest, name, recipe)
-        phase_means_by_name[name] = compute_phase_means(
-            channel,
-            phase,
-            settings=recipe.phase,
-            resources=recipe.resource_limits,
-            checkpoint=lambda: _checkpoint(cancellation),
-        )
-        events_by_name[name] = _root_events(
-            channel,
-            sample_rate_hz,
-            recipe,
-            channel_clipping,
-            cancellation,
-        )
-        _checkpoint(cancellation)
+    # F14 получает тот же фазовый корень и измеренный инвентарь; корни второго
+    # канала строятся один раз в обвязке F14, а не в теле seam.
+    phase_means_by_name, events_by_name = build_channel_roots(
+        channel_by_name,
+        phase,
+        meas_name,
+        means,
+        root_events,
+        manifest,
+        sample_rate_hz,
+        recipe,
+        cancellation,
+    )
     f14 = _compute_f14(
         phase,
         channel_by_name.get("ch1"),
