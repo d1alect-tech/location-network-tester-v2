@@ -318,6 +318,25 @@ def test_broken_transition_accounting_is_rejected() -> None:
         _build(broken)
 
 
+def test_broken_dwell_length_is_rejected_as_declared_not_raw_broadcast() -> None:
+    """Пустой массив длительностей даёт объявленную ошибку, а не сырой ValueError.
+
+    ``np.allclose`` broadcast'ит ``(1,)`` против ``(N,)``, поэтому длина 1 здесь
+    ничего не доказывает; пустой массив против непустого несовместим и бросает
+    broadcast-``ValueError``. Непойманное исключение на границе бандла
+    уничтожило бы весь прогон характеризации, а не одно семейство. Проверка формы
+    стоит первым условием там же, как в ``f14_arrays.py:183``, поэтому короткое
+    замыкание происходит до ``allclose``. Пустой массив недоступен для AVAILABLE:
+    ``labels.size == 0`` отвергнут выше, значит ожидаемых длительностей всегда
+    хотя бы одна.
+    """
+    broken = _without_result_validation(
+        _available(), dwell_durations_s=np.zeros(0, dtype=np.float64)
+    )
+    with pytest.raises(CharacterizationError, match="status_invariant"):
+        _build(broken)
+
+
 def test_wrong_shape_validity_mask_is_rejected_by_codec() -> None:
     """A partial mask cannot have a different shape than its array reference."""
     result = dataclasses.replace(

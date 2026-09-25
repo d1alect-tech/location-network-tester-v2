@@ -168,8 +168,10 @@ def _check_accounting(result: F15Result) -> None:
     stops = np.concatenate((starts[1:], np.asarray([labels.size], dtype=np.int64)))
     expected_labels = labels[starts]
     expected_durations = (stops - starts).astype(np.float64) * result.window_s
-    if not np.array_equal(result.dwell_labels, expected_labels) or not np.allclose(
-        result.dwell_durations_s, expected_durations, rtol=0.0, atol=1e-12
+    if (
+        result.dwell_durations_s.shape != expected_durations.shape
+        or not np.array_equal(result.dwell_labels, expected_labels)
+        or not np.allclose(result.dwell_durations_s, expected_durations, rtol=0.0, atol=1e-12)
     ):
         raise CharacterizationError("status_invariant", "f15 dwell accounting is inconsistent")
     expected_counts = np.zeros((_CLUSTER_COUNT, _CLUSTER_COUNT), dtype=np.int64)
