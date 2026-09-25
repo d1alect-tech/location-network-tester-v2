@@ -47,7 +47,7 @@ type BoolArray = NDArray[np.bool_]
 type Checkpoint = Callable[[], None] | None
 
 
-def compute_f18_bicoherence_triads(  # noqa: PLR0913, PLR0917 - полный вход F18
+def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вход и гейты F18
     samples: np.ndarray,
     phase: PhaseCycles,
     means: PhaseMeans,
@@ -107,11 +107,16 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0913, PLR0917 - полный в�
     if not bool(np.any(available)):
         reasons.add(ZERO_DENOMINATOR)
         return _unavailable(tuple(sorted(reasons)), len(values))
+    residual = observed_residual(values, phase, means, resources=resources, checkpoint=checkpoint)
+    if residual is None:
+        # Корень фазы не покрывает запись целиком: честный отказ одного семейства
+        # вместо непойманного исключения, которое унесло бы все восемнадцать.
+        # Накопленные коды сетки сохраняются, чтобы отказ не терял причину above_nyquist.
+        reasons.add(PHASE_REFERENCE_UNAVAILABLE)
+        return _unavailable(tuple(sorted(reasons)), len(values))
     phase_counter, iaaft_counter, converged = run_both_nulls(
         F18NullPlan(
-            residual=observed_residual(
-                values, phase, means, resources=resources, checkpoint=checkpoint
-            ),
+            residual=residual,
             phase=phase,
             means=zero_phase_means(means),
             declarations=declarations,

@@ -91,6 +91,28 @@ def _phase(sample_rate_hz: float, sample_count: int) -> PhaseCycles:
     )
 
 
+def _halo_phase(sample_rate_hz: float, sample_count: int, halo: int) -> PhaseCycles:
+    """Корень фазы, не покрывающий края записи, как настоящий root из seam.
+
+    ``compute_phase_cycles`` отбрасывает halo фильтра с обоих концов, поэтому
+    первый сэмпл записи всегда лежит до начала первого цикла, а последний —
+    за концом последнего. Здесь достаточно одного цикла halo, чтобы полное
+    покрытие перестало выполняться; настоящий seam теряет около трёх.
+    """
+    step = max(1, round(sample_rate_hz / 50.0))
+    starts = np.arange(halo, sample_count - halo, step, dtype=np.float64)
+    ends = np.append(starts[1:], float(sample_count - halo))
+    return PhaseCycles(
+        sample_rate_hz=sample_rate_hz,
+        sample_count=sample_count,
+        cycle_start_samples=starts,
+        cycle_end_samples=ends,
+        cycle_valid=np.ones(ends.size, dtype=np.bool_),
+        status=Status.AVAILABLE,
+        reason_code=None,
+    )
+
+
 def _means(level: float = 0.0) -> PhaseMeans:
     return PhaseMeans(
         means_v=np.full(64, level, dtype=np.float64),
@@ -312,6 +334,42 @@ def test_partially_measurable_grid_publishes_the_declared_domain() -> None:
     assert not np.any(result.significant[~result.triad_available])
     assert np.all(np.isnan(result.adjusted_p_value[~result.triad_available]))
     assert result.status is not Status.UNAVAILABLE
+
+
+def test_interior_only_phase_root_degrades_to_unavailable_not_an_error() -> None:
+    """Неполное покрытие корня — это отказ семейства, а не ValueError на весь seam.
+
+    Настоящий корень фазы никогда не покрывает запись целиком: halo фильтра
+    делает первый и последний сэмпл неквалифицированными. Материализация
+    остатка для суррогатного null обязана сообщать об этом как о недоступности
+    семейства с пустыми доменами. Непойманное исключение здесь уничтожило бы
+    весь прогон характеризации, то есть все восемнадцать семейств, а не одно.
+
+    Запись удлинена на два halo, чтобы квалифицированный спан остался ровно
+    ``_SAMPLES`` и сохранил locked ``minimum_frames``: иначе framing-путь
+    честно недосчитает кадров и откажет раньше, по ``insufficient_frames``,
+    и до материализации остатка дело не дойдёт.
+    """
+    halo = round(_FS / 50.0)
+    samples = _SAMPLES + 2 * halo
+
+    result = compute_f18_bicoherence_triads(
+        _coupled_record(_FS, samples),
+        _halo_phase(_FS, samples, halo),
+        _means(),
+        F18Declarations.locked(),
+        settings=_settings(),
+        resources=_resources(),
+    )
+
+    assert result.status is Status.UNAVAILABLE
+    assert result.reason_codes == (PHASE_REFERENCE_UNAVAILABLE,)
+    assert result.sample_count == samples
+    assert result.qualified_sample_count == 0
+    assert result.declared_triad_count == 0
+    assert result.iaaft_converged_count == 0
+    for array in _arrays(result):
+        assert array.size == 0
 
 
 def test_thirty_one_frames_is_insufficient_and_publishes_no_domain() -> None:

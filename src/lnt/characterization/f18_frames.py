@@ -75,12 +75,18 @@ def observed_residual(
     *,
     resources: ResourceLimits,
     checkpoint: Callable[[], None] | None = None,
-) -> Float64Array:
+) -> Float64Array | None:
     """Материализовать bounded phase-removed остаток — источник обоих null.
 
     Это тот же shared `phase_residual`, что и у framing-пути; второй STFT или
     второй framing-путь не создаётся. Остаток уже очищен от 64-бинного phase mean,
     поэтому суррогат проходит дальше с нулевым mean и не вычитает его дважды.
+
+    ``None`` означает, что корень фазы не покрывает запись целиком: нули на
+    неквалифицированных позициях исказили бы спектр суррогата, поэтому источник
+    null считается негодным. Это состояние записи, а не повреждение данных, —
+    поэтому сигнал возвращается значением, а не исключением: непойманное
+    исключение унесло бы весь прогон характеризации, а не одно семейство.
     """
     values = np.asarray(samples, dtype=np.float64)
     capacity = min(
@@ -96,7 +102,7 @@ def observed_residual(
         stop = min(int(values.size), start + capacity)
         residual, valid = phase_residual(values, phase, means, start, stop, resources=resources)
         if not bool(np.all(valid)):
-            raise ValueError("F18 surrogate source changed during residual replay")
+            return None
         parts.append(residual)
     if not parts:
         return np.empty(0, dtype=np.float64)
