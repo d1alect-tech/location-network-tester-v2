@@ -178,7 +178,8 @@ def test_locked_contract_and_claim_boundary_match_authoritative_recipe() -> None
     # Пробел объявленной сетки зафиксирован, а не обойден подбором удобной частоты.
     assert {gap[:5] for gap in SPEC_GAPS} == {"F17-1"}
     assert "cyclic_frequency_off_grid" in SPEC_GAPS[0]
-    assert "204800/k" in SPEC_GAPS[0]
+    assert "divide 102400" in SPEC_GAPS[0]
+    assert "_rate_code" in SPEC_GAPS[0]
 
 
 def test_exact_grid_maps_known_sidebands_without_interpolation() -> None:

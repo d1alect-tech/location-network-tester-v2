@@ -139,7 +139,12 @@ SPEC_GAPS: Final = (
         "of 6000 Hz, so all 15 triads report triad_above_nyquist instead. Exact grids exist "
         "only where fs/4096 divides the 1000 Hz gcd of the bases, that is fs = 4096000/k: "
         "1.024 MHz, 512 kHz and 256 kHz carry all 5 bases and all 15 triads, while "
-        "204.8 kHz and 102.4 kHz clamp the highest sums. The locked bases, segment length "
+        "204.8 kHz and 102.4 kHz clamp the highest sums. Decisive constraint: "
+        "acquire_validation._rate_code accepts ONLY integer 1..15 MHz for a hardware "
+        "capture, and no integer-megahertz rate divides 4096000 = 2^15 * 5^3, because "
+        "k * 10^6 = k * 2^6 * 5^6 would require 5^6 | 5^3. F18 therefore cannot produce a "
+        "measurement on any hardware record at any supported rate; 500 kHz and 8 kHz are "
+        "simulation-only rates. The locked bases, segment length "
         "and exact_fft_bins mapping were not retuned: rounding an off-grid frequency to the "
         "nearest bin would fabricate a component the record does not contain."
     ),
