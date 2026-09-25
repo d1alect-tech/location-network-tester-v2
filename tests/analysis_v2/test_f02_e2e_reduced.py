@@ -34,6 +34,7 @@ _F11_INDEX = 10
 _F13_INDEX = 12
 _F14_INDEX = 13
 _F15_INDEX = 14
+_F16_INDEX = 15
 _COMPUTED_INDICES = frozenset(
     {
         0,
@@ -50,6 +51,7 @@ _COMPUTED_INDICES = frozenset(
         _F13_INDEX,
         _F14_INDEX,
         _F15_INDEX,
+        _F16_INDEX,
     }
 )
 
@@ -165,7 +167,7 @@ def test_reference_session_publishes_f02_with_cache_and_stable_raw(tmp_path: Pat
     rest = tuple(
         family for index, family in enumerate(bundle.families) if index not in _COMPUTED_INDICES
     )
-    assert len(rest) == 4
+    assert len(rest) == 3
     assert all(family.status is Status.UNAVAILABLE for family in rest)
     assert all(family.reason_codes == ("not_computed",) for family in rest)
 

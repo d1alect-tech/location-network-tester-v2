@@ -16,6 +16,7 @@ from lnt.characterization.f11_bundle import F11_ID, F11_INDEX, build_f11_family
 from lnt.characterization.f13_bundle import F13_ID, F13_INDEX, build_f13_family
 from lnt.characterization.f14_bundle import F14_ID, F14_INDEX, build_f14_family
 from lnt.characterization.f15_bundle import F15_ID, F15_INDEX, build_f15_family
+from lnt.characterization.f16_bundle import F16_ID, F16_INDEX, build_f16_family
 from lnt.characterization.models import CharacterizationBundle
 from lnt.characterization.records import Band
 
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
     from lnt.characterization.f13_result import F13Result
     from lnt.characterization.f14_result import F14Result
     from lnt.characterization.f15_result import F15Result
+    from lnt.characterization.f16_result import F16Result
     from lnt.characterization.models import FamilyResult
     from lnt.characterization.tables import TableBlock
 
@@ -57,13 +59,14 @@ def build_characterization_bundle(  # noqa: PLR0913, PLR0917 - рецепт, к�
     f13_result: F13Result,
     f14_result: F14Result,
     f15_result: F15Result,
+    f16_result: F16Result,
     recipe: CharacterizationRecipe,
     *,
     measured_channel: str = "ch1",
     sample_rate_hz: float,
     record_duration_s: float,
 ) -> tuple[CharacterizationBundle, dict[str, np.ndarray], dict[str, TableBlock]]:
-    """Assemble the mapped families beside F01, F02, F05, F06 and four placeholders."""
+    """Assemble the mapped families beside F01, F02, F05, F06 and three placeholders."""
     families = recipe.families
     _require_declared_order(families)
     previous, arrays, tables = build_f01_f02_f05_f06_bundle(
@@ -147,6 +150,13 @@ def build_characterization_bundle(  # noqa: PLR0913, PLR0917 - рецепт, к�
         measured_channel=measured_channel,
         record_duration_s=float(record_duration_s),
     )
+    f16_family, f16_arrays, f16_tables = build_f16_family(
+        f16_result,
+        families[F16_INDEX],
+        band,
+        measured_channel=measured_channel,
+        record_duration_s=float(record_duration_s),
+    )
     # Сплайс один на все семейства: позиция -> конверт, остальное остаётся
     # заглушкой ``previous``. Ручные срезы по каждому индексу не масштабируются
     # на оставшиеся 4 семейства, поэтому порядок собирается общим проходом.
@@ -161,6 +171,7 @@ def build_characterization_bundle(  # noqa: PLR0913, PLR0917 - рецепт, к�
         (F13_INDEX, f13_family, f13_arrays, f13_tables),
         (F14_INDEX, f14_family, f14_arrays, f14_tables),
         (F15_INDEX, f15_family, f15_arrays, f15_tables),
+        (F16_INDEX, f16_family, f16_arrays, f16_tables),
     )
     envelope_by_index = {position: family for position, family, _, _ in mapped}
     bundle = CharacterizationBundle(
@@ -188,6 +199,7 @@ _DECLARED_ORDER: Final = (
     (F13_INDEX, F13_ID),
     (F14_INDEX, F14_ID),
     (F15_INDEX, F15_ID),
+    (F16_INDEX, F16_ID),
 )
 
 

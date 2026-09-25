@@ -40,6 +40,7 @@ from .characterization_slices_extended import (
     _compute_f14,
     _compute_f15,
 )
+from .characterization_slices_memory import _compute_f16
 from .types import AnalysisRunResult, Float32Array
 
 __all__ = ["run_characterization"]
@@ -220,6 +221,8 @@ def run_characterization(  # noqa: PLR0913, PLR0915 - seam параллелен 
         cancellation,
     )
     _checkpoint(cancellation)
+    f16 = _compute_f16(samples, phase, means, root_events, recipe, cancellation)
+    _checkpoint(cancellation)
     bundle, arrays, tables = build_characterization_bundle(
         result,
         f02,
@@ -235,6 +238,7 @@ def run_characterization(  # noqa: PLR0913, PLR0915 - seam параллелен 
         f13,
         f14,
         f15,
+        f16,
         recipe,
         measured_channel=meas_name,
         sample_rate_hz=sample_rate_hz,
