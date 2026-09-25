@@ -97,7 +97,13 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0913, PLR0917 - полный в�
         reasons.add(INSUFFICIENT_FRAMES)
         return _unavailable(tuple(sorted(reasons)), len(values))
     observed = triad_bicoherence(coefficients, rows)
-    available = measurable & np.isfinite(observed.bicoherence_squared)
+    # Наблюдение считается по measurable-подмножеству, а публикуется всегда в
+    # declared-домене. Маска доступности поэтому собирается scatter'ом, а не
+    # пересечением: на частично измеримой сетке длины (declared, measurable)
+    # расходятся, и пересечение падает ValueError. Неизмеримая триада заведомо
+    # недоступна, так что за пределами measurable маска равна False, а не NaN.
+    available = np.zeros(measurable.size, dtype=np.bool_)
+    available[measurable] = np.isfinite(observed.bicoherence_squared)
     if not bool(np.any(available)):
         reasons.add(ZERO_DENOMINATOR)
         return _unavailable(tuple(sorted(reasons)), len(values))

@@ -277,6 +277,43 @@ def test_nyquist_clamp_reports_above_nyquist_before_off_grid() -> None:
     assert result.declared_triad_count == 0
 
 
+def test_partially_measurable_grid_publishes_the_declared_domain() -> None:
+    """204.8 kHz: сетка точна, но измеримы не все триады — домен остаётся declared.
+
+    Промежуточный случай между «измеримы все» (512 kHz) и «не измерима ни одна»
+    (off-grid). Именно на нём расходится длина измеренного подмножества и
+    объявленного домена: наблюдаемая bicoherence считается по строкам
+    ``grid.rows[measurable]``, а публиковаться обязана в declared-домене.
+    Частота выбрана так, чтобы шаг 204800/4096 = 50 Hz делил все объявленные
+    базы, а Найквист 102.4 kHz оставался выше каждой компоненты фикстуры,
+    поэтому алиасинга здесь нет и расхождение длиной — единственное отличие.
+    """
+    rate = 204_800.0
+
+    result = compute_f18_bicoherence_triads(
+        _coupled_record(rate, _SAMPLES),
+        _phase(rate, _SAMPLES),
+        _means(),
+        F18Declarations.locked(),
+        settings=_settings(),
+        resources=_resources(),
+    )
+
+    declared = result.declared_triad_count
+    measurable = result.measurable_triad_count
+    assert declared == 15
+    assert 0 < measurable < declared
+    for array in _arrays(result):
+        assert array.size == declared
+    # Неизмеримые триады опубликованы как структурное отсутствие: NaN в домене
+    # bicoherence, а не ноль и не укороченный массив.
+    assert int(np.count_nonzero(np.isnan(result.bicoherence_squared))) == declared - measurable
+    assert int(np.count_nonzero(result.triad_available)) <= measurable
+    assert not np.any(result.significant[~result.triad_available])
+    assert np.all(np.isnan(result.adjusted_p_value[~result.triad_available]))
+    assert result.status is not Status.UNAVAILABLE
+
+
 def test_thirty_one_frames_is_insufficient_and_publishes_no_domain() -> None:
     """31 кадр на один меньше locked minimum_frames = declared insufficient."""
     sample_count = _SEGMENT + 30 * _HOP
