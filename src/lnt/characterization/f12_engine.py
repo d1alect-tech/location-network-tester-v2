@@ -16,7 +16,7 @@ from lnt.characterization.f12_contract import (
     ZERO_POWER,
 )
 from lnt.characterization.f12_inference import infer_f12_candidates
-from lnt.characterization.f12_input import materialize_phase_residual
+from lnt.characterization.f12_input import longest_qualified_span, materialize_phase_residual
 from lnt.characterization.f12_math import declared_phase_reason
 from lnt.characterization.f12_result import F12Result
 from lnt.characterization.f12_scales import observe_scale
@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
     from lnt.analysis_store.characterization_settings import ResourceLimits
     from lnt.characterization.clipping import ClippingBounds
+    from lnt.characterization.event_models import RootEvents
     from lnt.characterization.f12_result import F12Declarations
     from lnt.characterization.phase_model import PhaseCycles, PhaseMeans
 
@@ -38,26 +39,38 @@ def compute_f12_spectral_kurtosis(  # noqa: C901, PLR0911, PLR0913, PLR0917 - de
     phase: PhaseCycles,
     means: PhaseMeans,
     clipping: ClippingBounds,
+    inventory: RootEvents,
     declarations: F12Declarations,
     resources: ResourceLimits,
     checkpoint: Callable[[], None] | None = None,
 ) -> F12Result:
-    """Считать declared F12 из полного phase-residual record."""
+    """Считать declared F12 из longest phase-qualified span записи.
+
+    ``sample_count`` публикует полную длину записи, ``qualified_sample_count`` —
+    длину span, по которому на самом деле считалось. Оба отказа до выбора span
+    оценивают клиппинг и корень фазы на полной записи.
+    """
     if checkpoint is not None:
         checkpoint()
-    values = _validate_inputs(samples, phase, means, declarations, resources)
+    values = _validate_inputs(samples, phase, means, inventory, declarations, resources)
+    record_samples = int(values.size)
     if phase.status is Status.UNAVAILABLE or means.status is Status.UNAVAILABLE:
-        return _unavailable((PHASE_REFERENCE_UNAVAILABLE,), values.size)
+        return _unavailable((PHASE_REFERENCE_UNAVAILABLE,), record_samples)
     if phase.reason_code in PHASE_ROOT_REASON_CODES or means.reason_code in PHASE_ROOT_REASON_CODES:
         reason = declared_phase_reason(phase.reason_code or means.reason_code or "")
-        return _unavailable((reason,), values.size)
+        return _unavailable((reason,), record_samples)
     if clipping.classify(values) is not False:
-        return _unavailable((CLIPPED,), values.size)
+        return _unavailable((CLIPPED,), record_samples)
+    span = longest_qualified_span(values, phase, means, inventory, resources, checkpoint)
+    if span is None:
+        return _unavailable((PHASE_REFERENCE_UNAVAILABLE,), record_samples)
+    (start, stop), phase = span
+    values = values[start:stop]
     residual, qualified = materialize_phase_residual(values, phase, means, resources, checkpoint)
     if qualified != values.size:
-        return _unavailable((PHASE_REFERENCE_UNAVAILABLE,), values.size)
+        return _unavailable((PHASE_REFERENCE_UNAVAILABLE,), record_samples)
     if not np.any(residual * residual > 0.0):
-        return _unavailable((ZERO_POWER,), values.size)
+        return _unavailable((ZERO_POWER,), record_samples)
     scales = tuple(
         observe_scale(
             values,
@@ -72,10 +85,10 @@ def compute_f12_spectral_kurtosis(  # noqa: C901, PLR0911, PLR0913, PLR0917 - de
     )
     if not any(scale.reason_code is None for scale in scales):
         reasons = tuple(sorted({scale.reason_code for scale in scales if scale.reason_code}))
-        return _unavailable(reasons, values.size)
+        return _unavailable(reasons, record_samples)
     candidates = observed_candidates(scales)
     if candidates.spectral_kurtosis.size == 0:
-        return _unavailable((ZERO_POWER,), values.size)
+        return _unavailable((ZERO_POWER,), record_samples)
     magnitudes = np.abs(np.fft.rfft(residual))
     null_maxima = surrogate_global_maxima(
         residual,
@@ -87,7 +100,7 @@ def compute_f12_spectral_kurtosis(  # noqa: C901, PLR0911, PLR0913, PLR0917 - de
         checkpoint=checkpoint,
     )
     if not np.all(np.isfinite(null_maxima)):
-        return _unavailable((ZERO_POWER,), values.size)
+        return _unavailable((ZERO_POWER,), record_samples)
     inference = infer_f12_candidates(
         candidates,
         null_maxima,
@@ -114,7 +127,7 @@ def compute_f12_spectral_kurtosis(  # noqa: C901, PLR0911, PLR0913, PLR0917 - de
         selected_scale_index=inference.selected_scale_index,
         selected_band_low_hz=inference.selected_band_low_hz,
         selected_band_high_hz=inference.selected_band_high_hz,
-        sample_count=values.size,
+        sample_count=record_samples,
         qualified_sample_count=values.size,
         analyzed_scale_count=sum(scale.reason_code is None for scale in scales),
         candidate_count=candidates.spectral_kurtosis.size,
@@ -124,10 +137,11 @@ def compute_f12_spectral_kurtosis(  # noqa: C901, PLR0911, PLR0913, PLR0917 - de
     )
 
 
-def _validate_inputs(
+def _validate_inputs(  # noqa: PLR0913, PLR0917 - полный shared input contract
     samples: np.ndarray,
     phase: PhaseCycles,
     means: PhaseMeans,
+    inventory: RootEvents,
     declarations: F12Declarations,
     resources: ResourceLimits,
 ) -> np.ndarray:
@@ -137,6 +151,7 @@ def _validate_inputs(
         raise ValueError("F12 samples must be one finite vector")
     if (
         phase.sample_count != values.size
+        or inventory.sample_count != values.size
         or not math.isfinite(phase.sample_rate_hz)
         or phase.sample_rate_hz <= 0.0
         or means.means_v.shape != shape

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from lnt.analysis_store.characterization_settings import ResourceLimits
 from lnt.characterization.clipping import ClippingBounds
+from lnt.characterization.event_models import RootEvents, RootEventSettings, RootTimelineItem
 from lnt.characterization.f12_contract import (
     CLIPPED,
     INSUFFICIENT_FRAMES,
@@ -21,6 +23,9 @@ from lnt.characterization.f12_engine import compute_f12_spectral_kurtosis
 from lnt.characterization.f12_result import F12Declarations
 from lnt.characterization.phase_model import PhaseCycles, PhaseMeans
 from lnt.characterization.records import Status
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
 
 _FS_HZ = 10_000.0
 
@@ -49,6 +54,73 @@ def _phase(sample_count: int, sample_rate_hz: float = _FS_HZ) -> PhaseCycles:
         cycle_valid=np.ones(edges.size - 1, dtype=np.bool_),
         status=Status.AVAILABLE,
         reason_code=None,
+    )
+
+
+def _halo_phase(sample_count: int, halo: int, sample_rate_hz: float = _FS_HZ) -> PhaseCycles:
+    """Корень фазы, покрывающий только внутренний span [halo, sample_count - halo)."""
+    stop = sample_count - halo
+    edges = np.arange(halo, stop + 1, sample_rate_hz / 50.0, dtype=np.float64)
+    if int(edges[-1]) != stop:
+        edges = np.append(edges, stop)
+    return PhaseCycles(
+        sample_rate_hz=sample_rate_hz,
+        sample_count=sample_count,
+        cycle_start_samples=edges[:-1],
+        cycle_end_samples=edges[1:],
+        cycle_valid=np.ones(edges.size - 1, dtype=np.bool_),
+        status=Status.AVAILABLE,
+        reason_code=None,
+    )
+
+
+def _inventory(sample_count: int) -> RootEvents:
+    """Пустой корневой инвентарь: ни событий, ни unqualified gaps."""
+
+    def replay(_: Callable[[], None] | None) -> Iterator[RootTimelineItem]:
+        yield from ()
+
+    settings = RootEventSettings(
+        recipe_sha256="test",
+        detector="existing_event_inventory",
+        noise_window_samples=2_048,
+        noise_step_samples=1_024,
+        minimum_noise_samples=1_024,
+        threshold_sigma=5.0,
+        max_gap_samples=4,
+        minimum_event_samples=1,
+        minimum_snr_db=10.0,
+        minimum_snr_ratio=3.9810717055349722,
+        dead_time_s=0.001,
+        dead_time_samples=10,
+        chunk_samples=4_096,
+        fft_max_samples=1_048_576,
+        clipping_low_v=None,
+        clipping_high_v=None,
+        clipping_reason_code="not_applicable",
+        dead_time_handling="exclude_intervals",
+        gap_handling="exclude_crossing_intervals",
+    )
+    return RootEvents(
+        sample_rate_hz=_FS_HZ,
+        sample_count=sample_count,
+        events=(),
+        gaps=(),
+        exclusions=(),
+        candidate_count=0,
+        snr_rejected_count=0,
+        accepted_count=0,
+        omitted_count=0,
+        dead_time_rejected_count=0,
+        gap_count=0,
+        omitted_gap_count=0,
+        omitted_exclusion_count=0,
+        selection_rule="first_by_peak_sample",
+        retained_candidates_complete=True,
+        settings=settings,
+        status=Status.AVAILABLE,
+        reason_codes=(),
+        _replay_factory=replay,
     )
 
 
@@ -83,6 +155,7 @@ def test_unavailable_phase_normalizes_and_keeps_empty_domains() -> None:
         phase,
         _means(),
         _unclipped(),
+        _inventory(sample_count),
         F12Declarations.locked(),
         _resources(),
     )
@@ -121,6 +194,7 @@ def test_clipped_and_unknown_clipping_reject_before_measurement() -> None:
             _phase(sample_count),
             _means(),
             bounds,
+            _inventory(sample_count),
             F12Declarations.locked(),
             _resources(),
         )
@@ -139,6 +213,7 @@ def test_zero_phase_residual_second_moment_is_unavailable() -> None:
         _phase(sample_count),
         replace(_means(), means_v=np.ones(64, dtype=np.float64)),
         _unclipped(),
+        _inventory(sample_count),
         F12Declarations.locked(),
         _resources(),
     )
@@ -161,6 +236,7 @@ def test_partial_scale_support_is_partial_without_claiming_missing_scales() -> N
         _phase(sample_count),
         _means(),
         _unclipped(),
+        _inventory(sample_count),
         F12Declarations.locked(),
         _resources(),
     )
@@ -185,6 +261,7 @@ def test_short_record_reports_declared_scale_support_codes() -> None:
         _phase(sample_count),
         _means(),
         _unclipped(),
+        _inventory(sample_count),
         F12Declarations.locked(),
         _resources(),
     )
@@ -213,8 +290,13 @@ def test_periodic_band_limited_impulses_recover_significant_scale_band_and_are_d
     declarations = F12Declarations.locked()
     resources = _resources()
 
-    first = compute_f12_spectral_kurtosis(samples, phase, means, clipping, declarations, resources)
-    second = compute_f12_spectral_kurtosis(samples, phase, means, clipping, declarations, resources)
+    inventory = _inventory(sample_count)
+    first = compute_f12_spectral_kurtosis(
+        samples, phase, means, clipping, inventory, declarations, resources
+    )
+    second = compute_f12_spectral_kurtosis(
+        samples, phase, means, clipping, inventory, declarations, resources
+    )
 
     assert first.status in {Status.AVAILABLE, Status.PARTIAL}
     assert NO_SIGNIFICANT_BIN not in first.reason_codes
@@ -254,6 +336,7 @@ def test_seeded_gaussian_realization_has_no_significant_bin() -> None:
         _phase(sample_count, sample_rate_hz),
         _means(),
         _unclipped(),
+        _inventory(sample_count),
         F12Declarations.locked(),
         _resources(),
     )
@@ -282,9 +365,65 @@ def test_checkpoint_cancellation_propagates_by_identity() -> None:
             _phase(10_000),
             _means(),
             _unclipped(),
+            _inventory(10_000),
             F12Declarations.locked(),
             _resources(),
             checkpoint=checkpoint,
         )
 
     assert raised.value is error
+
+
+def test_padding_outside_qualified_span_does_not_change_the_measurement() -> None:
+    """Halo вне longest qualified span не меняет ни одного измеренного F12 домена."""
+    interior = 10_000
+    halo = 1_000
+    indices = np.arange(interior, dtype=np.int64)
+    time_s = indices.astype(np.float64) / _FS_HZ
+    reference = ((indices % 512) < 32).astype(np.float64) * np.sin(2.0 * np.pi * 3500.0 * time_s)
+    padded = np.concatenate((np.zeros(halo), reference, np.zeros(halo)))
+    declarations = F12Declarations.locked()
+    resources = _resources()
+
+    expected = compute_f12_spectral_kurtosis(
+        reference,
+        _phase(interior),
+        _means(),
+        _unclipped(),
+        _inventory(interior),
+        declarations,
+        resources,
+    )
+    measured = compute_f12_spectral_kurtosis(
+        padded,
+        _halo_phase(interior + 2 * halo, halo),
+        _means(),
+        _unclipped(),
+        _inventory(interior + 2 * halo),
+        declarations,
+        resources,
+    )
+
+    # 12000 samples, phase root только на [1000, 11000): 50 interior cycles, shift 1000.
+    assert expected.status is not Status.UNAVAILABLE
+    assert measured.status == expected.status
+    assert measured.reason_codes == expected.reason_codes
+    assert PHASE_REFERENCE_UNAVAILABLE not in measured.reason_codes
+    # N=10000 gives 77 complete L=256 frames, 18 L=1024, 3 L=4096, and no L=16384 frame.
+    assert measured.frame_count.tolist() == [77, 18, 3, 0]
+    # Re-base сохраняет bin assignment побитово: измерение инвариантно к padding.
+    np.testing.assert_array_equal(measured.spectral_kurtosis, expected.spectral_kurtosis)
+    np.testing.assert_array_equal(measured.frequencies_hz, expected.frequencies_hz)
+    np.testing.assert_array_equal(measured.scale_index, expected.scale_index)
+    np.testing.assert_array_equal(measured.adjusted_p_value, expected.adjusted_p_value)
+    np.testing.assert_array_equal(measured.frame_count, expected.frame_count)
+    np.testing.assert_array_equal(measured.scale_available, expected.scale_available)
+    assert measured.maximum_spectral_kurtosis == expected.maximum_spectral_kurtosis
+    assert measured.selected_scale_index == expected.selected_scale_index
+    assert measured.selected_band_low_hz == expected.selected_band_low_hz
+    assert measured.selected_band_high_hz == expected.selected_band_high_hz
+    # sample_count остаётся полной длиной записи, qualified — длиной измеренного span.
+    assert expected.sample_count == interior
+    assert expected.qualified_sample_count == interior
+    assert measured.sample_count == interior + 2 * halo
+    assert measured.qualified_sample_count == interior

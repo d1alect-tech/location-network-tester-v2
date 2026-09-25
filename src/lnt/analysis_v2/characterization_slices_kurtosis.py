@@ -12,6 +12,7 @@ from .characterization_slices import _checkpoint, _int_tuple, _num, _text
 if TYPE_CHECKING:
     from lnt.analysis_store import CharacterizationRecipe
     from lnt.characterization.clipping import ClippingBounds
+    from lnt.characterization.event_models import RootEvents
     from lnt.characterization.phase_model import PhaseCycles, PhaseMeans
     from lnt.scope_io import CancellationToken
 
@@ -27,10 +28,11 @@ def _compute_f12(  # noqa: PLR0913, PLR0917 - полный набор входо
     phase: PhaseCycles,
     means: PhaseMeans,
     clipping: ClippingBounds,
+    inventory: RootEvents,
     recipe: CharacterizationRecipe,
     cancellation: CancellationToken,
 ) -> F12Result:
-    """Собрать F12 из фазового остатка, средних и границ клиппирования."""
+    """Собрать F12 из фазового остатка, средних, инвентаря и границ клиппирования."""
     _checkpoint(cancellation)
     family = recipe.families[_F12_INDEX]
     declarations = F12Declarations(
@@ -56,6 +58,7 @@ def _compute_f12(  # noqa: PLR0913, PLR0917 - полный набор входо
         phase,
         means,
         clipping,
+        inventory,
         declarations,
         recipe.resource_limits,
         checkpoint=lambda: _checkpoint(cancellation),

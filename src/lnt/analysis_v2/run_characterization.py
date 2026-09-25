@@ -214,7 +214,7 @@ def run_characterization(  # noqa: PLR0913, PLR0915 - seam параллелен 
     _checkpoint(cancellation)
     f16 = _compute_f16(samples, phase, means, root_events, recipe, cancellation)
     _checkpoint(cancellation)
-    f12 = _compute_f12(samples, phase, means, clipping, recipe, cancellation)
+    f12 = _compute_f12(samples, phase, means, clipping, root_events, recipe, cancellation)
     _checkpoint(cancellation)
     f17 = _compute_f17(channel_by_name, phase, phase_means_by_name, recipe, cancellation)
     _checkpoint(cancellation)
