@@ -168,6 +168,11 @@ def _validate_built(result: _Result) -> None:
     window_shape = (len(COUNT_WINDOWS_S),)
     if (
         result.sample_count <= 0
+        # Построенный результат обязан иметь хотя бы один проанализированный сегмент:
+        # движок входит в этот путь только после `accumulator.add()`, который
+        # наращивает счётчик. Без нижней границы валидатор движка был бы мягче
+        # валидатора бандла — `f16_bundle._support` требует `1 <= segments <= qualified`.
+        or result.analyzed_segment_count < 1
         or result.lag_s.shape != lag_shape
         or result.autocorrelation.shape != lag_shape
         or result.pair_count.shape != lag_shape

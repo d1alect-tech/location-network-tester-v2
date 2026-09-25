@@ -593,3 +593,7 @@ def test_result_rejects_unknown_codes_and_nonempty_unavailable_domains() -> None
         replace(available, reason_codes=("invented",))
     with pytest.raises(CharacterizationError):
         replace(unavailable, lag_s=np.zeros(6, dtype=np.float64))
+    # Построенный результат без проанализированных сегментов противоречит положительной
+    # квалифицированной поддержке: валидатор движка не должен быть мягче бандла.
+    with pytest.raises(CharacterizationError):
+        replace(available, analyzed_segment_count=0)
