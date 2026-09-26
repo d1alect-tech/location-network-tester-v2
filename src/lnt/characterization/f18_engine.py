@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -19,10 +18,14 @@ from lnt.characterization.f18_contract import (
     ZERO_DENOMINATOR,
 )
 from lnt.characterization.f18_frames import (
-    SURROGATE_BYTES_PER_SAMPLE,
     observed_residual,
     triad_coefficients,
     zero_phase_means,
+)
+from lnt.characterization.f18_inputs import (
+    checkpoint_f18,
+    unavailable_f18_result,
+    validate_f18_inputs,
 )
 from lnt.characterization.f18_math import triad_bicoherence
 from lnt.characterization.f18_nulls import F18NullPlan, run_both_nulls
@@ -60,11 +63,11 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     checkpoint: Checkpoint = None,
 ) -> F18Result:
     """Считать F18 из longest phase-qualified span записи и двух declared null."""
-    _checkpoint(checkpoint)
-    values = _validate_inputs(samples, phase, means, declarations, settings, resources)
+    checkpoint_f18(checkpoint)
+    values = validate_f18_inputs(samples, phase, means, declarations, settings, resources)
     record_samples = len(values)
     if phase.status is Status.UNAVAILABLE or means.status is Status.UNAVAILABLE:
-        return _unavailable((PHASE_REFERENCE_UNAVAILABLE,), record_samples)
+        return unavailable_f18_result((PHASE_REFERENCE_UNAVAILABLE,), record_samples)
     effective = replace(
         settings,
         segment_samples=declarations.segment_samples,
@@ -84,13 +87,13 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     reasons = grid_reason_codes(grid)
     measurable = grid.measurable
     if not bool(np.any(measurable)):
-        return _unavailable(tuple(sorted(reasons)), record_samples)
+        return unavailable_f18_result(tuple(sorted(reasons)), record_samples)
     # Спан выбирается после triad_off_grid: на 500 кГц сетка вне решётки, и
     # triad_off_grid обязан остаться первой причиной отказа.
     span = longest_qualified_span(values, phase, means, inventory, resources, checkpoint)
     if span is None:
         reasons.add(PHASE_REFERENCE_UNAVAILABLE)
-        return _unavailable(tuple(sorted(reasons)), record_samples)
+        return unavailable_f18_result(tuple(sorted(reasons)), record_samples)
     (start, stop), phase = span
     values = values[start:stop]
     rows = grid.rows[measurable]
@@ -107,7 +110,7 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     frame_count = int(coefficients.shape[1])
     if frame_count < declarations.minimum_frames:
         reasons.add(INSUFFICIENT_FRAMES)
-        return _unavailable(tuple(sorted(reasons)), record_samples)
+        return unavailable_f18_result(tuple(sorted(reasons)), record_samples)
     observed = triad_bicoherence(coefficients, rows)
     # Наблюдение считается по measurable-подмножеству, а публикуется всегда в
     # declared-домене. Маска доступности поэтому собирается scatter'ом, а не
@@ -118,7 +121,7 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     available[measurable] = np.isfinite(observed.bicoherence_squared)
     if not bool(np.any(available)):
         reasons.add(ZERO_DENOMINATOR)
-        return _unavailable(tuple(sorted(reasons)), record_samples)
+        return unavailable_f18_result(tuple(sorted(reasons)), record_samples)
     residual = observed_residual(values, phase, means, resources=resources, checkpoint=checkpoint)
     if residual is None:
         # Спан квалифицирован конструктивно, поэтому в продукционном пути ветка
@@ -126,7 +129,7 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
         # строже движка и не выдаёт нули на неквалифицированных позициях за
         # измерение, если инвариант когда-нибудь разъедется.
         reasons.add(PHASE_REFERENCE_UNAVAILABLE)
-        return _unavailable(tuple(sorted(reasons)), record_samples)
+        return unavailable_f18_result(tuple(sorted(reasons)), record_samples)
     phase_counter, iaaft_counter, converged = run_both_nulls(
         F18NullPlan(
             residual=residual,
@@ -144,7 +147,7 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     )
     if converged == 0:
         reasons.add(IAAFT_NOT_CONVERGED)
-        return _unavailable(tuple(sorted(reasons)), record_samples)
+        return unavailable_f18_result(tuple(sorted(reasons)), record_samples)
     phase_p = _to_domain(
         add_one_p_value(phase_counter.exceedance, PHASE_RANDOMIZED_SURROGATE_COUNT), measurable
     )
@@ -203,79 +206,3 @@ def _decision(
     adjusted[available] = values
     significant[available] = flags
     return adjusted, significant
-
-
-def _validate_inputs(  # noqa: PLR0913, PLR0917 - полный shared input contract
-    samples: np.ndarray,
-    phase: PhaseCycles,
-    means: PhaseMeans,
-    declarations: F18Declarations,
-    settings: StftSettings,
-    resources: ResourceLimits,
-) -> np.ndarray:
-    """Сверить finite channel, phase root, phase bins, полосу и resource limits."""
-    values = np.asarray(samples)
-    if values.ndim != 1 or not np.all(np.isfinite(values)):
-        raise ValueError("F18 samples must be one finite vector")
-    if (
-        phase.sample_count != int(values.size)
-        or not math.isfinite(phase.sample_rate_hz)
-        or phase.sample_rate_hz <= 0.0
-    ):
-        raise ValueError("F18 roots do not share the measured sample grid")
-    shape = (declarations.phase_bins,)
-    if (
-        means.means_v.shape != shape
-        or means.counts.shape != shape
-        or means.valid_bins.shape != shape
-        or not np.all(np.isfinite(means.means_v))
-    ):
-        raise ValueError("F18 phase means do not match locked phase bins")
-    if max(declarations.phase_randomized_surrogate_count, declarations.iaaft_surrogate_count) > int(
-        resources.max_surrogates
-    ):
-        raise ValueError("F18 surrogate counts exceed the declared resource limit")
-    if int(declarations.segment_samples) > int(resources.hard_max_chunk_samples):
-        raise ValueError("F18 segment samples exceed the declared resource limit")
-    if int(values.size) * SURROGATE_BYTES_PER_SAMPLE > int(resources.max_work_bytes):
-        raise ValueError("F18 surrogate source exceeds the declared work budget")
-    if float(settings.analysis_low_hz) > min(declarations.base_frequencies_hz):
-        raise ValueError("F18 analysis band excludes a declared base frequency")
-    return values
-
-
-def _unavailable(codes: tuple[str, ...], sample_count: int) -> F18Result:
-    """Собрать UNAVAILABLE без осей, zero-filled arrays или выдуманных measurements."""
-    empty_float = np.empty(0, dtype=np.float64)
-    empty_int = np.empty(0, dtype=np.int64)
-    empty_bool = np.empty(0, dtype=np.bool_)
-    return F18Result(
-        status=Status.UNAVAILABLE,
-        reason_codes=codes,
-        triad_low_hz=empty_float,
-        triad_high_hz=empty_float,
-        triad_sum_hz=empty_float,
-        bicoherence_squared=empty_float,
-        biphase_rad=empty_float,
-        phase_randomized_p_value=empty_float,
-        iaaft_p_value=empty_float,
-        dual_null_p_value=empty_float,
-        adjusted_p_value=empty_float,
-        triad_available=empty_bool,
-        significant=empty_bool,
-        frame_support=empty_int,
-        sample_count=sample_count,
-        qualified_sample_count=0,
-        frame_count=0,
-        declared_triad_count=0,
-        measurable_triad_count=0,
-        off_grid_triad_count=0,
-        above_nyquist_triad_count=0,
-        dropped_triad_count=0,
-        iaaft_converged_count=0,
-    )
-
-
-def _checkpoint(checkpoint: Checkpoint) -> None:
-    if checkpoint is not None:
-        checkpoint()
