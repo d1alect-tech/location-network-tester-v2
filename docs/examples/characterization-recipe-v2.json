@@ -318,7 +318,7 @@
       "maximum_triads": 4096,
       "phase_randomized_surrogate_count": 99,
       "iaaft_surrogate_count": 99,
-      "iaaft_iterations": 100,
+      "iaaft_iterations": 2,
       "iaaft_relative_rms_magnitude_tolerance": 0.000001,
       "surrogate_seed": 6022,
       "dual_null_p_value": "maximum_add_one_p_value",

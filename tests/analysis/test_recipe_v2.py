@@ -31,7 +31,7 @@ def test_characterization_example_round_trips_through_public_parser() -> None:
     assert isinstance(recipe, CharacterizationRecipe)
     assert recipe.to_mapping() == mapping
     assert recipe.recipe_sha256 == (
-        "5191f68621cff448ea36904943f7a3c3240a52f16c1a77a4af199a885326b743"
+        "b4b3b66c7a23aeca8cc48db263537f7313f9f70d67502c95084e2677cd9db3f8"
     )
     assert tuple(family.id for family in recipe.families) == (
         "f01_phase_cycle",

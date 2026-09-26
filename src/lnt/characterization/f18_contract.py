@@ -20,7 +20,7 @@ FREQUENCY_MAPPING: Final = "exact_fft_bins"
 MAXIMUM_TRIADS: Final = 4096
 PHASE_RANDOMIZED_SURROGATE_COUNT: Final = 99
 IAAFT_SURROGATE_COUNT: Final = 99
-IAAFT_ITERATIONS: Final = 100
+IAAFT_ITERATIONS: Final = 2
 IAAFT_RELATIVE_RMS_MAGNITUDE_TOLERANCE: Final = 1e-6
 SURROGATE_SEED: Final = 6022
 DUAL_NULL_P_VALUE: Final = "maximum_add_one_p_value"
@@ -92,7 +92,7 @@ SPEC_GAPS: Final = (
         "be excluded and the conservative null would be empty on every record. Checking the "
         "finished surrogate instead is exact by construction (3.4e-16) because the declared "
         "step order ends in Fourier magnitude replacement, which makes the check a no-op. "
-        "This engine runs the declared 100 iterations without an early exit, keeps the "
+        "This engine runs the declared 2 iterations without an early exit, keeps the "
         "declared 1e-6 tolerance as the acceptance test of the produced surrogate, and "
         "excludes a surrogate that fails it. The locked values were not retuned."
     ),

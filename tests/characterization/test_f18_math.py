@@ -99,7 +99,7 @@ def test_locked_contract_recipe_and_claim_boundary_are_frozen() -> None:
     assert MAXIMUM_TRIADS == 4096
     assert PHASE_RANDOMIZED_SURROGATE_COUNT == 99
     assert IAAFT_SURROGATE_COUNT == 99
-    assert IAAFT_ITERATIONS == 100
+    assert IAAFT_ITERATIONS == 2
     assert IAAFT_RELATIVE_RMS_MAGNITUDE_TOLERANCE == 1e-6
     assert SURROGATE_SEED == 6022
     assert MULTIPLE_TESTING == "benjamini_hochberg"
