@@ -3,9 +3,11 @@
 Число отсчётов сегмента выводится движком из ИЗМЕРЕННОЙ частоты, поэтому шаг сетки
 больше не плывёт: на 1 МГц это round(0.001 * 10^6) = 1000 отсчётов, то есть ровно
 fs/1000 = 1000 Hz — НОК пяти объявленных баз. Все 15 триад измеримы, а пять баз дают
-позиции 3, 5, 10, 20 и 50. 8 МГц по-прежнему не публикует ничего вовсе: движок
-поднимает ValueError по бюджету суррогатного источника, потому что запись длиннее
-8 388 608 отсчётов, и этот отказ уходит из характеристики неуловленным.
+позиции 3, 5, 10, 20 и 50. 8 МГц — частота захвата Hantek 6022BE — меряется на
+объявленном пути анализа 1 МГц: запись приводится вниз ЦЕЛЫМ фактором 8, поэтому
+2.4 s дают 2 400 000 отсчётов вместо 19 200 000 и перестают отказывать по бюджету
+суррогатного источника. 500 кГц ниже 1 МГц, поэтому фактор равен 1 и запись
+остаётся нетронутой.
 """
 
 from __future__ import annotations
@@ -13,23 +15,26 @@ from __future__ import annotations
 import functools
 import hashlib
 import math
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
-import pytest
 
 from lnt.analysis_store import CharacterizationRecipe, parse_analysis_recipe
 from lnt.analysis_v2 import run_characterization
 from lnt.analysis_v2.characterization_slices_bicoherence import _compute_f18
 from lnt.characterization import OUTPUT_FILENAMES, Status, load_bundle
-from lnt.characterization.event_models import RootEvents, RootEventSettings
+from lnt.characterization.event_models import (
+    RootEvents,
+    RootEventSettings,
+    TaggedGap,
+)
 from lnt.characterization.f18_bundle import F18_ID
 from lnt.characterization.f18_contract import (
     DECLARED_CODES,
     METHOD,
     TRIAD_OFF_GRID,
+    analysis_factor_for,
     segment_samples_for,
 )
 from lnt.characterization.f18_frames import SURROGATE_BYTES_PER_SAMPLE
@@ -38,6 +43,7 @@ from lnt.characterization.f18_triads import build_triad_grid, grid_reason_codes
 from lnt.characterization.phase import PHASE_ROOT_REASON_CODES
 from lnt.characterization.phase_model import PhaseCycles, PhaseMeans
 from lnt.context.json_codec import decode_object
+from lnt.events.models import UnqualifiedGap
 from lnt.scope_io import NEVER_CANCELLED
 from tests.test_ui_sessions import write_manifest
 
@@ -60,14 +66,35 @@ _ONE_MHZ_HZ = 1_000_000.0
 _ONE_MHZ_SAMPLES = 2_400_000
 _HARDWARE_HZ = 8_000_000.0
 _HARDWARE_SAMPLES = 19_200_000
-# Порог длительности записи: max_work_bytes / SURROGATE_BYTES_PER_SAMPLE.
+# Порог длительности записи: max_work_bytes / SURROGATE_BYTES_PER_SAMPLE. Ниже
+# объявленного пути анализа 1 МГц запись 8 МГц в него не влезала.
 _RECORD_LENGTH_LIMIT = 8_388_608
-# Оба гейта длительности поднимают ValueError, поэтому пин различает их только строкой.
-_RECORD_LENGTH_MESSAGE = "F18 surrogate source exceeds the declared work budget"
+# Объявленный путь анализа F18 и целочисленный фактор приведения к нему.
+_ANALYSIS_HZ = 1_000_000.0
+_HARDWARE_FACTOR = 8
 # 1 МГц: сегмент 1000 отсчётов, шаг ровно 1000 Hz, поэтому пять баз дают целые
-# позиции 3, 5, 10, 20 и 50. 8 МГц: сегмент 8000, тот же шаг 1000 Hz, те же позиции.
+# позиции 3, 5, 10, 20 и 50. 8 МГц после приведения к 1 МГц: тот же шаг, те же позиции.
 _ONE_MHZ_BASE_BINS = (3.0, 5.0, 10.0, 20.0, 50.0)
 _HARDWARE_BASE_BINS = _ONE_MHZ_BASE_BINS
+# 500 кГц: частота НИЖЕ объявленного пути анализа, поэтому фактор 1, а сегмент
+# round(0.001 * 500000) = 500 отсчётов. Запись короче канонических 2.4 s: 40 000
+# отсчётов дают 159 кадров при locked minimum_frames = 32, то есть полный замер.
+_HALF_MHZ_HZ = 500_000.0
+_HALF_MHZ_SAMPLES = 40_000
+_HALF_MHZ_SEGMENT = 500
+# Разрыв на частоте ЗАХВАТА проверяется на частоте анализа: 1 600 000 отсчётов 8 МГц
+# дают 200 000 отсчётов 1 МГц, а разрыв (120 000, 200 000) пересчитывается в
+# (15 000, 25 000) и блокируется ВКЛЮЧАТЕЛЬНО, поэтому длинный спан начинается с
+# 25 001 и содержит 174 999 отсчётов — 348 кадров. Без пересчёта спан был бы
+# (0, 120 000) и 239 кадров, а без разрыва вообще 399: три различимых исхода.
+_GAP_SAMPLES = 1_600_000
+_GAP_SPAN = (120_000, 200_000)
+_GAP_RESCALED = (15_000, 25_000)
+_GAP_ANALYSIS_SAMPLES = 200_000
+# 348 полных кадров покрывают (348 - 1) * 500 + 1000 = 174 500 отсчётов: хвост
+# спана в 499 отсчётов не даёт ещё одного кадра и в qualified support не входит.
+_GAP_FRAMES = 348
+_GAP_QUALIFIED = 174_500
 # Решётка exact_fft_bins = segment * gcd(bases) = segment * 1000 Гц, а segment =
 # round(0.001 * fs), поэтому на любом целом МГц решётка есть: 1 МГц даёт 1 000 000 Гц.
 _ONE_MHZ_BIN_LATTICE_HZ = 1_000_000
@@ -232,10 +259,29 @@ def _phase_means() -> PhaseMeans:
 
 
 # Пустой измеренный инвентарь: F18 считает gaps, а не сами события, и гейт длительности
-# записи срабатывает раньше любого чтения инвентаря.
-def _inventory(sample_rate_hz: float, sample_count: int) -> RootEvents:
+# записи срабатывает раньше любого чтения инвентаря. Опциональный gap — на частоте
+# ЗАХВАТА: replay пересобирает разрывы из замыкания над полной сеткой, поэтому индексы
+# в нём всегда полноразмерные, как и в боевом пути.
+def _inventory(
+    sample_rate_hz: float, sample_count: int, gap: tuple[int, int] | None = None
+) -> RootEvents:
     def replay(_: Callable[[], None] | None) -> Iterator[RootTimelineItem]:
-        return iter(())
+        if gap is None:
+            return iter(())
+        start, stop = gap
+        return iter(
+            (
+                TaggedGap(
+                    kind="gap",
+                    gap=UnqualifiedGap(
+                        start_sample=start,
+                        end_sample=stop,
+                        start_time_s=start / sample_rate_hz,
+                        end_time_s=stop / sample_rate_hz,
+                    ),
+                ),
+            )
+        )
 
     settings = RootEventSettings(
         recipe_sha256="test",
@@ -269,7 +315,7 @@ def _inventory(sample_rate_hz: float, sample_count: int) -> RootEvents:
         accepted_count=0,
         omitted_count=0,
         dead_time_rejected_count=0,
-        gap_count=0,
+        gap_count=0 if gap is None else 1,
         omitted_gap_count=0,
         omitted_exclusion_count=0,
         selection_rule="first_by_peak_sample",
@@ -328,37 +374,119 @@ def test_one_megahertz_canonical_record_measures_every_triad_on_the_exact_bin_la
     assert all(bool(np.all(np.isfinite(array))) for array in floats)
 
 
-def test_hardware_rate_canonical_record_refuses_f18_on_the_record_length_budget() -> None:
-    """8 МГц: 19 200 000 отсчётов не влезают в бюджет суррогатного источника."""
+def test_hardware_rate_measures_on_the_decimated_one_megahertz_analysis_path() -> None:
+    """8 МГц: фактор 8 снимает отказ по длине, запись меряется на 1 МГц."""
     limits = _recipe().resource_limits
     # Арифметика порога как истина, а не согласие движка с самим собой.
     assert limits.max_work_bytes // SURROGATE_BYTES_PER_SAMPLE == _RECORD_LENGTH_LIMIT
     assert round(2.4 * _HARDWARE_HZ) == _HARDWARE_SAMPLES
     assert _HARDWARE_SAMPLES > _RECORD_LENGTH_LIMIT
     assert _ONE_MHZ_SAMPLES < _RECORD_LENGTH_LIMIT
-    # Сегментный гейт не может быть причиной: 8000 отсчётов намного ниже потолка,
-    # поэтому отказ приходит именно от размера записи, а не от размера сегмента.
-    assert segment_samples_for(_HARDWARE_HZ) == 8_000 <= limits.hard_max_chunk_samples
+    # Объявленное правило приведения: целый фактор 8 и ровно 1 МГц после него.
+    assert analysis_factor_for(_HARDWARE_HZ) == _HARDWARE_FACTOR
+    assert _HARDWARE_HZ / _HARDWARE_FACTOR == _ANALYSIS_HZ
+    assert _HARDWARE_SAMPLES // _HARDWARE_FACTOR == 2_400_000 < _RECORD_LENGTH_LIMIT
+    # Сегмент выводится на ИЗМЕРЕННОЙ частоте анализа, а не на частоте захвата.
+    assert segment_samples_for(_HARDWARE_HZ) == 8_000
+    assert segment_samples_for(_ANALYSIS_HZ) == 1_000 <= limits.hard_max_chunk_samples
 
     record = _coupled_record(_HARDWARE_HZ, _HARDWARE_SAMPLES).astype(np.float32)
-    # Строка отказа зафиксирована дословно: она снята с живого прогона, а не выведена из
-    # чтения кода, и уходит наружу необработанной, поэтому семейство не публикуется вовсе.
-    with pytest.raises(ValueError, match=re.escape(_RECORD_LENGTH_MESSAGE)) as refusal:
-        _compute_f18(
-            record,
-            _phase_cycles(_HARDWARE_HZ, _HARDWARE_SAMPLES),
-            _phase_means(),
-            _inventory(_HARDWARE_HZ, _HARDWARE_SAMPLES),
-            _recipe(),
-            NEVER_CANCELLED,
-        )
-    assert str(refusal.value) == _RECORD_LENGTH_MESSAGE
+    result = _compute_f18(
+        record,
+        _phase_cycles(_HARDWARE_HZ, _HARDWARE_SAMPLES),
+        _phase_means(),
+        _inventory(_HARDWARE_HZ, _HARDWARE_SAMPLES),
+        _recipe(),
+        NEVER_CANCELLED,
+    )
 
-    # Отказ приходит раньше сетки и до всякого framing: без гейта длительности 8 МГц
-    # уже стоял бы на решётке (шаг 1000 Hz), поэтому triad_off_grid на 8 МГц
-    # недостижим — гейт длительности перекрывает измерение, а не дополняет его.
-    assert _measured(_grid(_HARDWARE_HZ)) == _DECLARED_TRIADS
-    assert not grid_reason_codes(_grid(_HARDWARE_HZ))
-    hardware_positions = _base_bins(_HARDWARE_HZ)
+    # Отказа по длине записи больше нет, а sample_count равен ПРИВЕДЕННОМУ числу
+    # отсчётов: validate_f18_inputs требует phase.sample_count == values.size, поэтому
+    # равенство доказывается самим фактом успешного измерения, а не кодом выхода.
+    assert result.status is not Status.UNAVAILABLE
+    assert result.sample_count == 2_400_000
+    assert result.analysis_rate_hz == _ANALYSIS_HZ
+    assert result.segment_samples == 1_000 == segment_samples_for(_ANALYSIS_HZ)
+
+    # Полоса объявлена, а не предположена: клип 0.45 * частоты анализа не срезает
+    # последнюю сумму триады 50 + 50 = 100 кГц, поэтому все 15 триад доступны.
+    locked = _locked()
+    assert min(locked.analysis_high_hz, 0.45 * result.analysis_rate_hz) >= 100_000.0
+    assert bool(result.triad_available.all())
+    assert result.measurable_triad_count == _DECLARED_TRIADS
+    assert result.off_grid_triad_count == 0
+    assert result.above_nyquist_triad_count == 0
+    assert float(result.triad_sum_hz.max()) == 100_000.0
+
+    # Решётка после приведения совпадает с решёткой 1 МГц: шаг 1000 Hz и те же позиции.
+    assert _measured(_grid(_ANALYSIS_HZ)) == _DECLARED_TRIADS
+    assert not grid_reason_codes(_grid(_ANALYSIS_HZ))
+    hardware_positions = _base_bins(_ANALYSIS_HZ)
     assert np.array_equal(hardware_positions, np.asarray(_HARDWARE_BASE_BINS))
     assert np.array_equal(np.rint(hardware_positions), hardware_positions)
+
+
+def test_below_analysis_rate_record_keeps_factor_one_and_the_derived_segment() -> None:
+    """500 кГц: частота ниже объявленного пути, фактор 1 и запись не тронута."""
+    assert analysis_factor_for(_HALF_MHZ_HZ) == 1
+    assert _HALF_MHZ_HZ < _ANALYSIS_HZ
+    assert round(0.001 * _HALF_MHZ_HZ) == _HALF_MHZ_SEGMENT
+    # Канонические 2.4 s на 500 кГц — те же 1 200 000 отсчётов без приведения.
+    assert round(2.4 * _HALF_MHZ_HZ) == 1_200_000
+
+    record = _coupled_record(_HALF_MHZ_HZ, _HALF_MHZ_SAMPLES).astype(np.float32)
+    result = _compute_f18(
+        record,
+        _phase_cycles(_HALF_MHZ_HZ, _HALF_MHZ_SAMPLES),
+        _phase_means(),
+        _inventory(_HALF_MHZ_HZ, _HALF_MHZ_SAMPLES),
+        _recipe(),
+        NEVER_CANCELLED,
+    )
+
+    assert result.status is not Status.UNAVAILABLE
+    # Фактор 1 — тождественный путь: частота записи и отсчёты не изменились.
+    assert result.analysis_rate_hz == _HALF_MHZ_HZ
+    assert result.sample_count == _HALF_MHZ_SAMPLES
+    assert result.segment_samples == _HALF_MHZ_SEGMENT
+    assert bool(result.triad_available.all())
+    assert float(result.triad_sum_hz.max()) == 100_000.0
+
+
+def test_replayed_gap_indices_are_rescaled_onto_the_analysis_grid() -> None:
+    """Разрыв полноразмерного replay пересчитывается целочисленно, инвентарь цел.
+
+    RootEvents.replay пересобирает разрывы из замыкания над ПОЛНОЙ частотой захвата,
+    поэтому делить поля инвентаря бесполезно, а gap_count сверяется на равенство.
+    Пин различим: пересчитанный разрыв даёт 349 кадров, непересчитанный — 239, а
+    запись без разрыва — 399.
+    """
+    assert _GAP_SPAN[0] // _HARDWARE_FACTOR == _GAP_RESCALED[0]
+    assert _GAP_SPAN[1] // _HARDWARE_FACTOR == _GAP_RESCALED[1]
+    record = _coupled_record(_HARDWARE_HZ, _GAP_SAMPLES).astype(np.float32)
+    inventory = _inventory(_HARDWARE_HZ, _GAP_SAMPLES, _GAP_SPAN)
+
+    result = _compute_f18(
+        record,
+        _phase_cycles(_HARDWARE_HZ, _GAP_SAMPLES),
+        _phase_means(),
+        inventory,
+        _recipe(),
+        NEVER_CANCELLED,
+    )
+
+    assert result.status is not Status.UNAVAILABLE
+    assert result.sample_count == _GAP_ANALYSIS_SAMPLES == _GAP_SAMPLES // _HARDWARE_FACTOR
+    assert result.frame_count == _GAP_FRAMES
+    assert (
+        result.qualified_sample_count
+        == _GAP_QUALIFIED
+        == (
+            (_GAP_FRAMES - 1) * (segment_samples_for(_ANALYSIS_HZ) // 2)
+            + segment_samples_for(_ANALYSIS_HZ)
+        )
+    )
+    # Инвентарь не тронут: ни частота, ни длина, ни gap_count не переписаны движком.
+    assert inventory.sample_count == _GAP_SAMPLES
+    assert inventory.sample_rate_hz == _HARDWARE_HZ
+    assert inventory.gap_count == 1

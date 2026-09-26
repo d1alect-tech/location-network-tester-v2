@@ -18,6 +18,7 @@ from lnt.characterization.f18_contract import (
     ZERO_DENOMINATOR,
     segment_samples_for,
 )
+from lnt.characterization.f18_decimation import decimate_to_analysis_rate
 from lnt.characterization.f18_frames import (
     observed_residual,
     triad_coefficients,
@@ -65,6 +66,13 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
 ) -> F18Result:
     """Считать F18 из longest phase-qualified span записи и двух declared null."""
     checkpoint_f18(checkpoint)
+    # Приведение к объявленной частоте анализа — ПЕРВОЕ действие seam'а и до любой
+    # сверки: бюджет длины записи, сегмент, сетка и кадры обязаны видеть одну и ту же
+    # частоту. Вызывающая обвязка характеристики отдаёт запись на частоте ЗАХВАТА, и
+    # перепривязка корня фазы на стороне вызывающего заделала бы общий корень фазы,
+    # means и root_events, которые F02..F17 читают по ссылке.
+    samples, phase, factor = decimate_to_analysis_rate(samples, phase)
+    analysis_rate = phase.sample_rate_hz
     values = validate_f18_inputs(samples, phase, means, declarations, settings, resources)
     record_samples = len(values)
     # Сегмент выводится из объявленной длительности и ИЗМЕРЕННОЙ частоты, поэтому
@@ -72,10 +80,13 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     # STFT и к F18 не относится. Единственное равенство, которое здесь честно
     # проверяется, — выведенный сегмент против опубликованного в F18Result: его
     # проверяет валидатор, уже от самого результата.
-    segment_samples = segment_samples_for(phase.sample_rate_hz)
+    segment_samples = segment_samples_for(analysis_rate)
     if phase.status is Status.UNAVAILABLE or means.status is Status.UNAVAILABLE:
         return unavailable_f18_result(
-            (PHASE_REFERENCE_UNAVAILABLE,), record_samples, segment_samples
+            (PHASE_REFERENCE_UNAVAILABLE,),
+            record_samples,
+            segment_samples,
+            analysis_rate,
         )
     effective = replace(
         settings,
@@ -87,7 +98,7 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     grid = build_triad_grid(
         declarations.base_frequencies_hz,
         segment_samples=segment_samples,
-        sample_rate_hz=phase.sample_rate_hz,
+        sample_rate_hz=analysis_rate,
         analysis_low_hz=settings.analysis_low_hz,
         analysis_high_hz=declarations.analysis_high_hz,
         nyquist_fraction_max=declarations.nyquist_fraction_max,
@@ -96,13 +107,20 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     reasons = grid_reason_codes(grid)
     measurable = grid.measurable
     if not bool(np.any(measurable)):
-        return unavailable_f18_result(tuple(sorted(reasons)), record_samples, segment_samples)
+        return unavailable_f18_result(
+            tuple(sorted(reasons)), record_samples, segment_samples, analysis_rate
+        )
     # Спан выбирается после triad_off_grid: на 500 кГц сетка вне решётки, и
-    # triad_off_grid обязан остаться первой причиной отказа.
-    span = longest_qualified_span(values, phase, means, inventory, resources, checkpoint)
+    # triad_off_grid обязан остаться первой причиной отказа. Разрывы пересчитываются
+    # на приведённую сетку здесь, у места потребления: инвентарь хранит полную частоту.
+    span = longest_qualified_span(
+        values, phase, means, inventory, resources, checkpoint, gap_index_factor=factor
+    )
     if span is None:
         reasons.add(PHASE_REFERENCE_UNAVAILABLE)
-        return unavailable_f18_result(tuple(sorted(reasons)), record_samples, segment_samples)
+        return unavailable_f18_result(
+            tuple(sorted(reasons)), record_samples, segment_samples, analysis_rate
+        )
     (start, stop), phase = span
     values = values[start:stop]
     rows = grid.rows[measurable]
@@ -119,7 +137,9 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     frame_count = int(coefficients.shape[1])
     if frame_count < declarations.minimum_frames:
         reasons.add(INSUFFICIENT_FRAMES)
-        return unavailable_f18_result(tuple(sorted(reasons)), record_samples, segment_samples)
+        return unavailable_f18_result(
+            tuple(sorted(reasons)), record_samples, segment_samples, analysis_rate
+        )
     observed = triad_bicoherence(coefficients, rows)
     # Наблюдение считается по measurable-подмножеству, а публикуется всегда в
     # declared-домене. Маска доступности поэтому собирается scatter'ом, а не
@@ -130,7 +150,9 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     available[measurable] = np.isfinite(observed.bicoherence_squared)
     if not bool(np.any(available)):
         reasons.add(ZERO_DENOMINATOR)
-        return unavailable_f18_result(tuple(sorted(reasons)), record_samples, segment_samples)
+        return unavailable_f18_result(
+            tuple(sorted(reasons)), record_samples, segment_samples, analysis_rate
+        )
     residual = observed_residual(values, phase, means, resources=resources, checkpoint=checkpoint)
     if residual is None:
         # Спан квалифицирован конструктивно, поэтому в продукционном пути ветка
@@ -138,7 +160,9 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
         # строже движка и не выдаёт нули на неквалифицированных позициях за
         # измерение, если инвариант когда-нибудь разъедется.
         reasons.add(PHASE_REFERENCE_UNAVAILABLE)
-        return unavailable_f18_result(tuple(sorted(reasons)), record_samples, segment_samples)
+        return unavailable_f18_result(
+            tuple(sorted(reasons)), record_samples, segment_samples, analysis_rate
+        )
     phase_counter, iaaft_counter, converged = run_both_nulls(
         F18NullPlan(
             residual=residual,
@@ -156,7 +180,9 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     )
     if converged == 0:
         reasons.add(IAAFT_NOT_CONVERGED)
-        return unavailable_f18_result(tuple(sorted(reasons)), record_samples, segment_samples)
+        return unavailable_f18_result(
+            tuple(sorted(reasons)), record_samples, segment_samples, analysis_rate
+        )
     phase_p = _to_domain(
         add_one_p_value(phase_counter.exceedance, PHASE_RANDOMIZED_SURROGATE_COUNT), measurable
     )
@@ -188,6 +214,7 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
         frame_support=np.full(grid.declared_count, frame_count, dtype=np.int64),
         sample_count=record_samples,
         qualified_sample_count=(frame_count - 1) * hop + segment_samples,
+        analysis_rate_hz=analysis_rate,
         segment_samples=segment_samples,
         frame_count=frame_count,
         declared_triad_count=grid.declared_count,

@@ -8,6 +8,7 @@ from lnt.comparability import (
     CalibrationIdentity,
     ComparisonKind,
     ContextValue,
+    NormalizationDecision,
     NormalizationKind,
     NormalizationRequest,
     SessionDescriptor,
@@ -149,7 +150,7 @@ def test_clipped_capture_blocks_numeric_comparison() -> None:
         require_numeric_comparison(report)
 
 
-def test_psd_grid_decimation_is_the_only_permitted_normalization() -> None:
+def test_psd_grid_decimation_is_permitted_and_arbitrary_resample_is_not() -> None:
     source = WelchGrid(window="hann", nperseg=4096, noverlap=2048)
     target = WelchGrid(window="hann", nperseg=2048, noverlap=1024)
 
@@ -174,3 +175,59 @@ def test_psd_grid_decimation_is_the_only_permitted_normalization() -> None:
     assert permitted.rule_id == "psd_welch_nperseg_decimation_v1"
     assert arbitrary.permitted is False
     assert arbitrary.reason_code == "normalization_not_whitelisted"
+
+
+def _decimation_request(
+    factor: int | None, source_hz: float | None, target_hz: float | None
+) -> NormalizationRequest:
+    grid = WelchGrid(window="hann", nperseg=4096, noverlap=2048)
+    return NormalizationRequest(
+        kind=NormalizationKind.BICOHERENCE_DECIMATION,
+        source_grid=grid,
+        target_grid=grid,
+        sample_rate_hz=20_000_000.0,
+        analysis_factor=factor,
+        source_analysis_rate_hz=source_hz,
+        target_analysis_rate_hz=target_hz,
+    )
+
+
+def test_exact_integer_analysis_decimation_is_the_second_permitted_normalization() -> None:
+    """Целочисленное приведение к частоте анализа разрешено и названо своим rule_id."""
+    permitted = assess_normalization(_decimation_request(8, 8_000_000.0, 1_000_000.0))
+
+    assert permitted.permitted is True
+    assert permitted.rule_id == "bicoherence_analysis_rate_decimation_v1"
+    assert permitted.reason_code == "permitted"
+
+
+def test_non_integer_analysis_ratio_is_refused_instead_of_resampled() -> None:
+    """1.5 МГц -> 1 МГц это отношение 1.5: объявить его целым фактором нельзя."""
+    fractional = assess_normalization(_decimation_request(1, 1_500_000.0, 1_000_000.0))
+    rounded = assess_normalization(_decimation_request(2, 1_500_000.0, 1_000_000.0))
+    undeclared = assess_normalization(_decimation_request(None, None, None))
+    zero = assess_normalization(_decimation_request(0, 1_000_000.0, 1_000_000.0))
+
+    for refused in (fractional, rounded, undeclared, zero):
+        assert refused.permitted is False
+        assert refused.rule_id is None
+        assert refused.reason_code == "normalization_not_whitelisted"
+
+
+def test_every_normalization_kind_returns_a_decision() -> None:
+    """Член enum без case-arm молча вернул бы None: у match нет wildcard."""
+    grid = WelchGrid(window="hann", nperseg=4096, noverlap=2048)
+
+    for kind in NormalizationKind:
+        decision = assess_normalization(
+            NormalizationRequest(
+                kind=kind,
+                source_grid=grid,
+                target_grid=grid,
+                sample_rate_hz=8_000_000.0,
+                analysis_factor=8,
+                source_analysis_rate_hz=8_000_000.0,
+                target_analysis_rate_hz=1_000_000.0,
+            )
+        )
+        assert isinstance(decision, NormalizationDecision)

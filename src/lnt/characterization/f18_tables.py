@@ -9,6 +9,10 @@ import numpy as np
 import lnt.characterization.f18_contract as contract
 from lnt.characterization.errors import CharacterizationError
 from lnt.characterization.f18_declarations import locked_declarations
+from lnt.characterization.f18_rate_cells import (
+    persisted_analysis_rate_hz,
+    persisted_segment_samples,
+)
 from lnt.characterization.f18_result import F18Declarations
 from lnt.characterization.f18_triads import declared_triads
 from lnt.characterization.records import Unit
@@ -26,6 +30,7 @@ __all__ = [
     "bicoherence_metadata",
     "locked_axes",
     "locked_declarations",
+    "persisted_analysis_rate_hz",
     "persisted_segment_samples",
 ]
 
@@ -116,7 +121,11 @@ _COLUMNS: Final = (
     *_columns(
         TableValueType.NUMBER,
         Unit.HZ,
-        ("analysis_high_hz", *(f"base_frequency_{i}_hz" for i in range(1, 6))),
+        (
+            "analysis_rate_hz",
+            "analysis_high_hz",
+            *(f"base_frequency_{i}_hz" for i in range(1, 6)),
+        ),
     ),
     *_columns(
         TableValueType.TEXT,
@@ -156,10 +165,19 @@ _COLUMNS: Final = (
 )
 
 
-def bicoherence_metadata(declarations: F18Declarations, segment_samples: int) -> TableBlock:
+def bicoherence_metadata(
+    declarations: F18Declarations, segment_samples: int, analysis_rate_hz: float
+) -> TableBlock:
     """Сохранить весь declared F18 surface без пересказа или сокращений."""
     if declarations != F18Declarations.locked() or len(contract.SPEC_GAPS) != 5:  # noqa: PLR2004
         raise CharacterizationError("status_invariant", "F18 metadata declarations are not locked")
+    # Опубликованные частота и сегмент обязаны описывать одну геометрию: сегмент
+    # выведен из объявленной длительности по ИЗМЕРЕННОЙ частоте, поэтому непротиворечивая
+    # пара доказывает, что таблица не описывает частоту захвата вместо частоты анализа.
+    if contract.segment_samples_for(analysis_rate_hz) != segment_samples:
+        raise CharacterizationError(
+            "status_invariant", "F18 published segment contradicts the published analysis rate"
+        )
     values = (
         contract.F18_ID,
         contract.F18_INDEX,
@@ -172,6 +190,7 @@ def bicoherence_metadata(declarations: F18Declarations, segment_samples: int) ->
         declarations.nyquist_fraction_max,
         declarations.iaaft_relative_rms_magnitude_tolerance,
         declarations.false_discovery_rate,
+        analysis_rate_hz,
         declarations.analysis_high_hz,
         *declarations.base_frequencies_hz,
         declarations.dual_null_p_value,
@@ -207,30 +226,6 @@ def bicoherence_metadata(declarations: F18Declarations, segment_samples: int) ->
 
 
 # Универсальный column builder определён до module-level schema.
-
-
-def persisted_segment_samples(table: TableBlock) -> int:
-    """Прочитать выведенный движком сегмент из сохранённой metadata-таблицы.
-
-    Число отсчётов зависит от частоты записи, поэтому decoder не может вывести
-    его заново: частота в артефакте не хранится. Единственный носитель —
-    сохранённая ячейка, и читается она ДО locked-сверки таблицы, чтобы та
-    сверяла все 71 объявленную ячейку, а не подменяла эту.
-    """
-    index = next(
-        (
-            position
-            for position, column in enumerate(table.columns)
-            if column.name == "segment_samples"
-        ),
-        -1,
-    )
-    value = table.rows[0][index] if index >= 0 and table.row_count == _ROW_COUNT else None
-    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-        raise CharacterizationError(
-            "status_invariant", "F18 persisted segment is not an integer count"
-        )
-    return value
 
 
 def _recipe_counts(value: F18Declarations, segment_samples: int) -> tuple[int, ...]:

@@ -38,10 +38,19 @@ def replay_gaps(
     inventory: RootEvents,
     sample_count: int,
     checkpoint: Callable[[], None] | None,
+    index_factor: int = 1,
 ) -> tuple[Span, ...]:
-    """Прочитать full replay и сохранить только реальные unqualified gaps."""
+    """Прочитать full replay и сохранить только реальные unqualified gaps.
+
+    ``index_factor`` — целочисленный фактор приведения записи к частоте анализа.
+    ``RootEvents.replay`` пересобирает разрывы из замыкания над ПОЛНОЙ частотой
+    захвата, поэтому делить поля инвентаря бесполезно (replay их не читает, а
+    ``gap_count`` сверяется на равенство), и единственное верное место пересчёта —
+    здесь, на ПРОИГРАННЫХ индексах. Деление целочисленное: разрыв, съехавший на
+    отсчёт, обязан остаться разрывом, а не сдвинуться на половину отсчёта.
+    """
     raw = [
-        (int(item.gap.start_sample), int(item.gap.end_sample))
+        (int(item.gap.start_sample) // index_factor, int(item.gap.end_sample) // index_factor)
         for item in inventory.replay(checkpoint)
         if isinstance(item, TaggedGap)
     ]
@@ -172,6 +181,7 @@ def longest_qualified_span(  # noqa: PLR0913, PLR0917 - shared phase root, gaps 
     inventory: RootEvents,
     resources: ResourceLimits,
     checkpoint: Callable[[], None] | None = None,
+    gap_index_factor: int = 1,
 ) -> tuple[Span, PhaseCycles] | None:
     """Выбрать самый длинный qualified span и перебазировать корень фазы на него.
 
@@ -186,7 +196,7 @@ def longest_qualified_span(  # noqa: PLR0913, PLR0917 - shared phase root, gaps 
     требует ``phase.sample_count == values.size`` и определяет бины по абсолютным
     индексам, поэтому срез записи без сдвига корня рассинхронизировал бы их.
     """
-    gaps = replay_gaps(inventory, int(samples.size), checkpoint)
+    gaps = replay_gaps(inventory, int(samples.size), checkpoint, gap_index_factor)
     support = qualified_spans(samples, phase, means, gaps, resources, checkpoint)
     if not support.spans:
         return None

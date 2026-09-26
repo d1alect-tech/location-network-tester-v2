@@ -62,7 +62,7 @@ def validate_f18_inputs(  # noqa: PLR0913, PLR0917 - полный shared input c
 
 
 def unavailable_f18_result(
-    codes: tuple[str, ...], sample_count: int, segment_samples: int
+    codes: tuple[str, ...], sample_count: int, segment_samples: int, analysis_rate_hz: float
 ) -> F18Result:
     """Собрать UNAVAILABLE без осей, zero-filled arrays или выдуманных measurements."""
     empty_float = np.empty(0, dtype=np.float64)
@@ -85,6 +85,7 @@ def unavailable_f18_result(
         frame_support=empty_int,
         sample_count=sample_count,
         qualified_sample_count=0,
+        analysis_rate_hz=analysis_rate_hz,
         segment_samples=segment_samples,
         frame_count=0,
         declared_triad_count=0,

@@ -15,6 +15,12 @@ PHASE_BINS: Final = 64
 # отвергает любое расхождение, а locked() отдаёт константы времени импорта.
 # Выведенные отсчёты публикует движок, см. segment_samples_for.
 SEGMENT_DURATION_S: Final = 0.001
+# Объявленная частота анализа F18. Запись выше неё приводится вниз ЦЕЛЫМ числом
+# отсчётов на отсчёт: нецелое отношение запрещено (см. comparability.normalization,
+# rule_id bicoherence_analysis_rate_decimation_v1), потому что дробный ресемплинг
+# меняет статистику и не выводится из измеренной частоты однозначно. Объявление
+# обязано быть константой: locked_declarations() отвергает rate-зависимое поле.
+ANALYSIS_RATE_HZ: Final = 1_000_000.0
 WINDOW: Final = "hann_periodic"
 OVERLAP_FRACTION: Final = 0.5
 BASE_FREQUENCIES_HZ: Final = (3000.0, 5000.0, 10000.0, 20000.0, 50000.0)
@@ -44,6 +50,23 @@ def segment_samples_for(sample_rate_hz: float) -> int:
     if not math.isfinite(sample_rate_hz) or sample_rate_hz <= 0.0:
         raise ValueError("F18 segment needs a positive sample rate")
     return round(SEGMENT_DURATION_S * sample_rate_hz)
+
+
+def analysis_factor_for(sample_rate_hz: float) -> int:
+    """Вывести целочисленный фактор приведения записи к объявленной частоте анализа.
+
+    Единственный источник истины для формы «во сколько раз приведено»: движок зовёт
+    его на ИЗМЕРЕННОЙ частоте захвата до перепривязки корня фазы, тесты — на своих.
+    ``max(1, …)`` обязателен именно здесь: частота ниже объявленной даёт
+    ``round(< 1) == 0``, а ОБЪЯВЛЕННЫЙ фактор обязан быть не меньше единицы, иначе
+    его читатель (сверка нормализации, тест, деление) получил бы несуществующее
+    приведение. Второй слой защиты — ранний возврат в f18_decimation, который не
+    отдаёт нулевой фактор ресемплеру вовсе.
+    """
+    if not math.isfinite(sample_rate_hz) or sample_rate_hz <= 0.0:
+        raise ValueError("F18 analysis factor needs a positive sample rate")
+    factor = round(sample_rate_hz / ANALYSIS_RATE_HZ)
+    return max(1, int(factor))
 
 
 PHASE_REFERENCE_UNAVAILABLE: Final = "phase_reference_unavailable"

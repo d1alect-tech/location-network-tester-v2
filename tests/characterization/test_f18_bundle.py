@@ -262,7 +262,7 @@ def _partial_result() -> F18Result:
     )
 
 
-def _unavailable(reason: str, _sample_rate_hz: float) -> F18Result:
+def _unavailable(reason: str, sample_rate_hz: float) -> F18Result:
     empty_float = np.empty(0, dtype=np.float64)
     return F18Result(
         status=Status.UNAVAILABLE,
@@ -281,7 +281,8 @@ def _unavailable(reason: str, _sample_rate_hz: float) -> F18Result:
         frame_support=np.empty(0, dtype=np.int64),
         sample_count=_SAMPLES,
         qualified_sample_count=0,
-        segment_samples=segment_samples_for(_OFF_GRID_SAMPLE_RATE_HZ),
+        analysis_rate_hz=sample_rate_hz,
+        segment_samples=segment_samples_for(sample_rate_hz),
         frame_count=0,
         declared_triad_count=0,
         measurable_triad_count=0,
@@ -554,7 +555,10 @@ def test_metadata_table_carries_full_locked_truth_in_one_row() -> None:
     # движком отсчёты, поэтому decoder может восстановить rate-зависимое поле.
     assert metadata["segment_duration_s"] == 0.001
     assert metadata["segment_samples"] == _EXACT_GRID_SEGMENT == 1_024
-    assert len(table.columns) == len(table.rows[0]) == 72
+    # Частота анализа опубликована вместе с сегментом: она и есть причина, по которой
+    # отсчёты сегмента rate-зависимы, поэтому артефакт не должен молчать о ней.
+    assert metadata["analysis_rate_hz"] == _EXACT_GRID_SAMPLE_RATE_HZ == 1_024_000.0
+    assert len(table.columns) == len(table.rows[0]) == 73
     assert tuple(metadata[f"spec_gap_{index}"] for index in range(1, 6)) == SPEC_GAPS
     for _, name, unit in PERSISTED_QUANTITIES:
         assert metadata[f"{name}_quantity_name"] == name

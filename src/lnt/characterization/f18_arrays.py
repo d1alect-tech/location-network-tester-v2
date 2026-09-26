@@ -39,6 +39,7 @@ from lnt.characterization.f18_tables import (
     TRIAD_AVAILABLE_NAME,
     bicoherence_metadata,
     locked_axes,
+    persisted_analysis_rate_hz,
     persisted_segment_samples,
 )
 from lnt.characterization.f18_tables import (
@@ -99,10 +100,12 @@ def decode_f18_arrays(
     ):
         fail_f18_invariant("F18 persisted identity or metadata is not locked")
     metadata = tables[F18_METADATA_TABLE_ID]
-    # Выведенный сегмент читается из самой таблицы: locked-сверка ниже поэтому
-    # фиксирует все объявленные ячейки, а rate-зависимую проверяет decoder,
-    # восстанавливающий из неё F18Result.segment_samples.
-    if metadata != bicoherence_metadata(declarations, persisted_segment_samples(metadata)):
+    # Выведенные сегмент и частота анализа читаются из самой таблицы: locked-сверка
+    # ниже поэтому фиксирует все объявленные ячейки, а rate-зависимые проверяет
+    # decoder, восстанавливающий из них F18Result.
+    published_rate = persisted_analysis_rate_hz(metadata)
+    published_segment = persisted_segment_samples(metadata)
+    if metadata != bicoherence_metadata(declarations, published_segment, published_rate):
         fail_f18_invariant("F18 persisted identity or metadata is not locked")
     references = f18_array_references(family.status, shape)
     if family.array_refs != tuple(references):
