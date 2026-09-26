@@ -26,6 +26,7 @@ __all__ = [
     "bicoherence_metadata",
     "locked_axes",
     "locked_declarations",
+    "persisted_segment_samples",
 ]
 
 F18_METADATA_TABLE_ID: Final = "f18_bicoherence_metadata"
@@ -99,6 +100,9 @@ _COLUMNS: Final = (
         ),
     ),
     *_columns(TableValueType.TEXT, None, ("window",)),
+    # Длительность объявлена, число отсчётов выведено движком: обе формы публикуются,
+    # поэтому locked-поверка сверяет только первую, а вторую читают обратно.
+    *_columns(TableValueType.NUMBER, Unit.S, ("segment_duration_s",)),
     *_columns(
         TableValueType.NUMBER,
         Unit.RATIO,
@@ -152,7 +156,7 @@ _COLUMNS: Final = (
 )
 
 
-def bicoherence_metadata(declarations: F18Declarations) -> TableBlock:
+def bicoherence_metadata(declarations: F18Declarations, segment_samples: int) -> TableBlock:
     """Сохранить весь declared F18 surface без пересказа или сокращений."""
     if declarations != F18Declarations.locked() or len(contract.SPEC_GAPS) != 5:  # noqa: PLR2004
         raise CharacterizationError("status_invariant", "F18 metadata declarations are not locked")
@@ -161,8 +165,9 @@ def bicoherence_metadata(declarations: F18Declarations) -> TableBlock:
         contract.F18_INDEX,
         contract.METHOD,
         1,
-        *_recipe_counts(declarations),
+        *_recipe_counts(declarations, segment_samples),
         declarations.window,
+        declarations.segment_duration_s,
         declarations.overlap_fraction,
         declarations.nyquist_fraction_max,
         declarations.iaaft_relative_rms_magnitude_tolerance,
@@ -204,10 +209,34 @@ def bicoherence_metadata(declarations: F18Declarations) -> TableBlock:
 # Универсальный column builder определён до module-level schema.
 
 
-def _recipe_counts(value: F18Declarations) -> tuple[int, ...]:
+def persisted_segment_samples(table: TableBlock) -> int:
+    """Прочитать выведенный движком сегмент из сохранённой metadata-таблицы.
+
+    Число отсчётов зависит от частоты записи, поэтому decoder не может вывести
+    его заново: частота в артефакте не хранится. Единственный носитель —
+    сохранённая ячейка, и читается она ДО locked-сверки таблицы, чтобы та
+    сверяла все 71 объявленную ячейку, а не подменяла эту.
+    """
+    index = next(
+        (
+            position
+            for position, column in enumerate(table.columns)
+            if column.name == "segment_samples"
+        ),
+        -1,
+    )
+    value = table.rows[0][index] if index >= 0 and table.row_count == _ROW_COUNT else None
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise CharacterizationError(
+            "status_invariant", "F18 persisted segment is not an integer count"
+        )
+    return value
+
+
+def _recipe_counts(value: F18Declarations, segment_samples: int) -> tuple[int, ...]:
     return (
         value.phase_bins,
-        value.segment_samples,
+        segment_samples,
         value.maximum_triads,
         value.phase_randomized_surrogate_count,
         value.iaaft_surrogate_count,

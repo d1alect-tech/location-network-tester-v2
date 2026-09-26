@@ -130,7 +130,12 @@ def _validate_stft(by_id: dict[str, CharacterizationFamily], stft: StftSettings)
             raise RecipeError(f"рецепт characterization: F12.{name} не совпадает с root STFT")
     for family_id in ("f17_cyclic_spectral_coherence", "f18_bicoherence_triads"):
         family = by_id[family_id]
-        for name in ("segment_samples", *shared):
+        # F18 объявляет сегмент длительностью, а не числом отсчётов, поэтому его
+        # segment_samples выводится движком из частоты записи и равняться root-значению
+        # не обязан (на 1 МГц это 1000 против 4096). Parse-time частоты нет, поэтому
+        # равенство живёт в движке; здесь остаются четыре общих имени.
+        names = ("segment_samples", *shared) if family_id.startswith("f17") else shared
+        for name in names:
             if family.value(name) != getattr(stft, name):
                 raise RecipeError(f"рецепт characterization: {family_id}.{name} не совпадает")
     if by_id["f17_cyclic_spectral_coherence"].value("analysis_low_hz") != stft.analysis_low_hz:

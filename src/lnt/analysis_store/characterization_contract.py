@@ -109,7 +109,7 @@ FAMILY_FIELDS: Final = {
     ),
     "f18_bicoherence_triads": _family(
         "declared_normalized_bicoherence_dual_surrogate",
-        "phase_bins segment_samples window overlap_fraction base_frequencies_hz triad_rule "
+        "phase_bins segment_duration_s window overlap_fraction base_frequencies_hz triad_rule "
         + "analysis_high_hz nyquist_fraction_max frequency_mapping maximum_triads "
         + "phase_randomized_surrogate_count iaaft_surrogate_count iaaft_iterations "
         + "iaaft_relative_rms_magnitude_tolerance surrogate_seed dual_null_p_value "

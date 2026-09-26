@@ -307,7 +307,7 @@
       "method": "declared_normalized_bicoherence_dual_surrogate",
       "method_version": 1,
       "phase_bins": 64,
-      "segment_samples": 4096,
+      "segment_duration_s": 0.001,
       "window": "hann_periodic",
       "overlap_fraction": 0.5,
       "base_frequencies_hz": [3000.0, 5000.0, 10000.0, 20000.0, 50000.0],
