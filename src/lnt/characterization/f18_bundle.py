@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING, Final
-
-import numpy as np
 
 import lnt.characterization.f18_contract as contract
 from lnt.characterization.errors import CharacterizationError
 from lnt.characterization.f18_arrays import decode_f18_arrays, published
+from lnt.characterization.f18_decode import (
+    checked_f18_codes,
+    checked_f18_reasons,
+    checked_f18_status,
+    f18_count,
+    f18_record_span,
+)
 from lnt.characterization.f18_result import F18Result
 from lnt.characterization.f18_tables import (
     F18_METADATA_TABLE_ID as _TABLE_ID,
@@ -37,6 +41,8 @@ from lnt.characterization.records import (
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+    import numpy as np
 
     from lnt.analysis_store.characterization_family import CharacterizationFamily
     from lnt.characterization.tables import TableBlock
@@ -78,14 +84,14 @@ def build_f18_family(
     ):
         raise CharacterizationError("family_order", "f18 mapper needs the f18 family")
     declarations = locked_declarations(family)
-    reasons = _checked_codes(result.reason_codes)
-    span = _span(record_duration_s)
-    _status(result.status, reasons)
+    reasons = checked_f18_codes(result.reason_codes)
+    span = f18_record_span(record_duration_s)
+    checked_f18_status(result.status, reasons)
     validate_f18_result(result)
     spec = _spec(family, band, measured_channel, span, result.status, reasons)
     if result.status is Status.UNAVAILABLE:
         return family_envelope(spec, zero_support()), {}, {}
-    _reason_accounting(result, reasons)
+    checked_f18_reasons(result, reasons)
     arrays, references = published(result, declarations, partial=result.status is Status.PARTIAL)
     table = bicoherence_metadata(declarations)
     envelope = family_envelope(
@@ -104,8 +110,8 @@ def decode_f18_result(
     tables: Mapping[str, TableBlock],
 ) -> F18Result:
     """Проверить persisted F18 form и вернуть только engine-валидный F18Result."""
-    reasons = _checked_codes(family.reason_codes)
-    _status(family.status, reasons)
+    reasons = checked_f18_codes(family.reason_codes)
+    checked_f18_status(family.status, reasons)
     if family.status is Status.UNAVAILABLE:
         raise CharacterizationError("status_invariant", "unavailable F18 has no decodable domain")
     counters = _summary_counts(family)
@@ -146,60 +152,14 @@ def decode_f18_result(
         iaaft_converged_count=counters[8],
     )
     validate_f18_result(restored)
-    _reason_accounting(restored, reasons)
+    checked_f18_reasons(restored, reasons)
     return restored
 
 
-def _checked_codes(codes: tuple[str, ...]) -> tuple[str, ...]:
-    if (
-        any(code not in contract.DECLARED_CODES for code in codes)
-        or len(set(codes)) != len(codes)
-        or codes != tuple(sorted(codes))
-    ):
-        raise CharacterizationError("status_invariant", "F18 reasons are not canonical")
-    return codes
-
-
-def _status(status: object, reasons: tuple[str, ...]) -> None:
-    if not isinstance(status, Status):
-        raise CharacterizationError("status_invariant", "unknown F18 status")
-    if (status is Status.AVAILABLE and reasons) or (status is not Status.AVAILABLE and not reasons):
-        raise CharacterizationError("status_invariant", "invalid F18 status/reasons")
-    if status is Status.PARTIAL and any(
-        code in reasons
-        for code in (contract.PHASE_REFERENCE_UNAVAILABLE, contract.INSUFFICIENT_FRAMES)
-    ):
-        raise CharacterizationError("status_invariant", "terminal F18 reason cannot be partial")
-
-
-def _reason_accounting(result: F18Result, reasons: tuple[str, ...]) -> None:
-    available = int(np.count_nonzero(result.triad_available))
-    expected = (
-        (contract.TRIAD_OFF_GRID, result.off_grid_triad_count > 0),
-        (contract.TRIAD_ABOVE_NYQUIST, result.above_nyquist_triad_count > 0),
-        (contract.ARTIFACT_LIMIT, result.dropped_triad_count > 0),
-        (contract.ZERO_DENOMINATOR, result.measurable_triad_count != available),
-        (
-            contract.IAAFT_NOT_CONVERGED,
-            result.iaaft_converged_count < contract.IAAFT_SURROGATE_COUNT,
-        ),
-        (contract.NO_SIGNIFICANT_TRIAD, not bool(np.any(result.significant))),
-    )
-    if any((code in reasons) != present for code, present in expected):
-        _fail("F18 reason accounting is not exact")
-
-
-def _span(value: float) -> float:
-    span = float(value)
-    if not math.isfinite(span) or span <= 0.0:
-        raise CharacterizationError("status_invariant", "F18 record duration must be positive")
-    return span
-
-
 def _support(result: F18Result, span: float) -> Support:
-    sample = _count(result.sample_count, "sample_count")
-    qualified = _count(result.qualified_sample_count, "qualified_sample_count")
-    frames = _count(result.frame_count, "frame_count")
+    sample = f18_count(result.sample_count, "sample_count")
+    qualified = f18_count(result.qualified_sample_count, "qualified_sample_count")
+    frames = f18_count(result.frame_count, "frame_count")
     if sample <= 0 or qualified <= 0 or sample < qualified or frames < contract.MINIMUM_FRAMES:
         _fail("invalid F18 support counts")
     return Support(
@@ -274,12 +234,6 @@ def _spec(  # noqa: PLR0913, PLR0917 - envelope carries declared F18 geometry
         band=band,
         signal_plane=signal_plane_for(measured_channel),
     )
-
-
-def _count(value: object, name: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise CharacterizationError("status_invariant", f"F18 {name} must be a nonnegative integer")
-    return value
 
 
 def _fail(detail: str) -> None:
