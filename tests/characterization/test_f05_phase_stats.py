@@ -6,6 +6,8 @@ import math
 
 import numpy as np
 import pytest
+
+from lnt.characterization.event_models import RootEvent
 from lnt.characterization.f05_phase_stats import (
     CIRCULAR_AVERAGE,
     EVENT_SOURCE,
@@ -16,8 +18,6 @@ from lnt.characterization.f05_phase_stats import (
     F05Result,
     compute_f05_phase_conditioned_statistics,
 )
-
-from lnt.characterization.event_models import RootEvent
 from lnt.characterization.phase_model import PhaseCycles
 from lnt.characterization.records import Status
 from lnt.events.models import Polarity
