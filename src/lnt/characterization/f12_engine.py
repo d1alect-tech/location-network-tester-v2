@@ -16,11 +16,12 @@ from lnt.characterization.f12_contract import (
     ZERO_POWER,
 )
 from lnt.characterization.f12_inference import infer_f12_candidates
-from lnt.characterization.f12_input import longest_qualified_span, materialize_phase_residual
+from lnt.characterization.f12_input import materialize_phase_residual
 from lnt.characterization.f12_math import declared_phase_reason
 from lnt.characterization.f12_result import F12Result
 from lnt.characterization.f12_scales import observe_scale
 from lnt.characterization.f12_surrogates import surrogate_global_maxima
+from lnt.characterization.f16_segments import longest_qualified_span
 from lnt.characterization.phase import PHASE_ROOT_REASON_CODES
 from lnt.characterization.records import Status
 

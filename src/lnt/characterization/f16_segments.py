@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from lnt.characterization.event_models import TaggedGap
+from lnt.characterization.phase_model import PhaseCycles
 from lnt.characterization.phase_stats import phase_residual_impl
 
 type FloatInput = NDArray[np.float32] | NDArray[np.float64]
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 
     from lnt.analysis_store.characterization_settings import ResourceLimits
     from lnt.characterization.event_models import RootEvents
-    from lnt.characterization.phase_model import PhaseCycles, PhaseMeans
+    from lnt.characterization.phase_model import PhaseMeans
 type Span = tuple[int, int]
 
 _RESIDUAL_BYTES_PER_SAMPLE = 64
@@ -162,3 +163,61 @@ def _blocked(
             break
         probe += 1
     return blocked, probe
+
+
+def longest_qualified_span(  # noqa: PLR0913, PLR0917 - shared phase root, gaps и остаток
+    samples: FloatInput,
+    phase: PhaseCycles,
+    means: PhaseMeans,
+    inventory: RootEvents,
+    resources: ResourceLimits,
+    checkpoint: Callable[[], None] | None = None,
+) -> tuple[Span, PhaseCycles] | None:
+    """Выбрать самый длинный qualified span и перебазировать корень фазы на него.
+
+    Настоящий корень из :func:`compute_phase_cycles` никогда не покрывает запись
+    целиком: halo фильтра делает первый и последний сэмпл неквалифицированными.
+    Семейства, которым нужен сплошной остаток на всю доступную длину, поэтому
+    считают не по записи, а по самому длинному span. Выход за край корня и
+    root-event gaps исключаются одинаково, так что измерение никогда не сшивает
+    разрыв. ``None`` означает структурное отсутствие span, а не нулевой остаток.
+
+    :func:`rebase_phase_cycles` обязателен в паре со срезом: ``phase_bins_impl``
+    требует ``phase.sample_count == values.size`` и определяет бины по абсолютным
+    индексам, поэтому срез записи без сдвига корня рассинхронизировал бы их.
+    """
+    gaps = replay_gaps(inventory, int(samples.size), checkpoint)
+    support = qualified_spans(samples, phase, means, gaps, resources, checkpoint)
+    if not support.spans:
+        return None
+    # max берёт первый максимум при равенстве, поэтому выбор детерминирован.
+    # ponytail: считается только самый длинный span, более короткие отбрасываются.
+    # Потолок — запись с несколькими разрывами теряет их хвосты; учёт честный через
+    # пару sample_count/qualified_sample_count у каждого семейства. Склейка спанов
+    # дала бы ложные спектральные скачки на стыках, поэтому путь улучшения — не
+    # суммирование, а отдельный declared код «несколько спанов».
+    start, stop = max(support.spans, key=lambda span: span[1] - span[0])
+    return (start, stop), rebase_phase_cycles(phase, start, stop)
+
+
+def rebase_phase_cycles(phase: PhaseCycles, start: int, stop: int) -> PhaseCycles:
+    """Сдвинуть границы циклов на ``start``, не обрезая и не ограничивая концы.
+
+    Доли ``(position - cycle_start) / (cycle_end - cycle_start)`` при общем сдвиге
+    обоих концов сохраняются точно, поэтому номер phase bin, вычитаемая средняя и
+    все производные значения остаются прежними. Отрицательное начало первого
+    цикла и конец последнего за ``sample_count`` допустимы:
+    :func:`phase_bins_impl` требует только ``cycles >= 0`` и ``position <
+    cycle_end``, а ``PhaseCycles`` — frozen dataclass без ``__post_init__``.
+    Clamp конца перемасштабировал бы долю и молча сменил бы bin.
+    """
+    keep = (phase.cycle_end_samples > start) & (phase.cycle_start_samples < stop)
+    return PhaseCycles(
+        sample_rate_hz=phase.sample_rate_hz,
+        sample_count=stop - start,
+        cycle_start_samples=phase.cycle_start_samples[keep] - start,
+        cycle_end_samples=phase.cycle_end_samples[keep] - start,
+        cycle_valid=phase.cycle_valid[keep],
+        status=phase.status,
+        reason_code=phase.reason_code,
+    )
