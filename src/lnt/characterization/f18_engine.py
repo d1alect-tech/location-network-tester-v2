@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from lnt.characterization.f16_segments import longest_qualified_span
 from lnt.characterization.f18_contract import (
     IAAFT_NOT_CONVERGED,
     IAAFT_SURROGATE_COUNT,
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from lnt.analysis_store.characterization_settings import ResourceLimits, StftSettings
+    from lnt.characterization.event_models import RootEvents
     from lnt.characterization.phase_model import PhaseCycles, PhaseMeans
 
 type Float64Array = NDArray[np.float64]
@@ -51,16 +53,18 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     samples: np.ndarray,
     phase: PhaseCycles,
     means: PhaseMeans,
+    inventory: RootEvents,
     declarations: F18Declarations,
     settings: StftSettings,
     resources: ResourceLimits,
     checkpoint: Checkpoint = None,
 ) -> F18Result:
-    """Посчитать F18 из одного shared framing-пути и двух declared surrogate null."""
+    """Считать F18 из longest phase-qualified span записи и двух declared null."""
     _checkpoint(checkpoint)
     values = _validate_inputs(samples, phase, means, declarations, settings, resources)
+    record_samples = len(values)
     if phase.status is Status.UNAVAILABLE or means.status is Status.UNAVAILABLE:
-        return _unavailable((PHASE_REFERENCE_UNAVAILABLE,), len(values))
+        return _unavailable((PHASE_REFERENCE_UNAVAILABLE,), record_samples)
     effective = replace(
         settings,
         segment_samples=declarations.segment_samples,
@@ -80,7 +84,15 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     reasons = grid_reason_codes(grid)
     measurable = grid.measurable
     if not bool(np.any(measurable)):
-        return _unavailable(tuple(sorted(reasons)), len(values))
+        return _unavailable(tuple(sorted(reasons)), record_samples)
+    # Спан выбирается после triad_off_grid: на 500 кГц сетка вне решётки, и
+    # triad_off_grid обязан остаться первой причиной отказа.
+    span = longest_qualified_span(values, phase, means, inventory, resources, checkpoint)
+    if span is None:
+        reasons.add(PHASE_REFERENCE_UNAVAILABLE)
+        return _unavailable(tuple(sorted(reasons)), record_samples)
+    (start, stop), phase = span
+    values = values[start:stop]
     rows = grid.rows[measurable]
     coefficients = triad_coefficients(
         values,
@@ -95,7 +107,7 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     frame_count = int(coefficients.shape[1])
     if frame_count < declarations.minimum_frames:
         reasons.add(INSUFFICIENT_FRAMES)
-        return _unavailable(tuple(sorted(reasons)), len(values))
+        return _unavailable(tuple(sorted(reasons)), record_samples)
     observed = triad_bicoherence(coefficients, rows)
     # Наблюдение считается по measurable-подмножеству, а публикуется всегда в
     # declared-домене. Маска доступности поэтому собирается scatter'ом, а не
@@ -106,14 +118,15 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     available[measurable] = np.isfinite(observed.bicoherence_squared)
     if not bool(np.any(available)):
         reasons.add(ZERO_DENOMINATOR)
-        return _unavailable(tuple(sorted(reasons)), len(values))
+        return _unavailable(tuple(sorted(reasons)), record_samples)
     residual = observed_residual(values, phase, means, resources=resources, checkpoint=checkpoint)
     if residual is None:
-        # Корень фазы не покрывает запись целиком: честный отказ одного семейства
-        # вместо непойманного исключения, которое унесло бы все восемнадцать.
-        # Накопленные коды сетки сохраняются, чтобы отказ не терял причину above_nyquist.
+        # Спан квалифицирован конструктивно, поэтому в продукционном пути ветка
+        # недостижима и оставлена как defense-in-depth: материализация остатка
+        # строже движка и не выдаёт нули на неквалифицированных позициях за
+        # измерение, если инвариант когда-нибудь разъедется.
         reasons.add(PHASE_REFERENCE_UNAVAILABLE)
-        return _unavailable(tuple(sorted(reasons)), len(values))
+        return _unavailable(tuple(sorted(reasons)), record_samples)
     phase_counter, iaaft_counter, converged = run_both_nulls(
         F18NullPlan(
             residual=residual,
@@ -131,7 +144,7 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
     )
     if converged == 0:
         reasons.add(IAAFT_NOT_CONVERGED)
-        return _unavailable(tuple(sorted(reasons)), len(values))
+        return _unavailable(tuple(sorted(reasons)), record_samples)
     phase_p = _to_domain(
         add_one_p_value(phase_counter.exceedance, PHASE_RANDOMIZED_SURROGATE_COUNT), measurable
     )
@@ -161,7 +174,7 @@ def compute_f18_bicoherence_triads(  # noqa: PLR0911, PLR0913, PLR0917 - вхо�
         triad_available=available,
         significant=significant,
         frame_support=np.full(grid.declared_count, frame_count, dtype=np.int64),
-        sample_count=len(values),
+        sample_count=record_samples,
         qualified_sample_count=(frame_count - 1) * hop + declarations.segment_samples,
         frame_count=frame_count,
         declared_triad_count=grid.declared_count,

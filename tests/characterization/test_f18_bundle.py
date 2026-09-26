@@ -20,6 +20,11 @@ from lnt.characterization import (
     encode_bundle,
     load_bundle,
 )
+from lnt.characterization.event_models import (
+    RootEvents,
+    RootEventSettings,
+    RootTimelineItem,
+)
 from lnt.characterization.f18_bundle import (
     F18_ID,
     F18_INDEX,
@@ -67,6 +72,8 @@ from lnt.characterization.records import Band, validate_unit_name
 from lnt.context.json_codec import decode_object
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+
     from lnt.analysis_store.characterization_family import CharacterizationFamily
     from lnt.characterization.models import FamilyResult
     from lnt.characterization.tables import TableBlock
@@ -141,6 +148,56 @@ def _settings() -> StftSettings:
     )
 
 
+def _inventory(sample_count: int) -> RootEvents:
+    """Пустой измеренный инвентарь: F18 считает gaps, а не сами события."""
+
+    def replay(_: Callable[[], None] | None) -> Iterator[RootTimelineItem]:
+        return iter(())
+
+    settings = RootEventSettings(
+        recipe_sha256="test",
+        detector="existing_event_inventory",
+        noise_window_samples=2_048,
+        noise_step_samples=1_024,
+        minimum_noise_samples=1_024,
+        threshold_sigma=5.0,
+        max_gap_samples=4,
+        minimum_event_samples=1,
+        minimum_snr_db=10.0,
+        minimum_snr_ratio=3.9810717055349722,
+        dead_time_s=0.001,
+        dead_time_samples=10,
+        chunk_samples=4_096,
+        fft_max_samples=1_048_576,
+        clipping_low_v=None,
+        clipping_high_v=None,
+        clipping_reason_code="not_applicable",
+        dead_time_handling="exclude_intervals",
+        gap_handling="exclude_crossing_intervals",
+    )
+    return RootEvents(
+        sample_rate_hz=_EXACT_GRID_SAMPLE_RATE_HZ,
+        sample_count=sample_count,
+        events=(),
+        gaps=(),
+        exclusions=(),
+        candidate_count=0,
+        snr_rejected_count=0,
+        accepted_count=0,
+        omitted_count=0,
+        dead_time_rejected_count=0,
+        gap_count=0,
+        omitted_gap_count=0,
+        omitted_exclusion_count=0,
+        selection_rule="first_by_peak_sample",
+        retained_candidates_complete=True,
+        settings=settings,
+        status=Status.AVAILABLE,
+        reason_codes=(),
+        _replay_factory=replay,
+    )
+
+
 def _phase() -> PhaseCycles:
     step = round(_EXACT_GRID_SAMPLE_RATE_HZ / 50.0)
     starts = np.arange(0, _SAMPLES, step, dtype=np.float64)
@@ -186,6 +243,7 @@ def _available_result() -> F18Result:
         _coupled_record(),
         _phase(),
         _means(),
+        _inventory(_SAMPLES),
         F18Declarations.locked(),
         settings=_settings(),
         resources=_resources(),

@@ -218,7 +218,7 @@ def run_characterization(  # noqa: PLR0913, PLR0915 - seam параллелен 
     _checkpoint(cancellation)
     f17 = _compute_f17(channel_by_name, phase, phase_means_by_name, recipe, cancellation)
     _checkpoint(cancellation)
-    f18 = _compute_f18(samples, phase, means, recipe, cancellation)
+    f18 = _compute_f18(samples, phase, means, root_events, recipe, cancellation)
     _checkpoint(cancellation)
     bundle, arrays, tables = build_characterization_bundle(
         result,

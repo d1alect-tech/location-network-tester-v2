@@ -12,6 +12,7 @@ from .characterization_slices_extended import _float_tuple
 
 if TYPE_CHECKING:
     from lnt.analysis_store import CharacterizationRecipe
+    from lnt.characterization.event_models import RootEvents
     from lnt.characterization.phase_model import PhaseCycles, PhaseMeans
     from lnt.scope_io import CancellationToken
 
@@ -22,10 +23,11 @@ __all__ = ["_compute_f18"]
 _F18_INDEX: Final = 17
 
 
-def _compute_f18(
+def _compute_f18(  # noqa: PLR0913, PLR0917 - полный набор входов seam
     samples: Float32Array,
     phase: PhaseCycles,
     means: PhaseMeans,
+    inventory: RootEvents,
     recipe: CharacterizationRecipe,
     cancellation: CancellationToken,
 ) -> F18Result:
@@ -59,6 +61,7 @@ def _compute_f18(
         samples,
         phase,
         means,
+        inventory,
         declarations,
         recipe.stft,
         recipe.resource_limits,

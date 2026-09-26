@@ -1,21 +1,9 @@
-"""F18 E2E-reduced: реальный seam, честный отказ и сохранность всех 18 семейств.
+"""F18 E2E-reduced: реальный seam, измерение по qualified span и живой каталог.
 
-F18 объявляет 15 триад на пяти базовых частотах и требует exact FFT bins, поэтому
-через seam отказ наступает на двух разных условиях. На 500 кГц — канонической
-частоте эталонных записей — вся сетка вне решётки, и семья честно UNAVAILABLE с
-пустыми доменами. На частотах решётки сетка измерима, но корень фазы от реального
-CH2 всегда теряет фильтровый halo на обоих краях записи, поэтому источник null
-негоден и F18 отказывается.
-
-Обе причины обязаны оставаться локальными для F18. Длина измеренного подмножества
-триад расходится с declared-доменом на частичной сетке, а негодный остаток фазы
-не должен поднимать исключение. Любое из двух уносило весь прогон характеризации,
-то есть все восемнадцать семейств, вместо одного. Тесты ниже — интеграционный
-regression-пин: seam обязан завершиться и опубликовать полный каталог, а потеря
-одной фазы не должна превращаться в пустой набор семейств.
-
-Числовые выводы читаются из загруженного артефакта. Тесты не выводят калибровку,
-соответствие стандарту, неопределённость GUM, физический механизм или причинность.
+F18 требует exact FFT bins, поэтому на 500 кГц вся сетка вне решётки и семья UNAVAILABLE
+с пустыми доменами. На частотах решётки сетка измерима, а корень фазы от CH2 теряет
+фильтровый halo, поэтому F18 меряет самый длинный phase-qualified span: sample_count
+публикует всю запись, а qualified_sample_count — измеренный span.
 """
 
 from __future__ import annotations
@@ -37,7 +25,7 @@ from lnt.characterization.f18_bundle import F18_ID, decode_f18_result
 from lnt.characterization.f18_contract import (
     DECLARED_CODES,
     METHOD,
-    PHASE_REFERENCE_UNAVAILABLE,
+    NO_SIGNIFICANT_TRIAD,
     TRIAD_ABOVE_NYQUIST,
     TRIAD_OFF_GRID,
 )
@@ -49,7 +37,6 @@ from tests.test_ui_sessions import write_manifest
 
 if TYPE_CHECKING:
     from lnt.analysis_store.characterization_family import CharacterizationFamily
-    from lnt.analysis_v2.types import AnalysisRunResult
     from lnt.characterization.bundle_codec import LoadedCharacterization
     from lnt.characterization.f18_result import F18Declarations
     from lnt.characterization.f18_triads import F18TriadGrid
@@ -58,7 +45,6 @@ if TYPE_CHECKING:
 _EXAMPLE = Path(__file__).parents[2] / "docs/examples/characterization-recipe-v2.json"
 _F18_INDEX = 17
 _DECLARED_TRIADS = 15
-_PLACEHOLDER = "not_computed"
 # Стандартный профиль эталонных записей проекта: 500 кГц, 2.4 s.
 _STANDARD_FS_HZ = 500_000.0
 _STANDARD_SAMPLES = 1_200_000
@@ -72,10 +58,21 @@ _EXACT_GRID_FS_HZ = 512_000.0
 _EXACT_GRID_SAMPLES = 168_960
 # Решётка exact_fft_bins = segment_samples * gcd(bases) = 4096 * 1000 Гц.
 _EXACT_BIN_LATTICE_HZ = 4_096_000
-# Связанные триады фикстуры: 3000+5000 и 10000+20000; плюс три суммы 50/60/70 кГц.
+# Суммы f_1 + f_2 фикстуры: 8000 = 3+5, 30000 = 10+20, 60000 = 10+50, 70000 = 20+50 кГц.
+# Связанные триады записаны как индекс в порядке declared_triads -> phi, где phi —
+# постоянная фаза третьей компоненты, поэтому b2 = 1, а biphase = -phi.
+_COUPLED_TRIADS = ((3_000.0, 5_000.0, 0.7), (10_000.0, 20_000.0, -0.4))
+_COUPLED_PHI = {1: 0.7, 10: -0.4, 11: 1.1, 13: -1.6}
+# Триады, суммы которых (23, 15, 25, 55 кГц) нет вовсе в ch1: bicoherence честно
+# близка к нулю, тогда как у связанных триад она насыщается единицей.
+_ABSENT_SUM_INDICES = (3, 6, 7, 8)
+# Кадрово-согласованная трёхчастотная система даёт b2 = 1 в точности, поэтому у
+# связанных триад допуск 1e-4, а у свободных 1e-3 отделяет их на три порядка.
+_COUPLED_TOLERANCE = 1e-4
+_FREE_TOLERANCE = 1e-3
 # Измерено через build_triad_grid: у 14 целых частот решётки (делителей 4096000
-# от 8 кГц вверх) 0 < measurable < 15,
-# то есть длина измеренного подмножества расходится с declared-доменом.
+# от 8 кГц вверх) 0 < measurable < 15, то есть длина измеренного подмножества триад
+# расходится с declared-доменом, и расхождение публикуется как masked absence.
 _CRASH_BAND_RATES_HZ = (
     16_000,
     16_384,
@@ -127,8 +124,8 @@ def _measured(grid: F18TriadGrid) -> int:
     return int(np.count_nonzero(grid.measurable))
 
 
+# Целые частоты решётки, где длина measurable расходится с declared.
 def _crash_band_rates() -> tuple[int, ...]:
-    """Целые частоты решётки, где длина measurable расходится с declared."""
     return tuple(
         sorted(
             _EXACT_BIN_LATTICE_HZ // k
@@ -137,12 +134,6 @@ def _crash_band_rates() -> tuple[int, ...]:
             and 0 < _measured(_grid(_EXACT_BIN_LATTICE_HZ / k)) < _DECLARED_TRIADS
         )
     )
-
-
-def _exact_bin_positions(sample_rate_hz: float) -> np.ndarray:
-    """Аналитическая позиция объявленных баз на оси rFFT: base * segment / fs."""
-    locked = _locked()
-    return np.asarray(locked.base_frequencies_hz) * locked.segment_samples / sample_rate_hz
 
 
 def _load(session: Path) -> tuple[np.ndarray, np.ndarray]:
@@ -163,17 +154,17 @@ def _artifact_bytes(artifact_dir: Path) -> dict[str, bytes]:
     return {name: (artifact_dir / name).read_bytes() for name in OUTPUT_FILENAMES}
 
 
-def _coupled_record(sample_rate_hz: float, sample_count: int) -> np.ndarray:
-    """Сумма постоянно-фазовых синусоид: f_j = f_1 + f_2 у четырёх locked-триад.
+def _domain(loaded: LoadedCharacterization, name: str) -> np.ndarray:
+    return np.asarray(loaded.arrays[f"f18_{name}"])
 
-    Шумового пола здесь нет намеренно: он опустил бы наблюдаемое b2 чуть ниже 1,
-    а суррогат без шума насыщался бы единицей и выглядел «более связным», чем
-    наблюдение. Кадровый множитель 2*pi*f*n0/fs в B сокращается, поэтому для такой
-    записи b2 = 1 в точности, а biphase равен -phi.
-    """
+
+# Шумового пола здесь нет намеренно: он опустил бы наблюдаемое b2 чуть ниже 1, а суррогат
+# без шума насыщался бы единицей и выглядел «более связным», чем наблюдение. Кадровый
+# множитель 2*pi*f*n0/fs в B сокращается, поэтому b2 = 1 в точности, biphase = -phi.
+def _coupled_record(sample_rate_hz: float, sample_count: int) -> np.ndarray:
     times = np.arange(sample_count, dtype=np.float64) / sample_rate_hz
     record = np.zeros(sample_count, dtype=np.float64)
-    for low_hz, high_hz, phi in ((3_000.0, 5_000.0, 0.7), (10_000.0, 20_000.0, -0.4)):
+    for low_hz, high_hz, phi in _COUPLED_TRIADS:
         record += np.cos(2.0 * np.pi * low_hz * times)
         record += np.cos(2.0 * np.pi * high_hz * times)
         record += 0.5 * np.cos(2.0 * np.pi * (low_hz + high_hz) * times + phi)
@@ -183,26 +174,29 @@ def _coupled_record(sample_rate_hz: float, sample_count: int) -> np.ndarray:
     return record
 
 
-def _mains(sample_rate_hz: float, sample_count: int) -> np.ndarray:
-    times = np.arange(sample_count, dtype=np.float64) / sample_rate_hz
-    return np.sin(2.0 * np.pi * 50.0 * times + 0.2)
-
-
 def _write_session(path: Path, sample_rate_hz: float, sample_count: int) -> Path:
     write_manifest(path)
+    times = np.arange(sample_count, dtype=np.float64) / sample_rate_hz
     np.save(path / "ch1.npy", _coupled_record(sample_rate_hz, sample_count).astype(np.float32))
-    np.save(path / "ch2.npy", _mains(sample_rate_hz, sample_count).astype(np.float32))
+    np.save(path / "ch2.npy", np.sin(2.0 * np.pi * 50.0 * times + 0.2).astype(np.float32))
     return path
 
 
-def _publish_twice(
-    session: Path, sample_rate_hz: float
-) -> tuple[AnalysisRunResult, AnalysisRunResult, LoadedCharacterization, dict[str, bytes]]:
+def _publish_twice(session: Path, sample_rate_hz: float) -> LoadedCharacterization:
+    """Прогнать реальный seam дважды: кэш, артефакт и сырьё обязаны совпасть."""
+    before = _raw_hashes(session)
     first = run_characterization(_recipe(), session, _load(session), sample_rate_hz)
     files = _artifact_bytes(first.artifact_dir)
     loaded = load_bundle(files)
     second = run_characterization(_recipe(), session, _load(session), sample_rate_hz)
-    return first, second, loaded, files
+    assert first.cache_hit is False
+    assert first.failures == ()
+    assert second.cache_hit is True
+    assert second.artifact_key == first.artifact_key
+    assert second.artifact_dir == first.artifact_dir
+    assert _artifact_bytes(second.artifact_dir) == files
+    assert _raw_hashes(session) == before
+    return loaded
 
 
 def _assert_identity(f18: FamilyResult, loaded: LoadedCharacterization) -> None:
@@ -213,34 +207,16 @@ def _assert_identity(f18: FamilyResult, loaded: LoadedCharacterization) -> None:
     assert f18.signal_plane == "ch1_scope_input"
     # Каталог полон: 18 семейств, ни одного placeholder'а not_computed.
     assert len(loaded.bundle.families) == 18
-    assert not [f.family_id for f in loaded.bundle.families if _PLACEHOLDER in f.reason_codes]
+    assert not [f.family_id for f in loaded.bundle.families if "not_computed" in f.reason_codes]
     assert set(f18.reason_codes) <= set(DECLARED_CODES)
     assert PHASE_ROOT_REASON_CODES.isdisjoint(f18.reason_codes)
 
 
-def _assert_cache_and_source(
-    first: AnalysisRunResult,
-    second: AnalysisRunResult,
-    files: dict[str, bytes],
-    session: Path,
-    before: dict[str, str],
-) -> None:
-    assert first.cache_hit is False
-    assert first.failures == ()
-    assert second.cache_hit is True
-    assert second.artifact_key == first.artifact_key
-    assert second.artifact_dir == first.artifact_dir
-    assert _artifact_bytes(second.artifact_dir) == files
-    assert _raw_hashes(session) == before
-
-
+# UNAVAILABLE публикует ПУСТЫЕ домены, а не нули, и декодер их не выдумывает. Fill-in
+# остаётся невозможен и на уровне движка: validate_f18_result внутри build_f18_family
+# fail-closed отвергает заполненный домен у UNAVAILABLE, так что нули сюда не проходят
+# даже в обход записи.
 def _assert_unavailable_and_empty(f18: FamilyResult, loaded: LoadedCharacterization) -> None:
-    """UNAVAILABLE публикует ПУСТЫЕ домены, а не нули, и декодер их не выдумывает.
-
-    Fill-in остаётся невозможен и на уровне движка: `validate_f18_result` внутри
-    `build_f18_family` fail-closed отвергает заполненный домен у UNAVAILABLE, так
-    что нули сюда не проходят даже в обход записи.
-    """
     assert f18.status is Status.UNAVAILABLE
     assert f18.array_refs == ()
     assert f18.table_refs == ()
@@ -252,43 +228,67 @@ def _assert_unavailable_and_empty(f18: FamilyResult, loaded: LoadedCharacterizat
         decode_f18_result(f18, loaded.arrays, loaded.tables)
 
 
+# Семья меряет: полный declared-домен и все измеримые триады доступны.
+def _assert_measured(f18: FamilyResult, loaded: LoadedCharacterization, record: int) -> None:
+    assert f18.status is not Status.UNAVAILABLE
+    assert f18.support.sample_count == record
+    assert 0 < f18.n <= record
+    assert f18.support.observation_count == f18.n
+    assert f18.support.missing_count == record - f18.n
+    # Домены не урезаны: длина измеренного подмножества расходится с declared, поэтому
+    # публикуется declared-домен с masked absence, а не пересечение масок.
+    assert {reference.shape for reference in f18.array_refs} == {(_DECLARED_TRIADS,)}
+    available = _domain(loaded, "triad_available").astype(bool)
+    measurable = {i.name: i.value for i in f18.comparison_summary}["f18_measurable_triad_count"]
+    assert int(np.count_nonzero(available)) == measurable
+    # Persisted masked absence — ровный ноль под validity mask, а не NaN: NaN не
+    # переживает finite-only кодек, и движок публикует NaN в engine-форме.
+    assert bool(np.all(_domain(loaded, "bicoherence_squared")[~available] == 0.0))
+    assert bool(np.all(_domain(loaded, "dual_null_p_value")[~available] == 0.0))
+
+
 def test_standard_profile_record_refuses_f18_off_grid_with_empty_domains(tmp_path: Path) -> None:
     """500 кГц: exact_fft_bins не выполнен ни на одной базе — 15 триад не измеримы."""
     session = _write_session(tmp_path / "f18-off-grid", _STANDARD_FS_HZ, _STANDARD_SAMPLES)
-    before = _raw_hashes(session)
-    first, second, loaded, files = _publish_twice(session, _STANDARD_FS_HZ)
+    loaded = _publish_twice(session, _STANDARD_FS_HZ)
     f18 = loaded.bundle.families[_F18_INDEX]
-
-    _assert_cache_and_source(first, second, files, session, before)
     _assert_identity(f18, loaded)
     _assert_unavailable_and_empty(f18, loaded)
     assert f18.reason_codes == (TRIAD_OFF_GRID,)
 
     # Аналитика отказа: пять баз по правилу i <= j дают ровно n(n+1)/2 = 15 триад,
     # а 500000/4096 = 122.0703125 Hz ни одну базу на бин не кладёт.
-    base_count = len(_locked().base_frequencies_hz)
-    assert base_count * (base_count + 1) // 2 == _DECLARED_TRIADS
+    locked = _locked()
+    assert len(locked.base_frequencies_hz) * 6 // 2 == _DECLARED_TRIADS
     grid = _grid(_STANDARD_FS_HZ)
     assert (grid.declared_count, _measured(grid)) == (_DECLARED_TRIADS, 0)
     assert grid.off_grid_count == _DECLARED_TRIADS
     assert grid_reason_codes(grid) == {TRIAD_OFF_GRID}
-    positions = _exact_bin_positions(_STANDARD_FS_HZ)
+    positions = np.asarray(locked.base_frequencies_hz) * locked.segment_samples / _STANDARD_FS_HZ
     assert positions.tolist() == pytest.approx([24.576, 40.96, 81.92, 163.84, 409.6], abs=1e-9)
 
     # F18-5: решётка segment * gcd(bases) = 2^15 * 5^3 не делится ни на одно целое
     # МГц 1..15, поэтому F18 не может измерить ни одну аппаратную запись.
-    assert math.gcd(*(round(v) for v in _locked().base_frequencies_hz)) == 1_000
-    assert _locked().segment_samples * 1_000 == _EXACT_BIN_LATTICE_HZ
+    assert math.gcd(*(round(v) for v in locked.base_frequencies_hz)) == 1_000
+    assert locked.segment_samples * 1_000 == _EXACT_BIN_LATTICE_HZ
     for megahertz in range(1, 16):
         assert _EXACT_BIN_LATTICE_HZ % (megahertz * 1_000_000) != 0
 
 
-def test_crash_band_rate_keeps_the_seam_alive_and_reports_both_causes(tmp_path: Path) -> None:
-    """204.8 кГц: regression-пин обеих правок — длина declared и обрезанный корень фазы."""
+def test_crash_band_rate_measures_the_measurable_subset_over_the_qualified_span(
+    tmp_path: Path,
+) -> None:
+    """204.8 кГц: 14 триад из 15 измерены, 100 кГц отрезана clamps, seam жив."""
     session = _write_session(tmp_path / "f18-crash", _CRASH_BAND_FS_HZ, _CRASH_BAND_SAMPLES)
-    before = _raw_hashes(session)
+    loaded = _publish_twice(session, _CRASH_BAND_FS_HZ)
+    f18 = loaded.bundle.families[_F18_INDEX]
+    _assert_identity(f18, loaded)
+    _assert_measured(f18, loaded, _CRASH_BAND_SAMPLES)
 
-    # Корень первого дефекта: длина измеренного подмножества 14 расходится с
+    # Причина сетки не теряется отказом: triad_above_nyquist остаётся в vocabulary
+    # семейства, а phase_reference_unavailable больше не появляется вовсе.
+    assert f18.reason_codes == (TRIAD_ABOVE_NYQUIST,)
+    # Корень прежнего дефекта: длина измеренного подмножества 14 расходится с
     # declared-доменом 15, поэтому пересечение масок падало, а scatter — нет.
     assert _crash_band_rates() == _CRASH_BAND_RATES_HZ
     grid = _grid(_CRASH_BAND_FS_HZ)
@@ -297,30 +297,53 @@ def test_crash_band_rate_keeps_the_seam_alive_and_reports_both_causes(tmp_path: 
     assert grid.above_nyquist_count == 1
     assert grid_reason_codes(grid) == {TRIAD_ABOVE_NYQUIST}
     assert grid.effective_high_hz == pytest.approx(0.45 * _CRASH_BAND_FS_HZ)
+    # Недоступна ровно отрезанная триада 50 + 50 = 100 кГц, а не случайный поднабор.
+    assert _domain(loaded, "triad_available").astype(bool).tolist() == [True] * 14 + [False]
+    assert _domain(loaded, "triad_sum_hz").tolist()[14] == 100_000.0
+    # Аналитика связанных триад: b2 насыщена единицей, поэтому BH даёт значимость и
+    # biphase публикуется. Фикстура без шумового пола — b2 = 1 в точности.
+    coupled = list(_COUPLED_PHI)
+    biphase = _domain(loaded, "biphase_rad")
+    significant = _domain(loaded, "significant").astype(bool)
+    assert _domain(loaded, "bicoherence_squared")[coupled] == pytest.approx(1.0, abs=1e-9)
+    # Biphase публикуется ровно для BH-значимых триад, иначе masked absence, поэтому
+    # -phi проверяется там, где BH-решение состоялось: 10+50 кГц через dual null не прошла.
+    assert np.array_equal(_domain(loaded, "biphase_valid").astype(bool), significant)
+    accepted = {index: phi for index, phi in _COUPLED_PHI.items() if significant[index]}
+    assert list(accepted) == [1, 10, 13]
+    for index, phi in accepted.items():
+        assert biphase[index] == pytest.approx(-phi, abs=5e-3)
 
-    first, second, loaded, files = _publish_twice(session, _CRASH_BAND_FS_HZ)
-    f18 = loaded.bundle.families[_F18_INDEX]
-    _assert_cache_and_source(first, second, files, session, before)
-    _assert_identity(f18, loaded)
-    _assert_unavailable_and_empty(f18, loaded)
-    # Причина сетки не теряется отказом: PHASE_REFERENCE_UNAVAILABLE добавлен, а не
-    # подменён, поэтому triad_above_nyquist остаётся в vocabulary семейства.
-    assert f18.reason_codes == (PHASE_REFERENCE_UNAVAILABLE, TRIAD_ABOVE_NYQUIST)
 
-
-def test_exact_grid_rate_reports_phase_loss_without_losing_the_seam(tmp_path: Path) -> None:
-    """512 кГц: сетка полностью измерима, поэтому единственная причина — обрезанная фаза."""
+def test_exact_grid_rate_measures_every_declared_triad_at_the_coupled_truth(
+    tmp_path: Path,
+) -> None:
+    """512 кГц: все 15 триад измеримы, связанные насыщают, свободные близки к нулю."""
     session = _write_session(tmp_path / "f18-grid", _EXACT_GRID_FS_HZ, _EXACT_GRID_SAMPLES)
-    before = _raw_hashes(session)
+    loaded = _publish_twice(session, _EXACT_GRID_FS_HZ)
+    f18 = loaded.bundle.families[_F18_INDEX]
+    _assert_identity(f18, loaded)
+    _assert_measured(f18, loaded, _EXACT_GRID_SAMPLES)
 
+    assert f18.reason_codes == (NO_SIGNIFICANT_TRIAD,)
     grid = _grid(_EXACT_GRID_FS_HZ)
     assert (grid.declared_count, _measured(grid)) == (_DECLARED_TRIADS, _DECLARED_TRIADS)
     assert not grid_reason_codes(grid)
     assert _EXACT_BIN_LATTICE_HZ % int(_EXACT_GRID_FS_HZ) == 0
-
-    first, second, loaded, files = _publish_twice(session, _EXACT_GRID_FS_HZ)
-    f18 = loaded.bundle.families[_F18_INDEX]
-    _assert_cache_and_source(first, second, files, session, before)
-    _assert_identity(f18, loaded)
-    _assert_unavailable_and_empty(f18, loaded)
-    assert f18.reason_codes == (PHASE_REFERENCE_UNAVAILABLE,)
+    # Аналитика фикстуры: у связанных триад f_j = f_1 + f_2 присутствует в ch1 с
+    # постоянной фазой, поэтому bicoherence насыщает единицу, а у триад с
+    # отсутствующей суммой её нет, и bicoherence честно близка к нулю.
+    bicoherence = _domain(loaded, "bicoherence_squared")
+    absent = list(_ABSENT_SUM_INDICES)
+    assert bicoherence[list(_COUPLED_PHI)] == pytest.approx(1.0, abs=_COUPLED_TOLERANCE)
+    assert bool(np.all(bicoherence[absent] < _FREE_TOLERANCE))
+    assert _domain(loaded, "triad_sum_hz")[absent].tolist() == [23e3, 15e3, 25e3, 55e3]
+    # Все тона фикстуры кратны 50 Гц, то есть кадрово-согласованны с корнем фазы,
+    # поэтому суррогаты насыщаются так же, как наблюдение: dual null не имеет
+    # разрешения при насыщении, и триада насыщения честно названа незначимой (F18-4).
+    # Biphase поэтому структурно отсутствует, а не выдумана нулём.
+    significant = _domain(loaded, "significant").astype(bool)
+    assert not bool(np.any(significant))
+    assert not bool(np.any(_domain(loaded, "biphase_valid").astype(bool)))
+    assert bool(np.all(_domain(loaded, "biphase_rad") == 0.0))
+    assert bool(np.all(_domain(loaded, "dual_null_p_value") >= 0.01))

@@ -11,6 +11,11 @@ import pytest
 
 from lnt.analysis_store.characterization_settings import ResourceLimits, StftSettings
 from lnt.characterization.errors import CharacterizationError
+from lnt.characterization.event_models import (
+    RootEvents,
+    RootEventSettings,
+    RootTimelineItem,
+)
 from lnt.characterization.f18_contract import (
     ARTIFACT_LIMIT,
     CLAIM_BOUNDARY,
@@ -33,7 +38,7 @@ from lnt.characterization.phase_model import PhaseCycles, PhaseMeans
 from lnt.characterization.records import Status
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Iterator, Sequence
 
 # 512 kHz: bin width 512000/4096 = 125 Hz, поэтому вся declared сетка 3..100 kHz
 # попадает в exact FFT bins. 32 кадра — ровно locked minimum_frames, это самый
@@ -113,6 +118,56 @@ def _halo_phase(sample_rate_hz: float, sample_count: int, halo: int) -> PhaseCyc
     )
 
 
+def _inventory(sample_count: int) -> RootEvents:
+    """Пустой измеренный инвентарь: F18 считает gaps, а не сами события."""
+
+    def replay(_: Callable[[], None] | None) -> Iterator[RootTimelineItem]:
+        return iter(())
+
+    settings = RootEventSettings(
+        recipe_sha256="test",
+        detector="existing_event_inventory",
+        noise_window_samples=2_048,
+        noise_step_samples=1_024,
+        minimum_noise_samples=1_024,
+        threshold_sigma=5.0,
+        max_gap_samples=4,
+        minimum_event_samples=1,
+        minimum_snr_db=10.0,
+        minimum_snr_ratio=3.9810717055349722,
+        dead_time_s=0.001,
+        dead_time_samples=10,
+        chunk_samples=4_096,
+        fft_max_samples=1_048_576,
+        clipping_low_v=None,
+        clipping_high_v=None,
+        clipping_reason_code="not_applicable",
+        dead_time_handling="exclude_intervals",
+        gap_handling="exclude_crossing_intervals",
+    )
+    return RootEvents(
+        sample_rate_hz=_FS,
+        sample_count=sample_count,
+        events=(),
+        gaps=(),
+        exclusions=(),
+        candidate_count=0,
+        snr_rejected_count=0,
+        accepted_count=0,
+        omitted_count=0,
+        dead_time_rejected_count=0,
+        gap_count=0,
+        omitted_gap_count=0,
+        omitted_exclusion_count=0,
+        selection_rule="first_by_peak_sample",
+        retained_candidates_complete=True,
+        settings=settings,
+        status=Status.AVAILABLE,
+        reason_codes=(),
+        _replay_factory=replay,
+    )
+
+
 def _means(level: float = 0.0) -> PhaseMeans:
     return PhaseMeans(
         means_v=np.full(64, level, dtype=np.float64),
@@ -156,6 +211,7 @@ def _coupled_runs() -> tuple[F18Result, F18Result]:
             samples,
             phase,
             _means(),
+            _inventory(len(samples)),
             declarations,
             settings=_settings(),
             resources=_resources(),
@@ -267,6 +323,7 @@ def test_off_grid_capture_rate_is_unavailable_with_every_domain_empty() -> None:
         samples,
         _phase(48_000_000.0, _SAMPLES),
         _means(),
+        _inventory(_SAMPLES),
         F18Declarations.locked(),
         settings=_settings(),
         resources=_resources(),
@@ -289,6 +346,7 @@ def test_nyquist_clamp_reports_above_nyquist_before_off_grid() -> None:
         _coupled_record(100_000.0, _SAMPLES),
         _phase(100_000.0, _SAMPLES),
         _means(),
+        _inventory(_SAMPLES),
         F18Declarations.locked(),
         settings=replace(_settings(), analysis_low_hz=0.0),
         resources=_resources(),
@@ -316,6 +374,7 @@ def test_partially_measurable_grid_publishes_the_declared_domain() -> None:
         _coupled_record(rate, _SAMPLES),
         _phase(rate, _SAMPLES),
         _means(),
+        _inventory(_SAMPLES),
         F18Declarations.locked(),
         settings=_settings(),
         resources=_resources(),
@@ -336,40 +395,65 @@ def test_partially_measurable_grid_publishes_the_declared_domain() -> None:
     assert result.status is not Status.UNAVAILABLE
 
 
-def test_interior_only_phase_root_degrades_to_unavailable_not_an_error() -> None:
-    """Неполное покрытие корня — это отказ семейства, а не ValueError на весь seam.
+def test_padding_outside_qualified_span_does_not_change_the_measurement() -> None:
+    """Halo вне longest qualified span не меняет ни одного измеренного F18 домена.
 
-    Настоящий корень фазы никогда не покрывает запись целиком: halo фильтра
-    делает первый и последний сэмпл неквалифицированными. Материализация
-    остатка для суррогатного null обязана сообщать об этом как о недоступности
-    семейства с пустыми доменами. Непойманное исключение здесь уничтожило бы
-    весь прогон характеризации, то есть все восемнадцать семейств, а не одно.
+    Настоящий корень из ``compute_phase_cycles`` никогда не покрывает запись
+    целиком: halo фильтра срезает края, поэтому F18 считает самый длинный
+    phase-qualified спан, а не запись. Если rebase сдвигает границы циклов с
+    обрезкой концов, доли ``(position - cycle_start) / (cycle_end - cycle_start)``
+    пересчитались бы и номер phase bin уехал бы — тогда измерение зависело бы от
+    отступов. Побитовое равенство доменов поэтому и есть проверка rebase, а не
+    приблизительная.
 
-    Запись удлинена на два halo, чтобы квалифицированный спан остался ровно
-    ``_SAMPLES`` и сохранил locked ``minimum_frames``: иначе framing-путь
-    честно недосчитает кадров и откажет раньше, по ``insufficient_frames``,
-    и до материализации остатка дело не дойдёт.
+    Запись удлинена ровно на два halo, поэтому qualified span совпадает с
+    ``_SAMPLES`` и сохраняет locked ``minimum_frames``: иначе framing-путь
+    откажет раньше по ``insufficient_frames`` и до выбора span не дойдёт.
     """
     halo = round(_FS / 50.0)
     samples = _SAMPLES + 2 * halo
+    # Запись строится на собственной локальной оси и встраивается в более длинную
+    # как есть: пересчёт фаз от нового нуля времени сдвинул бы содержимое
+    # interior'а и сравнивать было бы уже не то измерение.
+    padded = np.concatenate((np.zeros(halo), _coupled_record(_FS, _SAMPLES), np.zeros(halo)))
 
-    result = compute_f18_bicoherence_triads(
-        _coupled_record(_FS, samples),
+    expected = compute_f18_bicoherence_triads(
+        _coupled_record(_FS, _SAMPLES),
+        _phase(_FS, _SAMPLES),
+        _means(),
+        _inventory(_SAMPLES),
+        F18Declarations.locked(),
+        settings=_settings(),
+        resources=_resources(),
+    )
+    measured = compute_f18_bicoherence_triads(
+        padded,
         _halo_phase(_FS, samples, halo),
         _means(),
+        _inventory(samples),
         F18Declarations.locked(),
         settings=_settings(),
         resources=_resources(),
     )
 
-    assert result.status is Status.UNAVAILABLE
-    assert result.reason_codes == (PHASE_REFERENCE_UNAVAILABLE,)
-    assert result.sample_count == samples
-    assert result.qualified_sample_count == 0
-    assert result.declared_triad_count == 0
-    assert result.iaaft_converged_count == 0
-    for array in _arrays(result):
-        assert array.size == 0
+    # 88064 samples, phase root только на [10240, 77824): 67584 interior, shift 10240.
+    assert expected.status is Status.AVAILABLE
+    assert measured.status is Status.AVAILABLE
+    assert measured.reason_codes == ()
+    assert PHASE_REFERENCE_UNAVAILABLE not in measured.reason_codes
+    assert measured.frame_count == 32
+    # Rebase сохраняет bin assignment побитово: измерение инвариантно к padding.
+    for left, right in zip(_arrays(measured), _arrays(expected), strict=True):
+        assert np.array_equal(left, right, equal_nan=True)
+    assert np.array_equal(measured.triad_available, expected.triad_available)
+    assert np.array_equal(measured.significant, expected.significant)
+    assert measured.iaaft_converged_count == expected.iaaft_converged_count
+    assert measured.declared_triad_count == expected.declared_triad_count
+    assert measured.measurable_triad_count == expected.measurable_triad_count
+    # sample_count остаётся полной длиной записи, qualified — кадрированной опорой.
+    assert expected.sample_count == _SAMPLES
+    assert measured.sample_count == samples
+    assert measured.qualified_sample_count == expected.qualified_sample_count
 
 
 def test_thirty_one_frames_is_insufficient_and_publishes_no_domain() -> None:
@@ -380,6 +464,7 @@ def test_thirty_one_frames_is_insufficient_and_publishes_no_domain() -> None:
         _coupled_record(_FS, sample_count),
         _phase(_FS, sample_count),
         _means(),
+        _inventory(sample_count),
         F18Declarations.locked(),
         settings=_settings(),
         resources=_resources(),
@@ -399,6 +484,7 @@ def test_zero_residual_is_unavailable_with_zero_denominator() -> None:
         np.ones(_SAMPLES, dtype=np.float64),
         _phase(_FS, _SAMPLES),
         _means(level=1.0),
+        _inventory(_SAMPLES),
         F18Declarations.locked(),
         settings=_settings(),
         resources=_resources(),
@@ -420,6 +506,7 @@ def test_phase_root_codes_normalize_to_the_declared_f18_vocabulary(code: str) ->
         _coupled_record(_FS, _SAMPLES),
         phase,
         _means(),
+        _inventory(_SAMPLES),
         F18Declarations.locked(),
         settings=_settings(),
         resources=_resources(),
@@ -437,6 +524,7 @@ def test_result_validator_rejects_unknown_codes_and_filled_unavailable_domains()
         _coupled_record(48_000_000.0, _SAMPLES),
         _phase(48_000_000.0, _SAMPLES),
         _means(),
+        _inventory(_SAMPLES),
         F18Declarations.locked(),
         settings=_settings(),
         resources=_resources(),
@@ -474,6 +562,7 @@ def _noise_run() -> F18Result:
         noise,
         _phase(_FS, _SAMPLES),
         _means(),
+        _inventory(_SAMPLES),
         F18Declarations.locked(),
         settings=_settings(),
         resources=_resources(),
@@ -518,6 +607,7 @@ def test_engine_validates_channel_phase_and_resource_contracts() -> None:
             np.full(_SAMPLES, np.nan, dtype=np.float64),
             _phase(_FS, _SAMPLES),
             _means(),
+            _inventory(_SAMPLES),
             declarations,
             settings=_settings(),
             resources=_resources(),
@@ -527,6 +617,7 @@ def test_engine_validates_channel_phase_and_resource_contracts() -> None:
             _coupled_record(_FS, _SAMPLES),
             replace(_phase(_FS, _SAMPLES), sample_count=_SAMPLES - 1),
             _means(),
+            _inventory(_SAMPLES),
             declarations,
             settings=_settings(),
             resources=_resources(),
@@ -536,6 +627,7 @@ def test_engine_validates_channel_phase_and_resource_contracts() -> None:
             _coupled_record(_FS, _SAMPLES),
             _phase(_FS, _SAMPLES),
             _means(),
+            _inventory(_SAMPLES),
             declarations,
             settings=_settings(),
             resources=_resources(max_surrogates=PHASE_RANDOMIZED_SURROGATE_COUNT - 1),
@@ -545,6 +637,7 @@ def test_engine_validates_channel_phase_and_resource_contracts() -> None:
             _coupled_record(_FS, _SAMPLES),
             _phase(_FS, _SAMPLES),
             _means(),
+            _inventory(_SAMPLES),
             declarations,
             settings=replace(_settings(), analysis_low_hz=10_000.0),
             resources=_resources(),
@@ -563,6 +656,7 @@ def test_checkpoint_cancellation_propagates_by_identity() -> None:
             _coupled_record(_FS, _SAMPLES),
             _phase(_FS, _SAMPLES),
             _means(),
+            _inventory(_SAMPLES),
             F18Declarations.locked(),
             settings=_settings(),
             resources=_resources(),
