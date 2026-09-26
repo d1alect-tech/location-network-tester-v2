@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Final
 
 F18_ID: Final = "f18_bicoherence_triads"
@@ -9,7 +10,11 @@ F18_INDEX: Final = 17
 METHOD: Final = "declared_normalized_bicoherence_dual_surrogate"
 
 PHASE_BINS: Final = 64
-SEGMENT_SAMPLES: Final = 4096
+# Сегмент объявлен ДЛИТЕЛЬНОСТЬЮ, а не числом отсчётов: число отсчётов зависит от
+# частоты захвата, поэтому объявить его в recipe невозможно — locked_declarations()
+# отвергает любое расхождение, а locked() отдаёт константы времени импорта.
+# Выведенные отсчёты публикует движок, см. segment_samples_for.
+SEGMENT_DURATION_S: Final = 0.001
 WINDOW: Final = "hann_periodic"
 OVERLAP_FRACTION: Final = 0.5
 BASE_FREQUENCIES_HZ: Final = (3000.0, 5000.0, 10000.0, 20000.0, 50000.0)
@@ -27,6 +32,19 @@ DUAL_NULL_P_VALUE: Final = "maximum_add_one_p_value"
 MULTIPLE_TESTING: Final = "benjamini_hochberg"
 FALSE_DISCOVERY_RATE: Final = 0.05
 MINIMUM_FRAMES: Final = 32
+
+
+def segment_samples_for(sample_rate_hz: float) -> int:
+    """Вывести длину сегмента в отсчётах из объявленной длительности и частоты.
+
+    Единственный источник истины для обеих форм: движок зовёт его на своей
+    частоте, тесты — на своих, поэтому объявленная 1 мс и фактический сегмент
+    расходятся только если разошлась формула, а не какое-то из двух мест.
+    """
+    if not math.isfinite(sample_rate_hz) or sample_rate_hz <= 0.0:
+        raise ValueError("F18 segment needs a positive sample rate")
+    return round(SEGMENT_DURATION_S * sample_rate_hz)
+
 
 PHASE_REFERENCE_UNAVAILABLE: Final = "phase_reference_unavailable"
 INSUFFICIENT_FRAMES: Final = "insufficient_frames"
@@ -128,25 +146,30 @@ SPEC_GAPS: Final = (
         "counts, q and estimator were not retuned."
     ),
     (
-        "F18-5: the declared base frequencies are off grid at every capture rate this "
-        "project actually uses, so the family is UNAVAILABLE there by construction. At "
-        "fs=500 kHz - the canonical rate of nine E2E-reduced tests - the 4096-sample step "
-        "is 122.0703 Hz and the bases land at bins 24.576, 40.96, 81.92, 163.84 and 409.6, "
-        "so 0 of the 15 declared triads are measurable and the family reports "
-        "triad_off_grid. At the 48 MHz device maximum the step is 11718.75 Hz and 3000 Hz "
-        "lands at bin 0.256, again 0 of 15. At fs=8 kHz the Nyquist clamp gives "
-        "effective_high = min(200000, 0.45 * 8000) = 3600 Hz, below the smallest triad sum "
-        "of 6000 Hz, so all 15 triads report triad_above_nyquist instead. Exact grids exist "
-        "only where fs/4096 divides the 1000 Hz gcd of the bases, that is fs = 4096000/k: "
-        "1.024 MHz, 512 kHz and 256 kHz carry all 5 bases and all 15 triads, while "
-        "204.8 kHz and 102.4 kHz clamp the highest sums. Decisive constraint: "
-        "acquire_validation._rate_code accepts ONLY integer 1..15 MHz for a hardware "
-        "capture, and no integer-megahertz rate divides 4096000 = 2^15 * 5^3, because "
-        "k * 10^6 = k * 2^6 * 5^6 would require 5^6 | 5^3. F18 therefore cannot produce a "
-        "measurement on any hardware record at any supported rate; 500 kHz and 8 kHz are "
-        "simulation-only rates. The locked bases, segment length "
-        "and exact_fft_bins mapping were not retuned: rounding an off-grid frequency to the "
-        "nearest bin would fabricate a component the record does not contain."
+        "F18-5: the declared segment used to be a fixed 4096 SAMPLES, so the "
+        "exact_fft_bins step was fs/4096 and the family was UNAVAILABLE at every rate this "
+        "project actually uses. Measured: at fs=500 kHz the step was 122.0703125 Hz and the "
+        "five bases landed at bins 24.576, 40.96, 81.92, 163.84 and 409.6, so 0 of the 15 "
+        "declared triads were measurable and the family reported triad_off_grid; at the 48 MHz "
+        "device maximum the step was 11718.75 Hz and 3000 Hz landed at bin 0.256, again 0 of "
+        "15. Decisive constraint: acquire_validation._rate_code accepts ONLY integer 1..15 MHz "
+        "for a hardware capture, and no integer-megahertz rate divides 4096000 = 2^15 * 5^3, so "
+        "F18 could not produce a measurement on any hardware record. The defect was the FORM "
+        "of the declaration, not the bases: the segment is now declared as a duration, "
+        "segment_duration_s = 0.001, and the engine derives segment_samples = round(0.001 * fs) "
+        "from the measured rate, so the step is 1000 Hz — the 1000 Hz gcd of the five declared "
+        "bases — at every rate whose 1 ms segment divides it exactly. Measured after the fix: "
+        "500 kHz (500 samples), 512 kHz (512), 1 MHz (1000), 1.024 MHz (1024) and 8 MHz (8000) "
+        "all carry 5 of 5 bases at bins 3, 5, 10, 20 and 50 and measure 15 of 15 triads. The "
+        "1 ms rounding is not a universal fix and is not claimed as one: where the 1 ms "
+        "segment does not divide the rate, the step leaves the lattice and the family still "
+        "reports triad_off_grid honestly — at 204.8 kHz the step is 999.0244 Hz and 3000 Hz "
+        "lands at bin 3.0029 (14 off grid, 1 above Nyquist), at 819.2 kHz it is 1000.2442 Hz "
+        "and 3000 Hz lands at bin 2.9993, all 15 off grid. At fs=8 kHz the Nyquist clamp gives "
+        "effective_high = min(200000, 0.45 * 8000) = 3600 Hz, below the smallest triad sum of "
+        "6000 Hz, so all 15 triads report triad_above_nyquist. The locked bases, the 1 ms "
+        "duration and the exact_fft_bins mapping were not retuned: rounding an off-grid "
+        "frequency to the nearest bin would fabricate a component the record does not contain."
     ),
 )
 

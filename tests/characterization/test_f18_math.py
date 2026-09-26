@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import math
 
 import numpy as np
@@ -35,7 +36,7 @@ from lnt.characterization.f18_contract import (
     OVERLAP_FRACTION,
     PHASE_BINS,
     PHASE_RANDOMIZED_SURROGATE_COUNT,
-    SEGMENT_SAMPLES,
+    SEGMENT_DURATION_S,
     SPEC_GAPS,
     SURROGATE_EXCEEDANCE,
     SURROGATE_SEED,
@@ -44,8 +45,10 @@ from lnt.characterization.f18_contract import (
     TRIAD_RULE,
     WINDOW,
     ZERO_DENOMINATOR,
+    segment_samples_for,
 )
 from lnt.characterization.f18_math import triad_bicoherence
+from lnt.characterization.f18_result import F18Declarations
 from lnt.characterization.f18_significance import (
     add_one_p_value,
     benjamini_hochberg,
@@ -60,7 +63,36 @@ from lnt.characterization.f18_surrogate import (
 from lnt.characterization.f18_triads import F18TriadGrid, build_triad_grid, declared_triads
 from lnt.characterization.records import Unit, validate_unit_name
 
+# Шаг решётки exact_fft_bins = fs / round(0.001 * fs): при объявленной длительности
+# 1 мс он равен 1000 Hz — НОК базовых частот — на каждой частоте, чей миллисекундный
+# сегмент делит fs нацело. _ON_GRID_FS = 1 024 000 даёт сегмент 1024 и шаг ровно 1000 Hz.
 _ON_GRID_FS = 1_024_000.0
+# 819.2 кГц: сегмент 819, шаг 1000.2442 Hz, поэтому 3000 Hz даёт бин 2.99927 и ни одна
+# из пятнадцати declared триад не попадает в решётку.
+_OFF_GRID_FS = 819_200.0
+_DECLARED_FIELDS = frozenset(
+    {
+        "phase_bins",
+        "segment_duration_s",
+        "window",
+        "overlap_fraction",
+        "base_frequencies_hz",
+        "triad_rule",
+        "analysis_high_hz",
+        "nyquist_fraction_max",
+        "frequency_mapping",
+        "maximum_triads",
+        "phase_randomized_surrogate_count",
+        "iaaft_surrogate_count",
+        "iaaft_iterations",
+        "iaaft_relative_rms_magnitude_tolerance",
+        "surrogate_seed",
+        "dual_null_p_value",
+        "multiple_testing",
+        "false_discovery_rate",
+        "minimum_frames",
+    }
+)
 
 
 def _grid(
@@ -73,7 +105,7 @@ def _grid(
 ) -> F18TriadGrid:
     return build_triad_grid(
         base,
-        segment_samples=SEGMENT_SAMPLES,
+        segment_samples=segment_samples_for(sample_rate_hz),
         sample_rate_hz=sample_rate_hz,
         analysis_low_hz=analysis_low_hz,
         analysis_high_hz=analysis_high_hz,
@@ -88,7 +120,7 @@ def test_locked_contract_recipe_and_claim_boundary_are_frozen() -> None:
     assert F18_INDEX == 17
     assert METHOD == "declared_normalized_bicoherence_dual_surrogate"
     assert PHASE_BINS == 64
-    assert SEGMENT_SAMPLES == 4096
+    assert SEGMENT_DURATION_S == 0.001
     assert WINDOW == "hann_periodic"
     assert OVERLAP_FRACTION == 0.5
     assert BASE_FREQUENCIES_HZ == (3000.0, 5000.0, 10000.0, 20000.0, 50000.0)
@@ -142,6 +174,25 @@ def test_locked_contract_recipe_and_claim_boundary_are_frozen() -> None:
     }
 
 
+def test_f18_declares_the_segment_as_a_duration_and_the_engine_derives_the_samples() -> None:
+    """Сегмент объявлен длительностью; recipe не может нести частотозависимое число."""
+    # Полный declared surface: переименование ровно одного поля, ничего не добавлено.
+    assert {field.name for field in dataclasses.fields(F18Declarations)} == _DECLARED_FIELDS
+
+
+def test_declared_duration_derives_the_sample_count_at_every_nominal_rate() -> None:
+    """Отсчёты — функция частоты: 1 мс даёт ровно fs/1000 на каждом целом кГц."""
+    duration_s = F18Declarations.locked().segment_duration_s
+
+    assert duration_s == SEGMENT_DURATION_S
+    assert segment_samples_for(1_000_000.0) == 1_000
+    assert segment_samples_for(500_000.0) == 500
+    assert segment_samples_for(512_000.0) == 512
+    assert segment_samples_for(8_000_000.0) == 8_000
+    # Округление объявленной длительности, а не усечение: 204 800 Гц даёт 205 отсчётов.
+    assert segment_samples_for(204_800.0) == 205
+
+
 def test_triad_rule_enumerates_every_unordered_base_pair_without_all_pairs() -> None:
     """Ровно 15 триад из 5 базовых частот: пары f1<=f2, а не полный перебор."""
     triads = declared_triads(BASE_FREQUENCIES_HZ, MAXIMUM_TRIADS)
@@ -159,15 +210,15 @@ def test_triad_rule_enumerates_every_unordered_base_pair_without_all_pairs() -> 
 
 
 def test_exact_fft_bins_are_accepted_only_on_the_declared_capture_rates() -> None:
-    """819.2 kHz / 1 / 2 / 4 MHz дают exact bins; 48 MHz даёт declared off_grid."""
+    """819.2 кГц даёт бин 2.99927 и объявлен off_grid; 1.024 МГц меряет все 15."""
     on_grid = _grid()
-    off_grid = _grid(sample_rate_hz=48_000_000.0)
+    off_grid = _grid(sample_rate_hz=_OFF_GRID_FS)
 
     assert bool(np.all(on_grid.measurable))
     assert on_grid.off_grid_count == 0
     assert on_grid.above_nyquist_count == 0
     assert on_grid.declared_count == 15
-    # 3000 Hz / 11718.75 Hz = 0.256 — ни одна частота сетки не попадает в бин.
+    # 3000 Hz / 1000.2442 Hz = 2.99927 — ни одна частота сетки не попадает в бин.
     assert off_grid.off_grid_count == 15
     assert int(np.count_nonzero(off_grid.measurable)) == 0
     assert math.isclose(on_grid.effective_high_hz, 200_000.0)

@@ -18,7 +18,7 @@ def locked_declarations(family: CharacterizationFamily) -> F18Declarations:
     try:
         declarations = F18Declarations(
             phase_bins=_integer(family.value("phase_bins")),
-            segment_samples=_integer(family.value("segment_samples")),
+            segment_duration_s=_number(family.value("segment_duration_s")),
             window=_text(family.value("window")),
             overlap_fraction=_number(family.value("overlap_fraction")),
             base_frequencies_hz=_numbers(family.value("base_frequencies_hz")),

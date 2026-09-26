@@ -1,10 +1,11 @@
-"""Базовые пины F18 на 1 и 8 МГц: сегодняшний отказ зафиксирован на неизменённом коде.
+"""Базовые пины F18 на 1 и 8 МГц: сегмент объявлен длительностью 1 мс.
 
-Сегмент F18 объявлен фиксированными 4096 отсчётами, поэтому шаг сетки плывёт с частотой
-захвата и на любой целой МГц F18 не меряет ни одной из 15 триад. Волны 3 и 4 инвертируют
-это поведение, поэтому здесь оно закреплено как есть: 1 МГц публикует UNAVAILABLE с пустыми
-доменами, а 8 МГц не публикует ничего вовсе — движок поднимает ValueError по бюджету
-суррогатного источника, и этот отказ уходит из характеристики неуловленным.
+Число отсчётов сегмента выводится движком из ИЗМЕРЕННОЙ частоты, поэтому шаг сетки
+больше не плывёт: на 1 МГц это round(0.001 * 10^6) = 1000 отсчётов, то есть ровно
+fs/1000 = 1000 Hz — НОК пяти объявленных баз. Все 15 триад измеримы, а пять баз дают
+позиции 3, 5, 10, 20 и 50. 8 МГц по-прежнему не публикует ничего вовсе: движок
+поднимает ValueError по бюджету суррогатного источника, потому что запись длиннее
+8 388 608 отсчётов, и этот отказ уходит из характеристики неуловленным.
 """
 
 from __future__ import annotations
@@ -23,10 +24,14 @@ from lnt.analysis_store import CharacterizationRecipe, parse_analysis_recipe
 from lnt.analysis_v2 import run_characterization
 from lnt.analysis_v2.characterization_slices_bicoherence import _compute_f18
 from lnt.characterization import OUTPUT_FILENAMES, Status, load_bundle
-from lnt.characterization.errors import CharacterizationError
 from lnt.characterization.event_models import RootEvents, RootEventSettings
-from lnt.characterization.f18_bundle import F18_ID, decode_f18_result
-from lnt.characterization.f18_contract import DECLARED_CODES, METHOD, TRIAD_OFF_GRID
+from lnt.characterization.f18_bundle import F18_ID
+from lnt.characterization.f18_contract import (
+    DECLARED_CODES,
+    METHOD,
+    TRIAD_OFF_GRID,
+    segment_samples_for,
+)
 from lnt.characterization.f18_frames import SURROGATE_BYTES_PER_SAMPLE
 from lnt.characterization.f18_tables import locked_declarations
 from lnt.characterization.f18_triads import build_triad_grid, grid_reason_codes
@@ -59,13 +64,13 @@ _HARDWARE_SAMPLES = 19_200_000
 _RECORD_LENGTH_LIMIT = 8_388_608
 # Оба гейта длительности поднимают ValueError, поэтому пин различает их только строкой.
 _RECORD_LENGTH_MESSAGE = "F18 surrogate source exceeds the declared work budget"
-# 1 МГц / 4096 = 244.140625 Гц на бин, поэтому пять баз дают ровно эти дробные позиции.
-# Список 500 кГц из test_f18_e2e_reduced вдвое больше: bin = f * 4096 / fs.
-_ONE_MHZ_BASE_BINS = (12.288, 20.48, 40.96, 81.92, 204.8)
-# 8 МГц / 4096 = 1953.125 Гц на бин: те же пять баз, но ещё дальше от целых.
-_HARDWARE_BASE_BINS = (1.536, 2.56, 5.12, 10.24, 25.6)
-# Решётка exact_fft_bins = segment * gcd(bases) = 4096 * 1000 Гц.
-_EXACT_BIN_LATTICE_HZ = 4_096_000
+# 1 МГц: сегмент 1000 отсчётов, шаг ровно 1000 Hz, поэтому пять баз дают целые
+# позиции 3, 5, 10, 20 и 50. 8 МГц: сегмент 8000, тот же шаг 1000 Hz, те же позиции.
+_ONE_MHZ_BASE_BINS = (3.0, 5.0, 10.0, 20.0, 50.0)
+_HARDWARE_BASE_BINS = _ONE_MHZ_BASE_BINS
+# Решётка exact_fft_bins = segment * gcd(bases) = segment * 1000 Гц, а segment =
+# round(0.001 * fs), поэтому на любом целом МГц решётка есть: 1 МГц даёт 1 000 000 Гц.
+_ONE_MHZ_BIN_LATTICE_HZ = 1_000_000
 # Кадрово-согласованная трёхчастотная система: f_j = f_1 + f_2 присутствует в ch1 с
 # постоянной фазой, поэтому bicoherence насыщается единицей. Шумового пола нет намеренно.
 _COUPLED_TRIADS = ((3_000.0, 5_000.0, 0.7), (10_000.0, 20_000.0, -0.4))
@@ -91,7 +96,7 @@ def _grid(sample_rate_hz: float) -> F18TriadGrid:
     locked = _locked()
     return build_triad_grid(
         locked.base_frequencies_hz,
-        segment_samples=locked.segment_samples,
+        segment_samples=segment_samples_for(sample_rate_hz),
         sample_rate_hz=sample_rate_hz,
         analysis_low_hz=_recipe().stft.analysis_low_hz,
         analysis_high_hz=locked.analysis_high_hz,
@@ -105,8 +110,8 @@ def _measured(grid: F18TriadGrid) -> int:
 
 
 def _base_bins(sample_rate_hz: float) -> np.ndarray:
-    locked = _locked()
-    return np.asarray(locked.base_frequencies_hz) * locked.segment_samples / sample_rate_hz
+    segment = segment_samples_for(sample_rate_hz)
+    return np.asarray(_locked().base_frequencies_hz) * segment / sample_rate_hz
 
 
 def _coupled_record(sample_rate_hz: float, sample_count: int) -> np.ndarray:
@@ -148,6 +153,10 @@ def _artifact_bytes(artifact_dir: Path) -> dict[str, bytes]:
     return {name: (artifact_dir / name).read_bytes() for name in OUTPUT_FILENAMES}
 
 
+def _domain(loaded: LoadedCharacterization, name: str) -> np.ndarray:
+    return np.asarray(loaded.arrays[f"f18_{name}"])
+
+
 def _publish_twice(session: Path, sample_rate_hz: float) -> LoadedCharacterization:
     """Прогнать реальный seam дважды: кэш, артефакт и сырьё обязаны совпасть."""
     before = _raw_hashes(session)
@@ -178,19 +187,22 @@ def _assert_identity(f18: FamilyResult, loaded: LoadedCharacterization) -> None:
     assert PHASE_ROOT_REASON_CODES.isdisjoint(f18.reason_codes)
 
 
-# UNAVAILABLE публикует ПУСТЫЕ домены, а не нули, и декодер их не выдумывает. Fill-in
-# остаётся невозможен и на уровне движка: validate_f18_result внутри build_f18_family
-# fail-closed отвергает заполненный домен у UNAVAILABLE.
-def _assert_unavailable_and_empty(f18: FamilyResult, loaded: LoadedCharacterization) -> None:
-    assert f18.status is Status.UNAVAILABLE
-    assert f18.array_refs == ()
-    assert f18.table_refs == ()
-    assert f18.comparison_summary == ()
-    assert not [name for name in loaded.arrays if name.startswith("f18_")]
-    assert not [name for name in loaded.tables if name.startswith("f18")]
-    assert f18.support.observation_count == 0
-    with pytest.raises(CharacterizationError, match="no decodable domain"):
-        decode_f18_result(f18, loaded.arrays, loaded.tables)
+# Семья меряет: полный declared-домен и все измеримые триады доступны, а masked
+# absence переживает finite-only кодек ровным нулём под validity mask.
+def _assert_measured(f18: FamilyResult, loaded: LoadedCharacterization, record: int) -> None:
+    assert f18.status is not Status.UNAVAILABLE
+    assert f18.support.sample_count == record
+    assert 0 < f18.n <= record
+    assert f18.support.observation_count == f18.n
+    assert f18.support.missing_count == record - f18.n
+    assert {reference.shape for reference in f18.array_refs} == {(_DECLARED_TRIADS,)}
+    available = _domain(loaded, "triad_available").astype(bool)
+    measurable = {item.name: item.value for item in f18.comparison_summary}[
+        "f18_measurable_triad_count"
+    ]
+    assert int(np.count_nonzero(available)) == measurable
+    assert bool(np.all(_domain(loaded, "bicoherence_squared")[~available] == 0.0))
+    assert bool(np.all(_domain(loaded, "dual_null_p_value")[~available] == 0.0))
 
 
 def _phase_cycles(sample_rate_hz: float, sample_count: int) -> PhaseCycles:
@@ -269,43 +281,48 @@ def _inventory(sample_rate_hz: float, sample_count: int) -> RootEvents:
     )
 
 
-def test_one_megahertz_canonical_record_refuses_f18_off_grid_with_empty_domains(
+def test_one_megahertz_canonical_record_measures_every_triad_on_the_exact_bin_lattice(
     tmp_path: Path,
 ) -> None:
-    """1 МГц: exact_fft_bins не выполнен ни на одной базе — 15 триад не измеримы."""
-    session = _write_session(tmp_path / "f18-1mhz-off-grid", _ONE_MHZ_HZ, _ONE_MHZ_SAMPLES)
+    """1 МГц: сегмент 1000 отсчётов даёт шаг 1000 Hz — все 15 триад измеримы."""
+    session = _write_session(tmp_path / "f18-1mhz-on-grid", _ONE_MHZ_HZ, _ONE_MHZ_SAMPLES)
     loaded = _publish_twice(session, _ONE_MHZ_HZ)
     f18 = loaded.bundle.families[_F18_INDEX]
     _assert_identity(f18, loaded)
-    _assert_unavailable_and_empty(f18, loaded)
-    assert f18.reason_codes == (TRIAD_OFF_GRID,)
+    _assert_measured(f18, loaded, _ONE_MHZ_SAMPLES)
 
-    # Аналитика отказа: пять баз по правилу i <= j дают ровно n(n+1)/2 = 15 триад,
-    # а 1 000 000 / 4096 = 244.140625 Гц ни одну базу на бин не кладёт.
+    # Причина triad_off_grid на решётке недостижима: все базы измеримы, поэтому её
+    # нет и среди опубликованных кодов семьи.
+    assert TRIAD_OFF_GRID not in f18.reason_codes
+
+    # Аналитика измерения: пять баз по правилу i <= j дают ровно n(n+1)/2 = 15 триад,
+    # а 1 000 000 / 1000 = ровно 1000 Hz на бин, поэтому пять бас ложатся на целые
+    # позиции 3, 5, 10, 20 и 50.
     locked = _locked()
-    assert locked.segment_samples == 4_096
+    assert locked.segment_duration_s == 0.001
+    assert segment_samples_for(_ONE_MHZ_HZ) == 1_000
     assert len(locked.base_frequencies_hz) * 6 // 2 == _DECLARED_TRIADS
     grid = _grid(_ONE_MHZ_HZ)
-    assert (grid.declared_count, _measured(grid)) == (_DECLARED_TRIADS, 0)
-    assert grid.off_grid_count == _DECLARED_TRIADS
+    assert (grid.declared_count, _measured(grid)) == (_DECLARED_TRIADS, _DECLARED_TRIADS)
+    assert grid.off_grid_count == 0
     assert grid.above_nyquist_count == 0
-    assert grid_reason_codes(grid) == {TRIAD_OFF_GRID}
+    assert not grid_reason_codes(grid)
 
-    # F18-5: решётка segment * gcd(bases) = 2^15 * 5^3 Гц не делится ни на одно целое
-    # МГц 1..15, поэтому F18 не меряет ни одну аппаратную запись.
+    # F18-5 после починки: решётка segment * gcd(bases) = segment * 1000 Гц равна самой
+    # частоте на каждом целом МГц 1..15, поэтому объявленные базы стоят на решётке на
+    # ЛЮБОЙ поддерживаемой аппаратной частоте захвата, а не только на 1 МГц.
     assert math.gcd(*(round(value) for value in locked.base_frequencies_hz)) == 1_000
-    assert locked.segment_samples * 1_000 == _EXACT_BIN_LATTICE_HZ
+    assert segment_samples_for(_ONE_MHZ_HZ) * 1_000 == _ONE_MHZ_BIN_LATTICE_HZ
     for megahertz in range(1, 16):
-        assert _EXACT_BIN_LATTICE_HZ % (megahertz * 1_000_000) != 0
+        rate = float(megahertz) * 1_000_000.0
+        assert segment_samples_for(rate) * 1_000 == rate
 
-    # Позиции пяти баз на сетке из 4096 отсчётов: bin = f * 4096 / fs. Сравнение точное,
-    # а не приближённое: аналитика и расчёт дают один и тот же double.
+    # Позиции пяти баз на сетке из 1000 отсчётов: bin = f * 1000 / fs. Сравнение
+    # точное, а не приближённое: аналитика и расчёт дают один и тот же double.
     positions = _base_bins(_ONE_MHZ_HZ)
     assert np.array_equal(positions, np.asarray(_ONE_MHZ_BASE_BINS))
-    assert not np.array_equal(np.rint(positions), positions)
+    assert np.array_equal(np.rint(positions), positions)
 
-    # Домены пусты и не замаскированы, потому что не опубликованы вовсе: у UNAVAILABLE нет
-    # ни одного f18-массива и ни одной f18-таблицы, поэтому masked absence нечего публиковать.
     # Все числа артефакта конечны, то есть NaN в опубликованные домены не проходит.
     floats = [array for array in loaded.arrays.values() if np.issubdtype(array.dtype, np.floating)]
     assert all(bool(np.all(np.isfinite(array))) for array in floats)
@@ -319,9 +336,9 @@ def test_hardware_rate_canonical_record_refuses_f18_on_the_record_length_budget(
     assert round(2.4 * _HARDWARE_HZ) == _HARDWARE_SAMPLES
     assert _HARDWARE_SAMPLES > _RECORD_LENGTH_LIMIT
     assert _ONE_MHZ_SAMPLES < _RECORD_LENGTH_LIMIT
-    # Сегментный гейт не может быть причиной: 4096 отсчётов намного ниже потолка, поэтому
-    # отказ приходит именно от размера записи, а не от размера сегмента.
-    assert _locked().segment_samples <= limits.hard_max_chunk_samples
+    # Сегментный гейт не может быть причиной: 8000 отсчётов намного ниже потолка,
+    # поэтому отказ приходит именно от размера записи, а не от размера сегмента.
+    assert segment_samples_for(_HARDWARE_HZ) == 8_000 <= limits.hard_max_chunk_samples
 
     record = _coupled_record(_HARDWARE_HZ, _HARDWARE_SAMPLES).astype(np.float32)
     # Строка отказа зафиксирована дословно: она снята с живого прогона, а не выведена из
@@ -337,11 +354,11 @@ def test_hardware_rate_canonical_record_refuses_f18_on_the_record_length_budget(
         )
     assert str(refusal.value) == _RECORD_LENGTH_MESSAGE
 
-    # Отказ приходит раньше сетки и до всякого framing: без гейта длительности 8 МГц тоже
-    # вне решётки, поэтому triad_off_grid на 8 МГц сегодня недостижим — гейт длительности
-    # перекрывает его, а не дополняет, и измерить 8 МГц нельзя ни при каком сегменте.
-    assert _measured(_grid(_HARDWARE_HZ)) == 0
-    assert grid_reason_codes(_grid(_HARDWARE_HZ)) == {TRIAD_OFF_GRID}
+    # Отказ приходит раньше сетки и до всякого framing: без гейта длительности 8 МГц
+    # уже стоял бы на решётке (шаг 1000 Hz), поэтому triad_off_grid на 8 МГц
+    # недостижим — гейт длительности перекрывает измерение, а не дополняет его.
+    assert _measured(_grid(_HARDWARE_HZ)) == _DECLARED_TRIADS
+    assert not grid_reason_codes(_grid(_HARDWARE_HZ))
     hardware_positions = _base_bins(_HARDWARE_HZ)
     assert np.array_equal(hardware_positions, np.asarray(_HARDWARE_BASE_BINS))
-    assert not np.array_equal(np.rint(hardware_positions), hardware_positions)
+    assert np.array_equal(np.rint(hardware_positions), hardware_positions)

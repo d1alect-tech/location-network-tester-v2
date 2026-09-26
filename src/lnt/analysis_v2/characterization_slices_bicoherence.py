@@ -36,7 +36,7 @@ def _compute_f18(  # noqa: PLR0913, PLR0917 - полный набор входо
     family = recipe.families[_F18_INDEX]
     declarations = F18Declarations(
         phase_bins=int(_num(family, "phase_bins")),
-        segment_samples=int(_num(family, "segment_samples")),
+        segment_duration_s=_num(family, "segment_duration_s"),
         window=_text(family, "window"),
         overlap_fraction=_num(family, "overlap_fraction"),
         base_frequencies_hz=_float_tuple(family, "base_frequencies_hz"),

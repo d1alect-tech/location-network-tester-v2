@@ -48,7 +48,6 @@ from lnt.characterization.f18_contract import (
     METHOD,
     PHASE_RANDOMIZED_P_NAME,
     PHASE_REFERENCE_UNAVAILABLE,
-    SEGMENT_SAMPLES,
     SPEC_GAPS,
     SURROGATE_SEED,
     TRIAD_ABOVE_NYQUIST,
@@ -56,6 +55,7 @@ from lnt.characterization.f18_contract import (
     TRIAD_LOW_NAME,
     TRIAD_OFF_GRID,
     TRIAD_SUM_NAME,
+    segment_samples_for,
 )
 from lnt.characterization.f18_engine import compute_f18_bicoherence_triads
 from lnt.characterization.f18_result import F18Declarations, F18Result
@@ -80,8 +80,11 @@ if TYPE_CHECKING:
 
 _EXAMPLE = Path(__file__).parents[2] / "docs/examples/characterization-recipe-v2.json"
 _OFF_GRID_SAMPLE_RATE_HZ: Final = 48_000_000.0
+# 1.024 МГц: сегмент round(0.001 * 1024000) = 1024 отсчёта, поэтому шаг сетки равен
+# 1000 Hz и все 15 declared триад измеримы. 32 кадра — ровно locked minimum_frames.
 _EXACT_GRID_SAMPLE_RATE_HZ: Final = 1_024_000.0
-_SAMPLES: Final = 67_584
+_EXACT_GRID_SEGMENT: Final = 1_024
+_SAMPLES: Final = _EXACT_GRID_SEGMENT + 31 * (_EXACT_GRID_SEGMENT // 2)
 _FRAMES: Final = 32
 _ARRAY_IDS: Final = (
     TRIAD_LOW_NAME,
@@ -139,7 +142,7 @@ def _resources() -> ResourceLimits:
 def _settings() -> StftSettings:
     return StftSettings(
         window="hann_periodic",
-        segment_samples=SEGMENT_SAMPLES,
+        segment_samples=_EXACT_GRID_SEGMENT,
         overlap_fraction=0.5,
         detrend="constant",
         analysis_low_hz=3_000.0,
@@ -278,6 +281,7 @@ def _unavailable(reason: str, _sample_rate_hz: float) -> F18Result:
         frame_support=np.empty(0, dtype=np.int64),
         sample_count=_SAMPLES,
         qualified_sample_count=0,
+        segment_samples=segment_samples_for(_OFF_GRID_SAMPLE_RATE_HZ),
         frame_count=0,
         declared_triad_count=0,
         measurable_triad_count=0,
@@ -502,7 +506,7 @@ def test_declared_axis_maps_through_distinct_bins_and_rows_without_compaction() 
     result = _available_result()
     grid = build_triad_grid(
         BASE_FREQUENCIES_HZ,
-        segment_samples=SEGMENT_SAMPLES,
+        segment_samples=_EXACT_GRID_SEGMENT,
         sample_rate_hz=_EXACT_GRID_SAMPLE_RATE_HZ,
         analysis_low_hz=3_000.0,
         analysis_high_hz=200_000.0,
@@ -510,7 +514,7 @@ def test_declared_axis_maps_through_distinct_bins_and_rows_without_compaction() 
         maximum_triads=4_096,
     )
     _, arrays, _ = _build(result)
-    frequency_axis = np.fft.rfftfreq(SEGMENT_SAMPLES, d=1.0 / _EXACT_GRID_SAMPLE_RATE_HZ)
+    frequency_axis = np.fft.rfftfreq(_EXACT_GRID_SEGMENT, d=1.0 / _EXACT_GRID_SAMPLE_RATE_HZ)
 
     assert grid.distinct_bins.ndim == 1
     assert grid.rows.shape == (15, 3)
@@ -546,6 +550,11 @@ def test_metadata_table_carries_full_locked_truth_in_one_row() -> None:
         metadata["triad_cap_convention"] == "maximum_triads_bounds_the_candidate_count_not_the_rule"
     )
     assert metadata["frequency_mapping"] == "exact_fft_bins"
+    # Обе формы сегмента опубликованы: объявленная длительность и выведенные
+    # движком отсчёты, поэтому decoder может восстановить rate-зависимое поле.
+    assert metadata["segment_duration_s"] == 0.001
+    assert metadata["segment_samples"] == _EXACT_GRID_SEGMENT == 1_024
+    assert len(table.columns) == len(table.rows[0]) == 72
     assert tuple(metadata[f"spec_gap_{index}"] for index in range(1, 6)) == SPEC_GAPS
     for _, name, unit in PERSISTED_QUANTITIES:
         assert metadata[f"{name}_quantity_name"] == name

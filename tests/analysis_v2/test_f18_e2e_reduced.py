@@ -28,6 +28,7 @@ from lnt.characterization.f18_contract import (
     NO_SIGNIFICANT_TRIAD,
     TRIAD_ABOVE_NYQUIST,
     TRIAD_OFF_GRID,
+    segment_samples_for,
 )
 from lnt.characterization.f18_tables import locked_declarations
 from lnt.characterization.f18_triads import build_triad_grid, grid_reason_codes
@@ -111,7 +112,7 @@ def _grid(sample_rate_hz: float) -> F18TriadGrid:
     locked = _locked()
     return build_triad_grid(
         locked.base_frequencies_hz,
-        segment_samples=locked.segment_samples,
+        segment_samples=segment_samples_for(sample_rate_hz),
         sample_rate_hz=sample_rate_hz,
         analysis_low_hz=_recipe().stft.analysis_low_hz,
         analysis_high_hz=locked.analysis_high_hz,
@@ -264,13 +265,17 @@ def test_standard_profile_record_refuses_f18_off_grid_with_empty_domains(tmp_pat
     assert (grid.declared_count, _measured(grid)) == (_DECLARED_TRIADS, 0)
     assert grid.off_grid_count == _DECLARED_TRIADS
     assert grid_reason_codes(grid) == {TRIAD_OFF_GRID}
-    positions = np.asarray(locked.base_frequencies_hz) * locked.segment_samples / _STANDARD_FS_HZ
+    positions = (
+        np.asarray(locked.base_frequencies_hz)
+        * segment_samples_for(_STANDARD_FS_HZ)
+        / _STANDARD_FS_HZ
+    )
     assert positions.tolist() == pytest.approx([24.576, 40.96, 81.92, 163.84, 409.6], abs=1e-9)
 
     # F18-5: решётка segment * gcd(bases) = 2^15 * 5^3 не делится ни на одно целое
     # МГц 1..15, поэтому F18 не может измерить ни одну аппаратную запись.
     assert math.gcd(*(round(v) for v in locked.base_frequencies_hz)) == 1_000
-    assert locked.segment_samples * 1_000 == _EXACT_BIN_LATTICE_HZ
+    assert segment_samples_for(_STANDARD_FS_HZ) * 1_000 == _STANDARD_FS_HZ
     for megahertz in range(1, 16):
         assert _EXACT_BIN_LATTICE_HZ % (megahertz * 1_000_000) != 0
 

@@ -30,6 +30,7 @@ from lnt.characterization.f18_contract import (
     TRIAD_ABOVE_NYQUIST,
     TRIAD_OFF_GRID,
     ZERO_DENOMINATOR,
+    segment_samples_for,
 )
 from lnt.characterization.f18_engine import compute_f18_bicoherence_triads
 from lnt.characterization.f18_result import F18Declarations, F18Result
@@ -40,14 +41,24 @@ from lnt.characterization.records import Status
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Sequence
 
-# 512 kHz: bin width 512000/4096 = 125 Hz, поэтому вся declared сетка 3..100 kHz
-# попадает в exact FFT bins. 32 кадра — ровно locked minimum_frames, это самый
-# дешёвый законный record для полного прогона 198 суррогатов.
+# 512 kHz: сегмент round(0.001 * 512000) = 512 отсчётов, поэтому шаг сетки равен
+# 1000 Hz и вся declared сетка 3..100 кГц попадает в exact FFT bins. 32 кадра — ровно
+# locked minimum_frames, это самый дешёвый законный record для полного прогона
+# 198 суррогатов.
 _FS = 512_000.0
-_SEGMENT = 4_096
-_HOP = 2_048
+_SEGMENT = 512
+_HOP = 256
 _FRAMES = 32
 _SAMPLES = _SEGMENT + (_FRAMES - 1) * _HOP
+# 819.2 кГц: сегмент 819, шаг 1000.2442 Hz, поэтому 3000 Hz даёт бин 2.99927 и вся
+# declared сетка вне решётки — declared triad_off_grid без единого отказа по Nyquist.
+_OFF_GRID_FS = 819_200.0
+# 204.8 кГц: сегмент 205, шаг 999.0244 Hz, поэтому 14 триад вне решётки, а 100 кГц
+# отрезана clamps 0.45 * fs = 92.16 кГц: обе причины в одной сетке.
+_ABOVE_AND_OFF_GRID_FS = 204_800.0
+# 200 кГц: сегмент 200, шаг 1000 Hz, поэтому измеримы 14 триад из 15, а 50 + 50 =
+# 100 кГц выше clamps 90 кГц. Единственная частично измеримая сетка на 1 мс.
+_PARTIAL_FS = 200_000.0
 
 # Четыре объявленные квадратично связанные триады: 3000+5000, 10000+20000,
 # 10000+50000 и 20000+50000. Их индексы в порядке declared_triads.
@@ -70,7 +81,7 @@ def _resources(max_surrogates: int = 199) -> ResourceLimits:
 def _settings() -> StftSettings:
     return StftSettings(
         window="hann_periodic",
-        segment_samples=_SEGMENT,
+        segment_samples=segment_samples_for(_FS),
         overlap_fraction=0.5,
         detrend="constant",
         analysis_low_hz=3_000.0,
@@ -316,12 +327,12 @@ def test_uncoupled_triads_of_the_coupled_record_keep_the_declared_domain() -> No
 
 
 def test_off_grid_capture_rate_is_unavailable_with_every_domain_empty() -> None:
-    """48 MHz: шаг 11718.75 Hz, ни одна declared частота не exact bin."""
-    samples = _coupled_record(48_000_000.0, _SAMPLES)
+    """819.2 kHz: шаг 1000.2442 Hz, ни одна declared частота не exact bin."""
+    samples = _coupled_record(_OFF_GRID_FS, _SAMPLES)
 
     result = compute_f18_bicoherence_triads(
         samples,
-        _phase(48_000_000.0, _SAMPLES),
+        _phase(_OFF_GRID_FS, _SAMPLES),
         _means(),
         _inventory(_SAMPLES),
         F18Declarations.locked(),
@@ -331,6 +342,7 @@ def test_off_grid_capture_rate_is_unavailable_with_every_domain_empty() -> None:
 
     assert result.status is Status.UNAVAILABLE
     assert result.reason_codes == (TRIAD_OFF_GRID,)
+    assert result.segment_samples == 819
     assert result.sample_count == _SAMPLES
     assert result.qualified_sample_count == 0
     assert result.frame_count == 0
@@ -341,10 +353,10 @@ def test_off_grid_capture_rate_is_unavailable_with_every_domain_empty() -> None:
 
 
 def test_nyquist_clamp_reports_above_nyquist_before_off_grid() -> None:
-    """100 kHz record: clamp 45 kHz, часть сумм объявлена above_nyquist."""
+    """204.8 kHz: 14 триад вне решётки, 100 кГц объявлена above_nyquist."""
     result = compute_f18_bicoherence_triads(
-        _coupled_record(100_000.0, _SAMPLES),
-        _phase(100_000.0, _SAMPLES),
+        _coupled_record(_ABOVE_AND_OFF_GRID_FS, _SAMPLES),
+        _phase(_ABOVE_AND_OFF_GRID_FS, _SAMPLES),
         _means(),
         _inventory(_SAMPLES),
         F18Declarations.locked(),
@@ -355,20 +367,22 @@ def test_nyquist_clamp_reports_above_nyquist_before_off_grid() -> None:
     assert result.status is Status.UNAVAILABLE
     assert result.reason_codes == (TRIAD_ABOVE_NYQUIST, TRIAD_OFF_GRID)
     assert result.declared_triad_count == 0
+    assert result.segment_samples == 205
 
 
 def test_partially_measurable_grid_publishes_the_declared_domain() -> None:
-    """204.8 kHz: сетка точна, но измеримы не все триады — домен остаётся declared.
+    """200 kHz: сетка точна, но измеримы не все триады — домен остаётся declared.
 
     Промежуточный случай между «измеримы все» (512 kHz) и «не измерима ни одна»
     (off-grid). Именно на нём расходится длина измеренного подмножества и
     объявленного домена: наблюдаемая bicoherence считается по строкам
     ``grid.rows[measurable]``, а публиковаться обязана в declared-домене.
-    Частота выбрана так, чтобы шаг 204800/4096 = 50 Hz делил все объявленные
-    базы, а Найквист 102.4 kHz оставался выше каждой компоненты фикстуры,
-    поэтому алиасинга здесь нет и расхождение длиной — единственное отличие.
+    Частота выбрана так, чтобы сегмент round(0.001 * 200000) = 200 давал шаг
+    1000 Hz, делящий все объявленные базы, а Найквист 90 кГц оставался выше
+    каждой компоненты фикстуры, поэтому алиасинга здесь нет и расхождение
+    длиной — единственное отличие.
     """
-    rate = 204_800.0
+    rate = _PARTIAL_FS
 
     result = compute_f18_bicoherence_triads(
         _coupled_record(rate, _SAMPLES),
@@ -380,6 +394,7 @@ def test_partially_measurable_grid_publishes_the_declared_domain() -> None:
         resources=_resources(),
     )
 
+    assert result.segment_samples == 200
     declared = result.declared_triad_count
     measurable = result.measurable_triad_count
     assert declared == 15
@@ -436,7 +451,7 @@ def test_padding_outside_qualified_span_does_not_change_the_measurement() -> Non
         resources=_resources(),
     )
 
-    # 88064 samples, phase root только на [10240, 77824): 67584 interior, shift 10240.
+    # 28928 samples, phase root только на [10240, 18688): 8448 interior, shift 10240.
     assert expected.status is Status.AVAILABLE
     assert measured.status is Status.AVAILABLE
     assert measured.reason_codes == ()
@@ -584,6 +599,34 @@ def test_no_significant_triad_code_is_published_as_an_explicit_state() -> None:
     assert bool(np.all(result.adjusted_p_value > 0.05))
 
 
+@pytest.mark.parametrize(
+    ("sample_rate_hz", "expected_segment"),
+    [(1_000_000.0, 1_000), (500_000.0, 500), (512_000.0, 512)],
+)
+def test_result_publishes_the_rate_derived_segment_in_samples(
+    sample_rate_hz: float, expected_segment: int
+) -> None:
+    """Объявлена длительность 1 мс; отсчёты выводит движок и публикует в результате."""
+    segment = segment_samples_for(sample_rate_hz)
+    hop = segment // 2
+    sample_count = segment + (_FRAMES - 1) * hop
+
+    result = compute_f18_bicoherence_triads(
+        _coupled_record(sample_rate_hz, sample_count),
+        _phase(sample_rate_hz, sample_count),
+        _means(),
+        _inventory(sample_count),
+        F18Declarations.locked(),
+        settings=_settings(),
+        resources=_resources(),
+    )
+
+    assert F18Declarations.locked().segment_duration_s == 0.001
+    assert segment == expected_segment == round(0.001 * sample_rate_hz)
+    assert result.segment_samples == expected_segment
+    assert result.qualified_sample_count == (result.frame_count - 1) * hop + expected_segment
+
+
 def test_declarations_reject_any_alternate_recipe_surface() -> None:
     """Нельзя silently сменить surrogate count, seed, tolerance или правило триад."""
     for field, value in (
@@ -594,6 +637,7 @@ def test_declarations_reject_any_alternate_recipe_surface() -> None:
         ("false_discovery_rate", 0.1),
         ("triad_rule", "all_pairs"),
         ("dual_null_p_value", "minimum_add_one_p_value"),
+        ("segment_duration_s", 0.002),
     ):
         with pytest.raises(ValueError, match="locked recipe"):
             replace(F18Declarations.locked(), **{field: value})

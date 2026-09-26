@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from lnt.characterization.f18_contract import segment_samples_for
 from lnt.characterization.f18_frames import SURROGATE_BYTES_PER_SAMPLE
 from lnt.characterization.f18_result import F18Result
 from lnt.characterization.records import Status
@@ -51,7 +52,7 @@ def validate_f18_inputs(  # noqa: PLR0913, PLR0917 - полный shared input c
         resources.max_surrogates
     ):
         raise ValueError("F18 surrogate counts exceed the declared resource limit")
-    if int(declarations.segment_samples) > int(resources.hard_max_chunk_samples):
+    if segment_samples_for(phase.sample_rate_hz) > int(resources.hard_max_chunk_samples):
         raise ValueError("F18 segment samples exceed the declared resource limit")
     if int(values.size) * SURROGATE_BYTES_PER_SAMPLE > int(resources.max_work_bytes):
         raise ValueError("F18 surrogate source exceeds the declared work budget")
@@ -60,7 +61,9 @@ def validate_f18_inputs(  # noqa: PLR0913, PLR0917 - полный shared input c
     return values
 
 
-def unavailable_f18_result(codes: tuple[str, ...], sample_count: int) -> F18Result:
+def unavailable_f18_result(
+    codes: tuple[str, ...], sample_count: int, segment_samples: int
+) -> F18Result:
     """Собрать UNAVAILABLE без осей, zero-filled arrays или выдуманных measurements."""
     empty_float = np.empty(0, dtype=np.float64)
     empty_int = np.empty(0, dtype=np.int64)
@@ -82,6 +85,7 @@ def unavailable_f18_result(codes: tuple[str, ...], sample_count: int) -> F18Resu
         frame_support=empty_int,
         sample_count=sample_count,
         qualified_sample_count=0,
+        segment_samples=segment_samples,
         frame_count=0,
         declared_triad_count=0,
         measurable_triad_count=0,

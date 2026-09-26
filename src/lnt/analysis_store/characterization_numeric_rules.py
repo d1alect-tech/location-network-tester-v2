@@ -55,7 +55,7 @@ _POSITIVE_INTS: Final = {
         "maximum_stored_cells"
     ),
     "f18_bicoherence_triads": (
-        "phase_bins segment_samples maximum_triads phase_randomized_surrogate_count "
+        "phase_bins maximum_triads phase_randomized_surrogate_count "
         "iaaft_surrogate_count iaaft_iterations minimum_frames"
     ),
 }
@@ -85,7 +85,9 @@ _POSITIVE_NUMBERS: Final = {
     "f15_interpretable_modes": "window_s",
     "f12_spectral_kurtosis": "analysis_low_hz analysis_high_hz",
     "f17_cyclic_spectral_coherence": "analysis_low_hz analysis_high_hz",
-    "f18_bicoherence_triads": "analysis_high_hz iaaft_relative_rms_magnitude_tolerance",
+    "f18_bicoherence_triads": (
+        "analysis_high_hz iaaft_relative_rms_magnitude_tolerance segment_duration_s"
+    ),
 }
 
 _OPEN_CLOSED_UNIT: Final = {

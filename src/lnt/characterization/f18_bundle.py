@@ -21,6 +21,7 @@ from lnt.characterization.f18_tables import (
 from lnt.characterization.f18_tables import (
     bicoherence_metadata,
     locked_declarations,
+    persisted_segment_samples,
 )
 from lnt.characterization.f18_validation import validate_f18_result
 from lnt.characterization.family_envelope import (
@@ -93,7 +94,7 @@ def build_f18_family(
         return family_envelope(spec, zero_support()), {}, {}
     checked_f18_reasons(result, reasons)
     arrays, references = published(result, declarations, partial=result.status is Status.PARTIAL)
-    table = bicoherence_metadata(declarations)
+    table = bicoherence_metadata(declarations, result.segment_samples)
     envelope = family_envelope(
         spec,
         _support(result, span),
@@ -116,6 +117,7 @@ def decode_f18_result(
         raise CharacterizationError("status_invariant", "unavailable F18 has no decodable domain")
     counters = _summary_counts(family)
     values = decode_f18_arrays(family, arrays, tables, counters[3], counters[7])
+    segment_samples = persisted_segment_samples(tables[F18_METADATA_TABLE_ID])
     sample_count, qualified_count, frame_count = counters[:3]
     if (
         family.n != qualified_count
@@ -143,6 +145,7 @@ def decode_f18_result(
         frame_support=values["f18_frame_support"],
         sample_count=sample_count,
         qualified_sample_count=qualified_count,
+        segment_samples=segment_samples,
         frame_count=frame_count,
         declared_triad_count=counters[3],
         measurable_triad_count=counters[4],

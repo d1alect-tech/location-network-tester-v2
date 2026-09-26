@@ -19,7 +19,6 @@ from lnt.characterization.f18_contract import (
     MINIMUM_FRAMES,
     NO_SIGNIFICANT_TRIAD,
     OVERLAP_FRACTION,
-    SEGMENT_SAMPLES,
     TRIAD_ABOVE_NYQUIST,
     TRIAD_HIGH_NAME,
     TRIAD_LOW_NAME,
@@ -33,8 +32,6 @@ from lnt.characterization.records import Status, Unit, validate_unit_name
 type Float64Array = np.ndarray
 type Int64Array = np.ndarray
 type BoolArray = np.ndarray
-
-_HOP_SAMPLES: int = round(SEGMENT_SAMPLES * (1.0 - OVERLAP_FRACTION))
 
 
 class _Result(Protocol):
@@ -87,6 +84,9 @@ class _Result(Protocol):
 
     @property
     def qualified_sample_count(self) -> int: ...
+
+    @property
+    def segment_samples(self) -> int: ...
 
     @property
     def frame_count(self) -> int: ...
@@ -159,7 +159,7 @@ def _validate_accounting(result: _Result) -> None:
         result.dropped_triad_count,
         result.iaaft_converged_count,
     )
-    if any(value < 0 for value in counts):
+    if result.segment_samples < 1 or any(value < 0 for value in counts):
         _fail("F18 support counts must be nonnegative")
     if (
         result.qualified_sample_count > result.sample_count
@@ -213,7 +213,12 @@ def _validate_built(result: _Result) -> None:
         _fail("F18 arrays do not share their fixed triad domain")
     # Построенный результат обязан иметь хотя бы minimum_frames кадров: иначе
     # валидатор движка был бы мягче объявленного support, а бандл всё равно отверг.
-    expected_samples = (result.frame_count - 1) * _HOP_SAMPLES + SEGMENT_SAMPLES
+    # Геометрия кадров выводится из ПУБЛИКОВАННОГО сегмента результата, а не из
+    # константы модуля: recipe объявляет длительность, поэтому число отсчётов
+    # принадлежит движку, и единственное место, где его можно проверить на
+    # согласованность с hop, — это сам результат.
+    hop_samples = round(result.segment_samples * (1.0 - OVERLAP_FRACTION))
+    expected_samples = (result.frame_count - 1) * hop_samples + result.segment_samples
     if (
         result.frame_count < MINIMUM_FRAMES
         or result.qualified_sample_count != expected_samples

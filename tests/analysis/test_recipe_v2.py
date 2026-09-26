@@ -30,8 +30,10 @@ def test_characterization_example_round_trips_through_public_parser() -> None:
 
     assert isinstance(recipe, CharacterizationRecipe)
     assert recipe.to_mapping() == mapping
+    # Хеш байтов рецепта, поэтому он меняется вместе с объявлением сегмента F18:
+    # segment_samples 4096 заменён на segment_duration_s 0.001.
     assert recipe.recipe_sha256 == (
-        "b4b3b66c7a23aeca8cc48db263537f7313f9f70d67502c95084e2677cd9db3f8"
+        "d35f875d72a2ddee0b540b0fdbe7939c78db4e517cc687f889ed0eddf99de55f"
     )
     assert tuple(family.id for family in recipe.families) == (
         "f01_phase_cycle",
@@ -213,7 +215,7 @@ def _set_root_group(
         _set_family(16, "segment_samples", 0),
         _set_family(16, "minimum_frames", 0),
         _set_family(16, "surrogate_count", 0),
-        _set_family(17, "segment_samples", 0),
+        _set_family(17, "segment_duration_s", 0.0),
         _set_family(17, "minimum_frames", 0),
         _set_family(17, "phase_randomized_surrogate_count", 0),
         _set_family(17, "iaaft_iterations", 0),
