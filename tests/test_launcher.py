@@ -2,7 +2,6 @@
 
 import json
 import os
-import socket
 import subprocess
 import sys
 import time
@@ -18,6 +17,7 @@ from lnt import launcher as launcher_module
 from lnt.launcher import (
     CLI_SUBCOMMANDS,
     LOCK_FILENAME,
+    PORT_FALLBACK_SPAN,
     SUPPORT_CODE_PREFIX,
     acquire_instance_lock,
     bind_first_free_port,
@@ -27,14 +27,41 @@ from lnt.launcher import (
 )
 from lnt.runtime.lease import bind_exclusive_loopback
 
-_HEALTH_TIMEOUT_S = 30.0
+# Реальный процесс-лаунчер под 16 воркерами xdist стартует вчетверо медленнее
+# (импорт fastapi/uvicorn/numpy/scipy под contention), поэтому бюджет ожидания
+# здоровья выше serial-значения.
+_HEALTH_TIMEOUT_S = 120.0
 _STOP_TIMEOUT_S = 15.0
 
+_PORT_WINDOW_BASE = 40_000
+# Шаг окна шире PORT_FALLBACK_SPAN (16), иначе хвост окна одного воркера
+# налезал бы на начало окна соседнего и снова ронял fallback-тест.
+_PORT_WINDOW_STRIDE = 32
 
-def _free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-        probe.bind(("127.0.0.1", 0))
-        return int(probe.getsockname()[1])
+
+def _worker_index(worker_id: str) -> int:
+    """`gw3` -> 3; без xdist (`master`) воркер один и берёт первое окно."""
+    return int(worker_id[2:]) if worker_id.startswith("gw") else 0
+
+
+def _free_port(worker_id: str = "master") -> int:
+    """Первый свободный порт ЛИЧНОГО окна воркера.
+
+    Прежняя версия брала `:0`, читала номер и закрывала сокет — два воркера
+    xdist получали один и тот же номер (TOCTOU между bind и возвратом). Окна
+    не пересекаются по построению, поэтому коллизия между воркерами исключена;
+    занятость внешним процессом по-прежнему проверяется честной попыткой
+    exclusive-bind, а занятый порт просто даёт следующий.
+    """
+    first = _PORT_WINDOW_BASE + _worker_index(worker_id) * _PORT_WINDOW_STRIDE
+    for port in range(first, first + _PORT_WINDOW_STRIDE):
+        try:
+            with bind_exclusive_loopback(port):
+                pass
+        except OSError:
+            continue
+        return port
+    pytest.fail(f"свободного порта нет в окне {first}..{first + _PORT_WINDOW_STRIDE - 1}")
 
 
 def _health(port: int) -> dict[str, object] | None:
@@ -92,8 +119,9 @@ def server(tmp_path: Path) -> Iterator[Callable[[int], subprocess.Popen[str]]]:
 def test_two_processes_yield_one_server_and_second_focuses_url(
     tmp_path: Path,
     server: Callable[[int], subprocess.Popen[str]],
+    worker_id: str,
 ) -> None:
-    port = _free_port()
+    port = _free_port(worker_id)
     root = tmp_path / "сессии"
     process = server(port)
     first_health = _wait_health(port, _HEALTH_TIMEOUT_S)
@@ -142,9 +170,12 @@ def test_stale_pid_lock_is_recovered_by_clean_takeover(tmp_path: Path) -> None:
     assert not lock_path.exists()
 
 
-def test_port_fallback_is_deterministic_next_free(tmp_path: Path) -> None:
+def test_port_fallback_is_deterministic_next_free(
+    tmp_path: Path,
+    worker_id: str,
+) -> None:
     del tmp_path
-    preferred = _free_port()
+    preferred = _free_port(worker_id)
     blocker = bind_exclusive_loopback(preferred)
     try:
         bound, chosen = bind_first_free_port(preferred)
@@ -152,8 +183,12 @@ def test_port_fallback_is_deterministic_next_free(tmp_path: Path) -> None:
         blocker.close()
 
     try:
-        assert chosen == preferred + 1
-        assert bound.getsockname()[1] == preferred + 1
+        # Контракт fallback — уйти с занятого preferred и не выйти за
+        # объявленный PORT_FALLBACK_SPAN. Конкретный соседний номер контрактом
+        # не является: его может занять посторонний процесс между зондом
+        # свободного порта и bind, и тогда first-free честно отдаст следующий.
+        assert preferred < chosen <= preferred + PORT_FALLBACK_SPAN - 1
+        assert bound.getsockname()[1] == chosen
     finally:
         bound.close()
 
@@ -175,6 +210,7 @@ def test_gui_main_crash_writes_support_code_without_traceback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    worker_id: str,
 ) -> None:
     def explode(**_kwargs: object) -> int:
         raise RuntimeError("взрыв в рабочем режиме")
@@ -182,7 +218,13 @@ def test_gui_main_crash_writes_support_code_without_traceback(
     monkeypatch.setattr("lnt.launcher.launch", explode)
 
     exit_code = gui_main(
-        ["--root", str(tmp_path / "сессии"), "--port", str(_free_port()), "--no-browser"],
+        [
+            "--root",
+            str(tmp_path / "сессии"),
+            "--port",
+            str(_free_port(worker_id)),
+            "--no-browser",
+        ],
     )
 
     captured = capsys.readouterr()

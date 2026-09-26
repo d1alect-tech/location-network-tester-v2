@@ -57,14 +57,20 @@ def test_second_process_reports_hardware_owner(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     ("pid", "stored_start", "observed_start"),
-    [(999_999_999, 10, None), (os.getpid(), 10, 11)],
+    # os.getpid() в списке параметров выполнялся на импорте, и каждый воркер
+    # xdist впечатывал свой PID в id теста: сборка переставала быть канонической
+    # и xdist падал с "Different tests were collected". None резолвится в PID
+    # уже внутри теста, id остаётся одинаковым у всех воркеров.
+    [(999_999_999, 10, None), (None, 10, 11)],
 )
 def test_stale_or_pid_reused_lease_is_recovered(
     tmp_path: Path,
-    pid: int,
+    pid: int | None,
     stored_start: int,
     observed_start: int | None,
 ) -> None:
+    if pid is None:
+        pid = os.getpid()
     path = tmp_path / "hardware.lease"
     _write_owner(path, LeaseOwner(pid, stored_start, "old", "2000-01-01T00:00:00Z"))
 

@@ -620,7 +620,7 @@ if ($Full) {
         try {
             uv run pytest tests/test_module_size.py tests/test_safe_paths.py `
                 tests/catalog/test_deep_verify.py tests/test_cli_bom_inputs.py `
-                tests/archive tests/test_ui_security_v2.py -q
+                tests/archive tests/test_ui_security_v2.py -q -n auto
         } finally {
             Pop-Location
         }

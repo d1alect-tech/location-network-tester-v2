@@ -304,7 +304,7 @@ foreach ($num in 1..52) {
 # --- Step 7: unified gates -----------------------------------------------------------
 $gates = [ordered]@{}
 if (-not $SkipGates) {
-    $py = Invoke-Native "pytest" { uv run pytest -q }
+    $py = Invoke-Native "pytest" { uv run pytest -q -n auto }
     $pytestExit = $py[0]
     $pytestOut = ($py[1] | Out-String)
     $passed = $null; $failed = $null; $skippedCount = $null
