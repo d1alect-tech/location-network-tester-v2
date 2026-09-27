@@ -558,18 +558,45 @@ def test_metadata_table_carries_full_locked_truth_in_one_row() -> None:
     # Частота анализа опубликована вместе с сегментом: она и есть причина, по которой
     # отсчёты сегмента rate-зависимы, поэтому артефакт не должен молчать о ней.
     assert metadata["analysis_rate_hz"] == _EXACT_GRID_SAMPLE_RATE_HZ == 1_024_000.0
-    assert len(table.columns) == len(table.rows[0]) == 73
-    assert tuple(metadata[f"spec_gap_{index}"] for index in range(1, 6)) == SPEC_GAPS
+    assert len(table.columns) == len(table.rows[0]) == 74
+    assert tuple(metadata[f"spec_gap_{index}"] for index in range(1, 7)) == SPEC_GAPS
     for _, name, unit in PERSISTED_QUANTITIES:
         assert metadata[f"{name}_quantity_name"] == name
         assert metadata[f"{name}_unit"] == unit.value
 
 
+def test_iaaft_non_convergence_finding_is_published_verbatim_in_the_decoded_artifact() -> None:
+    """F18-6 обязана дойти до артефакта байт-в-байт: находка опубликована, не закомментирована.
+
+    Клетка берётся из ДЕКОДИРОВАННОГО артефакта, а не из таблицы сборки: encode_bundle +
+    load_bundle проходят и запись, и декодер, поэтому равенство cell == SPEC_GAPS[5] доказывает,
+    что находка пережила публикацию целиком. Пересказ (paraphrase) здесь не проходит — сравнение
+    точное.
+    """
+    _, _, tables = _round_trip(_available_result())
+    table = tables[F18_METADATA_TABLE_ID]
+    metadata = dict(zip((column.name for column in table.columns), table.rows[0], strict=True))
+    cell = metadata["spec_gap_6"]
+    assert isinstance(cell, str)
+
+    assert len(SPEC_GAPS) == 6
+    assert cell == SPEC_GAPS[5]
+    assert cell.startswith("F18-6: the IAAFT iteration does not converge")
+    # Находка говорит ровно измеренное: итерация не сходится, а опубликованная
+    # статистика не двигается — обе половины обязаны пережить публикацию.
+    assert "flat at about 1.35 from iteration 1 to iteration 200" in cell
+    assert "produced_err is about 3e-16 on every iteration" in cell
+    assert "identical to 4 decimal places at 1, 2, 10 and 100 iterations" in cell
+    assert "correlation 1.000" in cell
+    assert "maximum deviation 3.3e-2 at max|x| = 0.807" in cell
+    assert "not declared invalid" in cell
+
+
 def test_claim_boundary_and_spec_gap_tamper_are_rejected() -> None:
-    """Metadata нельзя пересказать: boundary и F18-1..F18-5 должны быть exact."""
+    """Metadata нельзя пересказать: boundary и последний F18-gap должны быть exact."""
     mapped, arrays, tables = _build(_available_result())
     table = tables[F18_METADATA_TABLE_ID]
-    for column_name in ("claim_boundary", "spec_gap_5"):
+    for column_name in ("claim_boundary", "spec_gap_6"):
         row = list(table.rows[0])
         index = next(
             index for index, column in enumerate(table.columns) if column.name == column_name

@@ -169,7 +169,7 @@ def bicoherence_metadata(
     declarations: F18Declarations, segment_samples: int, analysis_rate_hz: float
 ) -> TableBlock:
     """Сохранить весь declared F18 surface без пересказа или сокращений."""
-    if declarations != F18Declarations.locked() or len(contract.SPEC_GAPS) != 5:  # noqa: PLR2004
+    if declarations != F18Declarations.locked() or len(contract.SPEC_GAPS) != 6:  # noqa: PLR2004
         raise CharacterizationError("status_invariant", "F18 metadata declarations are not locked")
     # Опубликованные частота и сегмент обязаны описывать одну геометрию: сегмент
     # выведен из объявленной длительности по ИЗМЕРЕННОЙ частоте, поэтому непротиворечивая

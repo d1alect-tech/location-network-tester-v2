@@ -194,6 +194,29 @@ SPEC_GAPS: Final = (
         "duration and the exact_fft_bins mapping were not retuned: rounding an off-grid "
         "frequency to the nearest bin would fabricate a component the record does not contain."
     ),
+    (
+        "F18-6: the IAAFT iteration does not converge; it is repeated resampling from a stationary "
+        "distribution of the map, not a refinement. The meaningful error measure (the spectrum "
+        "taken right after the amplitude rank remap) is flat at about 1.35 from iteration 1 to "
+        "iteration 200, and max|delta| stays O(1) on every iteration, so no iteration is closer "
+        "than the one before it. The implemented convergence check is a no-op: produced_err is "
+        "about 3e-16 on every iteration, because the declared step order "
+        "rank_remap_then_fourier_magnitude_replacement ends in a Fourier magnitude replacement, "
+        "so the produced surrogate has exactly the observed spectrum by construction, which F18-1 "
+        "already admits. Empirically the mean null b2 is identical to 4 decimal places at 1, 2, "
+        "10 and 100 iterations, and the p-values differ only within Monte-Carlo noise, so the "
+        "published statistic does not move: the add-one p floor 1/100 = 0.01 is set by the "
+        "declared 99+99 surrogate counts, not by the iteration count. Measured, the IAAFT null is "
+        "nearly indistinguishable from the phase-randomized null (correlation 1.000, per-triad "
+        "ratios 0.97-2.3), and NEITHER null reproduces the observed amplitude distribution: "
+        "maximum deviation 3.3e-2 at max|x| = 0.807, about 4 percent, where a converged IAAFT "
+        "would be about 0. IAAFT's defining property, the exact amplitude distribution, is "
+        "therefore never achieved, and the declared dual null is in practice two near-duplicate "
+        "nulls. The engine keeps the declared 2 iterations, the declared 1e-6 tolerance, the "
+        "declared 99+99 surrogate counts and the iaaft_not_converged reporting: the published "
+        "statistic is not declared invalid, only the iteration's claimed convergence is "
+        "withdrawn."
+    ),
 )
 
 CLAIM_BOUNDARY: Final = (
