@@ -171,6 +171,7 @@ def test_locked_contract_recipe_and_claim_boundary_are_frozen() -> None:
         "F18-3",
         "F18-4",
         "F18-5",
+        "F18-6",
     }
 
 
