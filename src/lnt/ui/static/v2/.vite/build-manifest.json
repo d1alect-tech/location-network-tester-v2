@@ -480,7 +480,7 @@
     "src/views/settings/settingsWorkspace.test.ts": "b46195279d0655e87f0271a030a48fd2f5ea9480a347d6b47e37369b44439cde",
     "src/views/settings/settingsWorkspace.ts": "0f947bf32f5d9fb65b373e04ec52412646e63ab661a964d48f749719d86690bf",
     "src/vite-env.d.ts": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5",
-    "public/third-party-licenses.txt": "796a464d82b8db55841cbcf8c7cd2e92b753b321696f1c31056650113ce1254f"
+    "public/third-party-licenses.txt": "369b8c05d8cc892a5387a6e9d08b11c6f6836da123b5239ba13b89b7e330d263"
   },
   "outputs": {
     ".vite/manifest.json": "aff54591c4d27dc88dab9733f33d5b51a867c5c353877703c1fb37d00d5e98fb",
@@ -551,6 +551,6 @@
     "showcase-v5.html": "a35efd996d560021223012b60f6c52a2c0e5da1030900631486f8e4eb9e2a771",
     "showcase-v6.html": "b28b9a69f4ecdc3b300b61480470385c547bc9510602a08a334f5b37afb959ef",
     "showcase.html": "36b04afe97c24da6aee4ac88a7d92c7e53f220d25afc1e1ea36b4218d9dce5cc",
-    "third-party-licenses.txt": "796a464d82b8db55841cbcf8c7cd2e92b753b321696f1c31056650113ce1254f"
+    "third-party-licenses.txt": "369b8c05d8cc892a5387a6e9d08b11c6f6836da123b5239ba13b89b7e330d263"
   }
 }
