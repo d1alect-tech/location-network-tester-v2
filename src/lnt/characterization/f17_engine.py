@@ -73,6 +73,14 @@ def compute_f17_cyclic_spectral_coherence(  # noqa: C901, PLR0911, PLR0913
     compact_first = compact_samples(first, blocks)
     compact_second = compact_samples(second, blocks)
     compact_reference = compact_phase(phase, blocks)
+    # Приоритет причин (owner-ratified, gate Q3): невозможность положить declared
+    # alpha на сетку FFT - структурный факт уровня частоты дискретизации, он
+    # не зависит от длины записи и потому доминирует над фактом числа кадров.
+    # Проверка сетки идёт до collect_stft, чтобы off-grid запись отказывала без
+    # платного сбора STFT. Дальше число кадров остаётся вторым по значимости.
+    grid = build_frequency_grid(declarations, float(phase.sample_rate_hz))
+    if not bool(np.any(grid.available)):
+        return unavailable_f17((CYCLIC_FREQUENCY_OFF_GRID,), sample_count)
     measured = collect_stft(
         compact_first,
         compact_reference,
@@ -94,12 +102,9 @@ def compute_f17_cyclic_spectral_coherence(  # noqa: C901, PLR0911, PLR0913
     measured, reference = align_stft(measured, reference)
     if measured.frame_indices.size < declarations.minimum_frames:
         return unavailable_f17((INSUFFICIENT_FRAMES,), sample_count)
-    grid = build_frequency_grid(declarations, float(phase.sample_rate_hz))
     observed = estimate_cyclic_coherence(
         measured.coefficients, reference.coefficients, measured.bin_numbers, grid
     )
-    if not bool(np.any(grid.available)):
-        return unavailable_f17((CYCLIC_FREQUENCY_OFF_GRID,), sample_count)
     if not bool(np.any(observed.available)):
         codes = {ZERO_DENOMINATOR}
         if not bool(np.all(grid.alpha_on_grid)):

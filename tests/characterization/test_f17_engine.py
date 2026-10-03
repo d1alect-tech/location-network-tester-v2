@@ -20,7 +20,6 @@ from lnt.characterization.f17_contract import (
     F17_ID,
     F17_INDEX,
     INSUFFICIENT_CYCLES,
-    INSUFFICIENT_FRAMES,
     METHOD,
     NO_SIGNIFICANT_CELL,
     PHASE_REFERENCE_UNAVAILABLE,
@@ -343,7 +342,12 @@ def test_fewer_than_forty_cycles_is_exact_support_failure() -> None:
 
 
 def test_thirty_one_frames_is_exact_frame_failure() -> None:
-    """При 48 kHz 40 циклов дают меньше 32 кадров, поэтому refusal до суррогатов."""
+    """При 48 kHz 40 циклов дают меньше 32 кадров, поэтому refusal до суррогатов.
+
+    Частота 48 kHz не делит 102400, поэтому declared alpha лежат вне сетки FFT:
+    rate-level структурный факт сильнее факта длины записи, и движок отказывает
+    с cyclic_frequency_off_grid раньше, чем успевает посчитать кадры.
+    """
     cycles = 40
     cycle_samples = 960
     count = cycles * cycle_samples
@@ -368,7 +372,7 @@ def test_thirty_one_frames_is_exact_frame_failure() -> None:
     )
 
     assert result.status is Status.UNAVAILABLE
-    assert result.reason_codes == (INSUFFICIENT_FRAMES,)
+    assert result.reason_codes == (CYCLIC_FREQUENCY_OFF_GRID,)
     assert result.frame_count == 0
 
 
