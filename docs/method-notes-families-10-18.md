@@ -405,19 +405,28 @@ Generate two seeded null ensembles of 99 each. The phase-randomized ensemble
 keeps the record FFT magnitudes and randomizes phases. The IAAFT ensemble starts
 from a seeded permutation and alternates exact rank remapping to the observed
 amplitudes with replacement of Fourier magnitudes by observed magnitudes for
-100 iterations. IAAFT convergence means relative RMS Fourier-magnitude error
+2 iterations. IAAFT convergence means relative RMS Fourier-magnitude error
 at most `1e-6`; otherwise the surrogate is excluded and
 `iaaft_not_converged` is reported. A triad raw p-value uses the larger of the
 two add-one p-values, each divided by 100. Apply BH once across all declared
 triads. Store biphase only when `b2` is significant and its bispectrum magnitude
 is nonzero.
 
-**Fixed recipe parameters.** STFT segment samples `4096`; Hann window; overlap
-`0.5`; phase bins `64`; base frequencies `[3000,5000,10000,20000,50000] Hz`;
-triads are every valid unordered pair from that list, capped at `4096`; analysis
-upper bound `200000 Hz` with Nyquist clamp; phase-randomized surrogates `99`;
-IAAFT surrogates `99`; IAAFT iterations `100`; seed `6022`; `q = 0.05`;
+**Fixed recipe parameters.** STFT segment duration `0.001 s`, which is 1000
+samples at the declared analysis rate `1000000 Hz`; the engine derives the
+sample count from the measured capture rate (`f18_contract.segment_samples_for`);
+Hann window; overlap `0.5`; phase bins `64`; base frequencies
+`[3000,5000,10000,20000,50000] Hz`; triads are every valid unordered pair from
+that list, capped at `4096`; analysis upper bound `200000 Hz` with Nyquist
+clamp; phase-randomized surrogates `99`; IAAFT surrogates `99`; IAAFT iterations
+`2`; seed `6022`; `q = 0.05`;
 IAAFT relative RMS Fourier-magnitude tolerance `1e-6`; minimum frames `32`.
+
+The reduction from 100 to 2 IAAFT iterations is recorded in
+`docs/coverage-18-families.md` (F18-6 bullet): mean null `b²` agrees to four
+digits at 1, 2, 10 and 100 iterations, so the recipe keeps 2. The 100-iteration
+value documented here drifted during the F3 wave audit and was left
+unremediated until this fix.
 
 **Inputs and support/QC.** Finite channel, sample rate, qualified phase, exact
 FFT-bin triads, nonzero denominator, and at least 32 frames. Frequency pairs are
@@ -428,8 +437,8 @@ fixed before data inspection.
 `iaaft_not_converged`, `no_significant_triad`, `artifact_limit`.
 
 **Bounds.** At most 15 triads for the fixed base grid, below the hard cap of
-4096, with 198 surrogates and 100 bounded IAAFT iterations. Work is
-`O(198 * (N log N + 100N log N))`; one surrogate and its STFT are held at once.
+4096, with 198 surrogates and 2 bounded IAAFT iterations. Work is
+`O(198 * (N log N + 2N log N))`; one surrogate and its STFT are held at once.
 
 **Analytic tests.** Positive: `x = cos(2pi f1 t) + cos(2pi f2 t) +
 0.5 cos(2pi(f1+f2)t + phi)` with locked phases produces significant
