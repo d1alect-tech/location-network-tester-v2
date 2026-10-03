@@ -38,7 +38,12 @@ export type ExtendedRunClient = {
 
 export type CharacterizationSummary = {
   readonly f1Hz: number | null;
-  readonly families: readonly { readonly id: string; readonly status: string }[];
+  readonly families: readonly {
+    readonly id: string;
+    readonly status: string;
+    /** Коды причин из reason_codes без перевода; null — бандл их не несёт. */
+    readonly reasonCodes: readonly string[] | null;
+  }[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -49,15 +54,31 @@ function asFinite(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+/** reason_codes приходит списком строк; отсутствие поля — честный null. */
+function asReasonCodes(value: unknown): readonly string[] | null {
+  if (!Array.isArray(value)) return null;
+  const items: readonly unknown[] = value;
+  const codes: string[] = [];
+  for (const code of items) {
+    if (typeof code !== "string") return null;
+    codes.push(code);
+  }
+  return codes;
+}
+
 /** Разбирает characterization.json: f1 из сводки F01 + статусы семейств. */
 export function parseCharacterizationSummary(payload: unknown): CharacterizationSummary | null {
   if (!isRecord(payload) || !Array.isArray(payload.families)) return null;
-  const families: { id: string; status: string }[] = [];
+  const families: { id: string; status: string; reasonCodes: readonly string[] | null }[] = [];
   for (const item of payload.families) {
     if (!isRecord(item) || typeof item.family_id !== "string" || typeof item.status !== "string") {
       return null;
     }
-    families.push({ id: item.family_id, status: item.status });
+    families.push({
+      id: item.family_id,
+      status: item.status,
+      reasonCodes: asReasonCodes(item.reason_codes),
+    });
   }
   if (families.length !== 18) return null;
   const first = payload.families[0];
@@ -162,7 +183,9 @@ export function createExtendedRun(options: {
     });
     const list = el("ul", { className: "lnt-w1-failures" });
     for (const family of summary.families) {
-      list.append(el("li", { text: `${family.id}: ${family.status}` }));
+      const codes = family.reasonCodes ?? [];
+      const reason = codes.length > 0 ? ` — Причина: ${codes.join(", ")}` : "";
+      list.append(el("li", { text: `${family.id}: ${family.status}${reason}` }));
     }
     summaryHost.append(title, f1, list);
   }
