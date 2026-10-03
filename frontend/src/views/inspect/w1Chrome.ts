@@ -110,7 +110,9 @@ export function createW1Chrome(options: { readonly client: LntApiClient }): W1Ch
   jobRail.hidden = true;
   const panelsHost = el("div", { className: "lnt-w1-panels" });
   const panels = createPanelHost({ client, root: panelsHost });
-  const extended = createExtendedRun({ client: client.analysis });
+  const extended = createExtendedRun({
+    client: { ...client.analysis, ensureReady: (options) => client.ensureReady(options) },
+  });
   const sessionTypes = new Map<string, string>();
 
   const root = el("section", { className: "lnt-w1-chrome", attrs: { "aria-label": "Анализ v2" } }, [

@@ -59,6 +59,7 @@ function jsonBytes(payload: unknown): ArrayBuffer {
 function makeClient(downloadError: Error, payload: unknown = payloadOf([])): ExtendedRunClient {
   let summaryServed = false;
   return {
+    ensureReady: async () => undefined,
     recipes: async () => [{ recipe_id: "rec-1", name: EXTENDED_RECIPE_NAME }],
     runAnalysis: async () => snapshot("running", null),
     runStatus: async () => snapshot("succeeded", "art-key"),
@@ -112,6 +113,46 @@ describe("createExtendedRun: скачивание артефактов", () => {
     } finally {
       process.off("unhandledRejection", onUnhandled);
     }
+  });
+});
+
+describe("createExtendedRun: холодный старт без launch-nonce", () => {
+  it("получает nonce через ensureReady до первого POST прогона", async () => {
+    // Given: клиент без nonce — requireNonce бросил бы uninitialized на мутации.
+    const order: string[] = [];
+    let releaseReady = (): void => undefined;
+    const ready = new Promise<void>((resolve) => {
+      releaseReady = resolve;
+    });
+    const client: ExtendedRunClient = {
+      ensureReady: async () => {
+        order.push("ensureReady");
+        await ready;
+      },
+      recipes: async () => {
+        order.push("recipes");
+        return [{ recipe_id: "rec-1", name: EXTENDED_RECIPE_NAME }];
+      },
+      runAnalysis: async () => {
+        order.push("runAnalysis");
+        return snapshot("running", null);
+      },
+      runStatus: async () => snapshot("succeeded", "art-key"),
+      artifactBytes: async () => jsonBytes(payloadOf([])),
+    };
+    const handle = mountHandle(client);
+
+    // When: холодный клик по кнопке расширенного прогона.
+    handle.root
+      .querySelector<HTMLButtonElement>(".lnt-w1-toolbar button")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: первым идёт ensureReady, и до его завершения мутация не уходит.
+    await vi.waitFor(() => expect(order[0]).toBe("ensureReady"));
+    expect(order).not.toContain("runAnalysis");
+    releaseReady();
+    await vi.waitFor(() => expect(order).toContain("runAnalysis"));
+    handle.destroy();
   });
 });
 

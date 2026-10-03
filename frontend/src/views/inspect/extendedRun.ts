@@ -17,6 +17,8 @@ export const BUNDLE_FILES = [
 export type BundleFileName = (typeof BUNDLE_FILES)[number];
 
 export type ExtendedRunClient = {
+  /** Idempotent nonce bootstrap: расширенный прогон мутирует, нужен launch-nonce. */
+  readonly ensureReady: (options?: { readonly signal?: AbortSignal }) => Promise<void>;
   readonly recipes: (options?: { readonly signal?: AbortSignal }) => Promise<
     readonly { readonly recipe_id: string; readonly name: string }[]
   >;
@@ -208,6 +210,7 @@ export function createExtendedRun(options: {
     runAbort = new AbortController();
     const { signal } = runAbort;
     try {
+      await client.ensureReady({ signal });
       setStatus("Ищем рецепт characterization-v1…");
       const recipes = await client.recipes({ signal });
       const recipe = recipes.find((item) => item.name === EXTENDED_RECIPE_NAME);
