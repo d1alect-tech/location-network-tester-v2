@@ -1,19 +1,19 @@
-Исходники Windows-релиза LNT 0.1.0
+Исходники Windows-релиза LNT 0.1.1
 =================================
 
 Публичный релиз распространяется под GPL-3.0-only. На одной странице GitHub
 Release публикуются четыре актива:
-LNT-0.1.0-win64.zip
-LNT-0.1.0-win64.zip.sha256
-LNT-0.1.0-corresponding-source.zip
-LNT-0.1.0-corresponding-source.zip.sha256
+LNT-0.1.1-win64.zip
+LNT-0.1.1-win64.zip.sha256
+LNT-0.1.1-corresponding-source.zip
+LNT-0.1.1-corresponding-source.zip.sha256
 
-https://github.com/d1alect-tech/location-network-tester-v2/releases/tag/v0.1.0
+https://github.com/d1alect-tech/location-network-tester-v2/releases/tag/v0.1.1
 
 Скачайте оба архива и сверьте SHA-256 по примечаниям к релизу и двум файлам
 .sha256. Документация не содержит хеши архивов до их сборки и публикации.
 
-Corresponding Source включает код и материалы сборки для версии 0.1.0, в том
+Corresponding Source включает код и материалы сборки для версии 0.1.1, в том
 числе Hantek6022API из точного коммита
 e65d52b0f2536e56eaadbb555e5d7b756409c36e. Аппаратная часть LNT рассчитана
 только на Hantek 6022BE. Zadig и WinUSB распространяются отдельно и в активы
