@@ -125,16 +125,17 @@ def test_public_release_policy_contract() -> None:
         ROOT / "README.md",
         ROOT / "docs" / "distribution-policy.md",
         ROOT / "docs" / "packaging-notices.md",
-        ROOT / "packaging" / "SOURCE.txt",
     )
+    notice_path = ROOT / "packaging" / "SOURCE.txt"
     policy_texts = [path.read_text(encoding="utf-8") for path in policy_paths]
+    notice_text = notice_path.read_text(encoding="utf-8")
     audit_text = (ROOT / "scripts" / "audit-scope.ps1").read_text(encoding="utf-8-sig")
     packager_text = (ROOT / "packaging" / "build.ps1").read_text(encoding="utf-8-sig")
     source_builder_text = (ROOT / "scripts" / "release_sources.py").read_text(encoding="utf-8")
     spec_text = (ROOT / "packaging" / "lnt.spec").read_text(encoding="utf-8")
-    release_policy_text = "\n".join([*policy_texts, audit_text])
+    release_policy_text = "\n".join([*policy_texts, notice_text, audit_text])
 
-    assert all("GPL-3.0-only" in text for text in policy_texts)
+    assert all("GPL-3.0-only" in text for text in [*policy_texts, notice_text])
     assert "GPL-3.0-or-later" not in release_policy_text
     assert "public" in packager_text.lower()
     assert '$zipName = "LNT-$projectVersion-win64.zip"' in packager_text
@@ -149,6 +150,24 @@ def test_public_release_policy_contract() -> None:
     assert not (ROOT / "packaging" / "PRIVATE-USE.txt").exists()
     assert (ROOT / "LICENSE").is_file()
     assert '(str(ROOT / "LICENSE"), ".")' in spec_text
+
+
+def test_source_notice_names_the_current_release_assets() -> None:
+    """SOURCE.txt ships inside the release it describes, so it tracks the live version."""
+    version: str = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+        "version"
+    ]
+    text = (ROOT / "packaging" / "SOURCE.txt").read_text(encoding="utf-8")
+    expected_assets = {
+        f"LNT-{version}-win64.zip",
+        f"LNT-{version}-win64.zip.sha256",
+        f"LNT-{version}-corresponding-source.zip",
+        f"LNT-{version}-corresponding-source.zip.sha256",
+    }
+
+    assert expected_assets <= set(re.findall(rf"LNT-{re.escape(version)}-[\w.-]+", text))
+    assert f"/releases/tag/v{version}" in text
+    assert text.startswith(f"Исходники Windows-релиза LNT {version}")
 
 
 def test_dependency_policy_rejects_dependency_without_license(tmp_path: Path) -> None:
