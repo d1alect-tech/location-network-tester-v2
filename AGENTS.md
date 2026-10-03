@@ -30,7 +30,7 @@
 
 ## CONVENTIONS
 
-- TDD RED→GREEN; module ≤250 pure LOC (`tests/test_module_size.py`). Ledger is down to ONE entry, `frontend/src/components/charts/spectrogramView.ts: 269` — everything else must pass on its own. Split, never add an entry.
+- TDD RED→GREEN; module ≤250 pure LOC (`tests/test_module_size.py`). The ledger is EMPTY since D3 (spectrogramView 269→127, split into `spectrogramViewOption`/`spectrogramTiles`/`spectrogramMarkers`) — every module must pass on its own. Split, never add an entry.
 - `uv run --python 3.12` everything; ruff `ALL` (RUF001-003 off for Russian text); basedpyright `all`; biome + `tsc --noEmit` strict for frontend.
 - CLI exits 0/1/2/3, one-line stderr, no traceback. Sessions atomic `.partial-*` + rename. Compare deltas `B - A`.
 - Tests: `*.test.ts` = vitest, `*.spec.ts` = playwright (vite :4101, `installMockBackend` + `pumpAll`), `tests/js/*.mjs` = node:test.
@@ -58,7 +58,7 @@ node --test "tests/js/*.test.mjs"
 ## NOTES
 
 - `CLI_SUBCOMMANDS` in `launcher.py` must mirror `cli.py` parser (see roadmap A4).
-- KNOWN BUG (open): the API looks a session up by DIRECTORY NAME while the catalog shows the `id` from `manifest.json`. When they differ the spectrum endpoint 404s; when they match it serves 200. Do not "fix" the catalog display — the lookup key is the defect.
+- Session lookup (roadmap D1, CLOSED): `ui/sessions.resolve_session_dir` accepts BOTH the directory name and the `manifest.json` `session_id` (ambiguity raises `SessionAmbiguousError`). The catalog shows the `id`; when it differs from the directory name the spectrum endpoint still serves 200.
 - `lnt ui` holds a single-instance lease: a second launch exits 2. Kill the first before retrying, and free ports 8765/8770.
 - Vite builds INTO `src/lnt/ui/static/v2` (base `/static/v2/`); byte-stable rebuild required by `build-check.js`.
 - Offline: vendored uPlot 1.6.32 + IBM Plex; server binds 127.0.0.1 only, Swagger/ReDoc off.
