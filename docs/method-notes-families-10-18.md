@@ -403,12 +403,15 @@ report offset `-1` and none lands on grid. Numeric consistency of this section
 is therefore not reachability on live hardware — a consistent recipe can still be
 unreachable everywhere it would be measured.
 
-Every F17 number carries its configuration: segment basis 4096, sample rate, and
+Every F17 number carries its configuration: segment basis, sample rate, and
 record length. The same family costs about 3 s or about 260 s depending on a
-single constant, so no figure here is portable without it. Cited with
-configuration: 1.16 s for the full compute and 35.1 us for the pure grid verdict
-at 8 MHz over a 0.8 s record; 261.66 s and 984.5 MB for the full run under the
-plan's todo 9 measurement configuration. Unavailable, never fabricated.
+single constant, so no figure here is portable without it. Each figure below
+carries its own full configuration. At segment basis 4096, 8 MHz over a 0.8 s
+record — 1.16 s full compute, 35.1 us pure grid verdict. At a substituted 40 ms
+segment basis (320 000 samples), 8 MHz over a 0.8 s record, 39 frames, without
+the hoist — 261.66 s and 984.5 MB peak RSS, as measured in the hardware
+viability plan `f17-f18-hardware-viability.md` (risk R8). Unavailable, never
+fabricated.
 
 ## Family 18: Declared normalized bicoherence triads
 
