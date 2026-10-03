@@ -18,3 +18,4 @@ _recovery/
 # in a clone; the release pristine gate requires zero untracked entries.
 .openchamber/
 /nul
+/dist-quarantine/
