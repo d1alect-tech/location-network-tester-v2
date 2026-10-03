@@ -391,6 +391,25 @@ fixed realization. Limitation: fewer than 40 complete cycles returns
 record, not independent-replicate confidence intervals. Cyclic coherence does
 not prove source, nonlinearity, causality, or practical utility.
 
+**Reachability caveat (SPEC_GAP F17-1).** `SPEC_GAPS F17-1` in
+`src/lnt/characterization/f17_contract.py` is the normative statement, and it
+overrides any reading of the parameters above as a live capability. At hardware
+capture rates the declared alphas do not land on the 4096-point FFT grid, so the
+family is unavailable on every record this project can capture, by construction.
+The canonical proof is
+`test_canonical_500k_rate_records_exact_grid_gap` in
+`tests/characterization/test_f17_engine.py`: at 500 kHz all four declared alphas
+report offset `-1` and none lands on grid. Numeric consistency of this section
+is therefore not reachability on live hardware — a consistent recipe can still be
+unreachable everywhere it would be measured.
+
+Every F17 number carries its configuration: segment basis 4096, sample rate, and
+record length. The same family costs about 3 s or about 260 s depending on a
+single constant, so no figure here is portable without it. Cited with
+configuration: 1.16 s for the full compute and 35.1 us for the pure grid verdict
+at 8 MHz over a 0.8 s record; 261.66 s and 984.5 MB for the full run under the
+plan's todo 9 measurement configuration. Unavailable, never fabricated.
+
 ## Family 18: Declared normalized bicoherence triads
 
 **Quantities and units.** Squared normalized bicoherence, biphase in radians,
