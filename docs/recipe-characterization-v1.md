@@ -5,15 +5,52 @@
 Каноническое содержимое: `docs/examples/characterization-recipe-v2.json`
 (schema_version 2, mode `characterization`, строго 18 блоков families в
 заданном порядке, все `method_version: 1`). Проверено строгой валидацией
-`CharacterizationRecipe.from_mapping` / `parse_analysis_recipe`
-(`src/lnt/analysis_store/recipe_v2.py:35-61,135-137`): round-trip
-`to_mapping() == mapping`, canonical sha256
+`CharacterizationRecipe.from_mapping` / `parse_analysis_recipe`:
+round-trip `to_mapping() == mapping`, канонический sha256 — `d35f875d…`.
+
+Точки входа (символические ссылки; номера строк — на aaade98, при правках
+могут сдвинуться, ищите по именам):
+
+- `parse_analysis_recipe` — `src/lnt/analysis_store/recipe_parse.py:21`
+  (диспетчер по `schema_version`).
+- `CharacterizationRecipe.from_mapping` —
+  `src/lnt/analysis_store/recipe_v2.py:64` (строгий разбор без defaults).
+- `CharacterizationRecipe.recipe_sha256` (property) —
+  `src/lnt/analysis_store/recipe_v2.py:135` (sha256 только канонических байтов).
+
+### Канонический pin и пересчёт
+
+Канонический machine-checked pin живёт в
+`tests/analysis/test_recipe_v2.py` — тест
+`test_characterization_example_round_trips_through_public_parser`
+(assert `recipe.recipe_sha256 == "d35f875d…"`; на aaade98 — строки 35-37,
+комментарий над ними объясняет смену F18 `segment_samples 4096` на
+`segment_duration_s 0.001`).
+
+Пересчёт pin — из корня репозитория:
 
 ```
-5191f68621cff448ea36904943f7a3c3240a52f16c1a77a4af199a885326b743
+uv run --python 3.12 python -c "from pathlib import Path; from lnt.analysis_store import parse_analysis_recipe; from lnt.context.json_codec import decode_object; p = Path('docs/examples/characterization-recipe-v2.json'); print(parse_analysis_recipe(decode_object(p.read_text(encoding='utf-8'), p.name)).recipe_sha256)"
 ```
 
-см. `tests/analysis/test_recipe_v2.py` (179 тестов зелёные, допуски не расширялись).
+Вывод (совпадает с pin посимвольно):
+
+```
+d35f875d72a2ddee0b540b0fdbe7939c78db4e517cc687f889ed0eddf99de55f
+```
+
+### Триангуляция хешей
+
+- `d35f875d72a2ddee0b540b0fdbe7939c78db4e517cc687f889ed0eddf99de55f` —
+  **канонический** `recipe_sha256`: sha256 канонических (compact, sorted-keys)
+  байтов рецепта. Это и есть authority.
+- `1a9b1d4a0dd3ecfd9afea39cc41a574a7398e27cd2e5ee0c1b1754175c1ffa53` —
+  sha256 **сырых байтов файла** `docs/examples/characterization-recipe-v2.json`
+  (отступы, порядок ключей, переводы строк). Никогда не выдавать его за
+  `recipe_sha256`: он меняется от любого редактирования файла, даже
+  семантически нейтрального.
+
+Прочие тесты — `tests/analysis/test_recipe_v2.py` (допуски не расширялись).
 
 Сидирование: при первом использовании рецепт сохраняется через
 `RecipeCatalog(<root>/.lnt/analysis-recipes/).create("characterization-v1", recipe)`
