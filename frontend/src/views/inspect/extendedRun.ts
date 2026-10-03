@@ -138,10 +138,15 @@ export function createExtendedRun(options: {
       link.addEventListener("click", () => {
         void (async () => {
           if (session === null) return;
-          const bytes = await client.artifactBytes(session, artifactKey, name, {
-            signal: runAbort.signal,
-          });
-          saveBlob(`${artifactKey}-${name}`, bytes);
+          try {
+            const bytes = await client.artifactBytes(session, artifactKey, name, {
+              signal: runAbort.signal,
+            });
+            saveBlob(`${artifactKey}-${name}`, bytes);
+          } catch (error) {
+            if (error instanceof DOMException && error.name === "AbortError") return;
+            setStatus(error instanceof Error ? error.message : "Неизвестная ошибка");
+          }
         })();
       });
       downloads.append(link);
