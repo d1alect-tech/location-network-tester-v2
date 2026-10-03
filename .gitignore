@@ -12,3 +12,9 @@ __pycache__/
 # Machine-bound hash manifests, meaningless in a clone.
 .integrity/
 _recovery/
+
+# Owner-local leftovers: screenshots from another project (diyaudio, Sep 11)
+# and the `nul` device-name artifact from a stray redirect. Neither belongs
+# in a clone; the release pristine gate requires zero untracked entries.
+.openchamber/
+/nul
