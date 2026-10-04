@@ -11,7 +11,7 @@ import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 
-from lnt.analysis_store import AnalysisRecipe, CharacterizationRecipe
+from lnt.analysis_store import AnalysisRecipe, CharacterizationRecipe, parse_analysis_recipe
 from lnt.analysis_v2 import AnalysisOrchestrator, DefaultAnalysisEngine, run_characterization
 from lnt.analysis_v2.jobs import AnalysisJobStore
 from lnt.analysis_v2.recipes import RecipeCatalog
@@ -52,8 +52,11 @@ MAX_RANGE: Final = 10_000_000.0
 
 @router.post("/recipes", dependencies=[Depends(require_csrf)], status_code=201)
 def create_recipe(request: RecipeCreateRequest, services: Services) -> dict[str, object]:
-    """Persist one immutable recipe."""
-    recipe = AnalysisRecipe.from_mapping(request.recipe)
+    """Persist one immutable recipe of any supported schema version."""
+    try:
+        recipe = parse_analysis_recipe(request.recipe)
+    except InputError as error:
+        raise http_unprocessable(str(error)) from error
     return (
         RecipeCatalog(services.root / ".lnt" / "analysis-recipes")
         .create(request.name, recipe)
