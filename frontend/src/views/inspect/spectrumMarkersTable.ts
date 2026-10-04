@@ -1,4 +1,4 @@
-/** B3: таблица маркеров спектра. Пики из detail().analysis, дельты A−B
+/** B3: таблица маркеров спектра. Пики из detail().analysis, дельты B−A
  * по payload через readout, гармоники H2–H40 от сильнейшего пика,
  * СКЗ полосы (анализ либо оценка по дисплею). Уровни — дБ отн. 1 В²/Гц. */
 
@@ -127,7 +127,7 @@ export function createMarkersTable(
         el("th", { text: "Частота, Гц", attrs: { scope: "col" } }),
         el("th", { text: `Уровень, ${unitRefLabel(unit)}`, attrs: { scope: "col" } }),
       ]);
-      if (withDelta) header.append(el("th", { text: "Δ A−B, дБ", attrs: { scope: "col" } }));
+      if (withDelta) header.append(el("th", { text: "Δ B−A, дБ", attrs: { scope: "col" } }));
       table.append(header);
       const peaks = analysisPeaks(source.analysis);
       if (peaks.length === 0) {

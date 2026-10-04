@@ -53,7 +53,7 @@ describe("readoutAt", () => {
 });
 
 describe("deltaAt", () => {
-  it("считает Δ A−B в дБ по одной частоте", () => {
+  it("считает Δ B−A в дБ по одной частоте", () => {
     expect(deltaAt(widePayload(1), widePayload(4), 400)).toBeCloseTo(6.0206, 3);
   });
 
@@ -111,7 +111,7 @@ describe("createSpectrumExtras: таблица маркеров", () => {
     expect(table?.textContent).toContain("Пик 1");
     expect(table?.textContent).toContain("H2");
     expect(table?.textContent).toContain("дБ (отн. 1 В²/Гц)");
-    expect(table?.textContent).toContain("Δ A−B");
+    expect(table?.textContent).toContain("Δ B−A");
     expect(table?.textContent).toMatch(/\+6,0/);
   });
 
@@ -119,7 +119,7 @@ describe("createSpectrumExtras: таблица маркеров", () => {
     const extras = createSpectrumExtras();
     extras.paint({ payloadA: widePayload(1), payloadB: null, analysis });
     const table = extras.markers.querySelector("[data-spectrum-markers-table]");
-    expect(table?.textContent).not.toContain("Δ A−B");
+    expect(table?.textContent).not.toContain("Δ B−A");
     expect(table?.textContent).toContain("СКЗ полосы");
   });
 

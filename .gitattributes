@@ -12,3 +12,8 @@ _recovery/RECOVERY.md -text
 *.json text eol=lf
 *.md text eol=lf
 *.txt text eol=lf
+
+# LICENSE has no extension, so the *.txt pin above never reaches it: under
+# core.autocrlf=true it materialized CRLF while LICENSES/GPL-3.0.txt is LF, and
+# tests/test_dependency_policy.py compares the two byte-for-byte.
+LICENSE text eol=lf

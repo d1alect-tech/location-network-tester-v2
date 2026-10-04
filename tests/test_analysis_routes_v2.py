@@ -91,6 +91,60 @@ def test_recipe_create_list_clone_and_referenced_delete_conflict(tmp_path: Path)
     assert deleted.status_code == 409
 
 
+_EXAMPLE_V2 = Path(__file__).parents[1] / "docs" / "examples" / "characterization-recipe-v2.json"
+
+
+def _load_example_v2() -> dict[str, JsonValue]:
+    return decode_object(_EXAMPLE_V2.read_text(encoding="utf-8"), "test recipe")
+
+
+def test_recipe_create_accepts_characterization_schema_v2(tmp_path: Path) -> None:
+    example = _load_example_v2()
+    app = create_app(root=tmp_path, runtime_db=tmp_path / "runtime.sqlite3")
+    with TestClient(app) as client:
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        created = client.post(
+            "/api/analysis/recipes",
+            json={"name": "characterization-v1", "recipe": example},
+            headers=headers,
+        )
+        listed = client.get("/api/analysis/recipes")
+
+    assert created.status_code == 201
+    body = created.json()
+    assert body["name"] == "characterization-v1"
+    assert body["recipe"]["schema_version"] == 2
+    assert body["recipe_id"] == parse_analysis_recipe(example).recipe_sha256
+    assert [item["recipe_id"] for item in listed.json()["items"]] == [body["recipe_id"]]
+
+
+def test_recipe_create_rejects_unsupported_schema_version(tmp_path: Path) -> None:
+    payload = _recipe_payload() | {"schema_version": 3}
+    app = create_app(root=tmp_path, runtime_db=tmp_path / "runtime.sqlite3")
+    with TestClient(app) as client:
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        response = client.post(
+            "/api/analysis/recipes", json={"name": "bogus", "recipe": payload}, headers=headers
+        )
+
+    assert response.status_code == 422
+    assert "schema_version" in response.json()["detail"]
+
+
+def test_recipe_create_rejects_malformed_characterization_recipe(tmp_path: Path) -> None:
+    example = _load_example_v2()
+    del example["families"]
+    app = create_app(root=tmp_path, runtime_db=tmp_path / "runtime.sqlite3")
+    with TestClient(app) as client:
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        response = client.post(
+            "/api/analysis/recipes", json={"name": "broken", "recipe": example}, headers=headers
+        )
+
+    assert response.status_code == 422
+    assert "families" in response.json()["detail"]
+
+
 def _publish_spectrum(session: Path) -> tuple[str, bytes]:
     recipe = AnalysisRecipe.from_mapping(_recipe_payload())
     raw = b"raw"
