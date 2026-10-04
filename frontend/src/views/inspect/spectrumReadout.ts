@@ -64,7 +64,7 @@ export function readoutAt(payload: SpectrumPayload, frequencyHz: number): Marker
   };
 }
 
-/** Δ A−B в дБ на одной частоте; null — нет трассы B или битые данные. */
+/** Δ B−A в дБ на одной частоте; null — нет трассы B или битые данные. */
 export function deltaAt(
   payloadA: SpectrumPayload,
   payloadB: SpectrumPayload | null,
