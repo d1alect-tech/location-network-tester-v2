@@ -129,6 +129,38 @@ test("saved view can be created, survives reset and is applied back", async ({ p
   await expect(page.getByLabel("Метка")).toHaveValue("самошум");
 });
 
+test("inspector form fields never overlap: notes and tags boxes stay separated", async ({
+  page,
+}) => {
+  const sessionId = firstFixtureId();
+  await openCatalog(page);
+
+  await page.locator(`.lnt-cat-row[data-session-id="${sessionId}"]`).click();
+  const inspectorRoot = page.locator(".lnt-cat-inspector");
+  await expect(page.locator(".lnt-cat-session-summary")).toContainText(sessionId);
+  await expect(inspectorRoot.locator(".lnt-cat-notes")).not.toHaveValue("");
+
+  // Геометрия, не тексты: рамки «Заметки» (textarea) и «Теги» (input) не
+  // пересекаются ни в одной оси. При узкой колонке поля складываются
+  // вертикально, при широкой — встают рядом с зазором; regression — баг
+  // box-sizing: .ctl с width:100% при content-box вылезал из grid-колонки
+  // на 22px и наезжал на соседнее поле.
+  const notesBox = await inspectorRoot.locator(".lnt-cat-notes").boundingBox();
+  const tagsBox = await page
+    .locator('.lnt-cat-inspector .form-grid:has(textarea.lnt-cat-notes) input[type="text"]')
+    .boundingBox();
+  expect(notesBox).not.toBeNull();
+  expect(tagsBox).not.toBeNull();
+  if (!notesBox || !tagsBox) throw new Error("инспектор: поля не измеримы");
+
+  const separated =
+    notesBox.x + notesBox.width <= tagsBox.x + 0.5 ||
+    tagsBox.x + tagsBox.width <= notesBox.x + 0.5 ||
+    notesBox.y + notesBox.height <= tagsBox.y + 0.5 ||
+    tagsBox.y + tagsBox.height <= notesBox.y + 0.5;
+  expect(separated).toBe(true);
+});
+
 test("inspector edits persist through save and page reload", async ({ page }) => {
   const sessionId = firstFixtureId();
   await openCatalog(page);

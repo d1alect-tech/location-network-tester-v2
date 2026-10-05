@@ -19,6 +19,17 @@
   font: 400 14px / 20px var(--lnt-ui);
 }
 
+/* Боксы — по границе (идиома capture: captureCore.css). Без border-box
+ * контролы .ctl (width:100% + padding 10px + border 1px) при content-box
+ * вылезают из своей grid-колонки формы на 22px: в инспекторе контекста
+ * textarea «Заметки» наезжал на input «Теги» (e2e RED→GREEN, catalog.spec.ts). */
+.lnt-cat-workspace,
+.lnt-cat-workspace *,
+.lnt-cat-workspace *::before,
+.lnt-cat-workspace *::after {
+  box-sizing: border-box;
+}
+
 /* Вид-контейнер под каталогом: без отступов, прокрутка внутри колонок. */
 .view-container.lnt-cat-view-container {
   padding: 0;
