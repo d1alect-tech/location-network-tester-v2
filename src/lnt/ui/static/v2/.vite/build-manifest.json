@@ -2,7 +2,7 @@
   "sources": {
     "index.html": "157299f23c5c15d0b7a5565d5d85cc53493eddaad3ce7454f2d841cd24f6d4e1",
     "vite.config.ts": "2189025b05e3891828b0d8676b32e0f1b1a778585533946cdf876ec6c5181d7f",
-    "package-lock.json": "5274ba00b38b99354722ca8c9aef226d408655b15eef42d49da44502be2f5716",
+    "package-lock.json": "e86a0b792c49567b5e5bdaf807b87c189ff1708bfce72b59a431c5bca1f9fcda",
     "src/api/AGENTS.md": "f103b80e918317b227d664ab48395b46af5983b6667e305870b67248a9a92948",
     "src/api/client-analysis.test.ts": "63d499f7cb2585f3311a4e59b482abf1191728a5eaa3f2c0c0f306ed0b17c5f6",
     "src/api/client-analysis.ts": "e8e46cd19ad4d04e62855e6d61076ba8e0e87ff0a4e34a639e310a500d4b90ec",

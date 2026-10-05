@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lnt"
-version = "0.1.1"
+version = "0.1.2"
 description = "Захват и спектральный анализ питающей сети для постановки и проверки гипотез об электрическом инпутлаге, сравнения локаций и условий питания"
 readme = "README.md"
 requires-python = ">=3.12"
