@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AnalysisRunSnapshot } from "../../api/types-analysis";
+import type { FamilySummary } from "./characterizationFamily";
 import {
   BUNDLE_FILES,
   EXTENDED_RECIPE_NAME,
@@ -7,6 +8,15 @@ import {
   parseCharacterizationSummary,
 } from "./extendedRun";
 import type { ExtendedRunClient, ExtendedRunHandle } from "./extendedRun";
+import { renderFamilyCards } from "./familyCards";
+import { reasonCodeRu } from "./reasonCodes";
+
+/* jsdom не реализует URL.createObjectURL; скачивание в тесте доходит до
+ * saveBlob только на успешном повторе, поэтому заглушка нужна именно там. */
+if (typeof URL.createObjectURL !== "function") {
+  URL.createObjectURL = () => "blob:mock";
+  URL.revokeObjectURL = () => undefined;
+}
 
 function snapshot(status: string, artifactKey: string | null): AnalysisRunSnapshot {
   return {
@@ -97,10 +107,40 @@ function payloadOf(overrides: Readonly<Record<number, FamilySpec>>): unknown {
   };
 }
 
-function summaryItems(handle: ExtendedRunHandle): readonly string[] {
-  return Array.from(handle.root.querySelectorAll(".lnt-w1-failures li"), (node) =>
-    (node.textContent ?? "").trim(),
+type BareOverrides = {
+  readonly id?: string;
+  readonly status?: string;
+  readonly reasonCodes?: readonly string[] | null;
+};
+
+/** Семейство без единого заполненного поля: все блоки — честные null. */
+function bareFamily(overrides: BareOverrides = {}): FamilySummary {
+  return {
+    id: overrides.id ?? "f01_phase_cycle",
+    status: overrides.status ?? "unavailable",
+    reasonCodes: overrides.reasonCodes === undefined ? null : overrides.reasonCodes,
+    qc: { passed: null, reasonCodes: null },
+    support: { storedCount: null, missingCount: null, selectionRule: null },
+    band: { lowHz: null, highHz: null },
+    window: { kind: null, durationS: null, sampleCount: null, overlapFraction: null },
+    inference: { estimateScope: null, populationInference: null, reasonCode: null },
+  };
+}
+
+function cardsIn(handle: ExtendedRunHandle, group: string): readonly HTMLElement[] {
+  return Array.from(
+    handle.root.querySelectorAll<HTMLElement>(`[data-family-group="${group}"] [data-family-id]`),
   );
+}
+
+function cardOf(handle: ExtendedRunHandle, familyId: string): HTMLElement {
+  const card = handle.root.querySelector<HTMLElement>(`[data-family-id="${familyId}"]`);
+  expect(card).not.toBeNull();
+  return card as HTMLElement;
+}
+
+function groupCount(handle: ExtendedRunHandle, group: string): string | null {
+  return handle.root.querySelector(`[data-group-count="${group}"]`)?.textContent ?? null;
 }
 
 function jsonBytes(payload: unknown): ArrayBuffer {
@@ -108,7 +148,7 @@ function jsonBytes(payload: unknown): ArrayBuffer {
 }
 
 /** Клиент, у которого только скачивание артефакта падает: сводка отдаётся. */
-function makeClient(downloadError: Error, payload: unknown = payloadOf([])): ExtendedRunClient {
+function makeClient(downloadError: Error, payload: unknown = payloadOf({})): ExtendedRunClient {
   let summaryServed = false;
   return {
     ensureReady: async () => undefined,
@@ -142,25 +182,59 @@ async function runToDownloads(handle: ExtendedRunHandle): Promise<void> {
 }
 
 describe("createExtendedRun: скачивание артефактов", () => {
-  it("показывает ошибку скачивания в строке статуса без необработанного отклонения", async () => {
-    // Given: сводный прогон завершён, кнопки скачивания отрисованы, артефакт падает.
+  it("показывает ошибку скачивания строкой с повтором, без необработанного отклонения", async () => {
+    // Supersession: ошибка скачивания переехала из строки статуса прогона в
+    // собственную строку role=alert рядом с кнопками (вариант «Карточки») и
+    // получила рабочий повтор; утверждение про строку статуса снято.
     const unhandled: unknown[] = [];
     const onUnhandled = (reason: unknown): void => {
       unhandled.push(reason);
     };
     process.on("unhandledRejection", onUnhandled);
     try {
-      const handle = mountHandle(makeClient(new Error("404")));
+      let summaryServed = false;
+      let npzAttempts = 0;
+      const client: ExtendedRunClient = {
+        ensureReady: async () => undefined,
+        recipes: async () => [{ recipe_id: "rec-1", name: EXTENDED_RECIPE_NAME }],
+        runAnalysis: async () => snapshot("running", null),
+        runStatus: async () => snapshot("succeeded", "art-key"),
+        artifactBytes: async (_session, _key, filename) => {
+          if (filename === BUNDLE_FILES[0] && !summaryServed) {
+            summaryServed = true;
+            return jsonBytes(payloadOf({}));
+          }
+          npzAttempts += 1;
+          if (npzAttempts === 1) throw new Error("404");
+          return new ArrayBuffer(8);
+        },
+      };
+      const handle = mountHandle(client);
       await runToDownloads(handle);
       const status = handle.root.querySelector<HTMLElement>('[role="status"]');
 
-      // When
+      // When: первый клик по артефакту массивов падает с 404.
       handle.root
         .querySelector<HTMLButtonElement>(`[data-bundle-file="${BUNDLE_FILES[1]}"]`)
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-      // Then
-      await vi.waitFor(() => expect(status?.textContent).toContain("404"));
+      // Then: видима строка ошибки, строка статуса прогона не загрязнена.
+      await vi.waitFor(() => {
+        const row = handle.root.querySelector<HTMLElement>("[data-download-error]");
+        expect(row?.textContent).toContain("404");
+      });
+      const errorRow = handle.root.querySelector<HTMLElement>("[data-download-error]");
+      expect(errorRow?.textContent).toContain(BUNDLE_FILES[1]);
+      expect(status?.textContent).not.toContain("404");
+
+      // When: повтор.
+      handle.root
+        .querySelector<HTMLButtonElement>("[data-download-retry]")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+      // Then: вторая попытка уходит, строка ошибки исчезает.
+      await vi.waitFor(() => expect(npzAttempts).toBe(2));
+      await vi.waitFor(() => expect(handle.root.querySelector("[data-download-error]")).toBeNull());
       await vi.waitFor(() => expect(unhandled).toEqual([]));
     } finally {
       process.off("unhandledRejection", onUnhandled);
@@ -190,7 +264,7 @@ describe("createExtendedRun: холодный старт без launch-nonce", (
         return snapshot("running", null);
       },
       runStatus: async () => snapshot("succeeded", "art-key"),
-      artifactBytes: async () => jsonBytes(payloadOf([])),
+      artifactBytes: async () => jsonBytes(payloadOf({})),
     };
     const handle = mountHandle(client);
 
@@ -208,59 +282,155 @@ describe("createExtendedRun: холодный старт без launch-nonce", (
   });
 });
 
-describe("сводка: коды причин", () => {
-  it("дописывает коды к строке семейства через одну метку", async () => {
-    // Given: реальная выдача probe — F17 недоступен из-за вне-сеточной циклической частоты.
-    const payload = payloadOf({
-      0: { id: "f01_phase_cycle", status: "available", codes: [] },
-      16: {
-        id: "f17_cyclic_spectral_coherence",
-        status: "unavailable",
-        codes: ["cyclic_frequency_off_grid"],
+describe("сводка: карточки по статусам", () => {
+  const MIXED = payloadOf({
+    0: { id: "f01_phase_cycle", status: "available", codes: [] },
+    1: {
+      id: "f02_amplitude_time_shape",
+      status: "partial",
+      codes: ["baseline_unavailable"],
+      support: { storedCount: 312, missingCount: 88, selectionRule: "declared_band_full_record" },
+      band: { lowHz: 45, highHz: 2000 },
+      window: { kind: "boxcar", durationS: 0.04, sampleCount: 819, overlapFraction: 0 },
+    },
+    2: {
+      id: "f03_interharmonic_tracking",
+      status: "partial",
+      codes: ["artifact_limit"],
+      support: { storedCount: 1840, missingCount: 256, selectionRule: "declared_band_full_record" },
+      band: { lowHz: 3000, highHz: 200000 },
+      window: { kind: "hann", durationS: 0.2, sampleCount: 40000, overlapFraction: 0.5 },
+    },
+    3: { id: "f04_multicycle_periodicity", status: "unavailable", codes: [] },
+    5: {
+      id: "f06_modulation_trajectories",
+      status: "partial",
+      codes: ["band_above_nyquist"],
+      support: {
+        storedCount: 7420,
+        missingCount: 2820,
+        selectionRule: "declared_band_full_record",
       },
-    });
+      band: { lowHz: 30, highHz: 500 },
+      window: { kind: "hann", durationS: 0.5, sampleCount: 10240, overlapFraction: 0.5 },
+    },
+    7: {
+      id: "f08_transient_morphology",
+      status: "partial",
+      codes: ["too_few_samples"],
+      support: { storedCount: 96, missingCount: 41, selectionRule: "event_window" },
+      band: { lowHz: 45, highHz: 2000 },
+      window: { kind: "boxcar", durationS: 0.04, sampleCount: 819, overlapFraction: 0 },
+    },
+    16: {
+      id: "f17_cyclic_spectral_coherence",
+      status: "unavailable",
+      codes: ["cyclic_frequency_off_grid"],
+    },
+  });
+
+  it("группирует семейства по статусу со счётчиками групп", async () => {
+    // Given: реальная форма выдачи: 1 доступно, 4 частично, 13 недоступно.
+    const handle = mountHandle(makeClient(new Error("404"), MIXED));
 
     // When
-    const handle = mountHandle(makeClient(new Error("404"), payload));
     await runToDownloads(handle);
 
     // Then
-    await vi.waitFor(() => expect(summaryItems(handle)).toHaveLength(18));
-    expect(summaryItems(handle)[16]).toBe(
-      "f17_cyclic_spectral_coherence: unavailable — Причина: cyclic_frequency_off_grid",
+    await vi.waitFor(() => expect(cardsIn(handle, "unavailable")).toHaveLength(13));
+    expect(cardsIn(handle, "available")).toHaveLength(1);
+    expect(cardsIn(handle, "partial")).toHaveLength(4);
+    expect(groupCount(handle, "available")).toBe("1 из 18");
+    expect(groupCount(handle, "partial")).toBe("4 из 18");
+    expect(groupCount(handle, "unavailable")).toBe("13 из 18");
+    expect(handle.root.querySelector('[data-tally="available"]')?.textContent).toBe("1 доступно");
+    expect(handle.root.querySelector('[data-tally="partial"]')?.textContent).toBe("4 частично");
+    expect(handle.root.querySelector('[data-tally="unavailable"]')?.textContent).toBe(
+      "13 недоступно",
     );
   });
 
-  it("печатает доминирующий код реальной выдачи без перевода", async () => {
+  it("печатает RU-фразу из словаря reasonCodes рядом с сырым кодом", async () => {
+    const handle = mountHandle(makeClient(new Error("404"), MIXED));
+    await runToDownloads(handle);
+
+    await vi.waitFor(() => expect(cardsIn(handle, "unavailable")).toHaveLength(13));
+    const f17 = cardOf(handle, "f17_cyclic_spectral_coherence");
+    expect(f17.textContent).toContain(reasonCodeRu("cyclic_frequency_off_grid"));
+    expect(f17.textContent).toContain("cyclic_frequency_off_grid");
+    const f02 = cardOf(handle, "f02_amplitude_time_shape");
+    expect(f02.textContent).toContain(reasonCodeRu("baseline_unavailable"));
+    expect(f02.textContent).toContain("baseline_unavailable");
+  });
+
+  it("семейству без кодов даёт честную фразу, доступному — фразу полного результата", async () => {
+    const handle = mountHandle(makeClient(new Error("404"), MIXED));
+    await runToDownloads(handle);
+
+    await vi.waitFor(() => expect(cardsIn(handle, "available")).toHaveLength(1));
+    const f01 = cardOf(handle, "f01_phase_cycle");
+    expect(f01.textContent).toContain("Результат полный, QC пройден.");
+    expect(f01.querySelector(".lnt-xr-code")).toBeNull();
+    const f04 = cardOf(handle, "f04_multicycle_periodicity");
+    expect(f04.textContent).toContain("Причина не сообщена в бандле.");
+  });
+
+  it("неизвестный код остаётся видимым через запасную фразу словаря", async () => {
     const payload = payloadOf({
       0: { id: "f01_phase_cycle", status: "available", codes: [] },
-      4: {
-        id: "f05_phase_conditioned_statistics",
-        status: "unavailable",
-        codes: ["phase_reference_unavailable"],
-      },
+      5: { id: "f06_modulation_trajectories", status: "partial", codes: ["telemetry_v9_code"] },
     });
-
     const handle = mountHandle(makeClient(new Error("404"), payload));
     await runToDownloads(handle);
 
-    await vi.waitFor(() => expect(summaryItems(handle)).toHaveLength(18));
-    expect(summaryItems(handle)[4]).toBe(
-      "f05_phase_conditioned_statistics: unavailable — Причина: phase_reference_unavailable",
-    );
+    await vi.waitFor(() => expect(cardsIn(handle, "partial")).toHaveLength(1));
+    const card = cardOf(handle, "f06_modulation_trajectories");
+    expect(card.textContent).toContain(reasonCodeRu("telemetry_v9_code"));
+    expect(card.textContent).toContain("telemetry_v9_code");
   });
 
-  it("не печатает метку для семейства без кодов", async () => {
-    const payload = payloadOf({
-      0: { id: "f01_phase_cycle", status: "available" },
-      1: { id: "f02_amplitude_time_shape", status: "unavailable", codes: [] },
+  it("богатое семейство несёт поддержку, полосу и окно на карточку", async () => {
+    // Supersession: строка `<li>` «id: status — Причина: code» заменена
+    // карточкой; те же данные проверяются полями карточки.
+    const rich = payloadOf({
+      0: { id: "f01_phase_cycle", status: "available", codes: [] },
+      11: {
+        id: "f12_spectral_kurtosis",
+        status: "partial",
+        codes: ["artifact_limit"],
+        qc: { passed: false, codes: ["artifact_limit"] },
+        support: {
+          storedCount: 4096,
+          missingCount: 12,
+          selectionRule: "declared_band_full_record",
+        },
+        band: { lowHz: 3000, highHz: 200000 },
+        window: { kind: "record", durationS: 1.5, sampleCount: 30720, overlapFraction: 0.5 },
+      },
     });
-
-    const handle = mountHandle(makeClient(new Error("404"), payload));
+    const handle = mountHandle(makeClient(new Error("404"), rich));
     await runToDownloads(handle);
 
-    await vi.waitFor(() => expect(summaryItems(handle)).toHaveLength(18));
-    expect(summaryItems(handle)[1]).toBe("f02_amplitude_time_shape: unavailable");
+    await vi.waitFor(() => expect(cardsIn(handle, "partial")).toHaveLength(1));
+    const card = cardOf(handle, "f12_spectral_kurtosis");
+    expect(card.textContent).toContain("Спектральный эксцесс");
+    expect(card.textContent).toContain(reasonCodeRu("artifact_limit"));
+    expect(card.textContent).toContain("поддержка 4096 / 12");
+    expect(card.textContent).toContain("3000.0–200000.0 Гц");
+    expect(card.textContent).toContain("1.5 с");
+    expect(card.textContent).toContain("qc fail");
+    expect(card.querySelector(".lnt-xr-bar-fill")).not.toBeNull();
+  });
+
+  it("держит длинный id сессии в шапке сводки без обрезания", async () => {
+    const longSession = "cap-20260805-180623-very-long-suffix";
+    const handle = createExtendedRun({ client: makeClient(new Error("404")) });
+    document.body.replaceChildren(handle.root);
+    handle.setSession(longSession);
+    await runToDownloads(handle);
+
+    await vi.waitFor(() => expect(cardsIn(handle, "unavailable")).toHaveLength(18));
+    expect(handle.root.querySelector(".lnt-xr-note")?.textContent).toContain(longSession);
   });
 });
 
@@ -446,19 +616,62 @@ describe("parseCharacterizationSummary: богатая сводка", () => {
     });
     expect(summary?.families[3]?.reasonCodes).toEqual(["not_computed"]);
   });
+});
 
-  it("печатает строку семейства ровно как раньше, несмотря на новые поля", async () => {
-    const payload = payloadOf({
-      0: { id: "f01_phase_cycle", status: "available", codes: [] },
-      11: RICH,
+describe("familyCards: худшие случаи", () => {
+  it("ноль семейств: три пустые группы и нулевые счётчики, без NaN", () => {
+    const root = renderFamilyCards({ f1Hz: null, families: [] });
+
+    expect(root.querySelectorAll("[data-family-group]")).toHaveLength(3);
+    expect(root.querySelectorAll(".lnt-xr-empty")).toHaveLength(3);
+    expect(root.querySelectorAll("[data-family-id]")).toHaveLength(0);
+    expect(root.querySelector('[data-tally="available"]')?.textContent).toBe("0 доступно");
+    expect(root.querySelector('[data-group-count="available"]')?.textContent).toBe("0 из 0");
+    expect(root.textContent).toContain("н/д");
+    expect(root.textContent).not.toContain("NaN");
+  });
+
+  it("одно семейство: одна карточка и две пустые группы", () => {
+    const root = renderFamilyCards({
+      f1Hz: 50.01,
+      families: [bareFamily({ id: "f01_phase_cycle", status: "available", reasonCodes: [] })],
     });
 
-    const handle = mountHandle(makeClient(new Error("404"), payload));
-    await runToDownloads(handle);
-
-    await vi.waitFor(() => expect(summaryItems(handle)).toHaveLength(18));
-    expect(summaryItems(handle)[11]).toBe(
-      "f12_spectral_kurtosis: partial — Причина: artifact_limit",
+    expect(root.querySelectorAll('[data-family-group="available"] [data-family-id]')).toHaveLength(
+      1,
     );
+    expect(root.querySelectorAll('[data-family-group="partial"] .lnt-xr-empty')).toHaveLength(1);
+    expect(root.querySelectorAll('[data-family-group="unavailable"] .lnt-xr-empty')).toHaveLength(
+      1,
+    );
+    expect(root.querySelector('[data-group-count="available"]')?.textContent).toBe("1 из 1");
+  });
+
+  it("семейство без полей: тихие тире, без полосы и без выдуманных чисел", () => {
+    const root = renderFamilyCards({
+      f1Hz: null,
+      families: [bareFamily({ id: "f09_event_ordering" })],
+    });
+    const card = root.querySelector<HTMLElement>('[data-family-id="f09_event_ordering"]');
+
+    expect(card).not.toBeNull();
+    expect(card?.querySelector(".lnt-xr-bar")).toBeNull();
+    expect(card?.textContent).toContain("поддержка —");
+    expect(card?.textContent).toContain("qc —");
+    expect(card?.textContent).toContain("Причины не сообщены в бандле.");
+    expect(card?.textContent).not.toContain("NaN");
+    expect(card?.textContent).not.toContain("undefined");
+  });
+
+  it("неизвестный статус получает собственную группу с сырым заголовком", () => {
+    const root = renderFamilyCards({
+      f1Hz: null,
+      families: [bareFamily({ id: "f02_amplitude_time_shape", status: "degraded" })],
+    });
+
+    const group = root.querySelector('[data-family-group="degraded"]');
+    expect(group).not.toBeNull();
+    expect(group?.querySelector("h3")?.textContent).toBe("degraded");
+    expect(group?.querySelectorAll("[data-family-id]")).toHaveLength(1);
   });
 });

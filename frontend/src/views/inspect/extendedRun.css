@@ -1,0 +1,298 @@
+/* Расширенный прогон: карточки семейств (вариант «Карточки»).
+ * Токены только v6; движение — вход каскадом при появлении результатов,
+ * hover/active отклик; prefers-reduced-motion гасит вход и трансформации. */
+
+.lnt-w1-extended {
+  --lnt-xr-enter: 220ms;
+  --lnt-xr-hover: 150ms;
+  --lnt-xr-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-4);
+  margin-top: var(--lnt-space-3);
+}
+
+.lnt-w1-extended .lnt-btn:active {
+  transform: scale(0.97);
+}
+
+.lnt-w1-extended-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lnt-space-2);
+}
+
+/* ---------- вход каскадом: только transform/opacity ---------- */
+
+@keyframes lnt-xr-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lnt-xr-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(var(--share, 0));
+  }
+}
+
+.lnt-xr-enter {
+  animation: lnt-xr-rise var(--lnt-xr-enter) var(--lnt-xr-ease-out) both;
+  animation-delay: calc(var(--i, 0) * 18ms);
+}
+
+/* ---------- шапка сводки ---------- */
+
+.lnt-xr {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-5);
+}
+
+.lnt-xr-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lnt-space-4);
+  padding: var(--lnt-space-4) var(--lnt-space-5);
+  background-color: var(--lnt-bg-raised);
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-panel);
+}
+
+.lnt-xr-top-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.lnt-xr-top-text h3 {
+  margin: 0 0 var(--lnt-space-1);
+  font-size: 16px;
+  font-weight: var(--lnt-weight-semibold);
+  line-height: 24px;
+}
+
+.lnt-xr-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--lnt-fg-secondary);
+  overflow-wrap: anywhere;
+}
+
+.lnt-xr-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lnt-space-2);
+}
+
+.lnt-xr-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--lnt-space-1) var(--lnt-space-3);
+  border-radius: var(--lnt-r-pill);
+  background-color: var(--lnt-bg-panel);
+  color: var(--lnt-fg-secondary);
+  font-family: var(--lnt-font-mono);
+  font-size: 12px;
+}
+
+/* ---------- группы по статусу ---------- */
+
+.lnt-xr-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-3);
+}
+
+.lnt-xr-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lnt-space-2);
+  padding-bottom: var(--lnt-space-1);
+  border-bottom: var(--lnt-border-width) solid var(--lnt-line);
+}
+
+.lnt-xr-group-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: var(--lnt-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lnt-xr-group[data-family-group="available"] h3 {
+  color: var(--lnt-status-ok);
+}
+
+.lnt-xr-group[data-family-group="partial"] h3 {
+  color: var(--lnt-status-warn);
+}
+
+.lnt-xr-group[data-family-group="unavailable"] h3 {
+  color: var(--lnt-fg-disabled);
+}
+
+.lnt-xr-count {
+  font-family: var(--lnt-font-mono);
+  font-size: 12px;
+  color: var(--lnt-text-dim);
+}
+
+.lnt-xr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--lnt-space-3);
+}
+
+.lnt-xr-empty {
+  margin: 0;
+  padding: var(--lnt-space-3) var(--lnt-space-4);
+  color: var(--lnt-fg-disabled);
+  font-size: 13px;
+}
+
+/* ---------- карточка семейства ---------- */
+
+.lnt-xr-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-2);
+  padding: var(--lnt-space-4);
+  background-color: var(--lnt-bg-raised);
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-panel);
+  transition: transform var(--lnt-xr-hover) ease, border-color var(--lnt-xr-hover) ease,
+    background-color var(--lnt-xr-hover) ease;
+}
+
+.lnt-xr-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--lnt-line-hot);
+  background-color: var(--lnt-bg-selected);
+}
+
+.lnt-xr-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lnt-space-2);
+}
+
+/* tone-ok осветлён color-mix, как .lnt-tone-ok в primitives.css (≈5.6:1). */
+.lnt-xr-pill-ok {
+  background-color: var(--lnt-status-ok-bg);
+  color: color-mix(in srgb, var(--lnt-status-ok) 65%, white);
+}
+
+.lnt-xr-pill-warn {
+  background-color: var(--lnt-status-warn-bg);
+  color: var(--lnt-status-warn);
+}
+
+.lnt-xr-pill-dim {
+  background-color: var(--lnt-bg-panel);
+  color: var(--lnt-fg-disabled);
+}
+
+.lnt-xr-id {
+  font-family: var(--lnt-font-mono);
+  font-size: 12px;
+  color: var(--lnt-text-dim);
+}
+
+.lnt-xr-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: var(--lnt-weight-medium);
+  line-height: 20px;
+}
+
+.lnt-xr-reason {
+  margin: 0;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--lnt-fg-secondary);
+}
+
+.lnt-xr-code {
+  display: block;
+  font-family: var(--lnt-font-mono);
+  font-size: 11px;
+  color: var(--lnt-text-dim);
+}
+
+.lnt-xr-bar {
+  height: 4px;
+  border-radius: var(--lnt-radius-status);
+  background-color: var(--lnt-line);
+  overflow: hidden;
+}
+
+.lnt-xr-bar-fill {
+  height: 100%;
+  border-radius: var(--lnt-radius-status);
+  background-color: var(--lnt-accent-a);
+  transform-origin: left center;
+  transform: scaleX(var(--share, 0));
+  animation: lnt-xr-grow var(--lnt-xr-enter) var(--lnt-xr-ease-out) both;
+  animation-delay: calc(var(--i, 0) * 18ms);
+}
+
+.lnt-xr-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--lnt-space-2);
+  font-family: var(--lnt-font-mono);
+  font-size: 11px;
+  color: var(--lnt-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- строка ошибки скачивания ---------- */
+
+.lnt-xr-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lnt-space-3);
+  margin-top: var(--lnt-space-2);
+  padding: var(--lnt-space-3);
+  border: var(--lnt-border-width) solid var(--lnt-status-error);
+  border-left-width: 3px;
+  border-radius: var(--lnt-radius-control);
+  background-color: var(--lnt-status-error-bg);
+  color: var(--lnt-fg-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.lnt-xr-error-text {
+  flex: 1 1 320px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lnt-xr-enter,
+  .lnt-xr-bar-fill {
+    animation: none;
+  }
+
+  .lnt-xr-card,
+  .lnt-xr-card:hover {
+    transition: none;
+    transform: none;
+  }
+
+  .lnt-w1-extended .lnt-btn:active {
+    transform: none;
+  }
+}
