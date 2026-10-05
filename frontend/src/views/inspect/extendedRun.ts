@@ -4,6 +4,10 @@
 
 import type { AnalysisRunSnapshot } from "../../api/types-analysis";
 import { clearElement, el } from "../../components/primitives/dom";
+import { asReasonCodes, readFamilyDetail } from "./characterizationFamily";
+import type { FamilySummary } from "./characterizationFamily";
+/** Типы полей семейства живут в characterizationFamily.ts; здесь — только реэкспорт. */
+export type * from "./characterizationFamily";
 
 export const EXTENDED_RUN_BUTTON = "Запустить расширенный анализ";
 export const EXTENDED_RUN_TITLE = "Расширенный анализ (characterization-v1)";
@@ -40,12 +44,7 @@ export type ExtendedRunClient = {
 
 export type CharacterizationSummary = {
   readonly f1Hz: number | null;
-  readonly families: readonly {
-    readonly id: string;
-    readonly status: string;
-    /** Коды причин из reason_codes без перевода; null — бандл их не несёт. */
-    readonly reasonCodes: readonly string[] | null;
-  }[];
+  readonly families: readonly FamilySummary[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -56,22 +55,10 @@ function asFinite(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** reason_codes приходит списком строк; отсутствие поля — честный null. */
-function asReasonCodes(value: unknown): readonly string[] | null {
-  if (!Array.isArray(value)) return null;
-  const items: readonly unknown[] = value;
-  const codes: string[] = [];
-  for (const code of items) {
-    if (typeof code !== "string") return null;
-    codes.push(code);
-  }
-  return codes;
-}
-
-/** Разбирает characterization.json: f1 из сводки F01 + статусы семейств. */
+/** Разбирает characterization.json: f1 из сводки F01 + статусы и поля семейств. */
 export function parseCharacterizationSummary(payload: unknown): CharacterizationSummary | null {
   if (!isRecord(payload) || !Array.isArray(payload.families)) return null;
-  const families: { id: string; status: string; reasonCodes: readonly string[] | null }[] = [];
+  const families: FamilySummary[] = [];
   for (const item of payload.families) {
     if (!isRecord(item) || typeof item.family_id !== "string" || typeof item.status !== "string") {
       return null;
@@ -80,6 +67,7 @@ export function parseCharacterizationSummary(payload: unknown): Characterization
       id: item.family_id,
       status: item.status,
       reasonCodes: asReasonCodes(item.reason_codes),
+      ...readFamilyDetail(item),
     });
   }
   if (families.length !== 18) return null;

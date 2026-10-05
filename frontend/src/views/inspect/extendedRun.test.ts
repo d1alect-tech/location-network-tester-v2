@@ -26,6 +26,24 @@ type FamilySpec = {
   readonly status: string;
   /** Отсутствует ключ — payload без reason_codes (обратная совместимость). */
   readonly codes?: readonly string[];
+  readonly qc?: { readonly passed: boolean; readonly codes: readonly string[] };
+  readonly support?: {
+    readonly storedCount: number;
+    readonly missingCount: number;
+    readonly selectionRule: string;
+  };
+  readonly band?: { readonly lowHz: number; readonly highHz: number };
+  readonly window?: {
+    readonly kind: string;
+    readonly durationS: number;
+    readonly sampleCount: number;
+    readonly overlapFraction: number;
+  };
+  readonly inference?: {
+    readonly estimateScope: string;
+    readonly populationInference: string;
+    readonly reasonCode: string | null;
+  };
 };
 
 function payloadOf(overrides: Readonly<Record<number, FamilySpec>>): unknown {
@@ -40,6 +58,40 @@ function payloadOf(overrides: Readonly<Record<number, FamilySpec>>): unknown {
         status: spec.status,
         comparison_summary: index === 0 ? [{ name: "f1_hz", value: 50.01, unit: "Hz" }] : [],
         ...(spec.codes === undefined ? {} : { reason_codes: [...spec.codes] }),
+        ...(spec.qc === undefined
+          ? {}
+          : { qc: { passed: spec.qc.passed, reason_codes: [...spec.qc.codes] } }),
+        ...(spec.support === undefined
+          ? {}
+          : {
+              support: {
+                stored_count: spec.support.storedCount,
+                missing_count: spec.support.missingCount,
+                selection_rule: spec.support.selectionRule,
+              },
+            }),
+        ...(spec.band === undefined
+          ? {}
+          : { band: { low_hz: spec.band.lowHz, high_hz: spec.band.highHz } }),
+        ...(spec.window === undefined
+          ? {}
+          : {
+              window: {
+                kind: spec.window.kind,
+                duration_s: spec.window.durationS,
+                sample_count: spec.window.sampleCount,
+                overlap_fraction: spec.window.overlapFraction,
+              },
+            }),
+        ...(spec.inference === undefined
+          ? {}
+          : {
+              inference: {
+                estimate_scope: spec.inference.estimateScope,
+                population_inference: spec.inference.populationInference,
+                reason_code: spec.inference.reasonCode,
+              },
+            }),
       };
     }),
   };
@@ -223,10 +275,17 @@ describe("parseCharacterizationSummary: границы", () => {
 
     expect(summary?.f1Hz).toBeCloseTo(50.01, 5);
     expect(summary?.families).toHaveLength(18);
+    // Контракт сводки расширен: кроме id/status/reasonCodes несутся qc, support,
+    // band, window и inference. Бандл без этих блоков даёт честные null.
     expect(summary?.families[0]).toEqual({
       id: "f01_phase_cycle",
       status: "available",
       reasonCodes: [],
+      qc: { passed: null, reasonCodes: null },
+      support: { storedCount: null, missingCount: null, selectionRule: null },
+      band: { lowHz: null, highHz: null },
+      window: { kind: null, durationS: null, sampleCount: null, overlapFraction: null },
+      inference: { estimateScope: null, populationInference: null, reasonCode: null },
     });
   });
 
@@ -278,5 +337,128 @@ describe("parseCharacterizationSummary: границы", () => {
     };
 
     expect(parseCharacterizationSummary(payload)?.f1Hz).toBeNull();
+  });
+});
+
+describe("parseCharacterizationSummary: богатая сводка", () => {
+  const RICH: FamilySpec = {
+    id: "f12_spectral_kurtosis",
+    status: "partial",
+    codes: ["artifact_limit"],
+    qc: { passed: false, codes: ["artifact_limit"] },
+    support: { storedCount: 4096, missingCount: 12, selectionRule: "declared_band_full_record" },
+    band: { lowHz: 3000, highHz: 200000 },
+    window: { kind: "record", durationS: 1.5, sampleCount: 30720, overlapFraction: 0.5 },
+    inference: {
+      estimateScope: "one_record",
+      populationInference: "not_supported",
+      reasonCode: "insufficient_frames",
+    },
+  };
+
+  it("несёт reason_codes, qc, support, band, window и inference из payload", () => {
+    // Given: реальная форма family_mapping из metadata_mapping.py.
+    const payload = payloadOf({ 11: RICH });
+
+    // When
+    const summary = parseCharacterizationSummary(payload);
+
+    // Then
+    expect(summary?.families[11]).toEqual({
+      id: "f12_spectral_kurtosis",
+      status: "partial",
+      reasonCodes: ["artifact_limit"],
+      qc: { passed: false, reasonCodes: ["artifact_limit"] },
+      support: { storedCount: 4096, missingCount: 12, selectionRule: "declared_band_full_record" },
+      band: { lowHz: 3000, highHz: 200000 },
+      window: { kind: "record", durationS: 1.5, sampleCount: 30720, overlapFraction: 0.5 },
+      inference: {
+        estimateScope: "one_record",
+        populationInference: "not_supported",
+        reasonCode: "insufficient_frames",
+      },
+    });
+  });
+
+  it("читает qc.reason_codes независимо от reason_codes семейства", () => {
+    const payload = payloadOf({
+      17: { ...RICH, id: "f18_bicoherence_triads", qc: { passed: false, codes: [] } },
+    });
+
+    const summary = parseCharacterizationSummary(payload);
+
+    expect(summary?.families[17]?.reasonCodes).toEqual(["artifact_limit"]);
+    expect(summary?.families[17]?.qc).toEqual({ passed: false, reasonCodes: [] });
+  });
+
+  it("держит нулевые и дробные значения support, а не глотает их", () => {
+    const payload = payloadOf({
+      4: {
+        ...RICH,
+        id: "f05_phase_conditioned_statistics",
+        support: { storedCount: 0, missingCount: 0, selectionRule: "all" },
+        band: { lowHz: 47.5, highHz: 52.5 },
+      },
+    });
+
+    const summary = parseCharacterizationSummary(payload);
+
+    expect(summary?.families[4]?.support).toEqual({
+      storedCount: 0,
+      missingCount: 0,
+      selectionRule: "all",
+    });
+    expect(summary?.families[4]?.band).toEqual({ lowHz: 47.5, highHz: 52.5 });
+  });
+
+  it("отдаёт null вместо NaN, когда бэкенд прислал нечисловую границу полосы", () => {
+    const payload = {
+      families: Array.from({ length: 18 }, (_, index) => ({
+        family_id: `f${String(index + 1).padStart(2, "0")}`,
+        status: "unavailable",
+        comparison_summary: [],
+        band: index === 2 ? { low_hz: "47.5", high_hz: null } : undefined,
+      })),
+    };
+
+    const summary = parseCharacterizationSummary(payload);
+
+    expect(summary?.families[2]?.band).toEqual({ lowHz: null, highHz: null });
+  });
+
+  it("не ломает разбор, когда support и band вовсе не пришли", () => {
+    const payload = {
+      families: Array.from({ length: 18 }, (_, index) => ({
+        family_id: `f${String(index + 1).padStart(2, "0")}`,
+        status: "unavailable",
+        reason_codes: ["not_computed"],
+        comparison_summary: index === 0 ? [{ name: "f1_hz", value: 50, unit: "Hz" }] : [],
+      })),
+    };
+
+    const summary = parseCharacterizationSummary(payload);
+
+    expect(summary?.f1Hz).toBeCloseTo(50, 5);
+    expect(summary?.families[3]?.support).toEqual({
+      storedCount: null,
+      missingCount: null,
+      selectionRule: null,
+    });
+    expect(summary?.families[3]?.reasonCodes).toEqual(["not_computed"]);
+  });
+
+  it("печатает строку семейства ровно как раньше, несмотря на новые поля", async () => {
+    const payload = payloadOf({
+      0: { id: "f01_phase_cycle", status: "available", codes: [] },
+      11: RICH,
+    });
+
+    const handle = mountHandle(makeClient(new Error("404"), payload));
+    await runToDownloads(handle);
+
+    await vi.waitFor(() => expect(summaryItems(handle)).toHaveLength(18));
+    expect(summaryItems(handle)[11]).toBe(
+      "f12_spectral_kurtosis: partial — Причина: artifact_limit",
+    );
   });
 });
