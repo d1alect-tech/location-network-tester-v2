@@ -7,6 +7,7 @@
  * на .col-cat (см. catalog.css). */
 
 import type { LntApiClient } from "../../api/client";
+import type { CatalogSession } from "../../api/types";
 import { el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import type { RouteStore } from "../../state/routeState";
@@ -14,6 +15,7 @@ import { type CatalogFilterPanelHandle, createCatalogFilterPanel } from "./catal
 import { type CatalogListHandle, createCatalogListView } from "./catalogListView";
 import { CatalogStore } from "./catalogStore";
 import { type ContextInspectorHandle, createContextInspector } from "./contextInspector";
+import type { SessionMeta } from "./contextSummary";
 import { type ProfileManagerHandle, createProfileManager } from "./profileManager";
 import { createProfilePreview } from "./profilePreview";
 import "./catalog.css";
@@ -174,7 +176,15 @@ export function mountCatalogWorkspace(
     await store.applyQuery(catalogQueryFromParams(routes.get().params));
   }
 
+  let latestItems: CatalogSession[] = [];
+  function metaFor(sessionId: string): SessionMeta | undefined {
+    const session = latestItems.find((item) => item.id === sessionId);
+    if (!session) return undefined;
+    return { id: session.id, createdUtc: session.created_utc, sessionHealth: session.health };
+  }
+
   const unsubscribeStore = store.subscribe((state) => {
+    latestItems = state.items;
     if (state.status === "loading" && state.items.length === 0) {
       list.setNotice("loading", LOADING_MESSAGE);
       return;
@@ -205,7 +215,7 @@ export function mountCatalogWorkspace(
     inFlightSessionId = sessionId;
     list.setSelected(sessionId);
     void inspector
-      .loadSession(sessionId)
+      .loadSession(sessionId, metaFor(sessionId))
       .then(() => {
         loadedSessionId = sessionId;
         announcePolite(`Сессия ${sessionId} открыта`);

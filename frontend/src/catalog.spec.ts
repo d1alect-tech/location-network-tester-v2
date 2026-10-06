@@ -8,7 +8,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Page, expect, test } from "@playwright/test";
-import { generateSessions } from "./testkit/catalogFixture";
+import { generateSessions, worstCaseSessions } from "./testkit/catalogFixture";
 import { type MockLntBackend, installMockBackend } from "./testkit/mockBackend";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +17,7 @@ const EVIDENCE_DIR = resolve(
   __dirname,
   "../../../.omo/start-work/evidence/task-39-lnt-complete-redesign",
 );
+const TASK5_EVIDENCE_DIR = resolve(__dirname, "../../../.omo/evidence/ui-refactor/task-5");
 const BASE = "http://127.0.0.1:4101/static/v2/";
 const FIXTURE_SIZE = 10_000;
 
@@ -49,6 +50,12 @@ test.beforeEach(async ({ page }) => {
 async function openCatalog(page: Page): Promise<void> {
   await page.goto(`${BASE}#/catalog`);
   await expect(page.locator(".lnt-cat-workspace")).toBeVisible();
+}
+
+/** Ждём конец анимации входа инспектора: computed opacity доходит до 1
+ * (ключевые кадры стартуют с 0). Поллинг expect-ом, без ожиданий по таймеру. */
+async function settleEntrance(page: Page): Promise<void> {
+  await expect(page.locator(".insp-body")).toHaveCSS("opacity", "1");
 }
 
 function firstFixtureId(): string {
@@ -237,6 +244,128 @@ test("corrupt sessions stay visible with reason-coded badges and recovery explan
   await expect(recovery).toBeVisible();
   await expect(recovery).toContainText("Контекст сессии повреждён");
   await expect(recovery).toContainText("Не удалось прочитать context.json");
+});
+
+test("dense table groups sessions by day with row counters", async ({ page }) => {
+  await openCatalog(page);
+  const group = page.locator("tr.cat-group").first();
+  await expect(group).toBeVisible();
+  await expect(group.locator("[data-cat-count]")).toHaveText(/^\d+$/u);
+  // Строка плотной таблицы: пилюля + метка + тип + время, выбор с data-selected.
+  const row = page.locator(".lnt-cat-row").first();
+  await row.click();
+  await expect(row).toHaveAttribute("data-selected", "");
+  await expect(row.locator(".lnt-status-pill")).toBeVisible();
+});
+
+test("row click keeps roving focus on the row instead of body", async ({ page }) => {
+  await openCatalog(page);
+  const row = page.locator(".lnt-cat-row").first();
+  const sessionId = await row.getAttribute("data-session-id");
+  await row.click();
+  const activeId = await page.evaluate(
+    () => document.activeElement?.getAttribute("data-session-id") ?? null,
+  );
+  expect(activeId).toBe(sessionId);
+});
+
+test("inspector readouts and THD stay factual, no verdict words", async ({ page }) => {
+  const sessionId = firstFixtureId();
+  backend.seedSessionDetail(sessionId, {
+    name: sessionId,
+    manifest: { duration_s: 18.6, line_frequency_hz: 50.0 },
+    analysis: {
+      line_quality: { thd_ratio: 0.089, cycles_analyzed: 930, fundamental_hz: 50.11 },
+    },
+    spectrum_available: false,
+    waveform_available: false,
+    ch2_available: false,
+  });
+  await openCatalog(page);
+  await page.locator(`.lnt-cat-row[data-session-id="${sessionId}"]`).click();
+  const inspector = page.locator(".lnt-cat-inspector");
+  const summary = inspector.locator(".lnt-cat-session-summary");
+  await expect(summary).toContainText("18,6 с");
+  await expect(summary).toContainText("50,11 Гц");
+  await expect(inspector.locator(".insp-thd")).toHaveAttribute("data-thd-compare", "above");
+  await expect(inspector.locator("[data-thd-badge]")).toHaveText("выше предела 8 %");
+  const text = await inspector.textContent();
+  expect(text).not.toMatch(/норм|годен/iu);
+});
+
+test("save on context_invalid is refused with role=alert and no write", async ({ page }) => {
+  const corruptId = firstFixtureWithHealth("context_invalid");
+  await openCatalog(page);
+  await page.getByLabel("Состояние (health)").selectOption("context_invalid");
+  await page.locator(`.lnt-cat-row[data-session-id="${corruptId}"]`).click();
+  const before = backend.getContext(corruptId)?.revision;
+
+  await page.locator(".lnt-cat-inspector .lnt-btn-primary").click();
+  const alert = page.locator(".lnt-cat-inspector [role='alert']");
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText("Сохранение отклонено: контекст повреждён");
+  await expect(alert).toContainText("context_cache_malformed");
+  expect(backend.getContext(corruptId)?.revision).toBe(before);
+});
+
+test("prefers-reduced-motion removes entrance animation and row transitions", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openCatalog(page);
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".insp-body")).toBeAttached();
+  const styles = await page.evaluate(() => {
+    const body = document.querySelector(".insp-body");
+    const row = document.querySelector(".lnt-cat-row");
+    return {
+      animation: body === null ? "missing" : getComputedStyle(body).animationName,
+      rowTransition: row === null ? "missing" : getComputedStyle(row).transitionDuration,
+    };
+  });
+  expect(styles.animation).toBe("none");
+  // Глобальное правило style.css гасит движение целиком: transition: none.
+  expect(styles.rowTransition).toBe("0s");
+});
+
+test("worst-case catalog states captured through the real component", async ({ page }) => {
+  const [longSession, invalidSession, missingSession, plainSession] = worstCaseSessions();
+  if (!longSession || !invalidSession || !missingSession || !plainSession)
+    throw new Error("worst-case fixture пуста");
+  mkdirSync(TASK5_EVIDENCE_DIR, { recursive: true });
+  await openCatalog(page);
+
+  // Ноль строк в выдаче: пустое состояние таблицы (мок отдаёт research-сессии
+  // при пустом каталоге, поэтому ноль показан фильтром без совпадений).
+  await page.getByLabel("Метка").fill("нет-такой-сессии-вовсе");
+  await expect(page.locator(".lnt-cat-empty")).toBeVisible();
+  await page.screenshot({ path: resolve(TASK5_EVIDENCE_DIR, "worst-0-sessions.png") });
+  await page.getByLabel("Метка").fill("");
+
+  backend.seedCatalog([plainSession]);
+  await page.reload();
+  await expect(page.locator(".lnt-cat-row")).toHaveCount(1);
+  await page.screenshot({ path: resolve(TASK5_EVIDENCE_DIR, "worst-1-session.png") });
+
+  backend.seedCatalog([longSession]);
+  await page.reload();
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".lnt-cat-session-summary")).toContainText(longSession.id.slice(0, 16));
+  await settleEntrance(page);
+  await page.screenshot({ path: resolve(TASK5_EVIDENCE_DIR, "worst-long-id.png") });
+
+  backend.seedCatalog([invalidSession]);
+  await page.reload();
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".lnt-cat-recovery")).toBeVisible();
+  await settleEntrance(page);
+  await page.screenshot({ path: resolve(TASK5_EVIDENCE_DIR, "worst-invalid-context.png") });
+
+  backend.seedCatalog([missingSession]);
+  await page.reload();
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".lnt-cat-session-summary")).toContainText(missingSession.id);
+  await expect(page.locator(".lnt-cat-session-summary")).toContainText("недоступно");
+  await settleEntrance(page);
+  await page.screenshot({ path: resolve(TASK5_EVIDENCE_DIR, "worst-empty-fields.png") });
 });
 
 test("keyboard-only journey reaches list, opens detail and saves an edit", async ({ page }) => {

@@ -1,10 +1,11 @@
-/** Инспектор контекста сессии V6: панель .panel (hd + bd), сводка
- * .readout-grid, таблица полей .tbl, редакторы .form-grid с .ctl,
- * восстановление .banner, конфликт revision .banner.banner-inline.
- * Логика без изменений: поля с источником/доступностью, правка заметок,
- * тегов и пользовательских полей, сохранение через PUT с оптимистичной
- * блокировкой; конфликт revision — типизированное состояние с потоком
- * «перечитать и объединить». Хук .lnt-cat-inspector и связки e2e
+/** Инспектор контекста сессии V6 по варианту «Плотный список»: сводка
+ * плитками, здоровье контекста с ревизией, баннер восстановления, блок
+ * THD-V (факт + сравнение с пределом), секция полей с источником, теги,
+ * правка заметок/тегов/пользовательских полей и сохранение через PUT
+ * с оптимистичной блокировкой. Повреждённый контекст не перезаписывается:
+ * сохранение отклоняется строкой role=alert с кодами причин. Конфликт
+ * revision — в inspectorConflictPanel, рендеры — contextSummary/contextThd,
+ * метрики — contextMetrics. Хук .lnt-cat-inspector и связки e2e
  * (.lnt-cat-session-summary, .lnt-cat-notes, .lnt-btn-primary) сохранены. */
 
 import type { LntApiClient } from "../../api/client";
@@ -13,7 +14,15 @@ import { el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { createMutation, createResourceLoader } from "../../state/resource";
 import { v6Field } from "./catalogV6Field";
-import { createFieldsTable, createRecoveryPanel } from "./contextFieldsView";
+import { createFieldsSection, createRecoveryPanel } from "./contextFieldsView";
+import { EMPTY_METRICS, type SessionMetrics, readSessionMetrics } from "./contextMetrics";
+import {
+  type SessionMeta,
+  renderHealthRow,
+  renderReadouts,
+  renderTagsSection,
+} from "./contextSummary";
+import { renderThdBlock } from "./contextThd";
 import {
   type RevisionConflict,
   conflictFromError,
@@ -21,12 +30,7 @@ import {
   mergeDraftOntoFresh,
   userEditableFields,
 } from "./inspectorConflict";
-
-const CONTEXT_HEALTH_LABELS: Readonly<Record<string, string>> = {
-  context_valid: "Исправен",
-  context_absent: "Не сохранён",
-  context_invalid: "Повреждён",
-};
+import { type ConflictDraft, createConflictPanel } from "./inspectorConflictPanel";
 
 export interface ContextInspectorOptions {
   client: LntApiClient;
@@ -34,13 +38,16 @@ export interface ContextInspectorOptions {
 
 export interface ContextInspectorHandle {
   root: HTMLElement;
-  loadSession(sessionId: string): Promise<void>;
+  loadSession(sessionId: string, meta?: SessionMeta): Promise<void>;
 }
 
 export function createContextInspector(options: ContextInspectorOptions): ContextInspectorHandle {
   const { client } = options;
   let currentSessionId: string | null = null;
-  let conflict: RevisionConflict | null = null;
+  let meta: SessionMeta | null = null;
+  let metrics: SessionMetrics = EMPTY_METRICS;
+  let animateNext = false;
+  let currentBody: HTMLElement | null = null;
 
   const loader = createResourceLoader<ContextResponse>((key, signal) =>
     client.context(key, { signal }),
@@ -50,9 +57,7 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     return client.updateContext(currentSessionId, request);
   });
 
-  const summary = el("div", { className: "lnt-cat-session-summary readout-grid" });
-  const recovery = el("div", {});
-  const fieldsHost = el("div", {});
+  const bodyHost = el("div", { className: "insp-host-body" });
   const notesArea = document.createElement("textarea");
   notesArea.className = "ctl lnt-cat-notes";
   notesArea.rows = 4;
@@ -60,14 +65,12 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
   tagsInput.type = "text";
   tagsInput.className = "ctl";
   const userFieldsHost = el("div", { className: "form-grid" });
-  const conflictPanel = el("div", {
-    className: "banner banner-inline banner-warn lnt-cat-conflict",
-  });
-  conflictPanel.hidden = true;
   // Пустая строка ошибки остаётся скрытой: пустой role=alert и красная рамка
   // до первой загрузки/сохранения — ложный сигнал (см. contextInspector.test.ts).
-  const errorClass = "lnt-error-text banner banner-inline";
-  const errorNote = el("p", { className: errorClass, attrs: { role: "alert" } });
+  const errorNote = el("p", {
+    className: "lnt-error-text banner banner-inline",
+    attrs: { role: "alert" },
+  });
   errorNote.hidden = true;
   const saveButton = el("button", {
     className: "btn lnt-btn lnt-btn-primary",
@@ -80,21 +83,37 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     errorNote.hidden = message === "";
   }
 
-  function draftTags(): string[] {
-    return tagsInput.value
-      .split(",")
-      .map((part) => part.trim())
-      .filter((part) => part !== "");
+  async function saveRequest(request: ContextUpdateRequest): Promise<unknown> {
+    await client.ensureReady();
+    return saveMutation.run(request);
   }
 
-  function collectDraft(): { notes: string; tags: string[]; userFields: Record<string, string> } {
+  async function reloadCurrent(): Promise<ContextResponse | null> {
+    if (currentSessionId === null) return null;
+    await loader.load(currentSessionId);
+    const state = loader.get();
+    return state.kind === "ready" ? state.value : null;
+  }
+
+  function collectDraft(): ConflictDraft {
     const userFields: Record<string, string> = {};
     for (const input of userFieldsHost.querySelectorAll<HTMLInputElement>("input[data-field]")) {
       const key = input.getAttribute("data-field");
       if (key !== null) userFields[key] = input.value;
     }
-    return { notes: notesArea.value, tags: draftTags(), userFields };
+    const tags = tagsInput.value
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part !== "");
+    return { notes: notesArea.value, tags, userFields };
   }
+
+  const conflictUi = createConflictPanel({
+    collectDraft,
+    reloadCurrent,
+    save: saveRequest,
+    onError: setError,
+  });
 
   function buildRequest(context: ContextResponse): ContextUpdateRequest {
     const draft = collectDraft();
@@ -106,21 +125,29 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     };
   }
 
+  function refusalMessage(context: ContextResponse): string {
+    const reasons = context.reason_codes.length > 0 ? ` ${context.reason_codes.join("; ")}.` : "";
+    return `Сохранение отклонено: контекст повреждён.${reasons} Сначала восстановите context.json.`;
+  }
+
   async function runSave(): Promise<void> {
     const state = loader.get();
     if (state.kind !== "ready") return;
     setError("");
+    if (state.value.health === "context_invalid") {
+      setError(refusalMessage(state.value));
+      announcePolite("Сохранение отклонено: контекст повреждён");
+      return;
+    }
     try {
-      await client.ensureReady();
-      await saveMutation.run(buildRequest(state.value));
-      conflict = null;
-      renderConflict();
-      await loader.load(currentSessionId ?? state.value.session_id);
+      await saveRequest(buildRequest(state.value));
+      conflictUi.setConflict(null);
+      await reloadCurrent();
       announcePolite("Контекст сохранён");
     } catch (error) {
       if (isRevisionConflict(error)) {
-        conflict = conflictFromError(state.value.revision, error);
-        renderConflict();
+        const conflict: RevisionConflict = conflictFromError(state.value.revision, error);
+        conflictUi.setConflict(conflict);
         announcePolite("Конфликт версий: контекст изменён другим процессом");
       } else {
         setError(error instanceof Error ? error.message : "Не удалось сохранить изменения.");
@@ -130,88 +157,37 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
 
   saveButton.addEventListener("click", () => void runSave());
 
-  function renderConflict(): void {
-    while (conflictPanel.firstChild) conflictPanel.removeChild(conflictPanel.firstChild);
-    if (conflict === null) {
-      conflictPanel.hidden = true;
+  function renderBody(animate: boolean): void {
+    while (bodyHost.firstChild) bodyHost.removeChild(bodyHost.firstChild);
+    currentBody = null;
+    const state = loader.get();
+    if (state.kind !== "ready" || meta === null) {
+      bodyHost.append(
+        el("p", {
+          className: "insp-none",
+          text: "Сессия не выбрана. Выберите строку в каталоге слева.",
+        }),
+      );
       return;
     }
-    conflictPanel.hidden = false;
-    conflictPanel.append(
-      el("p", { className: "banner-msg", text: conflict.message }),
-      buildMergeButton(),
-      buildDiscardButton(),
+    const context = state.value;
+    const body = el("div", { className: animate ? "insp-body insp-enter" : "insp-body" });
+    body.append(
+      renderReadouts(meta, metrics),
+      renderHealthRow(context.health, context.revision, meta),
     );
-  }
-
-  function buildMergeButton(): HTMLElement {
-    const button = el("button", {
-      className: "btn",
-      text: "Перечитать и объединить",
-      attrs: { type: "button" },
-    });
-    button.addEventListener("click", () => {
-      void (async () => {
-        const state = loader.get();
-        if (state.kind !== "ready") return;
-        // Черновик фиксируется ДО перечитывания: renderReady иначе затрёт
-        // поля формы свежими данными, и объединение потеряло бы правки.
-        const draft = collectDraft();
-        await loader.load(state.value.session_id);
-        const fresh = loader.get();
-        if (fresh.kind !== "ready") return;
-        try {
-          await client.ensureReady();
-          await saveMutation.run(mergeDraftOntoFresh(fresh.value, draft));
-          conflict = null;
-          renderConflict();
-          await loader.load(fresh.value.session_id);
-          announcePolite("Изменения применены поверх актуальной версии");
-        } catch (retryError) {
-          setError(
-            retryError instanceof Error ? retryError.message : "Повторное сохранение не удалось.",
-          );
-        }
-      })();
-    });
-    return button;
-  }
-
-  function buildDiscardButton(): HTMLElement {
-    const button = el("button", {
-      className: "btn btn-secondary",
-      text: "Отбросить мои правки и перечитать",
-      attrs: { type: "button" },
-    });
-    button.addEventListener("click", () => {
-      conflict = null;
-      renderConflict();
-      const state = loader.get();
-      if (state.kind === "ready") void loader.load(state.value.session_id);
-    });
-    return button;
-  }
-
-  function renderReady(context: ContextResponse): void {
-    const healthLabel = CONTEXT_HEALTH_LABELS[context.health] ?? context.health;
-    while (summary.firstChild) summary.removeChild(summary.firstChild);
-    summary.append(
-      el("p", {
-        className: "t-mono",
-        text: context.session_id,
-        attrs: { title: "Идентификатор сессии" },
-      }),
-      el("p", {
-        className: "t-compact",
-        text: `Состояние контекста: ${healthLabel}`,
-      }),
-    );
-    while (recovery.firstChild) recovery.removeChild(recovery.firstChild);
     if (context.health !== "context_valid" || context.reason_codes.length > 0) {
-      recovery.append(createRecoveryPanel(context.reason_codes, context.health));
+      body.append(createRecoveryPanel(context.reason_codes, context.health));
     }
-    while (fieldsHost.firstChild) fieldsHost.removeChild(fieldsHost.firstChild);
-    fieldsHost.append(createFieldsTable(context.fields));
+    body.append(
+      renderThdBlock(metrics),
+      createFieldsSection(context),
+      renderTagsSection(context.tags),
+    );
+    bodyHost.append(body);
+    currentBody = body;
+    notesArea.value = context.notes ?? "";
+    tagsInput.value = context.tags.join(", ");
     while (userFieldsHost.firstChild) userFieldsHost.removeChild(userFieldsHost.firstChild);
     for (const [key, value] of Object.entries(userEditableFields(context))) {
       const input = document.createElement("input");
@@ -221,20 +197,27 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
       input.setAttribute("data-field", key);
       userFieldsHost.append(v6Field(key, input));
     }
-    notesArea.value = context.notes ?? "";
-    tagsInput.value = context.tags.join(", ");
     saveButton.disabled = false;
-    renderConflict();
+  }
+
+  /** Метрики догрузились после входа: плитки и блок THD меняются точечно,
+   * анимация входа и фокус формы не сбрасываются. */
+  function refreshMetrics(): void {
+    if (currentBody === null || meta === null) return;
+    currentBody.querySelector(".readout-grid")?.replaceWith(renderReadouts(meta, metrics));
+    currentBody.querySelector(".insp-thd")?.replaceWith(renderThdBlock(metrics));
   }
 
   loader.subscribe((state) => {
     if (state.kind === "ready") {
-      renderReady(state.value);
+      renderBody(animateNext);
+      animateNext = false;
     } else if (state.kind === "loading") {
       saveButton.disabled = true;
       setError("");
     } else if (state.kind === "error") {
       saveButton.disabled = true;
+      renderBody(false);
       setError(`${state.error.message} Выберите другую сессию или повторите.`);
     }
   });
@@ -249,27 +232,39 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
       el("h2", { className: "panel-title", text: "Инспектор контекста" }),
     ]),
     el("div", { className: "panel-bd" }, [
-      summary,
-      recovery,
-      fieldsHost,
+      bodyHost,
       el("div", { className: "form-grid" }, [
-        v6Field("Заметки", notesArea),
+        v6Field("Заметки", notesArea, "Описание замера, условия, что проверить"),
         v6Field("Теги", tagsInput, "Через запятую, например: самошум, стенд-А"),
       ]),
       userFieldsHost,
-      conflictPanel,
+      conflictUi.panel,
       errorNote,
-      el("div", { className: "form-actions" }, [saveButton]),
+      el("div", { className: "form-actions" }, [
+        saveButton,
+        el("span", {
+          className: "form-note",
+          text: "Сохранение повышает ревизию контекста; черновик заметок и тегов применяется к сессии.",
+        }),
+      ]),
     ]),
   ]);
 
   return {
     root,
-    loadSession: async (sessionId) => {
+    loadSession: async (sessionId, nextMeta) => {
       currentSessionId = sessionId;
-      conflict = null;
-      renderConflict();
+      if (nextMeta) meta = nextMeta;
+      if (meta === null) meta = { id: sessionId, createdUtc: null, sessionHealth: "" };
+      metrics = EMPTY_METRICS;
+      animateNext = true;
+      conflictUi.setConflict(null);
+      const detail = client.plots.detail(sessionId).catch(() => null);
       await loader.load(sessionId);
+      const payload = await detail;
+      if (currentSessionId !== sessionId) return;
+      metrics = readSessionMetrics(payload);
+      refreshMetrics();
     },
   };
 }

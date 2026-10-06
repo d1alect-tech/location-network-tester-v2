@@ -119,9 +119,17 @@
   background: var(--lnt-accent-press, var(--lnt-accent));
 }
 
+/* Нажатие: scale 0.97 за 160ms ease-out (планка emil-design-eng). */
+.lnt-cat-workspace .btn:active {
+  transform: scale(0.97);
+  transition: transform var(--lnt-motion-standard) var(--lnt-ease-out), background
+    var(--lnt-motion-fast) var(--lnt-ease-out);
+}
+
 .lnt-cat-workspace .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+  transform: none;
 }
 
 .lnt-cat-workspace .btn-secondary {

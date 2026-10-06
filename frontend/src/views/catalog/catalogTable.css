@@ -37,15 +37,26 @@
 }
 
 .lnt-cat-workspace .tbl tbody tr {
-  transition: background var(--lnt-t-fast) var(--lnt-ease);
+  /* Планка emil-design-eng: hover/прокрутка — десятки мс (100ms), отклик
+     выбора строки — 150ms (см. .lnt-cat-row-selected). */
+  transition: background-color var(--lnt-motion-fast) var(--lnt-ease-out);
 }
 
 .lnt-cat-workspace .tbl tbody tr:hover {
   background: var(--lnt-elev);
 }
 
+.lnt-cat-workspace .tbl tbody tr:active {
+  background: var(--lnt-elev);
+}
+
 .lnt-cat-workspace .tbl .is-selected {
   background: var(--lnt-elev);
+}
+
+/* Обратная связь выбора строки: 150ms ease-out (частотное правило планки). */
+.lnt-cat-workspace .lnt-cat-row-selected {
+  transition-duration: var(--lnt-t-select);
 }
 
 .lnt-cat-workspace .tbl .num {
@@ -80,15 +91,15 @@
  * поэтому здесь осветлённые варианты того же тона (замер axe ≥ 5:1). */
 .lnt-cat-workspace .lnt-tone-ok {
   background-color: var(--lnt-ok-bg, rgb(45 157 120 / 0.15));
-  color: #7fe0b8;
+  color: var(--lnt-tone-ok-fg);
 }
 
 .lnt-cat-workspace .lnt-tone-warn {
   background-color: var(--lnt-warn-bg, rgb(230 134 25 / 0.15));
-  color: #f7c46c;
+  color: var(--lnt-tone-warn-fg);
 }
 
 .lnt-cat-workspace .lnt-tone-error {
   background-color: var(--lnt-err-bg, rgb(236 91 98 / 0.15));
-  color: #ffc4c6;
+  color: var(--lnt-tone-error-fg);
 }

@@ -19,7 +19,12 @@
 import type { CatalogSession } from "../../api/types";
 import { clearElement, el } from "../../components/primitives/dom";
 import type { RowNav } from "./catalogListNav";
-import { handleRowKeys as handleNavKeys, syncRowTabindex } from "./catalogListNav";
+import {
+  handleRowKeys as handleNavKeys,
+  rememberRowFocus,
+  restoreRowFocus,
+  syncRowTabindex,
+} from "./catalogListNav";
 import {
   dayKey,
   orderSessions,
@@ -129,10 +134,8 @@ export function createCatalogListView(options: CatalogListOptions): CatalogListH
     ]),
   ]);
 
-  function roleOf(sessionId: string): "a" | "b" | null {
-    return roleOfSession(items, selectedId, sessionId);
-  }
-
+  const roleOf = (sessionId: string): "a" | "b" | null =>
+    roleOfSession(items, selectedId, sessionId);
   function render(): void {
     for (const [key, cell] of heads) {
       cell.setAttribute("aria-sort", sort === key ? dir : "none");
@@ -143,6 +146,7 @@ export function createCatalogListView(options: CatalogListOptions): CatalogListH
     // Без групп в колонке полная дата — ширины под «14:30» ей мало.
     table.classList.toggle("is-flat", sort !== "date");
 
+    const focusedId = rememberRowFocus(tbody);
     clearElement(tbody);
     const ordered = orderSessions(items, sort, dir);
     const ctx = {
@@ -176,6 +180,7 @@ export function createCatalogListView(options: CatalogListOptions): CatalogListH
         tbody.append(renderRow(session, position, { ...ctx, activeIndex }));
       });
     }
+    restoreRowFocus(tbody, focusedId, activeIndex);
     syncFound();
   }
 

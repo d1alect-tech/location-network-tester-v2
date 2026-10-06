@@ -52,6 +52,25 @@ export function createFieldsTable(fields: Record<string, ContextField>): HTMLEle
   return table;
 }
 
+export function createFieldsSection(context: {
+  fields: Record<string, ContextField>;
+  reason_codes: string[];
+}): HTMLElement {
+  const body =
+    Object.keys(context.fields).length === 0
+      ? el("p", {
+          className: "t-compact is-unavailable",
+          text: `Поля контекста не читаются: ${
+            context.reason_codes.join(", ") || "context.json недоступен"
+          }. Пропущенное не подменяется нулём.`,
+        })
+      : createFieldsTable(context.fields);
+  return el("div", { className: "insp-section" }, [
+    el("h3", { className: "insp-block-title", text: "Поля контекста" }),
+    body,
+  ]);
+}
+
 export function createRecoveryPanel(reasonCodes: string[], health: string): HTMLElement {
   const panel = el("div", {
     className: "banner lnt-cat-recovery",

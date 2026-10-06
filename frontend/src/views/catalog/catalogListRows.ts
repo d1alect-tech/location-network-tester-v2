@@ -97,14 +97,16 @@ export function renderRow(
   ctx: RowRenderContext,
 ): HTMLElement {
   const health = HEALTH_LABELS[session.health];
+  const isSelected = session.id === ctx.selectedId;
   const row = el("tr", {
-    className: `lnt-cat-row${session.id === ctx.selectedId ? " lnt-cat-row-selected is-selected" : ""}`,
+    className: `lnt-cat-row${isSelected ? " lnt-cat-row-selected is-selected" : ""}`,
     attrs: {
       tabindex: index === ctx.activeIndex ? "0" : "-1",
       "data-pos": String(index),
       "data-session-id": session.id,
       "data-session": session.id,
       "data-cat-date": dayKey(session.created_utc),
+      ...(isSelected ? { "data-selected": "", "aria-current": "true" } : {}),
       title: session.storage_path ?? session.id,
     },
   });
@@ -222,6 +224,13 @@ export function paintSelection(
     const isSelected = id === selectedId;
     node.classList.toggle("lnt-cat-row-selected", isSelected);
     node.classList.toggle("is-selected", isSelected);
+    if (isSelected) {
+      node.setAttribute("data-selected", "");
+      node.setAttribute("aria-current", "true");
+    } else {
+      node.removeAttribute("data-selected");
+      node.removeAttribute("aria-current");
+    }
     node.querySelector(".cat-role")?.remove();
     if (id !== null) {
       const role = roleOf(id);

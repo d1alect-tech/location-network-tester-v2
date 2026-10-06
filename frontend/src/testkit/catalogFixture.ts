@@ -78,6 +78,7 @@ export function generateSessions(options: CatalogFixtureOptions): CatalogSession
 }
 
 export function contextFor(session: CatalogSession): ContextResponse {
+  if (WORST_IDS.has(session.id)) return worstCaseContextFor(session);
   if (session.health === "context_invalid") {
     return {
       session_id: session.id,
@@ -125,6 +126,119 @@ export function contextFor(session: CatalogSession): ContextResponse {
     },
     tags: [TAGS[session.id.length % TAGS.length] ?? "контроль"],
     notes: `Заметки для ${session.id}`,
+  };
+}
+
+/** Worst-case набор для «Плотного списка»: длинный идентификатор и метка,
+ * повреждённый контекст с кодом причины, сессия без полей и даты,
+ * пустые теги/заметки. Ноль строк — пустой массив, одна — slice(0, 1),
+ * много — generateSessions полным размером. */
+const LONG_ID = "cap-20260804-205912-a1b2c3d4-renamed-after-transformer-230-6-replacement-bench-b";
+
+const WORST_IDS = new Set(worstCaseSessions().map((session) => session.id));
+
+export function worstCaseSessions(): CatalogSession[] {
+  return [
+    {
+      id: LONG_ID,
+      health: "duplicate_id",
+      created_utc: "2026-08-04T20:59:12Z",
+      source: "disk",
+      session_type: "line_quality",
+      profile: "bench-b",
+      label: "стенд-Б (папка переименована после замены трансформатора 230:6)",
+    },
+    {
+      id: "cap-20260805-093014-3d77",
+      health: "context_invalid",
+      created_utc: "2026-08-05T09:30:14Z",
+      source: "disk",
+      session_type: "line_quality",
+      profile: "bench-b",
+      label: "после-ремонта",
+    },
+    {
+      id: "cap-20260804-114502-2f9b",
+      health: "missing_files",
+      created_utc: null,
+      source: null,
+      session_type: null,
+      profile: null,
+      label: null,
+    },
+    {
+      id: "cap-20260805-174311-9f0c",
+      health: "ok",
+      created_utc: "2026-08-05T17:43:11Z",
+      source: "disk",
+      session_type: "capture",
+      profile: "loft-main",
+      label: "самошум",
+    },
+  ];
+}
+
+/** Контекст worst-case сессии: повреждённый не отдаёт полей, у пустой
+ * сессии теги/заметки пусты, недостающее остаётся отсутствующим. */
+export function worstCaseContextFor(session: CatalogSession): ContextResponse {
+  if (session.health === "context_invalid") {
+    return {
+      session_id: session.id,
+      revision: 0,
+      health: "context_invalid",
+      reason_codes: ["context_cache_malformed"],
+      fields: {},
+      tags: [],
+      notes: null,
+    };
+  }
+  if (session.health === "missing_files") {
+    return {
+      session_id: session.id,
+      revision: 0,
+      health: "context_absent",
+      reason_codes: [],
+      fields: {},
+      tags: [],
+      notes: null,
+    };
+  }
+  if (session.id === LONG_ID) {
+    return {
+      session_id: session.id,
+      revision: 3,
+      health: "context_valid",
+      reason_codes: ["context_events_torn_tail"],
+      fields: {
+        fs_hz: {
+          kind: "number",
+          value: 1_000_000,
+          unit: "Гц",
+          source: "profile",
+          captured_at: `${session.created_utc}`,
+        },
+      },
+      tags: ["длинный-тег-ночная-серия-после-ремонта-трансформатора-230-6-контроль", "повтор"],
+      notes:
+        "Папка переименована вручную после замены трансформатора; идентификатор в manifest.json остался прежним — отсюда дубль.",
+    };
+  }
+  return {
+    session_id: session.id,
+    revision: 2,
+    health: "context_valid",
+    reason_codes: [],
+    fields: {
+      sync_source: {
+        kind: "string",
+        value: "ch2",
+        source: "derived",
+        collection_status: "collected",
+        captured_at: `${session.created_utc}`,
+      },
+    },
+    tags: [],
+    notes: "",
   };
 }
 

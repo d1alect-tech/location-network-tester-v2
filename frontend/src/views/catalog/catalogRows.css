@@ -99,11 +99,11 @@
 }
 
 .lnt-cat-workspace .cat-role-a {
-  color: #9db4ff;
+  color: var(--lnt-role-a);
 }
 
 .lnt-cat-workspace .cat-role-b {
-  color: #f0a95c;
+  color: var(--lnt-role-b);
 }
 
 .lnt-cat-workspace .cat-empty {
@@ -255,4 +255,23 @@
 .lnt-cat-workspace .snav-item:focus-visible {
   outline: 2px solid var(--lnt-accent);
   outline-offset: -2px;
+}
+
+/* Reduced motion: движение убираем, цвет и прозрачность держим.
+ * Заголовки дней статичны всегда — анимации у них нет и не будет. */
+@media (prefers-reduced-motion: reduce) {
+  .lnt-cat-workspace .tbl tbody tr,
+  .lnt-cat-workspace .lnt-cat-row-selected,
+  .lnt-cat-workspace .btn,
+  .lnt-cat-workspace .btn-quiet,
+  .lnt-cat-workspace .ctl,
+  .lnt-cat-workspace .cat-sort,
+  .lnt-cat-workspace .snav-item {
+    transition-duration: 1ms;
+  }
+
+  .lnt-cat-workspace .btn:active,
+  .lnt-cat-workspace .btn-quiet:active {
+    transform: none;
+  }
 }

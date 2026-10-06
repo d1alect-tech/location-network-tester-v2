@@ -50,6 +50,11 @@
   --lnt-motion-fast: 100ms;
   --lnt-motion-standard: 160ms;
   --lnt-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  /* Планка emil-design-eng (частотное правило): отклик выбора строки и вход
+     содержимого инспектора. Прокрутка/фильтр списка остаются без анимации. */
+  --lnt-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --lnt-t-select: 150ms;
+  --lnt-t-enter: 200ms;
 
   /* U4: нейтральная шкала R3-A «Стойка» дефолтом; акцент #5681FF оставлен (Q2). */
   --lnt-canvas: #17191c;
@@ -99,6 +104,15 @@
   --lnt-status-warn-bg: #3d2a12;
   --lnt-status-error: #ef5b62;
   --lnt-status-error-bg: #3d1a1c;
+  /* Осветлённые тона мелкого текста пилюль/глифов (замер axe ≥ 5:1 на 12px):
+     сырые --lnt-status-* на тонированной подложке дают лишь 2.7–3.7:1. */
+  --lnt-tone-ok-fg: #7fe0b8;
+  --lnt-tone-warn-fg: #f7c46c;
+  --lnt-tone-error-fg: #ffc4c6;
+  --lnt-tone-info-fg: #a9c0ff;
+  /* Роли А/Б полосы сравнения (catalogRows.css). */
+  --lnt-role-a: #9db4ff;
+  --lnt-role-b: #f0a95c;
 }
 
 /* Light Theme */
