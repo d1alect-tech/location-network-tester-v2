@@ -162,7 +162,11 @@ export function mountCatalogWorkspace(
   // тулбар фильтров монтируется в слот панели списка.
   list.toolsSlot.append(filterPanel.root);
   const leftPane = el("div", { className: "col-cat" }, [list.root]);
-  const root = el("div", { className: "lnt-cat-workspace app-body" }, [leftPane, rightPane]);
+  const root = el(
+    "div",
+    { className: "lnt-cat-workspace app-body", attrs: { "data-density": "default" } },
+    [leftPane, rightPane],
+  );
   container.append(root);
 
   async function activate(sessionId: string): Promise<void> {

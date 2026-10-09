@@ -1,12 +1,12 @@
 /** Покадровая отрисовка live-спектрограммы: полотно в физических пикселях,
- * палитра витрины (heat для уровней, delta для отклонений). Без DOM-хрома. */
+ * палитра charts (копия значений витрины, todo 5). Без DOM-хрома. */
 
 import {
   DELTA_SPAN_DB,
   clamp01,
   deltaColor,
   heatColor,
-} from "../showcase-round2/spectrogramPalette";
+} from "../components/charts/spectrogramPalette";
 import {
   FREQ_BINS,
   type LiveGramMode,

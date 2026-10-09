@@ -107,3 +107,12 @@ select.ctl {
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* ── Плотность: решается один раз на каркасе (todo 5, ui-refactor-2). ───────
+ * Вид объявляет плотность атрибутом data-density="dense"|"default" на своём
+ * корне (inspect: dense; capture/catalog/settings: default). Дефолт 44px
+ * приходит из токенов v2-tokens.css (--lnt-table-row-min и т.д.; декларации
+ * не редактировать — пин tests/test_design_contract.py:55-59). Dense-значения —
+ * scoped-переопределения вида (inspect: .app-v6 { --lnt-table-row-min: 26px },
+ * v6.css:21-23). panel.css плотность НЕ задаёт — только документирует
+ * механизм: один атрибут на корне вида, одно место, где решено. */

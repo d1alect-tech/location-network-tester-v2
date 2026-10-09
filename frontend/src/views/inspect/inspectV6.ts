@@ -103,7 +103,7 @@ export async function mountInspectV6(
     extras.root,
   ]);
   const body = el("div", { className: "app-body" }, [colCat, colMain]);
-  const root = el("div", { className: "app-v6" }, [
+  const root = el("div", { className: "app-v6", attrs: { "data-density": "dense" } }, [
     pairbar.root,
     body,
     chrome.commandbar,

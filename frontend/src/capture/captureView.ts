@@ -146,26 +146,30 @@ export function createCaptureView(
     className: "capture-preview panel",
     attrs: { "aria-label": "Профиль записи" },
   });
-  const root = el("section", { className: "capture-view t-page" }, [
-    el("h2", { className: "view-title t-page", text: "Захват" }),
-    channelbar.root,
-    el("div", { className: "capture-layout" }, [
-      el("div", { className: "capture-form-column" }, [
-        form.root,
-        alert.line,
-        el("div", { className: "capture-start-row form-actions" }, [
-          startButton,
-          deviceRefreshButton,
+  const root = el(
+    "section",
+    { className: "capture-view t-page", attrs: { "data-density": "default" } },
+    [
+      el("h2", { className: "view-title t-page", text: "Захват" }),
+      channelbar.root,
+      el("div", { className: "capture-layout" }, [
+        el("div", { className: "capture-form-column" }, [
+          form.root,
+          alert.line,
+          el("div", { className: "capture-start-row form-actions" }, [
+            startButton,
+            deviceRefreshButton,
+          ]),
+        ]),
+        el("div", { className: "capture-side-column" }, [
+          previewContainer,
+          devicePanel.root,
+          liveGram.root,
         ]),
       ]),
-      el("div", { className: "capture-side-column" }, [
-        previewContainer,
-        devicePanel.root,
-        liveGram.root,
-      ]),
-    ]),
-    timeline.root,
-  ]);
+      timeline.root,
+    ],
+  );
 
   refreshPreview();
   void recovery.recoverActiveJobOnMount();

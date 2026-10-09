@@ -38,7 +38,7 @@
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
-- NEVER touch `frontend/src/showcase-round2/` (frozen, and live capture imports its palette — see `frontend/AGENTS.md`); never update golden/corpus values silently.
+- NEVER touch `frontend/src/showcase-round2/` (frozen; since todo 5 live capture no longer imports its palette — values copied into `components/charts/spectrogramPalette.ts`, see `frontend/AGENTS.md`); never update golden/corpus values silently.
 - NEVER: Plotly, React/Tailwind/Electron, opaque ML, UPX/onefile, auto-update, geolocation/telemetry collection.
 - NEVER write into original `location-network-tester` tree or real `~\lnt-sessions`. `.integrity/` + `_recovery/` are untracked (still on disk); receipts never auto-update — regenerate explicitly or `test_pristine_gate` skips.
 - NEVER claim calibrated voltage / IEC compliance / GUM / causation; `unavailable, never fabricated`.
