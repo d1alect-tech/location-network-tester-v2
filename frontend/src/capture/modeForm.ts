@@ -1,11 +1,15 @@
 /** Форма режима захвата: mode-first выбор из четырёх режимов, всегда видимые
  * критичные настройки, необязательные разделы за раскрытием. Базовая сессия
- * видима у всех режимов, которые её используют; невозможные поля не показываются. */
+ * видима у всех режимов, которые её используют; невозможные поля не
+ * показываются. Поля строит modeFormFields.ts, видимость по режиму и
+ * источнику живёт в modeFormVisibility.ts — сплит под потолок 250 чистых LOC;
+ * разметка, классы и name=-атрибуты не менялись (пины capture.spec.ts). */
 
 import { el } from "../components/primitives/dom";
-import { createField } from "../components/primitives/forms";
 import { createDisclosure } from "./disclosure";
-import { CAPTURE_MODES, CAPTURE_MODE_IDS, DEFAULT_FORM_VALUES } from "./modes";
+import { createModeFormFields, radioCard } from "./modeFormFields";
+import { syncModeVisibility } from "./modeFormVisibility";
+import { CAPTURE_MODES, CAPTURE_MODE_IDS } from "./modes";
 import type {
   CaptureFieldErrors,
   CaptureFormValues,
@@ -24,33 +28,6 @@ export interface ModeFormHandle {
   /** Подписка на любое изменение режима/источника/полей (перерисовка превью). */
   onChange(listener: () => void): void;
   focusFirstInvalid(): void;
-}
-
-function numberInput(name: string, step = "any", min?: string): HTMLInputElement {
-  const input = el("input", {
-    className: "lnt-input ctl",
-    attrs: { type: "number", name, step, inputmode: "decimal" },
-  });
-  if (min !== undefined) input.setAttribute("min", min);
-  return input;
-}
-
-/** V6-обёртка поля: дуал-класс .field/.field-label поверх lnt-примитива.
- *  Старые lnt-* классы остаются для e2e-пинов capture.spec.ts. */
-function v6field<T extends { root: HTMLElement }>(field: T): T {
-  field.root.classList.add("field");
-  field.root.querySelector("label")?.classList.add("field-label");
-  return field;
-}
-
-/** V6 radio-card (D1=A): новый карточный класс ПОВЕРХ существующей разметки.
- *  input[name] + label[for] + value/checked не меняются — селекторы пинятся. */
-function radioCard(radio: HTMLInputElement, titleText: string, descText: string): HTMLLabelElement {
-  const title = el("span", { className: "capture-mode-title radio-card-title", text: titleText });
-  const desc = el("span", { className: "capture-mode-desc radio-card-desc", text: descText });
-  const label = el("label", { className: "capture-mode-card radio-card" }, [radio, title, desc]);
-  label.htmlFor = radio.id;
-  return label;
 }
 
 export function createModeForm(): ModeFormHandle {
@@ -106,88 +83,16 @@ export function createModeForm(): ModeFormHandle {
     deviceLabel,
   ]);
 
-  // --- Всегда видимые критичные настройки ---
-  const durationInput = numberInput("duration_s", "0.1", "0.01");
-  durationInput.value = DEFAULT_FORM_VALUES.durationS;
-  const rateInput = numberInput("sample_rate_hz", "any", "1");
-  rateInput.value = DEFAULT_FORM_VALUES.sampleRateHz;
-  const rangeSelect = el("select", { className: "lnt-select ctl", attrs: { name: "range_v" } }, [
-    el("option", { text: "5 В", attrs: { value: "5" } }),
-    el("option", { text: "1 В", attrs: { value: "1" } }),
-    el("option", { text: "0,5 В", attrs: { value: "0.5" } }),
-  ]) as HTMLSelectElement;
-  rangeSelect.value = DEFAULT_FORM_VALUES.rangeV;
-  const labelInput = el("input", {
-    className: "lnt-input ctl",
-    attrs: { type: "text", name: "label", maxlength: "128" },
-  }) as HTMLInputElement;
-
-  const durationField = v6field(createField({ label: "Длительность, с", control: durationInput }));
-  const rateField = v6field(
-    createField({
-      label: "Частота дискретизации, Гц",
-      control: rateInput,
-      hintText: "АЦП осциллографа: до 8–24 МГц; симулятор допускает любые значения.",
-    }),
-  );
-  const rangeField = v6field(createField({ label: "Диапазон CH1", control: rangeSelect }));
-  const labelField = v6field(createField({ label: "Метка", control: labelInput }));
-
-  const channelsText = el("p", {
-    className: "capture-channels-value glyph glyph-ok",
-    text: "Каналы: 2 (CH1 + CH2)",
-  });
-
-  // --- Базовая сессия (видима только у режимов, которые её используют) ---
-  const baselineInput = el("input", {
-    className: "lnt-input ctl",
-    attrs: { type: "text", name: "baseline_session" },
-  }) as HTMLInputElement;
-  const baselineField = v6field(
-    createField({
-      label: "Базовая сессия (самошум)",
-      control: baselineInput,
-      hintText:
-        "Имя записанной сессии самошума этой локации; спектр CH1 будет приведён ко входу. Оставьте пустым, если база не нужна.",
-    }),
-  );
-  const baselineWrap = el("div", {}, [baselineField.root]);
+  // --- Поля записи, базовая сессия и серия ---
+  const fields = createModeFormFields();
 
   // --- Необязательные разделы за раскрытием ---
-  const repeatInput = numberInput("repeat", "1", "1");
-  repeatInput.value = DEFAULT_FORM_VALUES.repeat;
-  const intervalInput = numberInput("interval_s", "0.1", "0");
-  intervalInput.value = DEFAULT_FORM_VALUES.intervalS;
-  const profileSelect = el("select", {
-    className: "lnt-select ctl",
-    attrs: { name: "profile" },
-  }) as HTMLSelectElement;
-  for (const profile of ["bad", "bad-damped", "quiet", "sync-only", "async-heavy"]) {
-    profileSelect.append(el("option", { text: profile, attrs: { value: profile } }));
-  }
-  profileSelect.value = DEFAULT_FORM_VALUES.profile;
-  const repeatField = v6field(
-    createField({
-      label: "Повторов, шт.",
-      control: repeatInput,
-      hintText: "Серия повторных записей; каждая сессия пишется отдельно.",
-    }),
-  );
-  const intervalField = v6field(
-    createField({ label: "Интервал стартов, с", control: intervalInput }),
-  );
-  const profileField = v6field(createField({ label: "Профиль симуляции", control: profileSelect }));
   const seriesDisclosure = createDisclosure("Серия и протокол");
-  seriesDisclosure.body.append(repeatField.root, intervalField.root, profileField.root);
-
-  const settingsFields = el("div", { className: "capture-settings-grid form-grid" }, [
-    durationField.root,
-    rateField.root,
-    rangeField.root,
-    channelsText,
-    baselineWrap,
-    labelField.root,
-  ]);
+  seriesDisclosure.body.append(
+    fields.repeatField.root,
+    fields.intervalField.root,
+    fields.profileField.root,
+  );
 
   const root = el(
     "form",
@@ -199,34 +104,20 @@ export function createModeForm(): ModeFormHandle {
       modeFieldset,
       sourceFieldset,
       el("h3", { className: "capture-section-title panel-title", text: "Параметры записи" }),
-      settingsFields,
+      fields.settingsFields,
       seriesDisclosure.root,
     ],
   ) as HTMLFormElement;
 
-  const syncModeVisibility = (): void => {
-    const mode = handle.getMode();
-    channelsText.textContent =
-      mode.channels === 2 ? "Каналы: 2 (CH1 + CH2)" : "Каналы: 1 (только CH1)";
-    baselineWrap.hidden = !mode.usesBaseline;
-    profileField.root.hidden = handle.getSource() !== "simulator";
+  const syncVisibility = (): void => {
+    syncModeVisibility(handle.getMode(), handle.getSource(), fields);
   };
 
   root.addEventListener("change", () => {
-    syncModeVisibility();
+    syncVisibility();
     notify();
   });
   root.addEventListener("input", notify);
-
-  const fieldByErrorKey: Record<string, { setError(message: string | null): void }> = {
-    durationS: durationField,
-    sampleRateHz: rateField,
-    rangeV: rangeField,
-    label: labelField,
-    baselineSession: baselineField,
-    repeat: repeatField,
-    intervalS: intervalField,
-  };
 
   const handle: ModeFormHandle = {
     root,
@@ -235,24 +126,9 @@ export function createModeForm(): ModeFormHandle {
       return CAPTURE_MODES[(checked?.value ?? "rc_measurement") as CaptureModeId];
     },
     getSource: () => (deviceRadio.checked ? "device" : "simulator"),
-    values: () => ({
-      durationS: durationInput.value,
-      sampleRateHz: rateInput.value,
-      rangeV: rangeSelect.value,
-      label: labelInput.value,
-      baselineSession: baselineInput.value,
-      repeat: repeatInput.value,
-      intervalS: intervalInput.value,
-      profile: profileSelect.value,
-    }),
-    setErrors: (errors) => {
-      for (const [key, field] of Object.entries(fieldByErrorKey)) {
-        field.setError(errors[key as keyof CaptureFieldErrors] ?? null);
-      }
-    },
-    clearErrors: () => {
-      for (const field of Object.values(fieldByErrorKey)) field.setError(null);
-    },
+    values: fields.values,
+    setErrors: fields.setErrors,
+    clearErrors: fields.clearErrors,
     onChange: (listener) => {
       listeners.add(listener);
     },
@@ -262,6 +138,6 @@ export function createModeForm(): ModeFormHandle {
     },
   };
 
-  syncModeVisibility();
+  syncVisibility();
   return handle;
 }
