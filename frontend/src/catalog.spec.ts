@@ -424,6 +424,24 @@ test("reduced-motion: component rules silence motion without the global override
   expect(styles.rowTransition).toBe("0.001s");
 });
 
+/** ADV-1: override выбранной строки обязан реально применяться. Замер
+ * computed-значений в браузере: выбранная строка — 150ms токеном
+ * --lnt-ease-out, невыбранная — 100ms токеном --lnt-ease (shorthand). */
+test("selected row transition is 150ms ease-out token, plain row stays 100ms ease", async ({
+  page,
+}) => {
+  const sessionId = firstFixtureId();
+  await openCatalog(page);
+  await page.locator(`.lnt-cat-row[data-session-id="${sessionId}"]`).click();
+  const selected = page.locator(`.lnt-cat-row-selected[data-session-id="${sessionId}"]`);
+  await expect(selected).toHaveCSS("transition-property", "background-color");
+  await expect(selected).toHaveCSS("transition-duration", "0.15s");
+  await expect(selected).toHaveCSS("transition-timing-function", "cubic-bezier(0.23, 1, 0.32, 1)");
+  const plain = page.locator(".lnt-cat-row:not(.lnt-cat-row-selected)").first();
+  await expect(plain).toHaveCSS("transition-duration", "0.1s");
+  await expect(plain).toHaveCSS("transition-timing-function", "cubic-bezier(0.2, 0, 0, 1)");
+});
+
 test("worst-case catalog states captured through the real component", async ({ page }) => {
   const [longSession, invalidSession, missingSession, plainSession] = worstCaseSessions();
   if (!longSession || !invalidSession || !missingSession || !plainSession)

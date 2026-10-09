@@ -268,8 +268,10 @@
 /* Reduced motion: движение убираем, цвет и прозрачность держим.
  * Заголовки дней статичны всегда — анимации у них нет и не будет. */
 @media (prefers-reduced-motion: reduce) {
+  /* Селектор выбранной строки — той же специфичности (0,3,2), что и правило
+   * 150ms в catalogTable.css: rows импортирован позже, reduced-motion побеждает. */
   .lnt-cat-workspace .tbl tbody tr,
-  .lnt-cat-workspace .lnt-cat-row-selected,
+  .lnt-cat-workspace .tbl tbody tr.lnt-cat-row-selected,
   .lnt-cat-workspace .btn,
   .lnt-cat-workspace .btn-quiet,
   .lnt-cat-workspace .ctl,

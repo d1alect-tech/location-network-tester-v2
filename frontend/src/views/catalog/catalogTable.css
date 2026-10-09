@@ -54,8 +54,10 @@
   background: var(--lnt-elev);
 }
 
-/* Обратная связь выбора строки: 150ms ease-out (частотное правило планки). */
-.lnt-cat-workspace .lnt-cat-row-selected {
+/* Обратная связь выбора строки: 150ms ease-out (частотное правило планки).
+ * Селектор с tr: специфичность (0,3,2) выигрывает у shorthand `.tbl tbody tr`
+ * (0,2,2); классовая форма (0,2,0) проигрывала и была мёртвым CSS (ADV-1). */
+.lnt-cat-workspace .tbl tbody tr.lnt-cat-row-selected {
   transition-duration: var(--lnt-t-select);
   transition-timing-function: var(--lnt-ease-out);
 }
