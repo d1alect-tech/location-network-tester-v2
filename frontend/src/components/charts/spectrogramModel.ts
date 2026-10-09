@@ -1,7 +1,7 @@
 /** Модель ограниченной спектрограммы (todo 42): кап ячеек 524000 из бенча
  * (frontend/bench/DECISION.md), точные запросы тайлов по границам окна,
- * гонко-защита поколение+Abort (паттерн src/state/resource.ts), матрица CSV
- * и сводка видимого окна. Обзор 2048×1024 никогда не отображается целиком. */
+ * гонко-защита поколение+Abort (паттерн src/state/resource.ts) и срез уровня.
+ * Обзор 2048×1024 никогда не отображается целиком. */
 
 import { TileError } from "./tileError";
 
@@ -30,25 +30,6 @@ export interface TileRequest {
   key: string;
   window: TileWindow;
   cells: number;
-}
-
-export interface BandSummary {
-  hz: number;
-  db: number;
-}
-
-export interface WindowSummary {
-  tStartS: number;
-  tEndS: number;
-  fLowHz: number;
-  fHighHz: number;
-  cells: number;
-  minDb: number;
-  maxDb: number;
-  meanDb: number;
-  nanShare: number;
-  eventCount: number;
-  topBands: readonly BandSummary[];
 }
 
 /** Значение ячейки уровня; NaN — явное отсутствие покрытия. */

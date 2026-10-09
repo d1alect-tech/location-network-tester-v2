@@ -1,5 +1,5 @@
-/** Ошибка с повтором: идиома spectrogramPanel (баннер role=alert + кнопка
- * «Повторить»). Тексты — через textContent, без innerHTML. */
+/** Ошибка с повтором: баннер role=alert + кнопка «Повторить».
+ * Тексты — через textContent, без innerHTML. */
 
 import { el } from "./dom";
 

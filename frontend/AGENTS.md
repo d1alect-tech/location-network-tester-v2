@@ -9,7 +9,7 @@
 - `src/api/`: 24 typed clients, one per backend group; no fetch outside.
 - `src/views/`: route screens; inspect largest; keep view-local logic inside.
 - `src/components/charts/`: uPlot + echarts wrappers; token CSS only.
-- `src/state/`: `buildGate` + `resource` + `routeState`; single source per concern.
+- `src/state/`: `resource` + `routeState`; single source per concern.
 - Rollup inputs: `index.html` + 13 `showcase*.html` (a/b/c/d, redesign, round2, v1-v6, base).
 - `scripts/build-manifest.js`: emit asset manifest; `scripts/build-check.js`: byte-stable rebuild gate.
 
