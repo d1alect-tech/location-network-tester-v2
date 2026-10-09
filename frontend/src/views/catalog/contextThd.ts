@@ -4,7 +4,7 @@
  * предела. Предел и порог окон — единственные в views/inspect/thdVerdict. */
 
 import { el } from "../../components/primitives/dom";
-import { THD_V_LIMIT } from "../inspect/thdVerdict";
+import { THD_MIN_CYCLES, THD_V_LIMIT } from "../inspect/thdVerdict";
 import type { SessionMetrics } from "./contextMetrics";
 
 const PERCENT = new Intl.NumberFormat("ru-RU", {
@@ -12,9 +12,6 @@ const PERCENT = new Intl.NumberFormat("ru-RU", {
   maximumFractionDigits: 1,
 });
 const WHOLE = new Intl.NumberFormat("ru-RU");
-
-/** Меньше ста окон гармоник — сравнение с пределом не выдаётся. */
-export const THD_MIN_CYCLES = 100;
 
 export type ThdCompare = "above" | "below" | "few" | "none";
 

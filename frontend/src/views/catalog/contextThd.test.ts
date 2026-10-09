@@ -2,6 +2,7 @@
  * Оценочных слов («норма», «годен») в текстах блока нет вообще. */
 
 import { describe, expect, it } from "vitest";
+import { THD_MIN_CYCLES } from "../inspect/thdVerdict";
 import { EMPTY_METRICS, type SessionMetrics } from "./contextMetrics";
 import {
   renderThdBlock,
@@ -27,6 +28,12 @@ describe("thdCompareOf", () => {
   it("мало окон — сравнение не выдаётся", () => {
     expect(thdCompareOf(metrics({ thdRatio: 0.2, cycles: 99 }))).toBe("few");
     expect(thdCompareOf(metrics({ thdRatio: 0.2, cycles: null }))).toBe("few");
+  });
+
+  it("порог окон один на каталог и инспектор — из views/inspect/thdVerdict", () => {
+    expect(thdCompareOf(metrics({ thdRatio: 0.2, cycles: THD_MIN_CYCLES - 1 }))).toBe("few");
+    expect(thdCompareOf(metrics({ thdRatio: 0.2, cycles: THD_MIN_CYCLES }))).not.toBe("few");
+    expect(thdBadgeText("few")).toContain(String(THD_MIN_CYCLES));
   });
 
   it("нет значения — нет данных", () => {

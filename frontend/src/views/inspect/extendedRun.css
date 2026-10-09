@@ -5,7 +5,6 @@
 .lnt-w1-extended {
   --lnt-xr-enter: 220ms;
   --lnt-xr-hover: 150ms;
-  --lnt-xr-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 
   display: flex;
   flex-direction: column;
@@ -45,8 +44,10 @@
   }
 }
 
+/* Кривая входа — глобальный токен --lnt-ease-out (v2-tokens.css), не локальная
+ * копия: перенастройка движения обязана доехать и до карточек прогона. */
 .lnt-xr-enter {
-  animation: lnt-xr-rise var(--lnt-xr-enter) var(--lnt-xr-ease-out) both;
+  animation: lnt-xr-rise var(--lnt-xr-enter) var(--lnt-ease-out) both;
   animation-delay: calc(var(--i, 0) * 18ms);
 }
 
@@ -171,8 +172,8 @@
   background-color: var(--lnt-bg-raised);
   border: var(--lnt-border-width) solid var(--lnt-border-subtle);
   border-radius: var(--lnt-radius-panel);
-  transition: transform var(--lnt-xr-hover) ease, border-color var(--lnt-xr-hover) ease,
-    background-color var(--lnt-xr-hover) ease;
+  transition: transform var(--lnt-xr-hover) var(--lnt-ease-out), border-color var(--lnt-xr-hover)
+    var(--lnt-ease-out), background-color var(--lnt-xr-hover) var(--lnt-ease-out);
 }
 
 /* Hover карточки — только на устройствах с курсором: на таче липкий hover
@@ -248,7 +249,7 @@
   background-color: var(--lnt-accent-a);
   transform-origin: left center;
   transform: scaleX(var(--share, 0));
-  animation: lnt-xr-grow var(--lnt-xr-enter) var(--lnt-xr-ease-out) both;
+  animation: lnt-xr-grow var(--lnt-xr-enter) var(--lnt-ease-out) both;
   animation-delay: calc(var(--i, 0) * 18ms);
 }
 

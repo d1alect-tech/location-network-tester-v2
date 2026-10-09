@@ -18,6 +18,21 @@ export function isRevisionConflict(error: unknown): error is ApiError {
   return error instanceof ApiError && error.kind === "conflict";
 }
 
+/** Отказ ЧТЕНИЯ контекста с 409 (дубль идентификатора, спорный каталог):
+ * слияние черновика неприменимо — пользователю нужны факт отказа и повтор.
+ * Деталь сервера цитируем дословно, ничего не додумываем. */
+export function loadConflictMessage(error: ApiError): string {
+  const detail = typeof error.cause === "string" && error.cause !== "" ? ` ${error.cause}` : "";
+  return `Сервер отклонил чтение контекста: конфликт (409).${detail}`;
+}
+
+/** Строка ошибки загрузки: 409 описываем отказом чтения, остальное — как прежде. */
+export function loadErrorText(error: ApiError): string {
+  return error.kind === "conflict"
+    ? loadConflictMessage(error)
+    : `${error.message} Выберите другую сессию или повторите.`;
+}
+
 /** Собирает типизированное описание конфликта с русским сообщением. */
 export function conflictFromError(expectedRevision: number, error: ApiError): RevisionConflict {
   return {

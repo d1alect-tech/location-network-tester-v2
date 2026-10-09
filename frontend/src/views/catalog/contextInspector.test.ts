@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LntApiClient } from "../../api/client";
+import { ApiError } from "../../api/errors";
 import type { ContextResponse } from "../../api/types";
 import type { SessionDetailPayload } from "../../api/types-plots";
 import { createContextInspector } from "./contextInspector";
@@ -171,6 +172,87 @@ describe("createContextInspector сводка варианта «Плотный 
   it("empty tags render «Тегов нет» instead of an empty chip row", async () => {
     const mounted = await mount(contextResponse("context_valid"));
     expect(mounted.root.querySelector(".tag-empty")?.textContent).toBe("Тегов нет");
+  });
+});
+
+describe("createContextInspector провал загрузки контекста", () => {
+  it("показывает ошибку чтения, а не «сессия не выбрана»", async () => {
+    // Given: сессия выбрана, но GET context отклоняется
+    const inspector = createContextInspector({ client: fakeClient() });
+
+    // When
+    await inspector.loadSession("session-1", META);
+
+    // Then: тело называет провал чтения, а не отсутствие выбора
+    expect(inspector.root.querySelector(".insp-none")?.textContent).toBe(
+      "Не удалось загрузить контекст сессии.",
+    );
+    expect(inspector.root.textContent).not.toContain("Сессия не выбрана");
+
+    // Then: строка ошибки видна, сохранение закрыто
+    const alert = inspector.root.querySelector("[role='alert']");
+    expect(alert?.hasAttribute("hidden")).toBe(false);
+    expect(alert?.textContent).toContain("Выберите другую сессию или повторите.");
+    const save = inspector.root.querySelector<HTMLButtonElement>(".lnt-btn-primary");
+    expect(save?.disabled).toBe(true);
+  });
+});
+
+describe("createContextInspector конфликт чтения (409)", () => {
+  function conflict409(): ApiError {
+    return new ApiError("conflict", {
+      status: 409,
+      cause: "неоднозначный идентификатор сессии: 'syn-quiet-seed6022'",
+    });
+  }
+
+  function clientWith409(failTimes: number, thenContext: ContextResponse): LntApiClient {
+    let attempts = 0;
+    return {
+      context: vi.fn(async () => {
+        attempts += 1;
+        if (attempts <= failTimes) throw conflict409();
+        return thenContext;
+      }),
+      updateContext: vi.fn(async () => thenContext),
+      ensureReady: vi.fn(async () => undefined),
+      plots: { detail: vi.fn(async () => null) },
+    } as unknown as LntApiClient;
+  }
+
+  it("показывает баннер конфликта с деталью сервера и повтором", async () => {
+    // Given: GET context стабильно отвечает 409 (дубль идентификатора)
+    const inspector = createContextInspector({
+      client: clientWith409(2, contextResponse("context_valid")),
+    });
+
+    // When
+    await inspector.loadSession("session-1", META);
+
+    // Then: конфликт виден баннером, а не спрятан пустым состоянием
+    const banner = inspector.root.querySelector(".lnt-cat-conflict");
+    expect(banner?.hasAttribute("hidden")).toBe(false);
+    expect(banner?.textContent).toContain("Сервер отклонил чтение контекста: конфликт (409)");
+    expect(banner?.textContent).toContain("неоднозначный идентификатор сессии");
+    expect(banner?.querySelector("button")?.textContent).toBe("Повторить загрузку");
+
+    // Then: строка ошибки называет отказ чтения, а не конфликт ревизий
+    const alert = inspector.root.querySelector("[role='alert']");
+    expect(alert?.textContent).toContain("Сервер отклонил чтение контекста: конфликт (409)");
+    expect(alert?.textContent).not.toContain("Конфликт версий");
+  });
+
+  it("повтор загрузки прячет баннер, когда сервер отдаёт контекст", async () => {
+    const inspector = createContextInspector({
+      client: clientWith409(1, contextResponse("context_valid")),
+    });
+    await inspector.loadSession("session-1", META);
+    const banner = inspector.root.querySelector<HTMLElement>(".lnt-cat-conflict");
+    expect(banner?.hasAttribute("hidden")).toBe(false);
+
+    banner?.querySelector("button")?.click();
+    await vi.waitFor(() => expect(banner?.hasAttribute("hidden")).toBe(true));
+    expect(inspector.root.querySelector(".insp-body")).not.toBeNull();
   });
 });
 

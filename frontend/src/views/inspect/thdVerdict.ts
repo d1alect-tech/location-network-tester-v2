@@ -2,6 +2,10 @@
 
 export const THD_V_LIMIT = 0.08;
 
+/** Fewer analyzed harmonics windows: the limit comparison is withheld.
+ * Single source for inspect and catalog (contextThd imports both constants). */
+export const THD_MIN_CYCLES = 100;
+
 export type ThdWindow = {
   readonly thd: number;
 };
@@ -29,7 +33,7 @@ export function thdVerdict(input: ThdVerdictInput, limit: number = THD_V_LIMIT):
   if (input.harmonicsFailed) return { kind: "hidden", meanThd: mean };
   if (mean === null) return { kind: "legacy", meanThd: null };
   if (!Number.isFinite(limit) || limit <= 0) return { kind: "hidden", meanThd: mean };
-  if (input.cyclesAnalyzed < 100) return { kind: "hidden", meanThd: mean };
+  if (input.cyclesAnalyzed < THD_MIN_CYCLES) return { kind: "hidden", meanThd: mean };
   if (mean > limit) return { kind: "fail", meanThd: mean };
   return { kind: "pass", meanThd: mean };
 }

@@ -449,3 +449,34 @@ test("extended run: card grid groups 18 families by status with RU reasons", asy
   await expect(extended.locator(".lnt-xr-note")).toContainText(CHAR_SESSION);
   await expectNoErrorBand(page);
 });
+
+/* F3-F3: последняя интерактивная строка колонки обязана уходить выше
+ * фиксированного футера — иначе центр CTA ловит клик под статус-баром. */
+test("extended-run CTA clears the fixed statusbar at the end of the scroll", async ({ page }) => {
+  // Given: 1440x900, w1-детали раскрыты, сессия выбрана.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t1-cta-clear");
+  mockSessionDetail(backend, "t1-cta-clear", "v1-only/metrics.json");
+
+  // When: прокрутка главной колонки до конца.
+  await openW1Chrome(page, "t1-cta-clear");
+  const geometry = await page.evaluate((label) => {
+    const button = [...document.querySelectorAll("button")].find((n) => n.textContent === label);
+    const colMain = document.querySelector(".app-v6 .col-main");
+    if (button === undefined || colMain === null) return null;
+    colMain.scrollTop = colMain.scrollHeight;
+    const col = colMain.getBoundingClientRect();
+    const box = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return {
+      clearance: Math.round(col.bottom - box.bottom),
+      hitInside: button.contains(hit),
+    };
+  }, EXTENDED_RUN_BUTTON);
+
+  // Then: запас не меньше высоты футера .statusbar (32px), клик попадает в кнопку.
+  expect(geometry).not.toBeNull();
+  expect(geometry?.clearance).toBeGreaterThanOrEqual(32);
+  expect(geometry?.hitInside).toBe(true);
+});

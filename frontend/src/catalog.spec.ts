@@ -13,11 +13,13 @@ import { type MockLntBackend, installMockBackend } from "./testkit/mockBackend";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+/* Артефакты — внутри .omo текущего checkout (frontend/src → ../../ — корень),
+ * .omo в .gitignore. Глубина ../../../ уводила файлы НАД репозиторием. */
 const EVIDENCE_DIR = resolve(
   __dirname,
-  "../../../.omo/start-work/evidence/task-39-lnt-complete-redesign",
+  "../../.omo/start-work/evidence/task-39-lnt-complete-redesign",
 );
-const TASK5_EVIDENCE_DIR = resolve(__dirname, "../../../.omo/evidence/ui-refactor/task-5");
+const TASK5_EVIDENCE_DIR = resolve(__dirname, "../../.omo/evidence/ui-refactor/task-5");
 const BASE = "http://127.0.0.1:4101/static/v2/";
 const FIXTURE_SIZE = 10_000;
 
@@ -422,6 +424,35 @@ test("reduced-motion: component rules silence motion without the global override
   // переход строки сжат до 1ms (0.001s), а не до нуля глобальным override.
   expect(styles.animation).toBe("none");
   expect(styles.rowTransition).toBe("0.001s");
+
+  // Кнопки: press-scale гаснет и без глобального override. Для этого override
+  // в catalogRows.css поднят до (0,4,0) через :not(:disabled) — press-правило
+  // .btn:active из catalogForms.css импортируется позже и при равном весе (0,3,0)
+  // override глушило (MINOR-1). Замер в нажатом состоянии, мышь не отпускаем.
+  const saveButton = page.locator(".lnt-cat-inspector .lnt-btn-primary");
+  await saveButton.hover();
+  await page.mouse.down();
+  try {
+    await expect(saveButton).toHaveCSS("transform", "none");
+  } finally {
+    await page.mouse.up();
+  }
+});
+
+/** Контроль к предыдущему тесту: без reduced-motion press-scale на кнопке есть.
+ * Без него «transform: none» проходил бы и на мертвом override. */
+test("press scale 0.97 applies to catalog buttons without reduced motion", async ({ page }) => {
+  await openCatalog(page);
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".insp-body")).toBeAttached();
+  const saveButton = page.locator(".lnt-cat-inspector .lnt-btn-primary");
+  await saveButton.hover();
+  await page.mouse.down();
+  try {
+    await expect(saveButton).toHaveCSS("transform", "matrix(0.97, 0, 0, 0.97, 0, 0)");
+  } finally {
+    await page.mouse.up();
+  }
 });
 
 /** ADV-1: override выбранной строки обязан реально применяться. Замер

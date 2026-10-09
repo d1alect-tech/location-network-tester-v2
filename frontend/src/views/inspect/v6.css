@@ -128,12 +128,17 @@
   background: var(--lnt-chrome);
 }
 
+/* Нижний запас прокрутки равен высоте фиксированного футера (.statusbar, 32px):
+ * последняя интерактивная строка (CTA расширенного прогона в details w1)
+ * обязана уходить выше футера, иначе её центр ловит клик под статус-баром
+ * и полосой cmdbar (F3-F3, замер 1440x900). */
 .app-v6 .col-main {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  padding-bottom: var(--lnt-space-8);
 }
 
 /* Дочерние блоки не сжимаются: при нехватке высоты колонка скроллится,

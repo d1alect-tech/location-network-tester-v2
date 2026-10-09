@@ -280,8 +280,16 @@
     transition-duration: 1ms;
   }
 
-  .lnt-cat-workspace .btn:active,
-  .lnt-cat-workspace .btn-quiet:active,
+  /* Кнопки: press-правило .btn:active живёт в catalogForms.css, а catalog.css
+   * импортирует forms ПОСЛЕ rows — при равной специфичности (0,3,0) оно
+   * глушило этот override. :not(:disabled) поднимает его до (0,4,0);
+   * отключённая кнопка и так без трансформации (catalogForms.css).
+   * Пункт таббара объявлен выше в этом же файле — ему хватает (0,3,0). */
+  .lnt-cat-workspace .btn:active:not(:disabled),
+  .lnt-cat-workspace .btn-quiet:active:not(:disabled) {
+    transform: none;
+  }
+
   .lnt-cat-workspace .snav-item:active {
     transform: none;
   }

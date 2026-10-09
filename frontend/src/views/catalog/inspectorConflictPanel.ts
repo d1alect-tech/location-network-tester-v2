@@ -3,10 +3,15 @@
  * contextInspector ради потолка 250 чистых LOC; состояние конфликта живёт
  * здесь, инспектор передаёт черновик и перезагрузку зависимостями. */
 
+import type { ApiError } from "../../api/errors";
 import type { ContextResponse, ContextUpdateRequest } from "../../api/types";
 import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
-import { type RevisionConflict, mergeDraftOntoFresh } from "./inspectorConflict";
+import {
+  type RevisionConflict,
+  loadConflictMessage,
+  mergeDraftOntoFresh,
+} from "./inspectorConflict";
 
 export interface ConflictDraft {
   notes: string;
@@ -24,25 +29,53 @@ export interface ConflictPanelDeps {
 export interface ConflictPanelHandle {
   panel: HTMLElement;
   setConflict(conflict: RevisionConflict | null): void;
+  /** 409 на чтении контекста: баннер виден, слияние не предлагается. */
+  setLoadError(error: ApiError | null): void;
 }
 
 export function createConflictPanel(deps: ConflictPanelDeps): ConflictPanelHandle {
   const panel = el("div", { className: "banner banner-inline banner-warn lnt-cat-conflict" });
   panel.hidden = true;
   let conflict: RevisionConflict | null = null;
+  let loadError: ApiError | null = null;
 
   function render(): void {
     clearElement(panel);
-    if (conflict === null) {
-      panel.hidden = true;
+    if (conflict !== null) {
+      panel.hidden = false;
+      panel.append(
+        el("p", { className: "banner-msg", text: conflict.message }),
+        buildMergeButton(),
+        buildDiscardButton(),
+      );
       return;
     }
-    panel.hidden = false;
-    panel.append(
-      el("p", { className: "banner-msg", text: conflict.message }),
-      buildMergeButton(),
-      buildDiscardButton(),
-    );
+    if (loadError !== null) {
+      panel.hidden = false;
+      panel.append(
+        el("p", { className: "banner-msg", text: loadConflictMessage(loadError) }),
+        buildRetryButton(),
+      );
+      return;
+    }
+    panel.hidden = true;
+  }
+
+  /** Повтор чтения: баннер уходит только когда сервер реально отдал контекст. */
+  function buildRetryButton(): HTMLElement {
+    const button = el("button", {
+      className: "btn",
+      text: "Повторить загрузку",
+      attrs: { type: "button" },
+    });
+    button.addEventListener("click", () => {
+      void deps.reloadCurrent().then((fresh) => {
+        if (fresh === null) return;
+        loadError = null;
+        render();
+      });
+    });
+    return button;
   }
 
   function buildMergeButton(): HTMLElement {
@@ -92,6 +125,12 @@ export function createConflictPanel(deps: ConflictPanelDeps): ConflictPanelHandl
     panel,
     setConflict: (next) => {
       conflict = next;
+      // Новая сессия сбрасывает и конфликт записи, и отказ чтения.
+      if (next === null) loadError = null;
+      render();
+    },
+    setLoadError: (next) => {
+      loadError = next;
       render();
     },
   };

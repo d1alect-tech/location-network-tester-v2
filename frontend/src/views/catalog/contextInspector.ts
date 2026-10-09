@@ -27,6 +27,7 @@ import {
   type RevisionConflict,
   conflictFromError,
   isRevisionConflict,
+  loadErrorText,
   mergeDraftOntoFresh,
   userEditableFields,
 } from "./inspectorConflict";
@@ -162,12 +163,12 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     currentBody = null;
     const state = loader.get();
     if (state.kind !== "ready" || meta === null) {
-      bodyHost.append(
-        el("p", {
-          className: "insp-none",
-          text: "Сессия не выбрана. Выберите строку в каталоге слева.",
-        }),
-      );
+      // Провал чтения — не «сессия не выбрана»: сессия выбрана, ответ не пришёл.
+      const text =
+        state.kind === "error"
+          ? "Не удалось загрузить контекст сессии."
+          : "Сессия не выбрана. Выберите строку в каталоге слева.";
+      bodyHost.append(el("p", { className: "insp-none", text }));
       return;
     }
     const context = state.value;
@@ -218,7 +219,10 @@ export function createContextInspector(options: ContextInspectorOptions): Contex
     } else if (state.kind === "error") {
       saveButton.disabled = true;
       renderBody(false);
-      setError(`${state.error.message} Выберите другую сессию или повторите.`);
+      // 409 на чтении (дубль идентификатора): баннер конфликта обязан быть
+      // виден, а строка ошибки называет отказ чтения, а не конфликт ревизий.
+      conflictUi.setLoadError(state.error);
+      setError(loadErrorText(state.error));
     }
   });
 
