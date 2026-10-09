@@ -81,44 +81,22 @@
   min-width: 0;
 }
 
-/* ── Панели: фон панели, hairline-стыки (kit §5.2) ─────────────────────── */
+/* ── Панели: каноническая рамка — components/primitives/panel.css (глобально);
+ * здесь только видовые отличия «Захвата», которых нет в каноне (todo 2):
+ * карточное скругление панели и шапки, нулевой отступ заголовков (h2/h3.panel-title).
+ * Тело (.panel-bd) совпадает с каноном: панели авторазмера, поэтому канонические
+ * flex:1/overflow:auto картинку не меняют (скриншоты до/после — evidence task-2). */
 
 .capture-view .panel {
-  background: var(--lnt-panel);
-  border: 0;
   border-radius: var(--lnt-r-ctl);
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 .capture-view .panel-hd {
-  min-height: 30px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  background: rgb(0 0 0 / 0.18);
-  border-bottom: 1px solid var(--lnt-line);
   border-radius: var(--lnt-r-ctl) var(--lnt-r-ctl) 0 0;
 }
 
 .capture-view .panel-title {
-  font: 700 11px / 14px var(--lnt-ui);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--lnt-text-sec);
   margin: 0;
-}
-
-.capture-view h3.capture-section-title.panel-title {
-  margin: 0;
-}
-
-.capture-view .panel-bd {
-  padding: 12px;
-  min-height: 0;
 }
 
 /* Плоские панели (превью, таймлайн): отступы и ритм без panel-bd. */

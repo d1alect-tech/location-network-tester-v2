@@ -10,6 +10,7 @@ import { RouteStore } from "./state/routeState";
 // END Todo 40
 // --- Инспекция V6: единое окно сравнения (полный захват экрана) ---
 import "./components/charts/charts.css";
+import "./components/primitives/panel.css";
 import { type V6ShellHeader, createV6ShellHeader, createV6ShellStatusbar } from "./shell/v6Shell";
 import { mountInspectV6 } from "./views/inspect/inspectV6";
 

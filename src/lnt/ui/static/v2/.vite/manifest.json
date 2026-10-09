@@ -1,13 +1,13 @@
 {
-  "_chartshell.C01xOvsl.css": {
-    "file": "assets/chartshell.C01xOvsl.css",
-    "src": "_chartshell.C01xOvsl.css"
+  "_chartshell.D8oyVlI0.css": {
+    "file": "assets/chartshell.D8oyVlI0.css",
+    "src": "_chartshell.D8oyVlI0.css"
   },
-  "_chartshell.C0ugc3w8.js": {
-    "file": "assets/chartshell.C0ugc3w8.js",
+  "_chartshell.SVvxIY3H.js": {
+    "file": "assets/chartshell.SVvxIY3H.js",
     "name": "chartshell",
     "css": [
-      "assets/chartshell.C01xOvsl.css"
+      "assets/chartshell.D8oyVlI0.css"
     ],
     "assets": [
       "assets/inter-cyrillic-wght-normal.DqGufNeO.woff2",
@@ -111,17 +111,17 @@
     "src": "_variantV1.CCz54TsC.css"
   },
   "index.html": {
-    "file": "assets/main.Bq_Jy2ls.js",
+    "file": "assets/main.DdTPcjJO.js",
     "name": "main",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.C0ugc3w8.js",
+      "_chartshell.SVvxIY3H.js",
       "_spectrogramPalette.CfMVLFb-.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
-      "assets/main.BLau7wfA.css"
+      "assets/main.DjgImH4P.css"
     ]
   },
   "showcase-a.html": {
@@ -278,12 +278,12 @@
     ]
   },
   "showcase.html": {
-    "file": "assets/showcase.DnXDa--b.js",
+    "file": "assets/showcase.B-t_RdLK.js",
     "name": "showcase",
     "src": "showcase.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.C0ugc3w8.js"
+      "_chartshell.SVvxIY3H.js"
     ]
   },
   "src/showcase-redesign/fonts/IBMPlexMono-Medium.woff2": {

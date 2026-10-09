@@ -82,7 +82,10 @@ function readCss(relative: string): string {
 
 const SHEET: StyleRule[] = [
   ...topLevelRules(readCss("../../style.css"), 0),
-  ...topLevelRules(readCss("../experiments/experimentsCore.css"), 1_000_000),
+  // Todo 2 (ui-refactor-2): каноническая рамка переехала из experimentsCore.css
+  // в primitives/panel.css — модель каскада следует за реальным бандлом.
+  // Победители прежние: правила inspect в v6.css выигрывают специфичностью.
+  ...topLevelRules(readCss("../../components/primitives/panel.css"), 1_000_000),
   ...topLevelRules(readCss("./v6.css"), 2_000_000),
 ];
 
