@@ -258,6 +258,56 @@ test("dense table groups sessions by day with row counters", async ({ page }) =>
   await expect(row.locator(".lnt-status-pill")).toBeVisible();
 });
 
+test("worst-case health pills stay inside their column (desktop and 390px)", async ({ page }) => {
+  // break-ui: самые длинные пилюли health + короткие метки в тех же строках.
+  backend.seedCatalog([
+    {
+      id: "w-dup",
+      health: "duplicate_id",
+      created_utc: "2026-08-05T10:00:00Z",
+      source: "disk",
+      session_type: "line_quality",
+      profile: null,
+      label: "Jo",
+    },
+    {
+      id: "w-corrupt",
+      health: "corrupt_manifest",
+      created_utc: "2026-08-05T11:00:00Z",
+      source: "disk",
+      session_type: "line_quality",
+      profile: null,
+      label: "стенд-Б",
+    },
+  ]);
+  await openCatalog(page);
+  await expect(page.locator("tr.lnt-cat-row")).toHaveCount(2);
+
+  /** Пересечение пилюли с границей своей ячейки и с колонкой МЕТКА, в px. */
+  const overflow = (): Promise<number[]> =>
+    page.evaluate(() =>
+      [...document.querySelectorAll("tr.lnt-cat-row")].map((tr) => {
+        const pill = tr.querySelector(".lnt-status-pill")?.getBoundingClientRect();
+        const cells = tr.querySelectorAll("td");
+        const state = cells[0]?.getBoundingClientRect();
+        const label = cells[1]?.getBoundingClientRect();
+        if (!pill || !state || !label) return -1;
+        return Math.max(0, pill.right - state.right, pill.right - label.left);
+      }),
+    );
+
+  for (const value of await overflow()) expect(value, "пилюля в своей колонке").toBe(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator("tr.lnt-cat-row")).toHaveCount(2);
+  for (const value of await overflow()) expect(value, "пилюля в своей колонке на 390px").toBe(0);
+  const doc = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+  }));
+  expect(doc.scroll, "страница не скроллится горизонтально").toBeLessThanOrEqual(doc.client);
+});
+
 test("row click keeps roving focus on the row instead of body", async ({ page }) => {
   await openCatalog(page);
   const row = page.locator(".lnt-cat-row").first();
@@ -324,6 +374,54 @@ test("prefers-reduced-motion removes entrance animation and row transitions", as
   expect(styles.animation).toBe("none");
   // Глобальное правило style.css гасит движение целиком: transition: none.
   expect(styles.rowTransition).toBe("0s");
+});
+
+test("reduced-motion: component rules silence motion without the global override", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openCatalog(page);
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".insp-body")).toBeAttached();
+
+  // Изоляция компонентных правил: глобальный override style.css
+  // (* { transition/animation: none !important }) вырезается из CSSOM, и
+  // замеренные значения остаются только от правил компонентов
+  // (catalogRows.css, catalogInspector.css).
+  const removed = await page.evaluate(() => {
+    let count = 0;
+    for (const sheet of [...document.styleSheets]) {
+      const groups = sheet.cssRules;
+      for (let index = groups.length - 1; index >= 0; index -= 1) {
+        const group = groups[index];
+        if (!(group instanceof CSSMediaRule)) continue;
+        if (!group.conditionText.includes("prefers-reduced-motion")) continue;
+        const inner = group.cssRules;
+        for (let innerIndex = inner.length - 1; innerIndex >= 0; innerIndex -= 1) {
+          const rule = inner[innerIndex];
+          if (rule instanceof CSSStyleRule && rule.selectorText === "*") {
+            group.deleteRule(innerIndex);
+            count += 1;
+          }
+        }
+      }
+    }
+    return count;
+  });
+  expect(removed, "глобальное правило найдено и вырезано").toBeGreaterThan(0);
+
+  const styles = await page.evaluate(() => {
+    const body = document.querySelector(".insp-body");
+    const row = document.querySelector(".lnt-cat-row");
+    return {
+      animation: body === null ? "missing" : getComputedStyle(body).animationName,
+      rowTransition: row === null ? "missing" : getComputedStyle(row).transitionDuration,
+    };
+  });
+  // Компонентные правила держат reduced-motion сами: вход инспектора погашен,
+  // переход строки сжат до 1ms (0.001s), а не до нуля глобальным override.
+  expect(styles.animation).toBe("none");
+  expect(styles.rowTransition).toBe("0.001s");
 });
 
 test("worst-case catalog states captured through the real component", async ({ page }) => {

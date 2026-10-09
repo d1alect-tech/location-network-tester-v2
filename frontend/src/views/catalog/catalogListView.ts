@@ -184,11 +184,11 @@ export function createCatalogListView(options: CatalogListOptions): CatalogListH
     syncFound();
   }
 
-  function syncFound(): void {
-    found.textContent = hasMore ? `${items.length}+` : String(items.length);
-    found.title = hasMore
-      ? `Загружено ${items.length}, есть ещё — нажмите «Показать ещё»`
-      : `Загружено сессий: ${items.length}`;
+  function syncFound(count: number = items.length, more: boolean = hasMore): void {
+    found.textContent = more ? `${count}+` : String(count);
+    found.title = more
+      ? `Загружено ${count}, есть ещё — нажмите «Показать ещё»`
+      : `Загружено сессий: ${count}`;
   }
 
   function activate(index: number): void {
@@ -238,7 +238,9 @@ export function createCatalogListView(options: CatalogListOptions): CatalogListH
         moreButton.hidden = true;
         clearElement(tbody);
         tbody.append(renderEmpty(message));
-        syncFound();
+        // Видимая выдача — ноль строк: счётчик следует ей, а не прежней
+        // странице (ранее над пустым состоянием висело устаревшее «200+»).
+        syncFound(0, false);
         return;
       }
       table.hidden = true;

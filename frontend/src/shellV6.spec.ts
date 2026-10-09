@@ -231,3 +231,60 @@ test("S7: worst-case длинный ярлык эллипсуется, хром 
   expect((await header.boundingBox())?.height, "высота шапки не изменилась").toBe(heightBefore);
   await noHorizontalOverflow(page);
 });
+
+test("S8: холодный диплинк — вход играет на реальном маршруте", async ({ page }) => {
+  // Подписка на animationstart ДО кода приложения: событие не теряется.
+  await page.addInitScript(() => {
+    const log: { name: string; id: string }[] = [];
+    (window as unknown as { __navAnimStarts: typeof log }).__navAnimStarts = log;
+    document.addEventListener(
+      "animationstart",
+      (event) => {
+        log.push({ name: event.animationName, id: (event.target as HTMLElement).id });
+      },
+      true,
+    );
+  });
+  mockInspectApi(installMockBackend(page));
+  await page.goto(`${BASE}#/reports`);
+  await page.waitForFunction(
+    () => (window as unknown as { __navAnimStarts?: { name: string }[] }).__navAnimStarts?.length,
+  );
+  const starts = await page.evaluate(
+    () =>
+      (window as unknown as { __navAnimStarts: { name: string; id: string }[] }).__navAnimStarts,
+  );
+  const entrance = starts.filter((item) => item.name === "lnt-nav-in");
+  // Вход сыграл ровно один раз и на пункте реального маршрута, не дефолтного.
+  expect(entrance).toEqual([{ name: "lnt-nav-in", id: "nav-reports" }]);
+});
+
+test("S9: клик во время входа — затухание доигрывает до конца, повтора нет", async ({ page }) => {
+  await page.addInitScript(() => {
+    const log = { starts: [] as string[], ends: [] as string[], cancels: [] as string[] };
+    (window as unknown as { __navAnim: typeof log }).__navAnim = log;
+    const push = (kind: "starts" | "ends" | "cancels") => (event: AnimationEvent) => {
+      if (event.animationName === "lnt-nav-in") log[kind].push((event.target as HTMLElement).id);
+    };
+    document.addEventListener("animationstart", push("starts"), true);
+    document.addEventListener("animationend", push("ends"), true);
+    document.addEventListener("animationcancel", push("cancels"), true);
+  });
+  mockInspectApi(installMockBackend(page));
+  await page.goto(`${BASE}#/catalog`);
+  // Клик по вкладке в окне входа (180ms): затухание обязано доиграть.
+  await page.click("#nav-reports", { noWaitAfter: true });
+  await page.waitForFunction(() => {
+    const log = (window as unknown as { __navAnim?: { ends: string[]; cancels: string[] } })
+      .__navAnim;
+    return log !== undefined && log.ends.length + log.cancels.length > 0;
+  });
+  const log = await page.evaluate(
+    () =>
+      (window as unknown as { __navAnim: { starts: string[]; ends: string[]; cancels: string[] } })
+        .__navAnim,
+  );
+  expect(log.starts, "вход стартовал один раз на пункте монтажа").toEqual(["nav-catalog"]);
+  expect(log.ends, "затухание доиграло до конца (без скачка)").toEqual(["nav-catalog"]);
+  expect(log.cancels, "вход не оборван кликом").toEqual([]);
+});

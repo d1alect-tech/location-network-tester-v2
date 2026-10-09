@@ -46,9 +46,11 @@
   width: 100%;
 }
 
-/* Пилюля «Повреждён манифест» — самый длинный текст состояния (~150px). */
+/* Пилюля «Дубль идентификатора» — самый длинный текст состояния (замер
+ * break-ui: 164.5px) + 8px паддинга ячейки: колонка держит пилюлю целиком,
+ * вторжения в МЕТКУ нет ни на десктопе, ни на 390px. */
 .lnt-cat-workspace .cat-v6 .tbl-cat tr > :first-child {
-  width: 158px;
+  width: 176px;
 }
 
 /* Самый длинный тип «Качество сети» (~104px, измерено в витрине). */
@@ -230,12 +232,18 @@
   border: 0;
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease),
+    transform var(--lnt-motion-fast) var(--lnt-ease-out);
 }
 
 .lnt-cat-workspace .snav-item:hover {
   color: var(--lnt-text);
   background: var(--lnt-elev);
+}
+
+/* Отклик на нажатие таба: планка emil-design-eng, scale 0.97. */
+.lnt-cat-workspace .snav-item:active {
+  transform: scale(0.97);
 }
 
 .lnt-cat-workspace .snav-item.is-active {
@@ -271,7 +279,18 @@
   }
 
   .lnt-cat-workspace .btn:active,
-  .lnt-cat-workspace .btn-quiet:active {
+  .lnt-cat-workspace .btn-quiet:active,
+  .lnt-cat-workspace .snav-item:active {
     transform: none;
+  }
+}
+
+/* Узкий вьюпорт (375px → колонка ~336px): фиксированные ширины колонок не
+ * сжимаем — таблица едет горизонтально внутри .tbl-wrap, страница не
+ * скроллится. Блок живёт ЗДЕСЬ, после ширин: catalog.css импортирует rows
+ * после core, и прежний override из catalogCore.css проигрывал каскад. */
+@media (max-width: 520px) {
+  .lnt-cat-workspace .cat-v6 .tbl-cat {
+    min-width: 480px;
   }
 }

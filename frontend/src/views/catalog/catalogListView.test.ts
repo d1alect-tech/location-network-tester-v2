@@ -9,6 +9,7 @@ import { createCatalogListView } from "./catalogListView";
 
 function mountList(items: CatalogSession[]): {
   root: HTMLElement;
+  list: ReturnType<typeof createCatalogListView>;
   setItems: (next: CatalogSession[]) => void;
   dispose: () => void;
 } {
@@ -23,6 +24,7 @@ function mountList(items: CatalogSession[]): {
   list.setItems(items);
   return {
     root: list.root,
+    list,
     setItems: (next) => list.setItems(next),
     dispose: () => host.remove(),
   };
@@ -78,6 +80,29 @@ describe("catalogListView: фокус при пересборке", () => {
       const groups = root.querySelectorAll("tr.cat-group");
       expect(groups.length).toBe(1);
       expect(groups[0]?.querySelector("[data-cat-count]")?.textContent).toBe("2");
+    } finally {
+      dispose();
+    }
+  });
+
+  it("пустое состояние: счётчик показывает ноль, а не устаревшую страницу", () => {
+    // Given: загружена страница выдачи и есть ещё страницы («N+»).
+    const { root, list, dispose } = mountList(SESSIONS);
+    try {
+      list.setHasMore(true);
+      expect(root.querySelector(".cat-found")?.textContent).toBe(`${SESSIONS.length}+`);
+
+      // When: выдача пуста (фильтр без совпадений).
+      list.setNotice("empty", "По запросу ничего не найдено.");
+
+      // Then: счётчик следует видимой выдаче, устаревшее «N+» не висит.
+      expect(root.querySelector(".cat-found")?.textContent).toBe("0");
+
+      // When: выдача вернулась.
+      list.clearNotice();
+
+      // Then: счётчик снова честный.
+      expect(root.querySelector(".cat-found")?.textContent).toBe(`${SESSIONS.length}+`);
     } finally {
       dispose();
     }

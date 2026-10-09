@@ -13,6 +13,7 @@ import { announcePolite } from "../../components/primitives/status";
 import type { RouteStore } from "../../state/routeState";
 import { type CatalogFilterPanelHandle, createCatalogFilterPanel } from "./catalogFilterPanel";
 import { type CatalogListHandle, createCatalogListView } from "./catalogListView";
+import { filtersFromParams, hasActiveFilters } from "./catalogModel";
 import { CatalogStore } from "./catalogStore";
 import { type ContextInspectorHandle, createContextInspector } from "./contextInspector";
 import type { SessionMeta } from "./contextSummary";
@@ -35,7 +36,14 @@ const FILTER_KEYS = [
 
 export const EMPTY_MESSAGE =
   "По запросу ничего не найдено. Измените параметры фильтрации или нажмите «Сбросить».";
+/** Пустой каталог БЕЗ фильтров: сбрасывать нечего — своя формулировка. */
+export const NO_FILTERS_EMPTY_MESSAGE = "Каталог пуст — нет сохранённых сессий.";
 export const LOADING_MESSAGE = "Загрузка списка сессий…";
+
+/** Текст пустой выдачи: с активными фильтрами — фильтровый, без них — свой. */
+export function emptyCatalogMessage(params: Record<string, string>): string {
+  return hasActiveFilters(filtersFromParams(params)) ? EMPTY_MESSAGE : NO_FILTERS_EMPTY_MESSAGE;
+}
 
 export interface CatalogWorkspaceOptions {
   client: LntApiClient;
@@ -194,7 +202,7 @@ export function mountCatalogWorkspace(
       return;
     }
     if (state.items.length === 0) {
-      list.setNotice("empty", EMPTY_MESSAGE);
+      list.setNotice("empty", emptyCatalogMessage(routes.get().params));
       return;
     }
     list.clearNotice();

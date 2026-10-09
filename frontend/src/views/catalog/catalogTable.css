@@ -37,9 +37,9 @@
 }
 
 .lnt-cat-workspace .tbl tbody tr {
-  /* Планка emil-design-eng: hover/прокрутка — десятки мс (100ms), отклик
-     выбора строки — 150ms (см. .lnt-cat-row-selected). */
-  transition: background-color var(--lnt-motion-fast) var(--lnt-ease-out);
+  /* Планка emil-design-eng: hover — смена цвета, кривая ease; десятки мс
+     (100ms). Отклик выбора строки — 150ms ease-out (см. .lnt-cat-row-selected). */
+  transition: background-color var(--lnt-motion-fast) var(--lnt-ease);
 }
 
 .lnt-cat-workspace .tbl tbody tr:hover {
@@ -57,6 +57,7 @@
 /* Обратная связь выбора строки: 150ms ease-out (частотное правило планки). */
 .lnt-cat-workspace .lnt-cat-row-selected {
   transition-duration: var(--lnt-t-select);
+  transition-timing-function: var(--lnt-ease-out);
 }
 
 .lnt-cat-workspace .tbl .num {

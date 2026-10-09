@@ -5,6 +5,13 @@ import { createV6ShellHeader, createV6ShellStatusbar } from "./v6Shell";
 
 const TAB_ROUTES = ["catalog", "capture", "inspect", "experiments", "reports", "settings"] as const;
 
+/** Один кадр rAF: монтажное окно оболочки закрывается после первой отрисовки. */
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
 const TITLES: Record<(typeof TAB_ROUTES)[number], string> = {
   catalog: "Каталог",
   capture: "Захват",
@@ -129,22 +136,46 @@ describe("таббар «Иконки-ярлыки» (todo 7 ui-refactor)", () =
     }
   });
 
-  it("data-mount живёт до первой реальной смены маршрута", () => {
-    // Given: входная анимация привязана к монтажу оболочки.
+  it("вход на холодном старте: is-entering на активном пункте, до отрисовки переносится с маршрутом", () => {
+    // Given: оболочка создана с маршрутом по умолчанию.
     const header = createV6ShellHeader({ activeRoute: "catalog" });
-    expect(header.root.hasAttribute("data-mount")).toBe(true);
+    const catalog = header.root.querySelector("#nav-catalog");
+    expect(catalog?.classList.contains("is-entering")).toBe(true);
 
-    // When: повтор того же маршрута (init вызывает setActiveRoute тем же маршрутом).
-    header.setActiveRoute("catalog");
-
-    // Then: вход не гаснет от служебного вызова.
-    expect(header.root.hasAttribute("data-mount")).toBe(true);
-
-    // When: реальная смена.
+    // When: холодный диплинк — маршрут разбирается до первой отрисовки.
     header.setActiveRoute("reports");
 
-    // Then: replay входа на частом действии невозможен.
-    expect(header.root.hasAttribute("data-mount")).toBe(false);
+    // Then: вход переехал на реальный маршрут, обрыва затухания нет.
+    const reports = header.root.querySelector("#nav-reports");
+    expect(reports?.classList.contains("is-entering")).toBe(true);
+    expect(catalog?.classList.contains("is-entering")).toBe(false);
+
+    // When: вход доиграл.
+    reports?.dispatchEvent(new Event("animationend"));
+
+    // Then: класс входа снят, следов на пункте не остаётся.
+    expect(reports?.classList.contains("is-entering")).toBe(false);
+  });
+
+  it("после первой отрисовки клик не переносит вход на нажатый пункт", async () => {
+    // Given: монтажное окно закрылось (первая отрисовка прошла), вход играет.
+    const header = createV6ShellHeader({ activeRoute: "catalog" });
+    await nextFrame();
+    await nextFrame();
+    const catalog = header.root.querySelector("#nav-catalog");
+    expect(catalog?.classList.contains("is-entering")).toBe(true);
+
+    // When: клик по другой вкладке.
+    header.setActiveRoute("reports");
+
+    // Then: новый пункт вход не получает (replay невозможен), старый доигрывает
+    // затухание и снимает класс на animationend.
+    expect(header.root.querySelector("#nav-reports")?.classList.contains("is-entering")).toBe(
+      false,
+    );
+    expect(catalog?.classList.contains("is-entering")).toBe(true);
+    catalog?.dispatchEvent(new Event("animationend"));
+    expect(catalog?.classList.contains("is-entering")).toBe(false);
   });
 
   it("worst-case: длинный ярлык остаётся в .lbl и не меняет имя пункта", () => {
@@ -174,19 +205,27 @@ describe("таббар «Иконки-ярлыки» (todo 7 ui-refactor)", () =
     expect(ruleBody(css, ".hdr .tabbar .snav-item.is-active")).toContain("var(--lnt-accent-tint)");
   });
 
-  it("CSS: вход только под data-mount и гасится prefers-reduced-motion", () => {
+  it("CSS: вход только под is-entering и гасится prefers-reduced-motion", () => {
     // Given
     const css = readShellCss();
 
     // Then: анимация входа привязана к монтажу, у активного пункта её нет.
     expect(ruleBody(css, ".hdr .tabbar .snav-item.is-active")).not.toMatch(/animation/);
-    expect(ruleBody(css, ".hdr[data-mount] .tabbar .snav-item.is-active")).toContain("lnt-nav-in");
-    expect(ruleBody(css, ".hdr[data-mount] .tabbar .snav-item.is-active")).toContain(
-      "var(--lnt-t-mount)",
-    );
+    expect(ruleBody(css, ".hdr .tabbar .snav-item.is-entering")).toContain("lnt-nav-in");
+    expect(ruleBody(css, ".hdr .tabbar .snav-item.is-entering")).toContain("var(--lnt-t-mount)");
     const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
-    expect(reduced).toContain(".hdr[data-mount] .tabbar .snav-item.is-active");
+    expect(reduced).toContain(".hdr .tabbar .snav-item.is-entering");
     expect(reduced).toMatch(/animation:\s*none/);
+  });
+
+  it("CSS: нажатие пункта даёт отклик scale, в reduced-motion он снят", () => {
+    // Given
+    const css = readShellCss();
+
+    // Then: планка emil-design-eng — pressable элемент отвечает scale(0.97).
+    expect(ruleBody(css, ".hdr .tabbar .snav-item:active")).toContain("scale(0.97)");
+    const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(ruleBody(reduced, ".hdr .tabbar .snav-item:active")).toContain("transform: none");
   });
 
   it("CSS: на <=767px ярлык скрыт, пункт держит тач-таргет 44px", () => {

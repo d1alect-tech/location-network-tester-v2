@@ -71,9 +71,18 @@ export function createFieldsSection(context: {
   ]);
 }
 
+/** Тон баннера восстановления: предупреждение — контекст цел, но журнал с
+ * предупреждением; подсказка — контекста ещё нет; красный остаётся только у
+ * реального повреждения (семантика тона, а не один красный на всё). */
+function recoveryTone(health: string): string {
+  if (health === "context_valid") return " banner-warn";
+  if (health === "context_absent") return " banner-info";
+  return "";
+}
+
 export function createRecoveryPanel(reasonCodes: string[], health: string): HTMLElement {
   const panel = el("div", {
-    className: "banner lnt-cat-recovery",
+    className: `banner lnt-cat-recovery${recoveryTone(health)}`,
     attrs: { role: "note", "aria-label": "Состояние контекста" },
   });
   const summary =

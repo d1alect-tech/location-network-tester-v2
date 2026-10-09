@@ -175,10 +175,14 @@
     background-color var(--lnt-xr-hover) ease;
 }
 
-.lnt-xr-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--lnt-line-hot);
-  background-color: var(--lnt-bg-selected);
+/* Hover карточки — только на устройствах с курсором: на таче липкий hover
+ * оставлял бы карточку «приподнятой» после тапа (планка emil-design-eng). */
+@media (hover: hover) and (pointer: fine) {
+  .lnt-xr-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--lnt-line-hot);
+    background-color: var(--lnt-bg-selected);
+  }
 }
 
 .lnt-xr-card-top {

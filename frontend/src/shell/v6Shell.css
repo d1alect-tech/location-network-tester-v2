@@ -57,7 +57,8 @@
   border: var(--lnt-border-width) solid transparent;
   border-radius: var(--lnt-r-ctl);
   transition: background-color var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
-    var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
+    var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-motion-fast)
+    var(--lnt-ease-out);
 }
 
 .hdr .tabbar .snav-item .ico {
@@ -89,6 +90,8 @@
 .hdr .tabbar .snav-item:active {
   background: var(--lnt-canvas);
   color: var(--lnt-text);
+  /* Отклик на нажатие: планка emil-design-eng, 100–160ms ease-out. */
+  transform: scale(0.97);
 }
 
 .hdr .tabbar .snav-item.is-active {
@@ -106,9 +109,10 @@
   content: none;
 }
 
-/* Вход играет только на монтаже оболочки: data-mount снимается первой
- * реальной сменой маршрута, поэтому на кликах анимация не повторяется. */
-.hdr[data-mount] .tabbar .snav-item.is-active {
+/* Вход играет только на монтаже оболочки: is-entering ставится активному
+ * пункту при создании и снимается на animationend, поэтому холодный диплинк
+ * (маршрут разбирается до первой отрисовки) вход получает, а клики — нет. */
+.hdr .tabbar .snav-item.is-entering {
   animation: lnt-nav-in var(--lnt-t-mount) var(--lnt-ease-out) both;
 }
 
@@ -129,8 +133,12 @@
     transition: none;
   }
 
-  .hdr[data-mount] .tabbar .snav-item.is-active {
+  .hdr .tabbar .snav-item.is-entering {
     animation: none;
+  }
+
+  .hdr .tabbar .snav-item:active {
+    transform: none;
   }
 }
 

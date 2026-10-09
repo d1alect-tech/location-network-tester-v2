@@ -74,23 +74,68 @@ export function createV6ShellHeader(opts: V6ShellHeaderOpts): V6ShellHeader {
   }
   applyActive(links, opts.activeRoute);
   const device = el("span", { className: "hdr-status", text: "устройство · готов" });
-  // data-mount: входная анимация играет только на монтаже оболочки.
-  const root = el("header", { className: "hdr", attrs: { "data-mount": "" } }, [
+  const root = el("header", { className: "hdr" }, [
     el("span", { className: "hdr-brand", text: "LNT" }),
     nav,
     device,
   ]);
+
+  // Вход таббара: класс is-entering держит активный пункт до animationend,
+  // поэтому первое разрешение маршрута (холодный диплинк разбирает URL до
+  // первой отрисовки) переносит вход без обрыва затухания, а клики по
+  // вкладкам после первой отрисовки вход не повторяют.
+  let enteringLink: HTMLAnchorElement | null = null;
+  let enteringOff: (() => void) | null = null;
+  function markEntering(link: HTMLAnchorElement): void {
+    if (enteringLink === link) return;
+    enteringOff?.();
+    enteringLink?.classList.remove("is-entering");
+    enteringLink = link;
+    link.classList.add("is-entering");
+    const abort = new AbortController();
+    link.addEventListener(
+      "animationend",
+      () => {
+        link.classList.remove("is-entering");
+        if (enteringLink === link) enteringLink = null;
+      },
+      { once: true, signal: abort.signal },
+    );
+    enteringOff = () => abort.abort();
+  }
+  const linkOf = (route: string): HTMLAnchorElement | null =>
+    links.find((link) => link.dataset.route === route) ?? null;
+
+  // Монтажное окно закрывается после первой отрисовки (двойной rAF), а не на
+  // первой смене маршрута: до отрисовки смена переносит вход, после — клик.
+  let mounted = true;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      mounted = false;
+      // reduced-motion: animationend не придёт (animation: none) — класс входа
+      // снимаем вместе с монтажным окном, он уже ничего не рисует.
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        enteringOff?.();
+        enteringLink?.classList.remove("is-entering");
+        enteringLink = null;
+      }
+    });
+  });
+
+  const initial = linkOf(opts.activeRoute);
+  if (initial !== null) markEntering(initial);
+
   let current = opts.activeRoute;
   return {
     root,
     setActiveRoute(route: string): void {
-      // Смена маршрута — частое действие: вход не повторяется, data-mount
-      // снимается при первой РЕАЛЬНОЙ смене (повтор того же маршрута не в счёт).
-      if (route !== current) {
-        root.removeAttribute("data-mount");
-      }
+      const changed = route !== current;
       current = route;
       applyActive(links, route);
+      if (changed && mounted) {
+        const active = linkOf(route);
+        if (active !== null) markEntering(active);
+      }
     },
     setDeviceStatus(text: string): void {
       device.textContent = text;
