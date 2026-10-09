@@ -55,6 +55,19 @@
   --lnt-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --lnt-t-select: 150ms;
   --lnt-t-enter: 200ms;
+  /* Вход таббара оболочки: только монтаж, 180ms ease-out (прототип, вариант 3). */
+  --lnt-t-mount: 180ms;
+
+  /* Таббар оболочки «Иконки-ярлыки» (todo 7 ui-refactor): высота строки шапки
+     и пункта, пол сужения пункта и предел ярлыка до эллипсиса; тон активной
+     подложки — производная --lnt-accent, не разовый цвет. */
+  --lnt-hdr-h: 40px;
+  --lnt-nav-item-h: 28px;
+  --lnt-nav-item-min: 56px;
+  --lnt-nav-label-cap: 150px;
+  --lnt-ico: 16px;
+  --lnt-accent-tint: rgb(86 129 255 / 0.16);
+  --lnt-accent-tint-line: rgb(86 129 255 / 0.38);
 
   /* U4: нейтральная шкала R3-A «Стойка» дефолтом; акцент #5681FF оставлен (Q2). */
   --lnt-canvas: #17191c;

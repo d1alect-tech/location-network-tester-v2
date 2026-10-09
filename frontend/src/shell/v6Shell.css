@@ -1,7 +1,9 @@
 .hdr {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 16px;
+  min-height: var(--lnt-hdr-h);
   padding: 0 12px;
   background: var(--lnt-chrome);
   border-bottom: 1px solid var(--lnt-line);
@@ -26,13 +28,110 @@
   margin-left: auto;
 }
 
+/* Таббар оболочки «Иконки-ярлыки» (todo 7 ui-refactor): пункт = глиф 16px +
+ * короткий ярлык; активный — тон глифа и тонированная подложка с тон-рамкой.
+ * Переключается только тон, геометрия пункта не двигается (частое действие).
+ * Скоуп .hdr намеренный: классы .tabbar/.snav-item делят панели каталога и
+ * экспериментов — их базовые правила ниже остаются их контрактом. */
 .hdr .tabbar {
   display: flex;
-  align-items: stretch;
-  gap: 4px;
+  align-items: center;
+  gap: var(--lnt-space-2);
   flex: 1;
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.hdr .tabbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hdr .tabbar .snav-item {
+  box-sizing: border-box;
+  gap: var(--lnt-space-2);
+  flex: 0 1 auto;
+  min-width: var(--lnt-nav-item-min);
+  height: var(--lnt-nav-item-h);
+  padding: 0 var(--lnt-space-3);
+  border: var(--lnt-border-width) solid transparent;
+  border-radius: var(--lnt-r-ctl);
+  transition: background-color var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
+    var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.hdr .tabbar .snav-item .ico {
+  width: var(--lnt-ico);
+  height: var(--lnt-ico);
+  flex: none;
+  color: var(--lnt-text-dim);
+  transition: color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+/* Ярлык эллипсуется до --lnt-nav-label-cap: длинное имя не ломает хром. */
+.hdr .tabbar .snav-item .lbl {
+  display: block;
+  max-width: var(--lnt-nav-label-cap);
   overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hdr .tabbar .snav-item:hover {
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+}
+
+.hdr .tabbar .snav-item:hover .ico {
+  color: var(--lnt-text-sec);
+}
+
+.hdr .tabbar .snav-item:active {
+  background: var(--lnt-canvas);
+  color: var(--lnt-text);
+}
+
+.hdr .tabbar .snav-item.is-active {
+  background: var(--lnt-accent-tint);
+  border-color: var(--lnt-accent-tint-line);
+  color: var(--lnt-text);
+}
+
+.hdr .tabbar .snav-item.is-active .ico {
+  color: var(--lnt-accent);
+}
+
+/* Индикация тоном: акцентная полоса базового правила в шапке не нужна. */
+.hdr .tabbar .snav-item.is-active::before {
+  content: none;
+}
+
+/* Вход играет только на монтаже оболочки: data-mount снимается первой
+ * реальной сменой маршрута, поэтому на кликах анимация не повторяется. */
+.hdr[data-mount] .tabbar .snav-item.is-active {
+  animation: lnt-nav-in var(--lnt-t-mount) var(--lnt-ease-out) both;
+}
+
+@keyframes lnt-nav-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* prefers-reduced-motion: тон и подложка остаются, движение уходит. */
+@media (prefers-reduced-motion: reduce) {
+  .hdr .tabbar .snav-item,
+  .hdr .tabbar .snav-item .ico {
+    transition: none;
+  }
+
+  .hdr[data-mount] .tabbar .snav-item.is-active {
+    animation: none;
+  }
 }
 
 /* Пункт таббара: 13px w500, активный — 2px акцентная полоса снизу (§2.3). */
@@ -109,7 +208,27 @@
 }
 
 @media (max-width: 767px) {
+  .hdr {
+    gap: var(--lnt-space-2);
+    padding: 0 var(--lnt-space-2);
+    min-height: 52px;
+  }
+
   .hdr .tabbar {
-    overflow-x: auto;
+    gap: var(--lnt-space-1);
+  }
+
+  /* Ярлык уходит, глиф остаётся: тач-таргет 44px держит контракт a11y. */
+  .hdr .tabbar .snav-item {
+    flex: 0 0 auto;
+    width: var(--lnt-touch-target-min);
+    height: var(--lnt-touch-target-min);
+    min-width: 0;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .hdr .tabbar .snav-item .lbl {
+    display: none;
   }
 }

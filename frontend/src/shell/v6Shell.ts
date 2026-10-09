@@ -1,5 +1,6 @@
 import "./v6Shell.css";
 import { el } from "../components/primitives/dom";
+import { navIcon } from "./navIcons";
 
 export const V6_ROUTES = [
   "catalog",
@@ -51,27 +52,44 @@ export function createV6ShellHeader(opts: V6ShellHeaderOpts): V6ShellHeader {
   const links: HTMLAnchorElement[] = [];
   const nav = el("nav", { className: "tabbar", attrs: { "aria-label": "Разделы" } });
   for (const route of V6_ROUTES) {
-    const link = el("a", {
-      className: "snav-item",
-      text: TITLES[route],
-      attrs: {
-        id: `nav-${route}`,
-        href: `#/${route}`,
-        "data-route": route,
+    const label = TITLES[route];
+    // Пункт «Иконки-ярлыки»: глиф + короткий ярлык; aria-label держит имя
+    // пункта и на узком вьюпорте, где ярлык скрыт (иконка aria-hidden).
+    const link = el(
+      "a",
+      {
+        className: "snav-item",
+        attrs: {
+          id: `nav-${route}`,
+          href: `#/${route}`,
+          "data-route": route,
+          title: label,
+          "aria-label": label,
+        },
       },
-    });
+      [navIcon(route), el("span", { className: "lbl", text: label })],
+    );
     links.push(link);
     nav.append(link);
   }
   applyActive(links, opts.activeRoute);
   const device = el("span", { className: "hdr-status", text: "устройство · готов" });
+  // data-mount: входная анимация играет только на монтаже оболочки.
+  const root = el("header", { className: "hdr", attrs: { "data-mount": "" } }, [
+    el("span", { className: "hdr-brand", text: "LNT" }),
+    nav,
+    device,
+  ]);
+  let current = opts.activeRoute;
   return {
-    root: el("header", { className: "hdr" }, [
-      el("span", { className: "hdr-brand", text: "LNT" }),
-      nav,
-      device,
-    ]),
+    root,
     setActiveRoute(route: string): void {
+      // Смена маршрута — частое действие: вход не повторяется, data-mount
+      // снимается при первой РЕАЛЬНОЙ смене (повтор того же маршрута не в счёт).
+      if (route !== current) {
+        root.removeAttribute("data-mount");
+      }
+      current = route;
       applyActive(links, route);
     },
     setDeviceStatus(text: string): void {

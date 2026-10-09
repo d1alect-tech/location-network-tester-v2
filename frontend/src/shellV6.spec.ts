@@ -13,6 +13,15 @@ const TABS = 6; // Каталог, Захват, Инспекция, Экспе�
 
 const ROUTES = ["catalog", "capture", "inspect", "experiments", "reports", "settings"] as const;
 
+const TITLES: Record<(typeof ROUTES)[number], string> = {
+  catalog: "Каталог",
+  capture: "Захват",
+  inspect: "Инспекция",
+  experiments: "Эксперименты",
+  reports: "Отчёты",
+  settings: "Настройки",
+};
+
 function mockInspectApi(backend: MockLntBackend): void {
   backend.seedCatalog([
     {
@@ -57,6 +66,10 @@ test("S1: общая V6-шапка и статус-бар на всех марш
     await expect(header, `маршрут #/${route}: шапка .hdr`).toBeVisible();
     await expect(header.locator(".hdr-brand")).toHaveText("LNT");
     await expect(header.locator(".tabbar a.snav-item")).toHaveCount(TABS);
+    // Supersession: пункт теперь «Иконки-ярлыки» — глиф .ico обязателен у каждого.
+    await expect(header.locator(".tabbar a.snav-item svg.ico[aria-hidden='true']")).toHaveCount(
+      TABS,
+    );
     // Статус-бар внизу.
     await expect(page.locator("footer.statusbar"), `маршрут #/${route}: статус-бар`).toBeVisible();
     // Старой шапки больше нет нигде.
@@ -114,4 +127,107 @@ test("S2b: персона 375px — общая оболочка без гори�
     await expect(page.locator(".error-panel")).toHaveCount(0);
     await noHorizontalOverflow(page);
   }
+});
+
+test("S3: пункт = глиф + ярлык; активный тонирован, font-weight не прыгает", async ({ page }) => {
+  mockInspectApi(installMockBackend(page));
+  await page.goto(`${BASE}#/catalog`);
+  const header = page.locator("header.hdr");
+  for (const route of ROUTES) {
+    const item = header.locator(`#nav-${route}`);
+    await expect(item.locator(".lbl"), `ярлык ${route}`).toHaveText(TITLES[route]);
+    await expect(item, `имя пункта ${route}`).toHaveAttribute("aria-label", TITLES[route]);
+  }
+  const active = header.locator(".tabbar a.snav-item.is-active");
+  await expect(active).toHaveCSS("background-color", "rgba(86, 129, 255, 0.16)");
+  await expect(active).toHaveCSS("border-top-color", "rgba(86, 129, 255, 0.38)");
+  await expect(active.locator(".ico")).toHaveCSS("color", "rgb(86, 129, 255)");
+  const inactive = header.locator("#nav-capture");
+  await expect(inactive.locator(".ico")).toHaveCSS("color", "rgb(122, 130, 140)");
+  // Индикация тоном: полосы ::before у активного пункта шапки больше нет.
+  await expect(active).toHaveCSS("background-image", "none");
+  const weight = (locator: typeof active) =>
+    locator.evaluate((n) => getComputedStyle(n).fontWeight);
+  expect(await weight(active), "fw активного равен fw неактивного").toBe(await weight(inactive));
+});
+
+test("S4: смена вкладки — вход не повторяется, геометрия соседей не двинута", async ({ page }) => {
+  mockInspectApi(installMockBackend(page));
+  await page.goto(`${BASE}#/catalog`);
+  // Вход играет ровно один раз на монтаже оболочки.
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .some((a) => a instanceof CSSAnimation && a.animationName === "lnt-nav-in"),
+  );
+  await page.waitForFunction(() => {
+    const entrance = document
+      .getAnimations()
+      .find((a) => a instanceof CSSAnimation && a.animationName === "lnt-nav-in");
+    return entrance === undefined || entrance.playState === "finished";
+  });
+  const rects = () =>
+    [...document.querySelectorAll("header.hdr .tabbar a.snav-item")].map((node) => {
+      const box = node.getBoundingClientRect();
+      return [box.x, box.y, box.width, box.height];
+    });
+  const before = await page.evaluate(rects);
+
+  await page.click("#nav-reports");
+  await expect(page.locator("#nav-reports")).toHaveAttribute("aria-current", "page");
+
+  const replay = await page.evaluate(
+    () =>
+      document
+        .getAnimations()
+        .filter(
+          (a) =>
+            a instanceof CSSAnimation &&
+            a.animationName === "lnt-nav-in" &&
+            a.playState === "running",
+        ).length,
+  );
+  expect(replay, "вход не повторяется на смене вкладки").toBe(0);
+  expect(await page.evaluate(rects), "геометрия пунктов не двинулась").toEqual(before);
+});
+
+test("S5: 390px — ярлык уходит, глиф и тач-таргет 44px остаются", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  mockInspectApi(installMockBackend(page));
+  await page.goto(`${BASE}#/catalog`);
+  await expect(page.locator("header.hdr .tabbar a.snav-item")).toHaveCount(TABS);
+  await expect(page.locator("#nav-catalog .lbl")).toBeHidden();
+  const box = await page.locator("#nav-catalog").boundingBox();
+  expect(box?.width).toBeGreaterThanOrEqual(44);
+  expect(box?.height).toBeGreaterThanOrEqual(44);
+  await expect(page.locator("#nav-catalog")).toHaveAttribute("aria-label", TITLES.catalog);
+  await noHorizontalOverflow(page);
+});
+
+test("S6: prefers-reduced-motion — входа и переходов тона нет", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  mockInspectApi(installMockBackend(page));
+  await page.goto(`${BASE}#/catalog`);
+  const active = page.locator("header.hdr .tabbar a.snav-item.is-active");
+  await expect(active).toHaveCount(1);
+  await expect(active).toHaveCSS("animation-name", "none");
+  await expect(active).toHaveCSS("transition-duration", "0s");
+});
+
+test("S7: worst-case длинный ярлык эллипсуется, хром не ломается", async ({ page }) => {
+  mockInspectApi(installMockBackend(page));
+  await page.goto(`${BASE}#/catalog`);
+  const header = page.locator("header.hdr");
+  await expect(header.locator(".tabbar a.snav-item")).toHaveCount(TABS);
+  const heightBefore = (await header.boundingBox())?.height;
+
+  await page.evaluate(() => {
+    const lbl = document.querySelector("#nav-experiments .lbl") as HTMLElement;
+    lbl.textContent = "Прослеживаемость измерений и калибровочные коэффициенты стенда";
+  });
+  const lbl = page.locator("#nav-experiments .lbl");
+  await expect(lbl).toBeVisible();
+  expect(await lbl.evaluate((n) => n.scrollWidth > n.clientWidth), "ярлык эллипсован").toBe(true);
+  expect((await header.boundingBox())?.height, "высота шапки не изменилась").toBe(heightBefore);
+  await noHorizontalOverflow(page);
 });
