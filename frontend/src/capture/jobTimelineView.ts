@@ -5,6 +5,7 @@
 import { openDialog } from "../components/primitives/dialog";
 import { el } from "../components/primitives/dom";
 import { announcePolite, createJobProgress } from "../components/primitives/status";
+import { serializeLocation } from "../state/routeState";
 import {
   STAGE_LABELS_RU,
   STATUS_LABELS_RU,
@@ -27,6 +28,19 @@ export interface TimelineViewDeps {
 export interface TimelineViewHandle {
   root: HTMLElement;
   update(state: TimelineState): void;
+}
+
+/** Записанная сессия открывается в инспекции: #/inspect?a=<id> — зеркало
+ * captureDeepLink (обратный переход capture -> inspect). Без идентификатора
+ * остаётся текст: ссылаться не на что, а выдуманного id в URL быть не должно. */
+function writtenSessionNode(name: string): Text | HTMLElement {
+  const id = name.trim();
+  if (id === "") return document.createTextNode(name);
+  return el("a", {
+    className: "capture-written-link",
+    text: name,
+    attrs: { href: serializeLocation({ route: "inspect", params: { a: id } }) },
+  });
 }
 
 export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandle {
@@ -201,7 +215,9 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
             "ul",
             { className: "capture-written-list" },
             snapshot.written_sessions.map((name) =>
-              el("li", { className: "capture-written-item lnt-mono cell-wrap", text: name }),
+              el("li", { className: "capture-written-item lnt-mono cell-wrap" }, [
+                writtenSessionNode(name),
+              ]),
             ),
           ),
         );

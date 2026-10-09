@@ -1,13 +1,13 @@
 {
-  "_chartshell.CWUmM7kI.css": {
-    "file": "assets/chartshell.CWUmM7kI.css",
-    "src": "_chartshell.CWUmM7kI.css"
+  "_chartshell.C01xOvsl.css": {
+    "file": "assets/chartshell.C01xOvsl.css",
+    "src": "_chartshell.C01xOvsl.css"
   },
-  "_chartshell.mk7zSw5H.js": {
-    "file": "assets/chartshell.mk7zSw5H.js",
+  "_chartshell.C0ugc3w8.js": {
+    "file": "assets/chartshell.C0ugc3w8.js",
     "name": "chartshell",
     "css": [
-      "assets/chartshell.CWUmM7kI.css"
+      "assets/chartshell.C01xOvsl.css"
     ],
     "assets": [
       "assets/inter-cyrillic-wght-normal.DqGufNeO.woff2",
@@ -111,12 +111,12 @@
     "src": "_variantV1.CCz54TsC.css"
   },
   "index.html": {
-    "file": "assets/main.DlecfiKr.js",
+    "file": "assets/main.Bq_Jy2ls.js",
     "name": "main",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.mk7zSw5H.js",
+      "_chartshell.C0ugc3w8.js",
       "_spectrogramPalette.CfMVLFb-.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
@@ -278,12 +278,12 @@
     ]
   },
   "showcase.html": {
-    "file": "assets/showcase.DtldzuSS.js",
+    "file": "assets/showcase.DnXDa--b.js",
     "name": "showcase",
     "src": "showcase.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.mk7zSw5H.js"
+      "_chartshell.C0ugc3w8.js"
     ]
   },
   "src/showcase-redesign/fonts/IBMPlexMono-Medium.woff2": {

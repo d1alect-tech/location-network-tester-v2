@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { JobSnapshot } from "../api/types-jobs";
+import { parseHash } from "../state/routeState";
 import { applySnapshot, initialTimeline } from "./jobTimeline";
 import { createJobTimelineView } from "./jobTimelineView";
 
@@ -153,5 +154,66 @@ describe("createJobTimelineView: пояснение границы отмены"
 
     // Then
     expect(note?.hidden).toBe(true);
+  });
+});
+
+describe("createJobTimelineView: записанная сессия открывается в инспекции", () => {
+  const SESSION_ID = "2026-09-05T10-00-00_rc_measurement";
+
+  function writtenView(names: readonly string[]) {
+    const view = createJobTimelineView({ onCancel: vi.fn(), onRetry: vi.fn() });
+    document.body.replaceChildren(view.root);
+    view.update(
+      applySnapshot(
+        initialTimeline,
+        snap({ version: 2, status: "succeeded", written_sessions: [...names] }),
+      ),
+    );
+    return view;
+  }
+
+  it("элемент .capture-written-item несёт ссылку на маршрут инспекции", () => {
+    // Given / When
+    const view = writtenView([SESSION_ID]);
+
+    // Then: класс и текст элемента сохранены (пины capture.spec.ts:94,215)
+    const item = view.root.querySelector(".capture-written-item");
+    expect(item?.textContent).toBe(SESSION_ID);
+    const link = item?.querySelector("a");
+    expect(link).not.toBeNull();
+    // href разбирается каноническим парсером маршрутов продукта: тот же
+    // переход, который выполняет клик в браузере.
+    expect(parseHash(link?.getAttribute("href") ?? "")).toEqual({
+      route: "inspect",
+      params: { a: SESSION_ID },
+    });
+  });
+
+  it("клик по записанной сессии доходит до ссылки и не отменяется", () => {
+    // Given
+    const view = writtenView([SESSION_ID]);
+    const link = view.root.querySelector<HTMLAnchorElement>(".capture-written-item a");
+    const seen: { href: string | null; prevented: boolean }[] = [];
+    link?.addEventListener("click", (event) => {
+      seen.push({ href: link?.getAttribute("href") ?? null, prevented: event.defaultPrevented });
+    });
+
+    // When
+    link?.click();
+
+    // Then: jsdom не выполняет фрагмент-переход, поэтому саму навигацию
+    // проверяет e2e captureWrittenSession.spec.ts в настоящем браузере; здесь —
+    // что клик попадает в ссылку с каноническим href и ничем не отменён.
+    expect(seen).toEqual([{ href: `#/inspect?a=${SESSION_ID}`, prevented: false }]);
+  });
+
+  it("без идентификатора сессии элемент остаётся текстом без ссылки", () => {
+    // Given / When
+    const view = writtenView(["   "]);
+
+    // Then
+    const item = view.root.querySelector(".capture-written-item");
+    expect(item?.textContent).toBe("   ");
+    expect(item?.querySelector("a")).toBeNull();
   });
 });
