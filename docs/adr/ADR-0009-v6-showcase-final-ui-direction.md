@@ -72,8 +72,12 @@
 - **Визуальные артефакты приёмки**:
   `.omo/start-work/evidence/task-redesign-round2/v6-*.png`.
 - **Что уже существует в боевом коде, а что дизайн-предложение**: реальная
-  спектрограмма продукта — `frontend/src/components/charts/spectrogramView.ts`
-  (ECharts-heatmap, тайлы из npz, маркеры, зум). Витринный грам — синтетическая
+  спектрограмма продукта — live-грам захвата
+  `frontend/src/capture/spectrogramLiveRenderer.ts` и окно время×частота
+  инспекции `frontend/src/views/inspect/gramPair.ts`/`spectrogramOrient.ts`
+  поверх `components/charts/spectrogramModel.ts`/`spectrogramSetup.ts`
+  (ECharts-heatmap, тайлы из npz, маркеры, зум); путь уточнён после удаления
+  мёртвого charts-кластера (волна 0a). Витринный грам — синтетическая
   canvas-версия для дизайна. При переносе брать тезисы и посадку из витрины,
   а реализацию — из существующих боевых компонентов; не переносить синтетику.
 - Витрины V1–V5 — история поиска, не разрабатываются.

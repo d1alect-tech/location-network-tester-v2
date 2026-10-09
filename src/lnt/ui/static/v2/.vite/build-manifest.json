@@ -89,7 +89,7 @@
     "src/components/channelbar/channelbar.ts": "4afd85130ae0426c7447d24e4ffa334205018e81c32528f0d5555a9c4b38030d",
     "src/components/charts/AGENTS.md": "3c0204402962c929838a64b3d51c567ee99abc276c0498e30ca710e7e68f47b6",
     "src/components/charts/annotations.ts": "7dd01604da3ddfcc2afe3c3a20c996a80789900345da37bd976f55c7963509b6",
-    "src/components/charts/charts.baseline.test.ts": "e62c56f312da6c607136d5d33dd2e6ab6171dcd3304164e191cbb6178e761dbc",
+    "src/components/charts/charts.baseline.test.ts": "6a66d52a9485748cbf89ce632275ed0c6098bb42a3b7921a932cd8c79b698c5c",
     "src/components/charts/charts.css": "38e99493c5cb4c1d3cd1dcd639c7819cd466a6c46e4e2be1604567167777b700",
     "src/components/charts/echarts.ts": "1e5d679e940d03e896605d311600154cd09c106082d241e783f22f06bec63ee9",
     "src/components/charts/npz.test.ts": "c323f816f46ab0dd1d6797de6272de104204b5012f0b94dc6249f9e6d2ce7480",

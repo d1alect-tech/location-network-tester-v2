@@ -30,7 +30,7 @@
 
 ## CONVENTIONS
 
-- TDD RED→GREEN; module ≤250 pure LOC (`tests/test_module_size.py`). The ledger is EMPTY since D3 (spectrogramView 269→127, split into `spectrogramViewOption`/`spectrogramTiles`/`spectrogramMarkers`) — every module must pass on its own. Split, never add an entry.
+- TDD RED→GREEN; module ≤250 pure LOC (`tests/test_module_size.py`). The ledger is EMPTY since D3 (the D3 split modules were later deleted with the dead charts cluster, wave 0a) — every module must pass on its own. Split, never add an entry.
 - `uv run --python 3.12` everything; ruff `ALL` (RUF001-003 off for Russian text); basedpyright `all`; biome + `tsc --noEmit` strict for frontend.
 - CLI exits 0/1/2/3, one-line stderr, no traceback. Sessions atomic `.partial-*` + rename. Compare deltas `B - A`.
 - Tests: `*.test.ts` = vitest, `*.spec.ts` = playwright (vite :4101, `installMockBackend` + `pumpAll`), `tests/js/*.mjs` = node:test.

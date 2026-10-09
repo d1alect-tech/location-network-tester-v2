@@ -29,7 +29,7 @@ function makeFetch(
   return { fetch: impl as unknown as typeof fetch, calls };
 }
 
-describe("графики workbench: характеризация до todo 41", () => {
+describe("графики: характеризация plots API до todo 41", () => {
   it("plots API запрашивает закреплённые эндпоинты с лимитами точек", async () => {
     const { fetch, calls } = makeFetch((url) => {
       if (url.includes("/spectrum")) {
