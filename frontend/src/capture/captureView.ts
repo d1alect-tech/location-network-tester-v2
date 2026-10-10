@@ -1,9 +1,10 @@
-/** Представление раздела «Захват»: mode-first форма, предпросмотр профиля,
- * диагностика устройства с preflight, хронология задачи через SSE.
- * Мутации идут через доменный клиент (nonce); занятость блокирует запуск
- * осознанно с объявлением причины. Поток запуска и восстановление задачи
- * вынесены в captureStartFlow/captureRecovery (сплит под потолок 250 чистых
- * LOC); разметка раздела и его поведение не менялись. */
+/** Представление раздела «Захват»: пошаговый визард (вариант-победитель G4)
+ * — шаг 1 режим и источник, шаг 2 параметры с эхом и превью, шаг 3 запуск,
+ * устройство, live-грам и журнал задачи. Мутации идут через доменный клиент
+ * (nonce); занятость блокирует запуск осознанно с объявлением причины.
+ * Поток запуска, восстановление задачи и машина шагов вынесены в
+ * captureStartFlow/captureRecovery/captureSteps (сплит под потолок 250
+ * чистых LOC); e2e-пины сохранены дуал-классами и прежними селекторами. */
 
 import type { LntApiClient } from "../api/client";
 import { createDeviceApi } from "../api/client-device";
@@ -17,6 +18,8 @@ import type { CapturePrefill } from "./captureDeepLink";
 import { createCaptureRecovery } from "./captureRecovery";
 import { createCaptureStartFlow } from "./captureStartFlow";
 import type { CaptureFlowState, CaptureStartFlowHandle } from "./captureStartFlow";
+import { createCaptureSteps } from "./captureSteps";
+import type { CaptureStepsHandle } from "./captureSteps";
 import { mountCaptureChannelbar } from "./channelbarCapture";
 import { createDevicePanel } from "./devicePanel";
 import type { DevicePanelHandle } from "./devicePanel";
@@ -86,6 +89,10 @@ export function createCaptureView(
     text: "Проверить устройство",
     attrs: { type: "button" },
   }) as HTMLButtonElement;
+  const startRow = el("div", { className: "capture-start-row form-actions" }, [
+    startButton,
+    deviceRefreshButton,
+  ]);
 
   const refreshPreview = (): void => {
     alert.hide();
@@ -118,11 +125,36 @@ export function createCaptureView(
     attachStream: recovery.attachStream,
   });
 
-  startButton.addEventListener("click", () => {
+  // Валидация шага 2 — существующий per-mode гейт validateCaptureForm:
+  // ошибки рисуются на полях, причина объявляется, фокус — на первом ошибочном.
+  const validateStep2 = (): boolean => {
     const { valid, errors } = validateCaptureForm(form.values());
+    if (valid !== null) {
+      form.clearErrors();
+      return true;
+    }
+    form.setErrors(errors);
+    announcePolite("Форма содержит ошибки: исправьте выделенные поля.");
+    form.focusFirstInvalid();
+    return false;
+  };
+
+  // Визард (G4): рельс и панели шагов; шаг 3 забирает стартовую строку,
+  // устройство, live-грам и хронологию (журнал и записанные сессии живут там).
+  const steps: CaptureStepsHandle = createCaptureSteps({
+    form: form.root,
+    sections: form.sections,
+    launch: [alert.line, startRow, devicePanel.root, liveGram.root, timeline.root],
+    validateStep2,
+    onStep: () => steps.renderEcho(form.getMode(), form.getSource()),
+  });
+
+  startButton.addEventListener("click", () => {
+    const { valid } = validateCaptureForm(form.values());
     if (valid === null) {
-      form.setErrors(errors);
-      announcePolite("Форма содержит ошибки: исправьте выделенные поля.");
+      // Поля с ошибками живут на шаге 2: возвращаем туда и объявляем причину.
+      steps.show(2);
+      validateStep2();
       return;
     }
     form.clearErrors();
@@ -139,40 +171,56 @@ export function createCaptureView(
         }
       });
   });
-  form.onChange(refreshPreview);
+  form.onChange(() => {
+    refreshPreview();
+    steps.renderEcho(form.getMode(), form.getSource());
+  });
   const channelbar = mountCaptureChannelbar(form);
 
   const previewContainer = el("aside", {
     className: "capture-preview panel",
     attrs: { "aria-label": "Профиль записи" },
   });
+  // Боковая колонка визарда — только превью профиля (устройство и live-грам
+  // переехали на шаг 3); превью живо на всех шагах и обновляется на каждое
+  // изменение формы.
+  const stepMain = el("div", { className: "capture-form-column capture-step-main is-entering" }, [
+    form.root,
+    steps.panel3,
+  ]);
+  // Вход играет один раз на монтировании: переход между шагами — частое
+  // действие и остаётся без анимации (моушен-правило волны).
+  stepMain.addEventListener("animationend", (event) => {
+    if (event.target === stepMain) stepMain.classList.remove("is-entering");
+  });
   const root = el(
     "section",
     { className: "capture-view t-page", attrs: { "data-density": "default" } },
     [
       el("h2", { className: "view-title t-page", text: "Захват" }),
+      el("p", {
+        className: "capture-wizard-sub lnt-hint",
+        text: "Три шага: режим → параметры → запуск. Журнал задачи — на шаге 3.",
+      }),
       channelbar.root,
-      el("div", { className: "capture-layout" }, [
-        el("div", { className: "capture-form-column" }, [
-          form.root,
-          alert.line,
-          el("div", { className: "capture-start-row form-actions" }, [
-            startButton,
-            deviceRefreshButton,
-          ]),
-        ]),
-        el("div", { className: "capture-side-column" }, [
-          previewContainer,
-          devicePanel.root,
-          liveGram.root,
-        ]),
+      el("div", { className: "capture-layout capture-wizard" }, [
+        steps.rail,
+        stepMain,
+        el("div", { className: "capture-side-column" }, [previewContainer]),
       ]),
-      timeline.root,
     ],
   );
 
   refreshPreview();
-  void recovery.recoverActiveJobOnMount();
+  steps.renderEcho(form.getMode(), form.getSource());
+  // Deep-link билет из инспекции: если режим/источник уже решены — открываем
+  // шаг 2 (пустой префилл — обычный вход с шага 1; captureParamsToPrefill
+  // возвращает {} и для маршрута без параметров).
+  if (opts.initial !== undefined && Object.keys(opts.initial).length > 0) steps.show(2);
+  void recovery.recoverActiveJobOnMount().then((recovered) => {
+    // Активная/прерванная задача: журнал и управление ею живут на шаге 3.
+    if (recovered) steps.show(3);
+  });
 
   return {
     root,

@@ -39,10 +39,14 @@ test.beforeEach(async ({ page }) => {
   backend.seedCatalog([writtenSession(WRITTEN_ID)]);
 });
 
-/** Запускает симуляцию и доводит задачу до записанной сессии. */
+/** Запускает симуляцию и доводит задачу до записанной сессии.
+ * С G4 раздел — визард: старт живёт на шаге 3, форма по умолчанию валидна. */
 async function completeMockCapture(page: Page): Promise<void> {
   await page.goto(`${BASE}#/capture`);
   await expect(page.locator(".view-title")).toHaveText("Захват");
+  await page.getByRole("button", { name: "Далее: параметры" }).click();
+  await page.getByRole("button", { name: "Далее: запуск" }).click();
+  await expect(page.locator('.capture-step[data-capture-step="3"]')).toBeVisible();
   await page.getByRole("button", { name: "Запустить запись" }).click();
   backend.pumpAll();
   await expect(page.locator(".capture-timeline")).toContainText("Задача завершена");

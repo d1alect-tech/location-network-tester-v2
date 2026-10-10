@@ -6,15 +6,24 @@ import { installMockBackend } from "./testkit/mockBackend";
 
 /** E2E live-панели спектрограммы захвата (S3): появление, пустое состояние,
  * post-hoc fallback после завершения, axe, персона 375px. Данных бэкенда
- * панель не меняет — спектр мокается на сетевом слое Playwright. */
+ * панель не меняет — спектр мокается на сетевом слое Playwright.
+ * С G4 live-грам живёт на шаге 3 визарда — спеки открывают его навигацией. */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const BASE = "http://127.0.0.1:4101/static/v2/";
 
+/** Шаг 3 визарда: live-грам, устройство и журнал задачи. */
+async function gotoStep3(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Далее: параметры" }).click();
+  await page.getByRole("button", { name: "Далее: запуск" }).click();
+  await expect(page.locator('.capture-step[data-capture-step="3"]')).toBeVisible();
+}
+
 async function openCaptureWithSpectrum(page: Page): Promise<void> {
   installMockBackend(page);
   await page.goto(`${BASE}#/capture`);
+  await gotoStep3(page);
 }
 
 test("live-панель видна сразу с пустым состоянием, canvas не ниже 200px", async ({ page }) => {
@@ -30,6 +39,7 @@ test("live-панель видна сразу с пустым состояние
 test("post-hoc fallback: завершённая сессия подписана, пустое скрыто", async ({ page }) => {
   const backend = installMockBackend(page);
   await page.goto(`${BASE}#/capture`);
+  await gotoStep3(page);
   await page.getByRole("button", { name: "Запустить запись" }).click();
   backend.pumpAll();
   const session = page.locator("[data-livegram-session]");

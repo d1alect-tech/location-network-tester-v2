@@ -80,6 +80,11 @@ test("T12.1: занятый захват — warn-полоса, axe чист", a
   installMockBackend(page);
   await page.goto(`${BASE}#/capture`);
 
+  // Визард (G4): старт и журнал живут на шаге 3.
+  await page.getByRole("button", { name: "Далее: параметры" }).click();
+  await page.getByRole("button", { name: "Далее: запуск" }).click();
+  await expect(page.locator('.capture-step[data-capture-step="3"]')).toBeVisible();
+
   const startButton = page.getByRole("button", { name: "Запустить запись" });
   await startButton.click();
   await expect(page.locator(".capture-timeline")).toContainText("Задача выполняется");

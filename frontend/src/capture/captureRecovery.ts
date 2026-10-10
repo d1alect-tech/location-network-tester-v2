@@ -23,8 +23,9 @@ export interface CaptureRecoveryDeps {
 export interface CaptureRecoveryHandle {
   /** SSE задачи: снимки в хронологию, состояние связи, опрос при обрыве. */
   attachStream(snapshot: JobSnapshot): void;
-  /** Один раз при монтировании: живую/прерванную задачу показать и довести. */
-  recoverActiveJobOnMount(): Promise<void>;
+  /** Один раз при монтировании: живую/прерванную задачу показать и довести.
+   * true — хронология обновлена задачей (визард открывает шаг 3). */
+  recoverActiveJobOnMount(): Promise<boolean>;
 }
 
 export function createCaptureRecovery(deps: CaptureRecoveryDeps): CaptureRecoveryHandle {
@@ -43,8 +44,8 @@ export function createCaptureRecovery(deps: CaptureRecoveryDeps): CaptureRecover
     );
   }
 
-  async function recoverActiveJobOnMount(): Promise<void> {
-    if (!(await deps.ensureBootstrap())) return;
+  async function recoverActiveJobOnMount(): Promise<boolean> {
+    if (!(await deps.ensureBootstrap())) return false;
     try {
       const page = await deps.client.jobs.list(1, 0);
       const latest = page.items[0];
@@ -54,7 +55,7 @@ export function createCaptureRecovery(deps: CaptureRecoveryDeps): CaptureRecover
         latest === undefined ||
         (!needsRecoveryPrompt({ ...initialTimeline, latest }) && latest.status === "succeeded")
       ) {
-        return;
+        return false;
       }
       deps.state.timelineState = applySnapshot(initialTimeline, latest);
       deps.timeline.update(deps.state.timelineState);
@@ -62,8 +63,10 @@ export function createCaptureRecovery(deps: CaptureRecoveryDeps): CaptureRecover
       if (status === "queued" || status === "running" || status === "cancelling") {
         attachStream(latest);
       }
+      return true;
     } catch {
       // Восстановление необязательно: без истории стартовая валидна.
+      return false;
     }
   }
 

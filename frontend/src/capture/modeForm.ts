@@ -18,8 +18,19 @@ import type {
   CaptureSource,
 } from "./modes";
 
+/** Секции формы для раскладки по шагам визарда (captureSteps): владелец
+ * переносит узлы в панели шагов, форма остаётся их родителем. */
+export interface ModeFormSections {
+  readonly modes: HTMLElement;
+  readonly source: HTMLElement;
+  readonly paramsTitle: HTMLElement;
+  readonly settings: HTMLElement;
+  readonly series: HTMLElement;
+}
+
 export interface ModeFormHandle {
   root: HTMLFormElement;
+  readonly sections: ModeFormSections;
   getMode(): CaptureModeDef;
   getSource(): CaptureSource;
   values(): CaptureFormValues;
@@ -94,19 +105,17 @@ export function createModeForm(): ModeFormHandle {
     fields.profileField.root,
   );
 
+  const paramsTitle = el("h3", {
+    className: "capture-section-title panel-title",
+    text: "Параметры записи",
+  });
   const root = el(
     "form",
     {
       className: "capture-form",
       attrs: { novalidate: "" },
     },
-    [
-      modeFieldset,
-      sourceFieldset,
-      el("h3", { className: "capture-section-title panel-title", text: "Параметры записи" }),
-      fields.settingsFields,
-      seriesDisclosure.root,
-    ],
+    [modeFieldset, sourceFieldset, paramsTitle, fields.settingsFields, seriesDisclosure.root],
   ) as HTMLFormElement;
 
   const syncVisibility = (): void => {
@@ -121,6 +130,13 @@ export function createModeForm(): ModeFormHandle {
 
   const handle: ModeFormHandle = {
     root,
+    sections: {
+      modes: modeFieldset,
+      source: sourceFieldset,
+      paramsTitle,
+      settings: fields.settingsFields,
+      series: seriesDisclosure.root,
+    },
     getMode: () => {
       const checked = [...modeRadios.values()].find((radio) => radio.checked);
       return CAPTURE_MODES[(checked?.value ?? "rc_measurement") as CaptureModeId];

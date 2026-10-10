@@ -81,6 +81,106 @@
   min-width: 0;
 }
 
+/* ── Визард (G4, вариант 3 «Визард»): рельс — панели шагов — колонка превью.
+ * Раскладка — flex-wrap старой .capture-layout (дуал-класс сохранён): при
+ * нехватке ширины колонки переносятся целиком — это работает и под zoom 200%,
+ * где медиа-запросы видят незазумленный вьюпорт (грид с фикс-дорожками там
+ * вылезал за правую границу — регрессия 375px-пина). ─────────────────── */
+
+.capture-view .capture-steps {
+  flex: 0 0 232px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: calc(var(--lnt-hdr-h) + 16px);
+  align-self: stretch;
+  min-width: 0;
+}
+
+.capture-view .capture-step-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.capture-view .capture-step {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.capture-view .capture-step-hd {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.capture-view .capture-wizard-sub {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.capture-view .capture-step-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--lnt-line);
+  min-height: 32px;
+  min-width: 0;
+}
+
+.capture-view .capture-step-spacer {
+  flex: 1;
+}
+
+/* Хронология переехала внутрь панели шага 3: внешний отступ одностраничной
+ * раскладки (margin-top 24px ниже по каскаду) внутри панели не нужен. */
+.capture-view .capture-step .capture-timeline {
+  margin-top: 0;
+}
+
+/* Вход играет один раз на монтировании представления: transform/opacity,
+ * 200ms ease-out токенами ветки. Переход между шагами — частое действие,
+ * поэтому панели шагов переключаются без анимации (hidden-атрибут). */
+.capture-view .capture-step-main.is-entering {
+  animation: lnt-capture-in var(--lnt-t-enter) var(--lnt-ease-out) both;
+}
+
+@keyframes lnt-capture-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capture-view .capture-step-main.is-entering {
+    animation: none;
+  }
+}
+
+/* Узкая: рельс — горизонтальный ряд на всю ширину (идиома харнесса V3),
+ * основная и боковая колонки — во всю строку (правила 767px ниже). */
+@media (max-width: 939px) {
+  .capture-view .capture-steps {
+    flex: 1 0 100%;
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
 /* ── Панели: каноническая рамка — components/primitives/panel.css (глобально);
  * здесь только видовые отличия «Захвата», которых нет в каноне (todo 2):
  * карточное скругление панели и шапки, нулевой отступ заголовков (h2/h3.panel-title).
