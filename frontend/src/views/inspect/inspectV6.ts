@@ -19,6 +19,7 @@ import { loadAnalysisBand } from "./inspectV6Load";
 import { createPairDetail } from "./pairDetail";
 import { createPairState } from "./pairState";
 import { createPairbar } from "./pairbarV6";
+import { buildSessionAlias } from "./sessionAlias";
 import { createSpectrumGramSection } from "./spectrumGramSection";
 import type { SpectrumPanelClient } from "./spectrumPanelV6";
 import { createV6Chrome } from "./v6Chrome";
@@ -174,16 +175,18 @@ export async function mountInspectV6(
 
   async function boot(): Promise<void> {
     try {
-      const page = await client.catalogSessions({ page_size: 200 });
+      // include_paths: имя каталога сессии нужно, чтобы принять оба ключа D1.
+      const page = await client.catalogSessions({ page_size: 200, include_paths: true });
       if (disposed) return;
+      const alias = buildSessionAlias(page.items);
       for (const item of page.items) sessionMap.set(item.id, item);
       await catalogColumn.reload();
       if (disposed) return;
       const params = routes.get().params;
       const fromRouteA = paramId(params, "a");
       const fromRouteB = paramId(params, "b");
-      if (fromRouteA !== undefined) pair.pick(fromRouteA);
-      if (fromRouteB !== undefined) pair.pick(fromRouteB);
+      if (fromRouteA !== undefined) pair.pick(alias.get(fromRouteA) ?? fromRouteA);
+      if (fromRouteB !== undefined) pair.pick(alias.get(fromRouteB) ?? fromRouteB);
       if (pair.get().a !== null) return;
       const first = page.items[0];
       const second = page.items[1];

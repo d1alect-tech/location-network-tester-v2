@@ -222,6 +222,43 @@ describe("mountInspectV6", () => {
     expect(detail).toHaveBeenCalledTimes(2);
   });
 
+  it("F-1: deep-link по имени каталога наполняет слот пары метой каталога", async () => {
+    // Given: каталог несёт manifest id; имя каталога видно только в storage_path
+    // (include_paths). Шов захвата и ручные ссылки несут имя каталога (f3 F-1).
+    const row: CatalogSession = {
+      ...SESSION_A,
+      id: "syn-quiet-seed777",
+      label: "стенд-А",
+      storage_path: "/root/dirname-differs",
+    };
+    const client = {
+      ...fakeClient(),
+      catalogSessions: async () => ({ items: [row], next_cursor: null }),
+    };
+    window.location.hash = "#/inspect?a=dirname-differs";
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    // When
+    const cleanup = await mountInspectV6(container, {
+      client,
+      routes: new RouteStore(),
+      createView: fakeCreateView(),
+    });
+    cleanups.push(cleanup);
+    cleanups.push(() => {
+      window.location.hash = "";
+    });
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-pair="a"] .pair-name')?.textContent).toBe("стенд-А");
+    });
+
+    // Then: мета слота та же, что дал бы переход по manifest id.
+    expect(container.querySelector('[data-pair="a"] .pair-meta')?.textContent).toContain(
+      "2026-08-28",
+    );
+  });
+
   it("removes the v6 root when cleanup runs", async () => {
     // Given
     const container = document.createElement("div");

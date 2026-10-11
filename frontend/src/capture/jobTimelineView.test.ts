@@ -207,6 +207,84 @@ describe("createJobTimelineView: записанная сессия открыв�
     expect(seen).toEqual([{ href: `#/inspect?a=${SESSION_ID}`, prevented: false }]);
   });
 
+  it("F-2: запись серии до её анализа остаётся текстом без ссылки", () => {
+    // Given: рабочий записал сессию позиции 1 и ушёл в analyzing — артефактов
+    // анализа ещё нет, инспект показал бы «н/д» навсегда (f3 F-2).
+    const view = createJobTimelineView({ onCancel: vi.fn(), onRetry: vi.fn() });
+    document.body.replaceChildren(view.root);
+
+    // When
+    view.update(
+      applySnapshot(
+        initialTimeline,
+        snap({
+          version: 2,
+          status: "running",
+          stage: "analyzing",
+          series_index: 1,
+          series_total: 2,
+          written_sessions: [SESSION_ID],
+        }),
+      ),
+    );
+
+    // Then: элемент и текст на месте (пин .capture-written-item), ссылки нет.
+    const item = view.root.querySelector(".capture-written-item");
+    expect(item?.textContent).toBe(SESSION_ID);
+    expect(item?.querySelector("a")).toBeNull();
+  });
+
+  it("F-2: ссылка появляется, когда задача ушла к следующей позиции серии", () => {
+    // Given: позиция 1 записана и проанализирована, идёт позиция 2.
+    const view = createJobTimelineView({ onCancel: vi.fn(), onRetry: vi.fn() });
+    document.body.replaceChildren(view.root);
+
+    // When
+    view.update(
+      applySnapshot(
+        initialTimeline,
+        snap({
+          version: 3,
+          status: "running",
+          stage: "simulating",
+          series_index: 2,
+          series_total: 2,
+          written_sessions: [SESSION_ID],
+        }),
+      ),
+    );
+
+    // Then
+    const link = view.root.querySelector<HTMLAnchorElement>(".capture-written-item a");
+    expect(link?.getAttribute("href")).toBe(`#/inspect?a=${SESSION_ID}`);
+  });
+
+  it("F-2: interrupted до анализа оставляет запись текстом", () => {
+    // Given: сервер перезапустился посреди анализа позиции 1 (пин capture.spec).
+    const view = createJobTimelineView({ onCancel: vi.fn(), onRetry: vi.fn() });
+    document.body.replaceChildren(view.root);
+
+    // When
+    view.update(
+      applySnapshot(
+        initialTimeline,
+        snap({
+          version: 9,
+          status: "interrupted",
+          stage: "capturing",
+          series_index: 1,
+          series_total: 3,
+          written_sessions: [SESSION_ID],
+        }),
+      ),
+    );
+
+    // Then
+    const item = view.root.querySelector(".capture-written-item");
+    expect(item?.textContent).toBe(SESSION_ID);
+    expect(item?.querySelector("a")).toBeNull();
+  });
+
   it("без идентификатора сессии элемент остаётся текстом без ссылки", () => {
     // Given / When
     const view = writtenView(["   "]);
