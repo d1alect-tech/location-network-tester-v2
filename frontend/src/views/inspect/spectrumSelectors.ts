@@ -1,4 +1,4 @@
-/** B3: селекторы RBW/окна спектр-панели. Опции 10/30/50/100/300 Гц и 4 окна
+/** B3: селекторы RBW/окна спектр-панели. Опции 10/30/50/100/300 Гц и 5 окон
  * повторяют бэкенд-контракт RBW_OPTIONS_HZ/WINDOW_OPTIONS. Подпись файла
  * (RBW/окно/ENBW) — из payload; выбор пользователя хранится локально,
  * пометка честно говорит: применится при следующем анализе. */
@@ -8,12 +8,13 @@ import { el, nextId } from "../../components/primitives/dom";
 import { ruHz } from "./spectrumReadout";
 
 export const MARKER_RBW_OPTIONS = [10, 30, 50, 100, 300] as const;
-export const MARKER_WINDOW_OPTIONS = ["hann", "flattop", "kaiser", "blackman"] as const;
+export const MARKER_WINDOW_OPTIONS = ["hann", "flattop", "kaiser", "blackman", "rect"] as const;
 export const MARKER_WINDOW_LABELS: Record<string, string> = {
   hann: "Ханн",
   flattop: "Флэт-топ",
   kaiser: "Кайзер",
   blackman: "Блэкман",
+  rect: "Прямоугольное",
 };
 
 const RBW_STORAGE_KEY = "lnt.spectrum.rbw";

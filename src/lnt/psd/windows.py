@@ -8,7 +8,9 @@ ENBW (эквивалентная шумовая полоса, в бинах) и 
 
 Все окна периодические (``fftbins=True``) — стандарт Welch; дефолт Hann
 бит-в-бит совпадает с прежним ``signal.get_window("hann", N, fftbins=True)``.
-Kaiser зафиксирован на β=14 (боковые лепестки ≈ −90 дБ).
+Kaiser зафиксирован на β=14 (боковые лепестки ≈ −90 дБ). ``rect`` —
+прямоугольное окно (в SciPy ``boxcar``): веса равны 1, ENBW ровно 1.0 бина,
+когерентное усиление ровно 1.0.
 """
 
 from __future__ import annotations
@@ -28,9 +30,10 @@ WINDOW_HANN: Final = "hann"
 WINDOW_FLATTOP: Final = "flattop"
 WINDOW_KAISER: Final = "kaiser"
 WINDOW_BLACKMAN: Final = "blackman"
+WINDOW_RECT: Final = "rect"
 LEGACY_HANN_PERIODIC: Final = "hann_periodic"
 
-WINDOW_OPTIONS: Final = (WINDOW_HANN, WINDOW_FLATTOP, WINDOW_KAISER, WINDOW_BLACKMAN)
+WINDOW_OPTIONS: Final = (WINDOW_HANN, WINDOW_FLATTOP, WINDOW_KAISER, WINDOW_BLACKMAN, WINDOW_RECT)
 KNOWN_WINDOWS: Final = (*WINDOW_OPTIONS, LEGACY_HANN_PERIODIC)
 
 RBW_OPTIONS_HZ: Final = (10.0, 30.0, 50.0, 100.0, 300.0)
@@ -54,6 +57,9 @@ def get_window(name: str, nperseg: int) -> Float64Array:
     scipy_name: str | tuple[str, float] = canonical
     if canonical == WINDOW_KAISER:
         scipy_name = (WINDOW_KAISER, KAISER_BETA)
+    elif canonical == WINDOW_RECT:
+        # Имя SciPy для прямоугольного окна; каноническое "boxcar" остаётся невалидным.
+        scipy_name = "boxcar"
     return np.asarray(signal.get_window(scipy_name, nperseg, fftbins=True), dtype=np.float64)
 
 

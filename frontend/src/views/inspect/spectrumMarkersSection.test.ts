@@ -1,5 +1,5 @@
 /** B3: селекторы RBW/окна + таблица маркеров (пики, дельты A/B, гармоники, СКЗ полосы).
- * RED: селекторы 10/30/50/100/300 и 4 окна; readout с параболой в дБ;
+ * RED: селекторы 10/30/50/100/300 и 5 окон; readout с параболой в дБ;
  * max-агрегация ±1 бин; подписи дБ с ref 1 В²/Гц; русские строки. */
 
 import { describe, expect, it } from "vitest";
@@ -63,14 +63,14 @@ describe("deltaAt", () => {
 });
 
 describe("createSpectrumExtras: селекторы", () => {
-  it("пять RBW и четыре окна с русскими подписями", () => {
+  it("пять RBW и пять окон с русскими подписями", () => {
     const extras = createSpectrumExtras();
     const rbw = extras.selects.querySelector<HTMLSelectElement>("[data-spectrum-rbW-select]");
     const window = extras.selects.querySelector<HTMLSelectElement>("[data-spectrum-window-select]");
     expect([...MARKER_RBW_OPTIONS]).toEqual([10, 30, 50, 100, 300]);
-    expect([...MARKER_WINDOW_OPTIONS]).toEqual(["hann", "flattop", "kaiser", "blackman"]);
+    expect([...MARKER_WINDOW_OPTIONS]).toEqual(["hann", "flattop", "kaiser", "blackman", "rect"]);
     expect(rbw?.options.length).toBe(5);
-    expect(window?.options.length).toBe(4);
+    expect(window?.options.length).toBe(5);
     expect(extras.selects.textContent).toContain("RBW");
     expect(extras.selects.textContent).toContain("Окно");
   });

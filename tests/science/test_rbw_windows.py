@@ -20,6 +20,7 @@ from lnt.analysis_store.errors import RecipeError
 from lnt.analysis_store.recipe import AnalysisRecipe
 from lnt.analysis_store.settings import WelchSettings
 from lnt.psd import FrequencyBand, PsdSettings, compute_welch
+from lnt.psd.windows import canonical_window_name, coherent_gain, enbw_bins, get_window
 from lnt.spectrum import compute_band_spectrum
 from tests.science.corpus import pure_tone
 from tests.science.truth import verify_scalar
@@ -89,6 +90,32 @@ def test_hann_enbw_is_analytically_one_and_half_bins() -> None:
         expected=1.5,
         absolute_tolerance=1e-9,
         rationale="Σw=N/2 и Σw²=3N/8 для периодического Hann дают N·Σw²/(Σw)²=1.5 точно.",
+    )
+
+
+def test_rect_enbw_and_coherent_gain_are_unity() -> None:
+    """Прямоугольное окно: ENBW ровно 1.0 бина и когерентное усиление ровно 1.0."""
+    # Given: замкнутая форма rect — w(n) = 1 для всех n, значит Σw = N и Σw² = N.
+    # When: реестр строит окно rect и считает его метрики по формулам сумм весов.
+    # Then: ENBW = N·Σw²/(Σw)² = N·N/N² = 1.0 и CG = Σw/N = 1.0 — без приближений.
+    assert canonical_window_name("rect") == "rect"
+    weights = get_window("rect", NPERSEG)
+    assert weights.shape == (NPERSEG,)
+    assert np.all(weights == 1.0)
+    verify_scalar(
+        enbw_bins("rect", NPERSEG),
+        expected=1.0,
+        absolute_tolerance=0.0,
+        rationale=(
+            "Σw = Σw² = N для w(n) ≡ 1, поэтому N·Σw²/(Σw)² = 1.0; при N = 4096 "
+            "обе суммы и деление точны в float64 — допуск ноль."
+        ),
+    )
+    verify_scalar(
+        coherent_gain("rect", NPERSEG),
+        expected=1.0,
+        absolute_tolerance=0.0,
+        rationale="CG = Σw/N = N/N = 1.0 точно: rect не ослабляет когерентный тон.",
     )
 
 
