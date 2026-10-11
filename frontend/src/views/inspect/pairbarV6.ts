@@ -32,7 +32,11 @@ function sessionName(session: CatalogSession | null): string {
 function sessionMeta(session: CatalogSession | null): string {
   if (session === null) return "—";
   const type = session.session_type ?? "—";
-  const date = session.created_utc === null ? "—" : session.created_utc.slice(0, 10);
+  // F-5: бэкенд отдаёт exclude_none — created_utc может отсутствовать вовсе
+  // (undefined), а guard каталога это пропускает; нестроковое значение тоже не
+  // режем. Только строка даёт дату, всё остальное — честный прочерк.
+  const created = session.created_utc;
+  const date = typeof created === "string" ? created.slice(0, 10) : "—";
   return `${type} · ${date}`;
 }
 
