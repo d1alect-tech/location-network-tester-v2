@@ -31,3 +31,13 @@
   font-variant-numeric: tabular-nums lining-nums;
   color: var(--lnt-text);
 }
+
+/* Узкая ширина: индикаторы переносятся строками, а не обрезаются краем
+   (overflow:hidden резал значения на 375px — craft sweep todo 14). */
+@media (max-width: 767px) {
+  .channelbar {
+    flex-wrap: wrap;
+    row-gap: var(--lnt-space-1);
+    padding-block: var(--lnt-space-1);
+  }
+}

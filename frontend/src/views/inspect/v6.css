@@ -120,6 +120,23 @@
 /* Мобильная ширина: колонки складываются в стек, каталог — ограниченной
  * высоты сверху, иначе рейка 336px съедает весь вьюпорт 390px. */
 @media (max-width: 900px) {
+  /* Пара не теряет второй слот: слоты переносятся, а не обрезаются краем. */
+  .app-v6 .pairbar {
+    flex-wrap: wrap;
+    row-gap: var(--lnt-space-2);
+    padding-block: var(--lnt-space-2);
+  }
+
+  .app-v6 .pair-slot {
+    flex: 1 1 220px;
+  }
+
+  /* Ряд пары в сетке корня — auto: перенесённые слоты раздвигают строку,
+     а не рисуются поверх рабочей области. */
+  .app-v6 {
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+  }
+
   .app-v6 .app-body {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
@@ -528,11 +545,14 @@
   flex: none;
 }
 
+/* Строка поиска рельса — сетка [поле 1fr][кнопка auto]: поле и кнопка стоят
+   на одной линии, ряд читается тулбаром, а не наездом на шапку таблицы. */
 .app-v6 .cat-tools {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: var(--lnt-space-2);
+  padding: var(--lnt-space-1) var(--lnt-space-2);
   background: rgb(0 0 0 / 0.18);
   border-bottom: 1px solid var(--lnt-line);
 }
@@ -543,14 +563,15 @@
   color: var(--lnt-text-dim);
 }
 
-/* Поле живёт в хроме панели, а не выглядит веб-формой: без рамки и фона. */
+/* Поле живёт в хроме панели, а не выглядит веб-формой: без рамки и фона.
+   Высота — контрольный контракт 44px, как у кнопки сброса рядом: строка
+   поиска держит один ритм целей (craft sweep todo 14). */
 .app-v6 .cat-search {
   flex: 1;
   min-width: 0;
-  /* §2.3: инпут 32px. */
-  height: 32px;
+  height: var(--lnt-control-height);
   padding: 0 4px;
-  font: 400 12px / 32px var(--lnt-ui);
+  font: 400 12px / 20px var(--lnt-ui);
   color: var(--lnt-text);
   background: none;
   border: 0;
@@ -784,8 +805,7 @@
 }
 
 .app-v6 .gram-mode,
-.app-v6 .view-toggle-btn,
-.app-v6 [data-cat-clear] {
+.app-v6 .view-toggle-btn {
   min-height: 28px;
 }
 
@@ -813,7 +833,8 @@
 .app-v6 .btn-quiet,
 .app-v6 .gram-mode,
 .app-v6 .gram-detector,
-.app-v6 .view-toggle-btn {
+.app-v6 .view-toggle-btn,
+.app-v6 [data-cat-clear] {
   min-height: var(--lnt-control-height);
   padding: 0 var(--lnt-space-3);
   border: var(--lnt-border-width) solid var(--lnt-border-subtle);
@@ -827,7 +848,8 @@
 .app-v6 .btn-quiet:hover:not(:disabled),
 .app-v6 .gram-mode:hover:not(:disabled),
 .app-v6 .gram-detector:hover:not(:disabled),
-.app-v6 .view-toggle-btn:hover:not(:disabled) {
+.app-v6 .view-toggle-btn:hover:not(:disabled),
+.app-v6 [data-cat-clear]:hover:not(:disabled) {
   color: var(--lnt-text);
   border-color: var(--lnt-line-struct);
 }

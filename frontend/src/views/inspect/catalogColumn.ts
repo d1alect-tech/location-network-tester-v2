@@ -44,6 +44,7 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
       type: "search",
       "data-cat-search": "",
       "aria-label": "Поиск по метке",
+      placeholder: "Поиск по метке",
     },
   });
   const clear = el("button", {

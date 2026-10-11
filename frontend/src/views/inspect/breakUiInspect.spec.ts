@@ -18,6 +18,7 @@ const BASE = "http://127.0.0.1:4101/static/v2/#/inspect";
 const EVIDENCE_9 = resolve(__dirname, "../../../../.omo/evidence/ui-refactor-2/task-9/break-ui");
 const EVIDENCE_11 = resolve(__dirname, "../../../../.omo/evidence/ui-refactor-2/task-11/break-ui");
 const EVIDENCE_13 = resolve(__dirname, "../../../../.omo/evidence/ui-refactor-2/task-13/break-ui");
+const EVIDENCE_14 = resolve(__dirname, "../../../../.omo/evidence/ui-refactor-2/task-14/break-ui");
 
 function session(id: string, label: string): CatalogSession {
   return {
@@ -551,4 +552,95 @@ test("break-ui 13: движение — вход гасится reduced-motion, 
   expect(motion.animation).toBe("none");
   expect(motion.bodyTransition).toBe("0s");
   await shootSection(page, section, "reduced-motion.png");
+});
+
+/* ── Todo 14 (craft-зачистка): рельс, пара и полоса канала на узкой ширине. ── */
+
+test("break-ui 14: рельс — поле с подсказкой и тихая кнопка сброса в одном ритме целей", async ({
+  page,
+}) => {
+  const backend = installMockBackend(page);
+  seedPair(backend, ["cap-a", "cap-b"]);
+  await page.goto(BASE);
+  const rail = page.locator(".col-cat > .panel");
+  await expect(rail.locator("[data-session]").first()).toBeVisible();
+
+  await expect(rail.locator("[data-cat-search]")).toHaveAttribute("placeholder", "Поиск по метке");
+  const geo = await rail.evaluate((node) => {
+    const box = (sel: string) => {
+      const item = node.querySelector(sel);
+      if (!(item instanceof HTMLElement)) return null;
+      const r = item.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, height: r.height };
+    };
+    const clear = node.querySelector("[data-cat-clear]");
+    const clearStyle = clear === null ? null : getComputedStyle(clear);
+    return {
+      search: box("[data-cat-search]"),
+      clear: box("[data-cat-clear]"),
+      tools: box(".cat-tools"),
+      thead: box(".tbl-cat thead"),
+      clearFont: clearStyle?.fontFamily ?? "",
+    };
+  });
+  // Одна строка: поле и кнопка одной высоты (контракт целей), ряд не наезжает
+  // на шапку таблицы.
+  expect(geo.search).not.toBeNull();
+  expect(geo.clear).not.toBeNull();
+  expect(geo.tools).not.toBeNull();
+  expect(geo.thead).not.toBeNull();
+  if (geo.search === null || geo.clear === null || geo.tools === null || geo.thead === null) {
+    return;
+  }
+  expect(Math.abs(geo.search.height - geo.clear.height)).toBeLessThanOrEqual(1);
+  expect(geo.clear.height).toBeGreaterThanOrEqual(40);
+  expect(geo.tools.bottom).toBeLessThanOrEqual(geo.thead.top + 0.5);
+  // Кнопка сброса — тихая кнопка инспекции (IBM Plex), не UA-виджет.
+  expect(geo.clearFont).toContain("IBM Plex");
+  await rail.screenshot({ path: resolve(EVIDENCE_14, "rail-toolbar-1440.png") });
+});
+
+test("break-ui 14: 375px — пара держит оба слота, полоса канала не режет значения", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const backend = installMockBackend(page);
+  seedPair(backend, ["cap-a", "cap-b"]);
+  await page.goto(BASE);
+  await page.locator('.col-main [data-showcase="spectrum"] .uplot').waitFor({ timeout: 15_000 });
+
+  const state = await page.evaluate(() => {
+    const vw = document.documentElement.clientWidth;
+    const slots = [...document.querySelectorAll<HTMLElement>(".pair-slot")].map((node) => {
+      const r = node.getBoundingClientRect();
+      return { width: r.width, right: r.right, inView: r.right <= vw + 1 && r.width > 0 };
+    });
+    const chbar = document.querySelector<HTMLElement>(".channelbar");
+    return {
+      slots,
+      chbarClipped: chbar === null ? null : chbar.scrollWidth > chbar.clientWidth,
+    };
+  });
+  expect(state.slots).toHaveLength(2);
+  for (const slot of state.slots) expect(slot.inView).toBe(true);
+  expect(state.chbarClipped).toBe(false);
+  await noHorizontalOverflow(page);
+  await page.screenshot({ path: resolve(EVIDENCE_14, "mobile-pair-channelbar-375.png") });
+});
+
+test("break-ui 14: захват 375px — полоса канала переносится, значения читаются", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  installMockBackend(page);
+  await page.goto("http://127.0.0.1:4101/static/v2/#/capture");
+  await expect(page.locator(".capture-view").first()).toBeVisible();
+  const clipped = await page
+    .locator(".channelbar")
+    .evaluate((node) => node.scrollWidth > node.clientWidth);
+  expect(clipped).toBe(false);
+  await noHorizontalOverflow(page);
+  await page.locator(".channelbar").screenshot({
+    path: resolve(EVIDENCE_14, "capture-channelbar-375.png"),
+  });
 });
