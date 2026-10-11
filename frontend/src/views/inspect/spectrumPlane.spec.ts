@@ -124,7 +124,7 @@ test("селекторы RBW/окно и таблица маркеров", async
   await expect(panel.locator(".uplot")).toBeVisible({ timeout: 15_000 });
 
   await expect(panel.locator("[data-spectrum-rbW-select] option")).toHaveCount(5);
-  await expect(panel.locator("[data-spectrum-window-select] option")).toHaveCount(4);
+  await expect(panel.locator("[data-spectrum-window-select] option")).toHaveCount(5);
   await expect(panel.locator("[data-spectrum-window-select]")).toHaveValue("hann");
   await expect(panel.locator("[data-spectrum-selector-meta]")).toHaveText(
     "RBW ≈ 150 Гц · окно Ханн · ENBW 150 Гц",
