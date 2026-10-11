@@ -15,6 +15,8 @@ import { peaksFromDetail } from "../../components/charts/viewModels";
 import type { SeriesStyle } from "../../components/charts/viewModels";
 import { el } from "../../components/primitives/dom";
 import { createSpectrumExtras } from "./spectrumExtras";
+import { overlayRequest } from "./spectrumHoldOverlay";
+import { createSpectrumPanelChrome } from "./spectrumPanelChrome";
 import { EMPTY_SPECTRUM, detailForPeaks } from "./spectrumPanelData";
 import { createSpectrumPanelRequests } from "./spectrumPanelRequest";
 import { createPlaneControl } from "./spectrumPlaneControl";
@@ -81,8 +83,6 @@ function assertNever(value: never): never {
   throw new Error(`unhandled spectrum view ${String(value)}`);
 }
 
-import { overlayRequest } from "./spectrumHoldOverlay";
-
 export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHandle {
   const theme = readChartTheme();
   const viewFactory = opts.createView ?? createUplotView;
@@ -91,21 +91,8 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
   let viewChange: ((view: SpectrumView) => void) | undefined;
 
   const title = el("h2", { className: "panel-title", text: "Спектр мощности · Гц" });
-  const spectrumBtn = el("button", {
-    className: "btn-quiet view-toggle-btn",
-    text: "Спектр",
-    attrs: { type: "button", "data-spectrum-view": "spectrum", "aria-pressed": "true" },
-  });
-  const gramBtn = el("button", {
-    className: "btn-quiet view-toggle-btn",
-    text: "Спектрограмма",
-    attrs: { type: "button", "data-spectrum-view": "gram", "aria-pressed": "false" },
-  });
-  const viewToggle = el(
-    "div",
-    { className: "view-toggle", attrs: { role: "group", "aria-label": "Вид сигнального окна" } },
-    [spectrumBtn, gramBtn],
-  );
+  const { viewToggle, spectrumBtn, gramBtn, status, statusText, retryButton, frame } =
+    createSpectrumPanelChrome();
   let reloadPlane: () => void = () => undefined;
   let lastPayload: SpectrumPayload | null = null;
   let lastPayloadB: SpectrumPayload | null = null;
@@ -129,20 +116,7 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
       extras.selects,
       gramBar,
     ]);
-  const frame = el("div", { className: "frame" });
-  const statusText = el("span", {});
-  const retryButton = el("button", {
-    className: "lnt-btn btn-quiet",
-    text: "Пересчитать спектр",
-    attrs: { type: "button" },
-  }) as HTMLButtonElement;
   retryButton.addEventListener("click", () => reloadPlane());
-  const status = el(
-    "div",
-    { className: "spectrum-status", attrs: { role: "status", "data-spectrum-status": "" } },
-    [statusText, retryButton],
-  );
-  status.hidden = true;
   const body = el("div", { className: "panel-bd" }, [status, frame, gramHost, extras.markers]);
   const root = el("section", { className: "panel", attrs: { "data-showcase": "spectrum" } }, [
     header,

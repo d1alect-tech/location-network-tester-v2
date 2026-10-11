@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../../../api/errors";
 import type { ArtifactClient } from "./fetch";
-import { createPanelHost, harmonicsVisible } from "./host";
+import { HARMONICS_LABEL } from "./harmonics";
+import { ABSENT_ARTIFACT, createPanelHost, harmonicsVisible } from "./host";
 
 /** Given / When / Then: harmonics card visibility vs cycles and BranchFailure. */
 
@@ -101,28 +102,141 @@ describe("createPanelHost.bind", () => {
     expect(root.querySelector("details[open]")).toBeNull();
   });
 
-  it("repeats the BranchFailure branch name on the failure panel", async () => {
+  it("announces a failed branch as an absence chip, not a hollow panel", async () => {
     // Given
     const client = fakeClient({});
     const root = document.createElement("div");
     const host = createPanelHost({ client, root });
 
     // When
-    await host.bind(
+    const bound = await host.bind(
       {
         session: "t1-measurement",
         artifactKey: "art-meas",
         sessionType: "measurement",
         cycles: 200,
-        failures: [{ branch: "harmonics", message: "window underflow" }],
+        failures: [
+          { branch: "harmonics", message: "window underflow" },
+          { branch: "psd", message: "нет отсчётов" },
+        ],
+      },
+      new AbortController().signal,
+    );
+
+    // Then: имя ветки и причина названы, пустого раскрытия нет.
+    expect(root.querySelector('[data-panel="branch-failure"]')).toBeNull();
+    expect(root.querySelector('[data-panel="harmonics"]')).toBeNull();
+    expect(bound.absent).toContainEqual({
+      kind: "harmonics",
+      label: HARMONICS_LABEL,
+      reason: "ветка не посчитана: window underflow",
+      tone: "failed",
+    });
+    // Ветка без своей панели не теряется.
+    expect(bound.absent).toContainEqual({
+      kind: "psd",
+      label: "psd",
+      reason: "ветка не посчитана: нет отсчётов",
+      tone: "failed",
+    });
+    expect(bound.panelCount).toBe(0);
+  });
+
+  it("announces every missing artifact of a measurement session", async () => {
+    // Given: записан только burst.json.
+    const client = fakeClient({ "burst.json": { burst_count: 0, bursts: [] } });
+    const root = document.createElement("div");
+    const host = createPanelHost({ client, root });
+
+    // When
+    const bound = await host.bind(
+      {
+        session: "t1-measurement",
+        artifactKey: "art-meas",
+        sessionType: "measurement",
+        cycles: 200,
+        failures: [],
+      },
+      new AbortController().signal,
+    );
+
+    // Then: пять честных отсутствий, одна панель, ITIC/CM-DM не объявлены
+    // (неприменимы к типу сессии — это не отсутствие артефакта).
+    expect(bound.panelCount).toBe(1);
+    expect(bound.absent.map((row) => row.kind)).toEqual([
+      "harmonics",
+      "notching",
+      "apd",
+      "trends",
+      "audio",
+    ]);
+    expect(bound.absent.every((row) => row.reason === ABSENT_ARTIFACT)).toBe(true);
+    expect(bound.absent.every((row) => row.tone === "absent")).toBe(true);
+  });
+
+  it("names the cycle floor when harmonics are withheld", async () => {
+    // Given: артефакт на месте, циклов меньше минимума для лимита THD-V.
+    const client = fakeClient({
+      "harmonics.json": {
+        windows: [{ index: 0, start_time_s: 0, thd: 0.1, fundamental_rms: 230 }],
+      },
+    });
+    const root = document.createElement("div");
+    const host = createPanelHost({ client, root });
+
+    // When
+    const bound = await host.bind(
+      {
+        session: "t1-measurement",
+        artifactKey: "art-meas",
+        sessionType: "measurement",
+        cycles: 47,
+        failures: [],
       },
       new AbortController().signal,
     );
 
     // Then
-    const failure = root.querySelector('[data-panel="branch-failure"]');
-    expect(failure).not.toBeNull();
-    expect(failure?.querySelector("summary")?.textContent).toBe("harmonics");
     expect(root.querySelector('[data-panel="harmonics"]')).toBeNull();
+    expect(bound.absent).toContainEqual({
+      kind: "harmonics",
+      label: HARMONICS_LABEL,
+      reason: "недостаточно циклов (47 из 100)",
+      tone: "withheld",
+    });
+    // Скаляры THD-V при этом остаются фактом окон, без нормативной оценки.
+    expect(bound.windows).toHaveLength(1);
+  });
+
+  it("shows the key value in the collapsed summary", async () => {
+    // Given
+    const client = fakeClient({
+      "harmonics.json": {
+        windows: [{ index: 0, start_time_s: 0, thd: 0.04, fundamental_rms: 230 }],
+      },
+      "burst.json": { burst_count: 3, bursts: [] },
+    });
+    const root = document.createElement("div");
+    const host = createPanelHost({ client, root });
+
+    // When
+    const bound = await host.bind(
+      {
+        session: "t1-measurement",
+        artifactKey: "art-meas",
+        sessionType: "measurement",
+        cycles: 200,
+        failures: [],
+      },
+      new AbortController().signal,
+    );
+
+    // Then: значение видно без раскрытия, тело по-прежнему ленивое.
+    const harmonics = root.querySelector('[data-panel="harmonics"]');
+    expect(harmonics?.querySelector("[data-panel-key]")?.textContent).toBe("THD 0.04000");
+    expect(harmonics?.querySelector(".lnt-w1-sum-label")?.textContent).toBe(HARMONICS_LABEL);
+    expect(root.querySelector('[data-panel="burst"] [data-panel-key]')?.textContent).toBe("3");
+    expect(root.querySelector('[data-panel="harmonics"] table')).toBeNull();
+    expect(bound.panelCount).toBe(2);
   });
 });

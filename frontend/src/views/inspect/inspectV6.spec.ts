@@ -285,6 +285,7 @@ test("V6-P5: полный захват и возврат через таббар
 test("V6-P6: сворачиваемые панели осциллограммы и анализа", async ({ page }) => {
   mockApi(installMockBackend(page));
   await page.goto(BASE);
+  const section = page.locator(".v6-extras");
   const wave = page.locator(".v6-extras details[data-extra='waveform']");
   const w1 = page.locator(".v6-extras details[data-extra='w1']");
   await expect(wave).toBeVisible();
@@ -292,12 +293,15 @@ test("V6-P6: сворачиваемые панели осциллограммы 
   // Закрыты по умолчанию.
   expect(await wave.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false);
   expect(await w1.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false);
+  // G7: CTA пересчёта живёт в шапке секции и доступен без раскрытия.
+  await expect(section.locator(".av2-hd .lnt-btn-primary")).toBeVisible();
   // Открытие осциллограммы грузит CH1.
-  await wave.locator("summary").click();
+  await wave.locator("> summary").click();
   await expect(wave.locator(".uplot")).toBeVisible({ timeout: 10_000 });
-  // W1-хром содержит CTA пересчёта.
-  await w1.locator("summary").click();
-  await expect(w1).toContainText("Пересчитать анализ (v2)");
+  // Тело анализа: блок панелей и честные чипы отсутствия (артефакты не засеяны).
+  await w1.locator("> summary").click();
+  await expect(w1.locator("[data-role=panels-title]")).toBeVisible();
+  await expect(w1.locator("[data-absent-panel]")).toHaveCount(6);
 });
 
 test("V6-P7: показания базы, н/д для одноканальной сессии", async ({ page }) => {

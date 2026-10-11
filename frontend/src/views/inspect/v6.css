@@ -1035,45 +1035,201 @@
   }
 }
 
-/* ── Сворачиваемые панели под лентой анализа ─────────────────────────── */
+/* ── Секция analysis-v2 (G7 «Disclosure-панели», todo 13) ──────────────────
+ * Одна рамка панели (primitives/panel.css) + шапка, которая читается без
+ * раскрытия: заголовок, вердикт THD-V, сессия базы, CTA пересчёта. Ниже —
+ * два раскрытия: осциллограмма CH1 и анализ сессии. Раскрытие/сворачивание —
+ * частое действие, поэтому ноль анимации тела; движение остаётся только у
+ * шеврона (120ms) и у входа содержимого на смене пары (200ms ease-out). */
 
-.app-v6 .v6-extras summary {
+.app-v6 .analysis-v2 {
+  flex: none;
+  min-width: 0;
+}
+
+.app-v6 .av2-hd {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lnt-space-3);
+  min-height: var(--lnt-touch-target-min);
+  padding: var(--lnt-space-2) var(--lnt-space-4);
+}
+
+.app-v6 .av2-hd .panel-title {
+  flex: none;
+}
+
+.app-v6 .av2-verdict {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Пассивное отображение базы пары: источник выбора — рейка каталога (B2). */
+.app-v6 .av2-session {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lnt-space-2);
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.app-v6 .av2-session-cap {
+  flex: none;
+  font: 700 10px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+}
+
+.app-v6 .av2-session-id {
+  min-width: 0;
+  max-inline-size: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 12px / 18px var(--lnt-mono);
+  color: var(--lnt-text);
+}
+
+.app-v6 .av2-cta {
+  flex: none;
+}
+
+.app-v6 .av2-disclosure {
+  min-width: 0;
+  border-top: 1px solid var(--lnt-line);
+}
+
+.app-v6 .av2-disclosure > summary {
   display: flex;
   align-items: center;
-  height: 32px;
-  padding: 0 12px;
+  gap: var(--lnt-space-2);
+  /* Пол тач-цели: 44px вместо прежних 32px. */
+  min-height: var(--lnt-control-height);
+  padding: var(--lnt-space-2) var(--lnt-space-4);
   cursor: pointer;
+  list-style: none;
   font: 600 12px / 16px var(--lnt-ui);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--lnt-text-sec);
-  list-style: none;
 }
 
-.app-v6 .v6-extras summary::-webkit-details-marker {
+.app-v6 .av2-disclosure > summary::-webkit-details-marker {
   display: none;
 }
 
 /* Шеврон раскрытия: без него заголовок выглядит мёртвой подписью. */
-.app-v6 .v6-extras summary::before {
+.app-v6 .av2-disclosure > summary::before {
   content: "▸";
   flex: none;
-  margin-right: 8px;
   color: var(--lnt-text-dim);
   transition: transform var(--lnt-t-fast) var(--lnt-ease);
 }
 
-.app-v6 .v6-extras details[open] > summary::before {
+.app-v6 .av2-disclosure[open] > summary::before {
   transform: rotate(90deg);
 }
 
-.app-v6 .v6-extras summary:hover {
+.app-v6 .av2-disclosure > summary:hover {
   color: var(--lnt-text);
+  background: rgb(255 255 255 / 0.03);
 }
 
-.app-v6 .v6-extras summary:focus-visible {
+.app-v6 .av2-disclosure > summary:focus-visible {
   outline: 2px solid var(--lnt-accent);
   outline-offset: -2px;
+}
+
+.app-v6 .av2-sum-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Сводка в свёрнутой шапке: сколько панелей и скаляров реально есть. */
+.app-v6 .av2-sum-value {
+  flex: none;
+  margin-inline-start: auto;
+  font: 400 12px / 18px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--lnt-text-dim);
+  white-space: nowrap;
+}
+
+.app-v6 .av2-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-4);
+  min-width: 0;
+  padding: var(--lnt-space-4);
+  border-top: 1px solid var(--lnt-line);
+}
+
+.app-v6 .av2-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-2);
+  min-width: 0;
+}
+
+.app-v6 .av2-block-title {
+  margin: 0;
+  font: 700 10px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-dim);
+}
+
+/* Скаляры W1 — та же сетка плиток, что у ленты анализа, без её внешних полей. */
+.app-v6 .av2-scalars {
+  padding: 0;
+}
+
+/* Честное отсутствие: панель не смонтирована — причина названа чипом. */
+.app-v6 .av2-absent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lnt-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-v6 .av2-chip {
+  max-inline-size: 100%;
+  padding: 2px var(--lnt-space-2);
+  background: var(--lnt-chrome);
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-radius-status);
+  color: var(--lnt-text-sec);
+  font: 400 12px / 18px var(--lnt-ui);
+  overflow-wrap: anywhere;
+}
+
+.app-v6 .av2-chip.is-failed {
+  background-color: var(--lnt-status-error-bg);
+  border-color: var(--lnt-status-error);
+  color: var(--lnt-status-error);
+}
+
+.app-v6 .av2-chip.is-withheld {
+  background-color: var(--lnt-status-warn-bg);
+  border-color: var(--lnt-status-warn);
+  color: var(--lnt-fg-primary);
+}
+
+/* Решённый блок карточек живёт в том же ритме тела, без своего внешнего поля. */
+.app-v6 .analysis-v2 .lnt-w1-extended {
+  margin-top: 0;
+}
+
+/* Вход содержимого на смене пары: тот же ритм, что у секции спектр+грам. */
+.app-v6 .av2-body.is-enter {
+  animation: lnt-signal-enter var(--lnt-t-enter) var(--lnt-ease-out) both;
 }
 
 .app-v6 .gram .lnt-spec-chart {
@@ -1110,12 +1266,41 @@
   outline-offset: -2px;
 }
 
+@media (max-width: 720px) {
+  .app-v6 .av2-hd {
+    padding: var(--lnt-space-2) var(--lnt-space-3);
+  }
+
+  .app-v6 .av2-session {
+    flex: 1 1 100%;
+    margin-inline-start: 0;
+  }
+
+  .app-v6 .av2-cta {
+    flex: 1 1 100%;
+  }
+
+  .app-v6 .av2-disclosure > summary {
+    padding: var(--lnt-space-2) var(--lnt-space-3);
+  }
+
+  .app-v6 .av2-body {
+    gap: var(--lnt-space-3);
+    padding: var(--lnt-space-3);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-v6 .panel.is-loading .frame {
     opacity: 1;
   }
 
-  .app-v6 .signal-bd.is-enter {
+  .app-v6 .signal-bd.is-enter,
+  .app-v6 .av2-body.is-enter {
     animation: none;
+  }
+
+  .app-v6 .av2-disclosure > summary::before {
+    transition: none;
   }
 }

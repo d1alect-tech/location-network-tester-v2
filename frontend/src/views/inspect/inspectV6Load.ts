@@ -1,6 +1,7 @@
 import type { SessionDetailPayload, SpectrumPayload } from "../../api/types-plots";
 import type { Meter, PeakRow } from "./analysisBand";
 import { metersFromDetail } from "./analysisBand";
+import type { DetailLoader } from "./pairDetail";
 import { peakDeltas } from "./peaksDelta";
 import { isRecord } from "./w1Parse";
 
@@ -69,10 +70,13 @@ export async function loadAnalysisBand(
   a: string,
   b: string | null,
   signal?: AbortSignal,
+  detail?: DetailLoader,
 ): Promise<{ meters: Meter[]; peaks: PeakRow[] }> {
-  const detail = await client.plots.detail(a, { signal });
-  const meters = metersFromDetail(detail);
-  const parsed = peaksFromAnalysis(detail);
+  const loadDetail: DetailLoader =
+    detail ?? ((name, options) => client.plots.detail(name, options));
+  const payload = await loadDetail(a, { signal });
+  const meters = metersFromDetail(payload);
+  const parsed = peaksFromAnalysis(payload);
   if (b === null) {
     return { meters, peaks: parsed.map((peak) => withDelta(peak, null)) };
   }

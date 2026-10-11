@@ -117,6 +117,7 @@ export function createExtendedRun(options: {
     signal: () => runAbort.signal,
   });
   const summaryHost = el("div", { className: "lnt-w1-extended-summary" });
+  summaryHost.hidden = true;
   const root = el(
     "section",
     {
@@ -126,12 +127,21 @@ export function createExtendedRun(options: {
     [el("div", { className: "lnt-w1-toolbar" }, [button]), status, downloads.root, summaryHost],
   );
 
+  /** Пустые контейнеры не должны оставлять дыры в ритме секции: скрыты,
+   * пока в них нет ни кнопки скачивания, ни карточек. */
+  function paintDownloadsVisibility(): void {
+    downloads.root.hidden = downloads.root.querySelector("button") === null;
+  }
+
+  paintDownloadsVisibility();
+
   function setStatus(text: string): void {
     status.textContent = text;
   }
 
   function renderSummary(summary: CharacterizationSummary): void {
     clearElement(summaryHost);
+    summaryHost.hidden = false;
     summaryHost.append(renderFamilyCards(summary, { session }));
   }
 
@@ -173,6 +183,7 @@ export function createExtendedRun(options: {
       }
       setStatus(`Готово. Ключ артефакта: ${done.artifact_key}.`);
       downloads.render(done.artifact_key);
+      paintDownloadsVisibility();
       const raw = await client.artifactBytes(current, done.artifact_key, BUNDLE_FILES[0], {
         signal,
       });
@@ -202,7 +213,9 @@ export function createExtendedRun(options: {
       runAbort.abort();
       runAbort = new AbortController();
       downloads.clear();
+      paintDownloadsVisibility();
       clearElement(summaryHost);
+      summaryHost.hidden = true;
       button.disabled = next === null;
       setStatus(next === null ? "Выберите сессию." : "Готов к запуску.");
     },

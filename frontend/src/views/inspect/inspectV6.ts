@@ -16,6 +16,7 @@ import type { GramPairClient } from "./gramPair";
 import { ticketToCaptureParams } from "./inspectTicket";
 import type { AnalysisBandClient } from "./inspectV6Load";
 import { loadAnalysisBand } from "./inspectV6Load";
+import { createPairDetail } from "./pairDetail";
 import { createPairState } from "./pairState";
 import { createPairbar } from "./pairbarV6";
 import { createSpectrumGramSection } from "./spectrumGramSection";
@@ -57,6 +58,12 @@ export async function mountInspectV6(
   const { client, routes } = opts;
   const sessionMap = new Map<string, CatalogSession>();
   const pair = createPairState();
+  // B2: detail базы — один fetch на пару, общий для спектра, ленты и analysis-v2.
+  // Взгляд AnalysisBandClient даёт строгий тип SessionDetailPayload (пересечение
+  // клиентов иначе разрешает detail в широкий {analysis?}).
+  const bandClient: AnalysisBandClient = client;
+  const detailStore = createPairDetail((name, options) => bandClient.plots.detail(name, options));
+  const sessionTypeOf = (id: string): string => sessionMap.get(id)?.session_type ?? "";
   const chrome = createV6Chrome({
     onCapture: (ticket) => {
       routes.navigate({ route: "capture", params: ticketToCaptureParams(ticket) });
@@ -72,18 +79,27 @@ export async function mountInspectV6(
     pair,
     onPick: (id) => pair.pick(id),
   });
-  const signalSection = createSpectrumGramSection({ client, createView: opts.createView });
+  const signalSection = createSpectrumGramSection({
+    client,
+    createView: opts.createView,
+    detail: detailStore.load,
+  });
   const analysisBand = createAnalysisBand();
   analysisBand.update({ meters: [...EMPTY_METERS], peaks: [] });
   analysisBand.paintDelta(null, null);
   const extras = createV6Extras({
     client,
     createView: opts.createView,
+    detail: detailStore.load,
+    sessionTypeOf,
     ...(client instanceof LntApiClient
       ? {}
       : {
           createChrome: () => ({
+            bar: el("div", { className: "panel-hd av2-hd" }),
             root: el("div"),
+            setSession() {},
+            onSummary() {},
             destroy() {},
           }),
         }),
@@ -115,6 +131,7 @@ export async function mountInspectV6(
     const gen = ++pairGeneration;
     pairController.abort();
     pairController = new AbortController();
+    detailStore.reset();
     const { a, b } = pair.get();
     pairbar.setPair(
       a === null ? null : (sessionMap.get(a) ?? null),
@@ -127,11 +144,11 @@ export async function mountInspectV6(
     paintChannelbarFromPayload(channelbar, null, null);
     analysisBand.update({ meters: [...EMPTY_METERS], peaks: [] });
     analysisBand.paintDelta(null, null);
-    extras.setSession(null);
+    extras.setPair(null, null);
     try {
       const [, bandData] = await Promise.all([
         signalSection.setPair(a, b),
-        loadAnalysisBand(client, a, b, pairController.signal),
+        loadAnalysisBand(client, a, b, pairController.signal, detailStore.load),
       ]);
       if (disposed || gen !== pairGeneration) return;
       analysisBand.update(bandData);
@@ -143,7 +160,7 @@ export async function mountInspectV6(
           ? null
           : summarizeDelta(payloads.a?.psd_v2_per_hz, payloads.b.psd_v2_per_hz),
       );
-      extras.setSession(a);
+      extras.setPair(a, b);
     } catch (error) {
       if (disposed || gen !== pairGeneration || isAbortError(error)) return;
       // no-excuse-ok: catch — inspect v6 pair-refresh boundary
@@ -184,6 +201,7 @@ export async function mountInspectV6(
     disposed = true;
     pairGeneration += 1;
     pairController.abort();
+    detailStore.dispose();
     stopDeviceStatus();
     unsubscribe();
     signalSection.destroy();

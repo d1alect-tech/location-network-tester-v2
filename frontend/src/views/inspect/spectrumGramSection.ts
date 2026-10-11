@@ -27,6 +27,11 @@ export type SpectrumGramSectionHandle = InspectSection & {
 export type SpectrumGramSectionOpts = {
   readonly client: SpectrumGramClient;
   readonly createView?: (options: UplotViewOptions) => ChartHandle;
+  /** B2: общий загрузчик detail пары инспекции. */
+  readonly detail?: (
+    name: string,
+    o?: { readonly signal?: AbortSignal },
+  ) => Promise<{ readonly analysis?: unknown }>;
 };
 
 function cluster(key: string, caption: string, body: HTMLElement): HTMLElement {
@@ -60,8 +65,15 @@ export function createSpectrumGramSection(
     ]);
   }
 
+  // B2: detail базы приходит из общего загрузчика пары — подменяем его в
+  // клиенте панелей, чтобы спектр, лента и analysis-v2 не тянули метрики врозь.
+  const panelClient: SpectrumPanelClient =
+    opts.detail === undefined
+      ? opts.client
+      : { plots: { ...opts.client.plots, detail: opts.detail } };
+
   const panel: SpectrumPanelHandle = createSpectrumPanel({
-    client: opts.client,
+    client: panelClient,
     createView: opts.createView,
     slots: { gramBar: gramToolbar, gramHost: gramCanvasHost },
     composeHeader,

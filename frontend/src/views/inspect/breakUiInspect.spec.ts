@@ -2,11 +2,14 @@
  * Todo 9 — секция спектр+грам; todo 11 — лента анализа; todo 13 — analysis-v2.
  * Скриншоты пишутся в .omo/evidence/ui-refactor-2/task-N/break-ui/. */
 
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import type { CatalogSession } from "../../api/types";
 import { installMockBackend } from "../../testkit/mockBackend";
+import { FAMILY_NAME_RU } from "./familyNames";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -14,6 +17,7 @@ const BASE = "http://127.0.0.1:4101/static/v2/#/inspect";
 
 const EVIDENCE_9 = resolve(__dirname, "../../../../.omo/evidence/ui-refactor-2/task-9/break-ui");
 const EVIDENCE_11 = resolve(__dirname, "../../../../.omo/evidence/ui-refactor-2/task-11/break-ui");
+const EVIDENCE_13 = resolve(__dirname, "../../../../.omo/evidence/ui-refactor-2/task-13/break-ui");
 
 function session(id: string, label: string): CatalogSession {
   return {
@@ -256,4 +260,295 @@ test("break-ui 9: prefers-reduced-motion гасит вход секции", asyn
     .locator(".panel-bd.signal-bd")
     .evaluate((node) => getComputedStyle(node).animationName);
   expect(animation).toBe("none");
+});
+
+/* ---------- break-ui 13: секция analysis-v2 (G7 «Disclosure-панели») ---------- */
+
+const W1_ARTIFACT = "art-13";
+const CHAR_ARTIFACT = "art-char-13";
+const RUN_BUTTON = "Запустить расширенный анализ";
+const FIXTURES = resolve(__dirname, "../../test-support/analysis-v2-fixtures");
+const PANEL_FILES = [
+  "harmonics.json",
+  "notching.json",
+  "apd.json",
+  "burst.json",
+  "trends.json",
+  "audio_panel.json",
+] as const;
+const FAMILY_IDS = Object.keys(FAMILY_NAME_RU);
+
+function readFixture(relative: string): string {
+  return readFileSync(resolve(FIXTURES, relative), "utf8");
+}
+
+/** База пары с метриками v1; указатель и артефакты v2 — по списку файлов. */
+function seedAnalysisSession(
+  backend: ReturnType<typeof installMockBackend>,
+  id: string,
+  opts: { readonly pointer?: boolean; readonly files?: readonly string[] } = {},
+): void {
+  backend.seedCatalog([session(id, id)]);
+  backend.seedSessionDetail(id, {
+    name: id,
+    manifest: {},
+    analysis: {
+      needle: { needle_sigma_ratio: 0.35, cycles_analyzed: 128 },
+      spectrum: { peaks: [], band_low_hz: 3000, band_high_hz: 1350000, resolution_hz: 100 },
+    },
+    spectrum_available: true,
+    waveform_available: false,
+    ch2_available: false,
+  });
+  backend.seedSpectrum(id, {
+    frequency_hz: [10, 1000, 10_000],
+    psd_v2_per_hz: [1e-6, 1e-4, 1e-5],
+    point_count: 3,
+    resolution_hz: 100,
+  });
+  if (opts.pointer === false) return;
+  backend.seedAnalysisPointer(id, { artifact_key: W1_ARTIFACT });
+  for (const name of opts.files ?? []) {
+    backend.seedArtifact(id, W1_ARTIFACT, name, readFixture(`measurement/${name}`));
+  }
+}
+
+async function mockRunRoutes(page: Page): Promise<void> {
+  const snapshot = (status: string, key: string | null): unknown => ({
+    job_id: "job-13",
+    kind: "analysis",
+    status,
+    stage: "",
+    completed: status === "succeeded" ? 1 : 0,
+    total: 1,
+    artifact_key: key,
+    error: null,
+  });
+  await page.route(/\/api\/analysis\/(recipes|runs)/, async (route) => {
+    const path = new URL(route.request().url()).pathname.replace(/^\/static\/v2/, "");
+    const method = route.request().method();
+    const json = (body: unknown): Promise<void> =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+    if (path === "/api/analysis/recipes" && method === "GET") {
+      await json({
+        items: [
+          {
+            recipe_id: "rec-characterization-v1",
+            name: "characterization-v1",
+            sha256: "c".repeat(64),
+            recipe: { kind: "characterization" },
+          },
+        ],
+      });
+      return;
+    }
+    if (path === "/api/analysis/runs" && method === "POST") {
+      await json(snapshot("running", null));
+      return;
+    }
+    if (path.startsWith("/api/analysis/runs/") && method === "GET") {
+      await json(snapshot("succeeded", CHAR_ARTIFACT));
+      return;
+    }
+    await route.fallback();
+  });
+}
+
+/** Бандл characterization-v1: минимум полей, отсутствующее — тире на карточке. */
+function charBundle(familyCount: number): string {
+  const families = FAMILY_IDS.slice(0, familyCount).map((id, index) => ({
+    family_id: id,
+    status: index % 3 === 0 ? "available" : index % 3 === 1 ? "partial" : "unavailable",
+    reason_codes: index % 3 === 1 ? ["artifact_limit"] : index % 3 === 2 ? ["not_computed"] : [],
+    comparison_summary: index === 0 ? [{ name: "f1_hz", value: 50.02, unit: "Hz" }] : [],
+  }));
+  return JSON.stringify({ schema_version: 2, families });
+}
+
+async function openSection(page: Page, id: string) {
+  await page.goto(BASE);
+  const section = page.locator(".analysis-v2");
+  await expect(section).toBeVisible();
+  await expect(section.locator("[data-session-id]")).toHaveText(id);
+  await section.locator("details[data-extra='w1'] > summary").click();
+  return section;
+}
+
+/** Элементные скриншоты внутри скроллящейся колонки врут: снимаем вьюпорт
+ * после прокрутки секции в кадр. */
+async function shootSection(page: Page, section: Locator, name: string): Promise<void> {
+  await section.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: resolve(EVIDENCE_13, name) });
+}
+
+async function runExtended(page: Page, id: string, familyCount: number) {
+  const backend = installMockBackend(page);
+  seedAnalysisSession(backend, id, { files: [...PANEL_FILES] });
+  backend.seedArtifact(id, CHAR_ARTIFACT, "characterization.json", charBundle(familyCount));
+  await mockRunRoutes(page);
+  const section = await openSection(page, id);
+  await section.getByRole("button", { name: RUN_BUTTON }).click();
+  // Прогон дошёл до бандла: строка скачивания появляется только после задачи.
+  await expect(section.locator(".lnt-w1-extended-downloads button")).not.toHaveCount(0);
+  return section;
+}
+
+test("break-ui 13: штатная сессия — шапка, вердикт, скаляры, стек панелей", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const backend = installMockBackend(page);
+  seedAnalysisSession(backend, "cap-a", { files: [...PANEL_FILES] });
+  const section = await openSection(page, "cap-a");
+
+  await expect(section.locator("[data-panel]")).toHaveCount(6);
+  await expect(section.locator("[data-absent-panel]")).toHaveCount(0);
+  await expect(section.locator("[data-panel-key]")).toHaveCount(6);
+  await expect(section.locator("[data-scalar]")).toHaveCount(4);
+  await expect(section.locator("[data-thd-verdict]")).toHaveCount(1);
+  await noHorizontalOverflow(page);
+  await shootSection(page, section, "ok-expanded.png");
+  await page.screenshot({ path: resolve(EVIDENCE_13, "ok-fullpage.png"), fullPage: true });
+});
+
+test("break-ui 13: свёрнуто и раскрыто — ключевые значения видны в обоих", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const backend = installMockBackend(page);
+  seedAnalysisSession(backend, "cap-a", { files: [...PANEL_FILES] });
+  await page.goto(BASE);
+  const section = page.locator(".analysis-v2");
+  await expect(section.locator("[data-panel-key]")).toHaveCount(0);
+  await expect(section.locator("[data-role=w1-sum-value]")).not.toHaveText("сессия не выбрана");
+  await shootSection(page, section, "collapsed.png");
+
+  await section.locator("details[data-extra='waveform'] > summary").click();
+  await section.locator("details[data-extra='w1'] > summary").click();
+  await expect(section.locator("[data-panel]")).toHaveCount(6);
+  await shootSection(page, section, "expanded.png");
+
+  // Пол тач-цели: и раскрытия, и CTA не ниже 44px.
+  const heights = await section.evaluate((node) => {
+    const rows = [...node.querySelectorAll<HTMLElement>("summary, .av2-cta")];
+    return rows.map((row) => Math.round(row.getBoundingClientRect().height));
+  });
+  expect(heights.every((height) => height >= 44)).toBe(true);
+});
+
+test("break-ui 13: нет артефактов — шесть честных чипов вместо пустого стека", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const backend = installMockBackend(page);
+  seedAnalysisSession(backend, "cap-a", { files: [] });
+  const section = await openSection(page, "cap-a");
+
+  await expect(section.locator("[data-absent-panel]")).toHaveCount(6);
+  await expect(section.locator("[data-panel]")).toHaveCount(0);
+  await expect(section.locator('[data-absent-tone="absent"]')).toHaveCount(6);
+  await expect(section.locator("[data-role=w1-sum-value]")).toContainText("панелей 0");
+  await noHorizontalOverflow(page);
+  await shootSection(page, section, "missing-artifacts.png");
+});
+
+test("break-ui 13: нет анализа v2 — баннер, legacy-вердикт, стека панелей нет", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const backend = installMockBackend(page);
+  seedAnalysisSession(backend, "cap-a", { pointer: false });
+  const section = await openSection(page, "cap-a");
+
+  await expect(section.locator(".lnt-w1-banner")).toBeVisible();
+  await expect(section.locator('[data-thd-verdict="legacy"]')).toBeVisible();
+  await expect(section.locator("[data-absent-panel]")).toHaveCount(0);
+  await expect(section.locator("[data-panel]")).toHaveCount(0);
+  await expect(section.locator("[data-role=panels-title]")).toBeHidden();
+  await shootSection(page, section, "v1-only-banner.png");
+});
+
+test("break-ui 13: 18 семейств — решённый блок карточек в ритме секции", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const section = await runExtended(page, "cap-a", 18);
+
+  await expect(section.locator("[data-family-id]")).toHaveCount(18);
+  await noHorizontalOverflow(page);
+  await section.locator(".lnt-w1-extended").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: resolve(EVIDENCE_13, "families-18.png") });
+  await page.screenshot({ path: resolve(EVIDENCE_13, "families-18-fullpage.png"), fullPage: true });
+});
+
+test("break-ui 13: одно семейство в бандле — сетки нет, секция не рвётся", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const section = await runExtended(page, "cap-a", 1);
+
+  await expect(section.locator("[data-family-id]")).toHaveCount(0);
+  await noHorizontalOverflow(page);
+  await shootSection(page, section, "families-1.png");
+});
+
+test("break-ui 13: ноль семейств в бандле — сетки нет, секция не рвётся", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const section = await runExtended(page, "cap-a", 0);
+
+  await expect(section.locator("[data-family-id]")).toHaveCount(0);
+  await expect(section.locator("[data-panel]")).toHaveCount(6);
+  await noHorizontalOverflow(page);
+  await shootSection(page, section, "families-0.png");
+});
+
+test("break-ui 13: длинный id сессии — шапка переносится без overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const backend = installMockBackend(page);
+  seedAnalysisSession(backend, LONG_ID, { files: [...PANEL_FILES] });
+  const section = await openSection(page, LONG_ID);
+
+  await expect(section.locator("[data-panel]")).toHaveCount(6);
+  await noHorizontalOverflow(page);
+  await shootSection(page, section, "long-id-1440.png");
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await noHorizontalOverflow(page);
+  await shootSection(page, section, "long-id-375.png");
+});
+
+test("break-ui 13: 375px — шапка, чипы и стек переносятся без overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const backend = installMockBackend(page);
+  seedAnalysisSession(backend, "cap-a", { files: ["harmonics.json"] });
+  const section = await openSection(page, "cap-a");
+
+  await expect(section.locator("[data-panel]")).toHaveCount(1);
+  await expect(section.locator("[data-absent-panel]")).toHaveCount(5);
+  await noHorizontalOverflow(page);
+  await shootSection(page, section, "mobile-375.png");
+  await page.screenshot({ path: resolve(EVIDENCE_13, "mobile-375-fullpage.png"), fullPage: true });
+});
+
+test("break-ui 13: движение — вход гасится reduced-motion, раскрытие без анимации", async ({
+  page,
+}) => {
+  const backend = installMockBackend(page);
+  seedAnalysisSession(backend, "cap-a", { files: [...PANEL_FILES] });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const section = await openSection(page, "cap-a");
+  await expect(section.locator("[data-panel]")).toHaveCount(6);
+
+  // Вход тела на смене пары гасится.
+  const bodyAnimation = await section
+    .locator(".av2-body")
+    .first()
+    .evaluate((node) => getComputedStyle(node).animationName);
+  expect(bodyAnimation).toBe("none");
+
+  // Частое действие (раскрытие/сворачивание) — без анимации и без перехода.
+  const disclosure = section.locator("details[data-extra='w1']");
+  const motion = await disclosure.evaluate((node) => {
+    const style = getComputedStyle(node);
+    const body = node.querySelector(".av2-body");
+    return {
+      transition: style.transitionDuration,
+      animation: style.animationName,
+      bodyTransition: body === null ? null : getComputedStyle(body).transitionDuration,
+    };
+  });
+  expect(motion.transition).toBe("0s");
+  expect(motion.animation).toBe("none");
+  expect(motion.bodyTransition).toBe("0s");
+  await shootSection(page, section, "reduced-motion.png");
 });

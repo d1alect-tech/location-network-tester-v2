@@ -8,6 +8,8 @@ import { type MockLntBackend, installMockBackend } from "../../testkit/mockBacke
 
 /** E2E W1 inspect chrome inside V6 extras: measurement artifacts vs v1-only banner.
  * #/inspect mounts .app-v6; W1 lives in collapsed details[data-extra=w1].
+ * B2 (todo 13): сессию задаёт ПАРА инспекции — секция analysis-v2 показывает
+ * базу пары пассивно, своего select «Сессия инспекции» у неё больше нет.
  * API подменяется page.route как в spectrogram.spec.ts. */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -68,8 +70,12 @@ function mockSessionDetail(backend: MockLntBackend, id: string, metricsRel: stri
 async function openW1Chrome(page: Page, id: string): Promise<void> {
   await page.goto(INSPECT);
   await expect(page.locator(".app-v6")).toBeVisible();
-  await page.locator(".v6-extras details[data-extra='w1'] summary").click();
-  await page.selectOption('select[aria-label="Сессия инспекции"]', id);
+  const section = page.locator(".v6-extras");
+  // B2: базу пары уже выбрала рейка каталога (авто-подхват первого элемента);
+  // select как второй источник выбора удалён — осталось пассивное отображение.
+  await expect(section.locator("[data-session-id]")).toHaveText(id);
+  await expect(section.locator("select")).toHaveCount(0);
+  await section.locator("details[data-extra='w1'] > summary").click();
 }
 
 async function expectNoErrorBand(page: Page): Promise<void> {
@@ -111,6 +117,34 @@ test("measurement fixtures: THD verdict and four scalars, no banner, no eight pa
   await expect(chrome.getByText("σ_pk/μ_pk", { exact: true })).toBeVisible();
   await expect(chrome.locator("[data-scalar]")).toHaveCount(4);
   await expect(page.getByText(BANNER)).toHaveCount(0);
+  await expectNoErrorBand(page);
+});
+
+/* ---------- B2: единый выбор сессии и один detail на пару ---------- */
+
+test("B2: detail базы — один запрос на пару, каталог — boot и рейка", async ({ page }) => {
+  // Given: одна сессия в каталоге → одна пара (база t1-measurement, б нет);
+  // указатель анализа на месте, артефакты не засеяны (404).
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t1-measurement");
+  mockSessionDetail(backend, "t1-measurement", "measurement/metrics.json");
+  backend.seedAnalysisPointer("t1-measurement", { artifact_key: ARTIFACT_KEY });
+  const detailRequests: string[] = [];
+  const catalogRequests: string[] = [];
+  page.on("request", (request) => {
+    const urlPath = new URL(request.url()).pathname.replace(/^\/static\/v2/, "");
+    if (/^\/api\/sessions\/[^/]+$/.test(urlPath)) detailRequests.push(urlPath);
+    if (urlPath.startsWith("/api/catalog/sessions")) catalogRequests.push(urlPath);
+  });
+
+  // When: страница загружена, analysis-v2 раскрыт и дочитал артефакты.
+  await openW1Chrome(page, "t1-measurement");
+  await expect(page.locator(".v6-extras [data-absent-panel]")).toHaveCount(6);
+
+  // Then: спектр, лента и analysis-v2 делят один detail базы; второй вызов
+  // catalogSessions принадлежит рейке, у секции своего запроса нет.
+  expect(detailRequests).toEqual(["/api/sessions/t1-measurement"]);
+  expect(catalogRequests).toHaveLength(2);
   await expectNoErrorBand(page);
 });
 

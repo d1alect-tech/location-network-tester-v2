@@ -1,40 +1,42 @@
-/* W1 inspect chrome: banner, THD badge, four optional scalars. Tokens only. */
-
-.lnt-w1-chrome {
-  margin-top: var(--lnt-space-4);
-  padding: var(--lnt-space-4);
-  background-color: var(--lnt-bg-panel);
-  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
-  border-radius: var(--lnt-radius-panel);
-}
+/* Analysis-v2: баннер, вердикт-бейдж, скаляры панелей, свёрнутые панели,
+ * рельса задачи. Рамку секции даёт primitives/panel.css (класс .panel на шелле
+ * analysis-v2) — своей рамки и внешних отступов у .lnt-w1-chrome больше нет
+ * (todo 2: одна рамка). Скаляры W1 рисуются плитками ленты (.band-cell, v6.css),
+ * здесь остаётся компактный dl тел панелей (trends, itic). */
 
 .lnt-w1-toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: var(--lnt-space-3);
   align-items: center;
-  margin-bottom: var(--lnt-space-3);
+  min-width: 0;
 }
 
 .lnt-w1-banner {
-  border: var(--lnt-border-width) solid var(--lnt-border-strong);
-  background-color: var(--lnt-status-warn-bg);
-  color: var(--lnt-fg-primary);
-  border-radius: var(--lnt-radius-control);
+  margin: 0;
   padding: var(--lnt-space-2) var(--lnt-space-3);
-  margin: var(--lnt-space-2) 0;
-  font-size: 15px;
-  line-height: 22px;
+  background-color: var(--lnt-status-warn-bg);
+  border: var(--lnt-border-width) solid var(--lnt-border-strong);
+  border-left: 3px solid var(--lnt-status-warn);
+  border-radius: var(--lnt-radius-control);
+  color: var(--lnt-fg-primary);
+  font-size: 13px;
+  line-height: 19px;
+  overflow-wrap: anywhere;
 }
 
+/* Бейдж не интерактивен: пол 44px касается тач-таргетов, а не пилюль. */
 .lnt-w1-badge {
   display: inline-flex;
   align-items: center;
-  min-height: var(--lnt-control-height);
-  padding: 0 var(--lnt-space-3);
-  border-radius: var(--lnt-radius-control);
-  font-size: 13px;
+  min-height: 22px;
+  max-inline-size: 100%;
+  padding: 2px var(--lnt-space-2);
+  border-radius: var(--lnt-radius-status);
+  font-family: var(--lnt-font-mono);
+  font-size: 12px;
   font-weight: var(--lnt-weight-medium);
+  letter-spacing: 0.02em;
 }
 
 .lnt-w1-badge-ok {
@@ -50,13 +52,15 @@
 .lnt-w1-badge-legacy {
   background-color: var(--lnt-bg-raised);
   color: var(--lnt-fg-secondary);
+  white-space: normal;
 }
 
+/* Компактный dl тел панелей (trends/itic): пары подпись-значение в две колонки. */
 .lnt-w1-scalars {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: var(--lnt-space-1) var(--lnt-space-4);
-  margin: var(--lnt-space-3) 0 0;
+  margin: 0;
   font-family: var(--lnt-font-mono);
   font-size: 13px;
   line-height: 20px;
@@ -76,10 +80,102 @@
 .lnt-w1-scalars dd {
   margin: 0;
   color: var(--lnt-fg-primary);
+  overflow-wrap: anywhere;
+}
+
+.lnt-w1-panels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-2);
+  min-width: 0;
+}
+
+.lnt-w1-panel {
+  min-width: 0;
+  background-color: var(--lnt-bg-raised);
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-panel);
+}
+
+/* Свёрнутая панель: заголовок + ключевое значение читаются без раскрытия.
+ * Правило самодостаточно — шелл analysis-v2 больше не задаёт summary сверху. */
+.lnt-w1-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--lnt-space-2);
+  min-height: var(--lnt-control-height);
+  padding: var(--lnt-space-2) var(--lnt-space-3);
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  font-weight: var(--lnt-weight-semibold);
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lnt-fg-secondary);
+}
+
+.lnt-w1-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.lnt-w1-panel > summary::before {
+  content: "▸";
+  flex: none;
+  color: var(--lnt-fg-disabled);
+  transition: transform var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-w1-panel[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.lnt-w1-panel > summary:hover {
+  color: var(--lnt-fg-primary);
+  background-color: var(--lnt-bg-selected);
+}
+
+.lnt-w1-panel > summary:focus-visible {
+  outline: var(--lnt-focus-width) solid var(--lnt-accent-a);
+  outline-offset: calc(-1 * var(--lnt-focus-width));
+}
+
+.lnt-w1-sum-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lnt-w1-sum-value {
+  margin-inline-start: auto;
+  flex: none;
+  font-family: var(--lnt-font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums lining-nums;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--lnt-fg-secondary);
+  white-space: nowrap;
+}
+
+.lnt-w1-panel-body {
+  padding: 0 var(--lnt-space-3) var(--lnt-space-3);
+  /* Широкая таблица (CM/DM, APD) скроллится внутри панели, а не ломает раскладку. */
+  overflow-x: auto;
+}
+
+.lnt-w1-panel-note {
+  margin: 0 0 var(--lnt-space-2);
+  color: var(--lnt-fg-secondary);
+  font-size: 13px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
 }
 
 .lnt-w1-job-rail {
-  margin-top: var(--lnt-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-2);
 }
 
 .lnt-w1-job-bar {
@@ -91,45 +187,17 @@
 }
 
 .lnt-w1-failures {
-  margin: var(--lnt-space-2) 0 0;
+  margin: 0;
   padding-left: var(--lnt-space-5);
   color: var(--lnt-fg-secondary);
   font-size: 13px;
 }
 
-.lnt-w1-panels {
-  display: flex;
-  flex-direction: column;
-  gap: var(--lnt-space-2);
-  margin-top: var(--lnt-space-3);
-}
-
-.lnt-w1-panel {
-  background-color: var(--lnt-bg-raised);
-  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
-  border-radius: var(--lnt-radius-panel);
-}
-
-.lnt-w1-panel > summary {
-  min-height: var(--lnt-control-height);
-  padding: var(--lnt-space-2) var(--lnt-space-3);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: var(--lnt-weight-medium);
-}
-
-.lnt-w1-panel-body {
-  padding: 0 var(--lnt-space-3) var(--lnt-space-3);
-}
-
-.lnt-w1-panel-note {
-  margin: 0 0 var(--lnt-space-2);
-  color: var(--lnt-fg-secondary);
-  font-size: 13px;
-  line-height: 18px;
-}
-
 @media (prefers-reduced-motion: reduce) {
+  .lnt-w1-panel > summary::before {
+    transition: none;
+  }
+
   .lnt-w1-job-bar {
     transition: none;
   }

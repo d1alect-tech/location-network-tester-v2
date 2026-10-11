@@ -163,8 +163,10 @@ describe("mountInspectV6", () => {
           ...fakeClient().plots,
           detail: vi.fn(async () => {
             detailCall += 1;
-            if (detailCall === 2) return staleDetail;
-            return detailCall >= 4 ? currentDetail : DETAIL;
+            // B2: один fetch на пару — первый вызов это первая пара, и её
+            // поздний ответ обязан быть проигнорирован.
+            if (detailCall === 1) return staleDetail;
+            return currentDetail;
           }),
         },
       };
@@ -189,6 +191,36 @@ describe("mountInspectV6", () => {
       expect(container.querySelector<HTMLElement>("[data-inspect-error]")?.hidden).toBe(true);
     },
   );
+
+  it("fetches the base detail once per pair change: spectrum, band and analysis-v2 share it", async () => {
+    // Given: каталог из двух сессий — авто-подхват делает две смены пары.
+    const bandDetail: SessionDetailPayload = {
+      ...DETAIL,
+      analysis: { needle: { cycles_analyzed: 130 } },
+    };
+    const detail = vi.fn(async () => bandDetail);
+    const client = {
+      ...fakeClient(),
+      plots: { ...fakeClient().plots, detail },
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    // When
+    const cleanup = await mountInspectV6(container, {
+      client,
+      routes: new RouteStore(),
+      createView: fakeCreateView(),
+    });
+    cleanups.push(cleanup);
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-chbar="segments"]')?.textContent).toBe("130");
+    });
+    await flush();
+
+    // Then: по одному detail на смену пары, а не по одному на потребителя.
+    expect(detail).toHaveBeenCalledTimes(2);
+  });
 
   it("removes the v6 root when cleanup runs", async () => {
     // Given
