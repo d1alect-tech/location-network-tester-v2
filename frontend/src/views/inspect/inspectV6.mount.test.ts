@@ -259,6 +259,55 @@ describe("mountInspectV6", () => {
     );
   });
 
+  it("F-8: dir-name строки duplicate_id не канонизируется в неоднозначный id", async () => {
+    // Given: две строки каталога с одним manifest id (health duplicate_id).
+    // Запрос по id даёт 409 «идентификатор сессии неоднозначен», по имени
+    // каталога — 200 (D1). Шов захвата несёт имя каталога.
+    const dupRow = (dir: string, label: string): CatalogSession => ({
+      ...SESSION_A,
+      id: "syn-quiet-seed6022",
+      health: "duplicate_id",
+      label,
+      storage_path: `/root/${dir}`,
+    });
+    const rows = [dupRow("sim-quiet-a", "дубль-А"), dupRow("sim-quiet-b", "дубль-Б")];
+    const detailKeys: string[] = [];
+    const client = {
+      ...fakeClient(),
+      catalogSessions: async () => ({ items: rows, next_cursor: null }),
+      plots: {
+        ...fakeClient().plots,
+        detail: async (name: string) => {
+          detailKeys.push(name);
+          if (name === "syn-quiet-seed6022") throw new ApiError("conflict", { status: 409 });
+          return { ...DETAIL, name };
+        },
+      },
+    };
+    window.location.hash = "#/inspect?a=sim-quiet-a";
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    // When
+    const cleanup = await mountInspectV6(container, {
+      client,
+      routes: new RouteStore(),
+      createView: fakeCreateView(),
+    });
+    cleanups.push(cleanup);
+    cleanups.push(() => {
+      window.location.hash = "";
+    });
+
+    // Then: слот пары наполнен метой своей строки, а не прочерком.
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-pair="a"] .pair-name')?.textContent).toBe("дубль-А");
+    });
+    expect(detailKeys.length).toBeGreaterThan(0);
+    expect(detailKeys.every((key) => key === "sim-quiet-a")).toBe(true);
+    expect(container.querySelector<HTMLElement>("[data-inspect-error]")?.hidden).toBe(true);
+  });
+
   it("removes the v6 root when cleanup runs", async () => {
     // Given
     const container = document.createElement("div");

@@ -19,7 +19,7 @@ import { loadAnalysisBand } from "./inspectV6Load";
 import { createPairDetail } from "./pairDetail";
 import { createPairState } from "./pairState";
 import { createPairbar } from "./pairbarV6";
-import { buildSessionAlias } from "./sessionAlias";
+import { buildSessionAlias, indexSessionMeta } from "./sessionAlias";
 import { createSpectrumGramSection } from "./spectrumGramSection";
 import type { SpectrumPanelClient } from "./spectrumPanelV6";
 import { createV6Chrome } from "./v6Chrome";
@@ -179,7 +179,9 @@ export async function mountInspectV6(
       const page = await client.catalogSessions({ page_size: 200, include_paths: true });
       if (disposed) return;
       const alias = buildSessionAlias(page.items);
-      for (const item of page.items) sessionMap.set(item.id, item);
+      // Мета слота пары ищется по обоим ключам D1: dir-name-строка с
+      // duplicate_id не канонизируется (F-8), поэтому её ключ остаётся именем.
+      for (const item of page.items) indexSessionMeta(sessionMap, item);
       await catalogColumn.reload();
       if (disposed) return;
       const params = routes.get().params;

@@ -15,13 +15,27 @@ export function storageDirName(storagePath: string | null | undefined): string |
   return name;
 }
 
-/** Имя каталога → manifest id. Имя, равное id, алиасом не считается. */
+/** Имя каталога → manifest id. Имя, равное id, алиасом не считается.
+ * Строки `duplicate_id` пропускаются (F-8): их id неоднозначен, сервер отвечает
+ * 409 «идентификатор сессии неоднозначен» на detail/spectrum/pointer, тогда как
+ * имя каталога резолвится однозначно (D1). Ключ такой строки остаётся именем
+ * каталога. */
 export function buildSessionAlias(items: readonly CatalogSession[]): Map<string, string> {
   const alias = new Map<string, string>();
   for (const item of items) {
+    if (item.health === "duplicate_id") continue;
     const dir = storageDirName(item.storage_path);
     if (dir === null || dir === item.id) continue;
     if (!alias.has(dir)) alias.set(dir, item.id);
   }
   return alias;
+}
+
+/** Мета-индекс строки каталога: ключ — manifest id ИЛИ имя каталога (зеркало D1,
+ * как в `buildSessionAlias`). Существующий ключ не вытесняется: id строки важнее
+ * чужого имени каталога. */
+export function indexSessionMeta(map: Map<string, CatalogSession>, item: CatalogSession): void {
+  map.set(item.id, item);
+  const dir = storageDirName(item.storage_path);
+  if (dir !== null && !map.has(dir)) map.set(dir, item);
 }
