@@ -145,7 +145,7 @@ describe("createAnalysisBand", () => {
     },
   ];
 
-  it("renders readout cells and peak rows on update", () => {
+  it("renders two rows: scalar tiles then peaks plus delta rail", () => {
     // Given
     const band = createAnalysisBand();
 
@@ -154,16 +154,16 @@ describe("createAnalysisBand", () => {
 
     // Then
     expect(band.root.classList.contains("analysis-band")).toBe(true);
-    const readout = band.root.querySelector(".panel.readout");
-    expect(readout).not.toBeNull();
-    expect(readout?.querySelector(".panel-hd")?.textContent).toContain("Показания базы");
-    const cells = band.root.querySelectorAll(".readout-grid .readout-cell");
+    expect(band.root.getAttribute("data-band-variant")).toBe("two-rows");
+    expect(band.root.querySelector(".panel-hd")?.textContent).toContain("Показания базы");
+    const cells = band.root.querySelectorAll(".band-scalars .band-cell");
     expect(cells).toHaveLength(7);
-    expect(cells[0]?.querySelector(".readout-label")?.textContent).toBe("Частота сети");
-    expect(cells[0]?.querySelector(".readout-value")?.textContent).toContain("50.0000007");
+    expect(cells[0]?.querySelector("dt")?.textContent).toBe("Частота сети");
+    expect(cells[0]?.querySelector("dd")?.textContent).toContain("50.0000007");
     expect(cells[0]?.querySelector(".t-unit")?.textContent).toBe("Гц");
-    const wide = band.root.querySelector(".readout-cell.is-wide");
-    expect(wide?.querySelector(".readout-label")?.textContent).toBe("Полоса");
+    const wide = band.root.querySelector(".band-cell.is-wide");
+    expect(wide?.querySelector("dt")?.textContent).toBe("Полоса");
+    expect(wide?.querySelector("dd")?.classList.contains("is-long")).toBe(true);
     const peaksHd = band.root.querySelectorAll(".panel-hd");
     expect(peaksHd[1]?.textContent).toContain("Пики спектра · дельта к базе");
     const table = band.root.querySelector("table.tbl.tbl-compare");
@@ -173,6 +173,9 @@ describe("createAnalysisBand", () => {
     const firstCells = rows?.[0]?.querySelectorAll("td");
     expect(firstCells?.[0]?.classList.contains("num")).toBe(true);
     expect(firstCells?.[1]?.textContent).toBe("-48.57");
+    // Δ-полоса живёт во втором ряду ленты, рядом с пиками.
+    expect(band.root.querySelector(".band-tier2 .band-rail [data-delta-canvas]")).not.toBeNull();
+    expect(band.root.querySelector(".band-rail-note")?.textContent).toContain("±8 дБ");
   });
 
   it("renders data-delta -10.00 and glyph ▼ when deltaDb is -10", () => {

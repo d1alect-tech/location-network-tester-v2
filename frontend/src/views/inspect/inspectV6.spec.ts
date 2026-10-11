@@ -303,11 +303,11 @@ test("V6-P6: сворачиваемые панели осциллограммы 
 test("V6-P7: показания базы, н/д для одноканальной сессии", async ({ page }) => {
   mockApi(installMockBackend(page), { ch2: false });
   await page.goto(BASE);
-  const readout = page.locator(".analysis-band .readout-value");
+  const readout = page.locator(".analysis-band .band-cell dd");
   await expect(readout).toHaveCount(7);
   // P_async/P_sync отсутствует в один канал → «н/д», не 0.
   await expect(
-    page.locator(".analysis-band .readout-cell").filter({ hasText: "P_async" }),
+    page.locator(".analysis-band .band-cell").filter({ hasText: "P_async" }),
   ).toContainText("н/д");
 });
 

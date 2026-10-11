@@ -13,6 +13,7 @@ const __dirname = dirname(__filename);
 const BASE = "http://127.0.0.1:4101/static/v2/#/inspect";
 
 const EVIDENCE_9 = resolve(__dirname, "../../../../.omo/evidence/ui-refactor-2/task-9/break-ui");
+const EVIDENCE_11 = resolve(__dirname, "../../../../.omo/evidence/ui-refactor-2/task-11/break-ui");
 
 function session(id: string, label: string): CatalogSession {
   return {
@@ -58,6 +59,47 @@ async function noHorizontalOverflow(page: import("@playwright/test").Page): Prom
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow, "horizontal overflow").toBeLessThanOrEqual(0);
+}
+
+function seedPairWithPeaks(backend: ReturnType<typeof installMockBackend>): void {
+  backend.seedCatalog([session("cap-a", "cap-a"), session("cap-b", "cap-b")]);
+  for (const id of ["cap-a", "cap-b"]) {
+    backend.seedSessionDetail(id, {
+      name: id,
+      manifest: {},
+      analysis: {
+        needle: {
+          line_frequency_hz: 50.0000007,
+          needle_mean_v: 0.0234,
+          needle_sigma_ratio: 0.412,
+          async_sync_ratio: 0.07,
+          cycles_analyzed: 128,
+        },
+        spectrum: {
+          peaks: [{ frequency_hz: 1000, level_db: -40, prominence_db: 12.5, q_factor: 8.2 }],
+          band_low_hz: 3000,
+          band_high_hz: 1350000,
+          resolution_hz: 100,
+        },
+      },
+      spectrum_available: true,
+      waveform_available: false,
+      ch2_available: false,
+    });
+  }
+  // База выше сравнения на пике → дельта Б−А отрицательная.
+  backend.seedSpectrum("cap-a", {
+    frequency_hz: [10, 1000, 10_000],
+    psd_v2_per_hz: [1e-6, 1e-2, 1e-5],
+    point_count: 3,
+    resolution_hz: 100,
+  });
+  backend.seedSpectrum("cap-b", {
+    frequency_hz: [10, 1000, 10_000],
+    psd_v2_per_hz: [1e-6, 1e-4, 1e-5],
+    point_count: 3,
+    resolution_hz: 100,
+  });
 }
 
 test("break-ui 9: штатная пара, вид спектр и вид грам", async ({ page }) => {
@@ -128,6 +170,79 @@ test("break-ui 9: мобильная ширина — шапка перенос�
   await panel.locator(".uplot").waitFor({ timeout: 15_000 });
   await noHorizontalOverflow(page);
   await page.screenshot({ path: resolve(EVIDENCE_9, "mobile-ok.png"), fullPage: true });
+});
+
+test("break-ui 11: нули и пропуски в ленте — факты и н/д, без NaN", async ({ page }) => {
+  const backend = installMockBackend(page);
+  backend.seedCatalog([session("cap-a", "cap-a"), session("cap-b", "cap-b")]);
+  backend.seedSessionDetail("cap-a", {
+    name: "cap-a",
+    manifest: {},
+    analysis: {
+      needle: {
+        line_frequency_hz: 0,
+        needle_mean_v: 0,
+        needle_sigma_ratio: 0,
+        async_sync_ratio: null,
+        cycles_analyzed: 0,
+      },
+      spectrum: { peaks: [], band_low_hz: 0, band_high_hz: 0, resolution_hz: 0 },
+    },
+    spectrum_available: true,
+    waveform_available: false,
+    ch2_available: false,
+  });
+  backend.seedSessionDetail("cap-b", {
+    name: "cap-b",
+    manifest: {},
+    analysis: { needle: {}, spectrum: { peaks: [] } },
+    spectrum_available: true,
+    waveform_available: false,
+    ch2_available: false,
+  });
+  for (const id of ["cap-a", "cap-b"]) {
+    backend.seedSpectrum(id, {
+      frequency_hz: [10, 100],
+      psd_v2_per_hz: [1e-6, 1e-4],
+      point_count: 2,
+      resolution_hz: 100,
+    });
+  }
+  await page.goto(BASE);
+  const band = page.locator(".col-main .analysis-band");
+  await expect(band.locator(".band-cell dd")).toHaveCount(7);
+  await expect(band).not.toContainText("NaN");
+  await expect(band.locator(".band-cell").filter({ hasText: "P_async" })).toContainText("н/д");
+  await band.screenshot({ path: resolve(EVIDENCE_11, "zeros-missing.png") });
+});
+
+test("break-ui 11: отрицательные дельты пиков — глиф вниз и data-delta", async ({ page }) => {
+  seedPairWithPeaks(installMockBackend(page));
+  await page.goto(BASE);
+  const band = page.locator(".col-main .analysis-band");
+  const delta = band.locator("[data-delta]").first();
+  await expect(delta).toBeVisible();
+  await expect(delta).toHaveClass(/is-down/);
+  await band.screenshot({ path: resolve(EVIDENCE_11, "negative-deltas.png") });
+});
+
+test("break-ui 11: пара не выбрана — плитки н/д и приглашение Δ", async ({ page }) => {
+  installMockBackend(page);
+  await page.goto(BASE);
+  const band = page.locator(".col-main .analysis-band");
+  await expect(band.locator(".band-cell dd").first()).toContainText("н/д");
+  await expect(band.locator("[data-delta-empty]")).toBeVisible();
+  await band.screenshot({ path: resolve(EVIDENCE_11, "no-pair.png") });
+});
+
+test("break-ui 11: мобильная ширина — лента в один столбец без overflow", async ({ page }) => {
+  seedPairWithPeaks(installMockBackend(page));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(BASE);
+  const band = page.locator(".col-main .analysis-band");
+  await expect(band.locator(".band-cell dd")).toHaveCount(7);
+  await noHorizontalOverflow(page);
+  await band.screenshot({ path: resolve(EVIDENCE_11, "mobile-band.png") });
 });
 
 test("break-ui 9: prefers-reduced-motion гасит вход секции", async ({ page }) => {

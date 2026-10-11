@@ -14,7 +14,6 @@ import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { peaksFromDetail } from "../../components/charts/viewModels";
 import type { SeriesStyle } from "../../components/charts/viewModels";
 import { el } from "../../components/primitives/dom";
-import { createDeltaStrip } from "./deltaStrip";
 import { createSpectrumExtras } from "./spectrumExtras";
 import { EMPTY_SPECTRUM, detailForPeaks } from "./spectrumPanelData";
 import { createSpectrumPanelRequests } from "./spectrumPanelRequest";
@@ -110,7 +109,6 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
   let reloadPlane: () => void = () => undefined;
   let lastPayload: SpectrumPayload | null = null;
   let lastPayloadB: SpectrumPayload | null = null;
-  const deltaStrip = createDeltaStrip();
   const planeControl = createPlaneControl(() => reloadPlane());
   const extras = createSpectrumExtras();
   const gramBar = opts.slots?.gramBar ?? el("div", { className: "gram-bar" });
@@ -145,13 +143,7 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
     [statusText, retryButton],
   );
   status.hidden = true;
-  const body = el("div", { className: "panel-bd" }, [
-    status,
-    frame,
-    deltaStrip.root,
-    gramHost,
-    extras.markers,
-  ]);
+  const body = el("div", { className: "panel-bd" }, [status, frame, gramHost, extras.markers]);
   const root = el("section", { className: "panel", attrs: { "data-showcase": "spectrum" } }, [
     header,
     body,
@@ -196,7 +188,6 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
       frame.hidden = true;
       planeControl.paintRbw(null);
       extras.paint({ payloadA: EMPTY_SPECTRUM, payloadB: null, analysis: {} });
-      deltaStrip.paint(null, null);
     }
     status.hidden = false;
     retryButton.hidden = true;
@@ -221,7 +212,6 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
       peaksA = peaksFromDetail(detailForPeaks(a, detail));
       lastPayload = payloadA;
       lastPayloadB = payloadB;
-      deltaStrip.paint(payloadA, payloadB);
       const suffix = planeControl.plane() === "input-referred" ? " · вход" : "";
       const styleA: SeriesStyle = { color: theme.accentA, label: `${a}${suffix}` };
       const styleB: SeriesStyle = {

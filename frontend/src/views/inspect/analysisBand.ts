@@ -1,5 +1,10 @@
-import type { SessionDetailPayload } from "../../api/types-plots";
+/** Лента анализа (G6, вариант «Два ряда»): ряд 1 — скаляры иглы и спектра
+ * просторными плитками, ряд 2 — таблица пиков с дельтой к базе и Δ-полоса
+ * сбоку. Значения остаются фактами: без нормативных слов. */
+
+import type { SessionDetailPayload, SpectrumPayload } from "../../api/types-plots";
 import { el } from "../../components/primitives/dom";
+import { createDeltaStrip } from "./deltaStrip";
 import { isRecord, needleOf } from "./w1Parse";
 
 export type Meter = {
@@ -19,6 +24,7 @@ export type PeakRow = {
 const UNAVAILABLE = "н/д";
 const FLAT_DB = 0.05;
 const WIDE_CHARS = 11;
+const LONG_CHARS = 10;
 const ruNumber = new Intl.NumberFormat("ru-RU");
 
 function asFinite(value: unknown): number | null {
@@ -53,6 +59,18 @@ function meter(label: string, value: string, unit?: string): Meter {
   return unit === undefined ? { label, value } : { label, value, unit };
 }
 
+/** Плитки-заглушки без пары: подписи те же, значения «н/д» — факт отсутствия,
+ * а не пустой ряд (эталон G6: лента читается в любом состоянии пары). */
+export const EMPTY_METERS: readonly Meter[] = [
+  meter("Частота сети", UNAVAILABLE, "Гц"),
+  meter("μ иглы", UNAVAILABLE, "В"),
+  meter("σ/μ", UNAVAILABLE),
+  meter("P_async/P_sync", UNAVAILABLE),
+  meter("Циклов", UNAVAILABLE),
+  meter("Полоса", UNAVAILABLE, "Гц"),
+  meter("Разрешение", UNAVAILABLE, "Гц"),
+];
+
 export function metersFromDetail(detail: SessionDetailPayload): Meter[] {
   const analysis = detail.analysis;
   const needle = isRecord(analysis) && isRecord(analysis.needle) ? analysis.needle : null;
@@ -69,17 +87,18 @@ export function metersFromDetail(detail: SessionDetailPayload): Meter[] {
   ];
 }
 
-function readoutCell(item: Meter): HTMLElement {
-  const valueEl = el("span", { className: "readout-value" });
+/** Плитка скаляра: подпись-капс + крупное моно-значение; длинное число
+ * ступенью мельче и на две колонки, факт не усекается эллипсисом. */
+function scalarCell(item: Meter): HTMLElement {
+  const valueEl = el("dd", {
+    className: item.value.length > LONG_CHARS ? "is-long" : "",
+  });
   valueEl.append(item.value);
   if (item.unit !== undefined) {
     valueEl.append(el("span", { className: "t-unit", text: item.unit }));
   }
   const wide = item.value.length > WIDE_CHARS ? " is-wide" : "";
-  return el("div", { className: `readout-cell${wide}` }, [
-    el("span", { className: "readout-label", text: item.label }),
-    valueEl,
-  ]);
+  return el("dl", { className: `band-cell${wide}` }, [el("dt", { text: item.label }), valueEl]);
 }
 
 function deltaCell(deltaDb: number | null): HTMLTableCellElement {
@@ -109,47 +128,70 @@ function peakRow(row: PeakRow, index: number): HTMLTableRowElement {
   ]);
 }
 
-function heading(text: string): HTMLElement {
-  return el("div", { className: "panel-hd" }, [el("h2", { className: "panel-title", text })]);
+function heading(text: string, note: string): HTMLElement {
+  return el("div", { className: "panel-hd" }, [
+    el("h2", { className: "panel-title", text }),
+    el("span", { className: "band-note", text: note }),
+  ]);
 }
 
 export function createAnalysisBand(): {
   readonly root: HTMLElement;
   update(input: { meters: Meter[]; peaks: PeakRow[] }): void;
+  paintDelta(a: SpectrumPayload | null, b: SpectrumPayload | null): void;
 } {
-  const grid = el("div", { className: "readout-grid" });
+  const deltaStrip = createDeltaStrip();
+  const grid = el("div", { className: "panel-bd band-scalars" });
   const body = el("tbody");
-  const readout = el("section", { className: "panel readout" }, [
-    heading("Показания базы"),
-    el("div", { className: "panel-bd" }, [grid]),
-  ]);
-  const peaksPanel = el("section", { className: "panel" }, [
-    heading("Пики спектра · дельта к базе"),
-    el("div", { className: "panel-bd" }, [
-      el("table", { className: "tbl tbl-compare" }, [
-        el("thead", {}, [
-          el("tr", {}, [
-            el("th", { text: "f0, Гц", attrs: { scope: "col" } }),
-            el("th", { text: "База, дБ", attrs: { scope: "col" } }),
-            el("th", { text: "Δ Б−А, дБ", attrs: { scope: "col" } }),
-            el("th", { text: "Выдел., дБ", attrs: { scope: "col" } }),
-            el("th", { text: "Q", attrs: { scope: "col" } }),
+  const peaksPanel = el(
+    "section",
+    { className: "band-peaks", attrs: { "aria-label": "Пики спектра" } },
+    [
+      heading("Пики спектра · дельта к базе", "Δ = Б − А, дБ"),
+      el("div", { className: "tbl-wrap" }, [
+        el("table", { className: "tbl tbl-compare" }, [
+          el("thead", {}, [
+            el("tr", {}, [
+              el("th", { text: "f0, Гц", attrs: { scope: "col" } }),
+              el("th", { text: "База, дБ", attrs: { scope: "col" } }),
+              el("th", { text: "Δ Б−А, дБ", attrs: { scope: "col" } }),
+              el("th", { text: "Выдел., дБ", attrs: { scope: "col" } }),
+              el("th", { text: "Q", attrs: { scope: "col" } }),
+            ]),
           ]),
+          body,
         ]),
-        body,
       ]),
-    ]),
+    ],
+  );
+  const rail = el("aside", { className: "band-rail", attrs: { "aria-label": "Δ-полоса" } }, [
+    deltaStrip.root,
+    el("p", {
+      className: "band-rail-note",
+      text: "Отсчёты вне ±8 дБ рисуются на границе диапазона.",
+    }),
   ]);
-  const root = el("div", { className: "analysis-band" }, [readout, peaksPanel]);
+  const root = el(
+    "section",
+    {
+      className: "panel analysis-band",
+      attrs: { "data-band-variant": "two-rows", "aria-label": "Лента анализа" },
+    },
+    [
+      heading("Показания базы", "скаляры иглы и спектра"),
+      grid,
+      el("div", { className: "band-tier2" }, [peaksPanel, rail]),
+    ],
+  );
 
-  function update(input: { meters: Meter[]; peaks: PeakRow[] }): void {
-    const ordered = [...input.meters].sort(
-      (left, right) =>
-        Number(left.value.length > WIDE_CHARS) - Number(right.value.length > WIDE_CHARS),
-    );
-    grid.replaceChildren(...ordered.map(readoutCell));
-    body.replaceChildren(...input.peaks.map(peakRow));
-  }
-
-  return { root, update };
+  return {
+    root,
+    update(input) {
+      grid.replaceChildren(...input.meters.map(scalarCell));
+      body.replaceChildren(...input.peaks.map(peakRow));
+    },
+    paintDelta(a, b) {
+      deltaStrip.paint(a, b);
+    },
+  };
 }

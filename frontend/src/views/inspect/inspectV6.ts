@@ -8,7 +8,7 @@ import type { ChartHandle } from "../../components/charts/types";
 import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { el } from "../../components/primitives/dom";
 import type { RouteStore } from "../../state/routeState";
-import { createAnalysisBand } from "./analysisBand";
+import { EMPTY_METERS, createAnalysisBand } from "./analysisBand";
 import { createCatalogColumn } from "./catalogColumn";
 import { cyclesFromMeters, paintChannelbarFromPayload } from "./channelbarPaint";
 import { summarizeDelta } from "./deltaSummary";
@@ -74,6 +74,8 @@ export async function mountInspectV6(
   });
   const signalSection = createSpectrumGramSection({ client, createView: opts.createView });
   const analysisBand = createAnalysisBand();
+  analysisBand.update({ meters: [...EMPTY_METERS], peaks: [] });
+  analysisBand.paintDelta(null, null);
   const extras = createV6Extras({
     client,
     createView: opts.createView,
@@ -123,7 +125,8 @@ export async function mountInspectV6(
     chrome.hideError();
     pairbar.setDelta(null);
     paintChannelbarFromPayload(channelbar, null, null);
-    analysisBand.update({ meters: [], peaks: [] });
+    analysisBand.update({ meters: [...EMPTY_METERS], peaks: [] });
+    analysisBand.paintDelta(null, null);
     extras.setSession(null);
     try {
       const [, bandData] = await Promise.all([
@@ -133,6 +136,7 @@ export async function mountInspectV6(
       if (disposed || gen !== pairGeneration) return;
       analysisBand.update(bandData);
       const payloads = signalSection.payloads();
+      analysisBand.paintDelta(payloads.a, payloads.b);
       paintChannelbarFromPayload(channelbar, payloads.a, cyclesFromMeters(bandData.meters));
       pairbar.setDelta(
         payloads.b === null

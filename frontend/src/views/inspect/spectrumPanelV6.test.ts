@@ -199,7 +199,6 @@ describe("createSpectrumPanel", () => {
 
     expect(panel.payloads()).toEqual({ a: null, b: null });
     expect(panel.root.querySelector<HTMLElement>(".frame")?.hidden).toBe(true);
-    expect(panel.root.querySelector<HTMLElement>("[data-delta-empty]")?.hidden).toBe(false);
     release(SPECTRUM_B);
     await currentLoad;
   });

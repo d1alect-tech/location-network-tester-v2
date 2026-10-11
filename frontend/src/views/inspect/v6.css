@@ -197,49 +197,47 @@
   min-height: 0;
 }
 
-/* Нижний ярус анализа: показания базы слева, пики с дельтой во всю оставшуюся ширину. */
+/* Лента анализа (G6 «Два ряда»): ряд 1 — плитки скаляров, ряд 2 — пики с
+ * дельтой к базе и Δ-полоса сбоку. Плотность просторнее: строки 32px. */
 .app-v6 .analysis-band {
-  display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  --lnt-table-row-min: 32px;
+  display: flex;
+  flex-direction: column;
   flex: none;
   min-height: 0;
 }
 
-.app-v6 .analysis-band > * + * {
-  border-left: 1px solid var(--lnt-line);
-}
-
-.app-v6 .readout .panel-bd {
-  padding: 8px 12px;
-}
-
-.app-v6 .readout-grid {
+.app-v6 .band-scalars {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 12px;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: var(--lnt-space-3) var(--lnt-space-4);
+  padding: var(--lnt-space-4) var(--lnt-space-5);
 }
 
-.app-v6 .readout-cell {
+.app-v6 .band-cell {
   display: flex;
   flex-direction: column;
+  gap: var(--lnt-space-1);
   min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--lnt-chrome);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
 }
 
-.app-v6 .readout-cell.is-wide {
-  grid-column: 1 / -1;
-}
-
-.app-v6 .readout-label {
+.app-v6 .band-cell dt {
   font: 700 10px / 14px var(--lnt-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--lnt-text-dim);
+  color: var(--lnt-text-sec);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.app-v6 .readout-value {
+.app-v6 .band-cell dd {
+  margin: 0;
   font: 600 20px / 24px var(--lnt-mono);
   font-variant-numeric: tabular-nums lining-nums;
   color: var(--lnt-text);
@@ -248,9 +246,111 @@
   text-overflow: ellipsis;
 }
 
-.app-v6 .readout-value .t-unit {
+.app-v6 .band-cell dd.is-long {
+  font-size: 16px;
+  line-height: 20px;
+}
+
+.app-v6 .band-cell.is-wide {
+  grid-column: span 2;
+}
+
+.app-v6 .band-cell .t-unit {
   font: 400 12px / 16px var(--lnt-ui);
   color: var(--lnt-text-sec);
+}
+
+.app-v6 .band-tier2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  border-block-start: 1px solid var(--lnt-line);
+}
+
+.app-v6 .band-tier2 > * + * {
+  border-inline-start: 1px solid var(--lnt-line);
+}
+
+.app-v6 .band-peaks {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-v6 .band-tier2 .panel-hd {
+  min-height: var(--lnt-touch-target-min);
+}
+
+.app-v6 .band-note {
+  margin-inline-start: auto;
+  font: 400 11px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+}
+
+.app-v6 .band-peaks .tbl-wrap {
+  overflow: auto;
+  min-width: 0;
+}
+
+.app-v6 .band-rail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-v6 .band-rail .delta-strip {
+  border-top: 0;
+  background: transparent;
+}
+
+.app-v6 .band-rail .delta-strip-toggle {
+  min-height: var(--lnt-touch-target-min);
+}
+
+.app-v6 .band-rail .delta-strip-bd {
+  height: 88px;
+  padding: var(--lnt-space-3);
+  background: var(--lnt-chrome);
+}
+
+.app-v6 .band-rail-note {
+  margin: 0;
+  padding: var(--lnt-space-2) var(--lnt-space-3);
+  border-block-start: 1px solid var(--lnt-line);
+  color: var(--lnt-text-sec);
+  font: 400 11px / 16px var(--lnt-ui);
+}
+
+@media (max-width: 900px) {
+  .app-v6 .band-tier2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-v6 .band-tier2 > * + * {
+    border-inline-start: 0;
+    border-block-start: 1px solid var(--lnt-line);
+  }
+}
+
+@media (max-width: 720px) {
+  .app-v6 .band-scalars {
+    gap: var(--lnt-space-2);
+    padding: var(--lnt-space-3);
+  }
+
+  .app-v6 .band-cell dd {
+    font-size: 18px;
+    line-height: 22px;
+  }
+
+  .app-v6 .band-cell dd.is-long {
+    font-size: 15px;
+    line-height: 20px;
+  }
+
+  .app-v6 .band-cell.is-wide {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Строки пиков — плотность R3-A через общий var. */
