@@ -171,10 +171,10 @@ export function createW1Chrome(options: W1ChromeOptions): W1ChromeHandle {
     if (current === null) return;
     await client.ensureReady();
     jobRail.hidden = false;
-    jobBar.style.width = "50%";
+    jobBar.style.transform = "scaleX(0.5)";
     const snap = await client.jobs.start({ kind: "analyze", session_name: current });
     renderFailures(failuresHost, parseFailures(snap.result));
-    jobBar.style.width = snap.status === "succeeded" ? "100%" : "50%";
+    jobBar.style.transform = snap.status === "succeeded" ? "scaleX(1)" : "scaleX(0.5)";
   }
 
   function report(error: unknown): void {

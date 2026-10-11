@@ -178,12 +178,16 @@
   gap: var(--lnt-space-2);
 }
 
+/* IS-4: заполнение — transform: scaleX (100–250 мс, --lnt-ease-out);
+ * геометрия трека неизменна (width: 100%), прогресс задаёт TS. */
 .lnt-w1-job-bar {
   height: 8px;
-  width: 0;
+  width: 100%;
   background-color: var(--lnt-accent-a);
   border-radius: var(--lnt-radius-status);
-  transition: width 120ms linear;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 120ms var(--lnt-ease-out);
 }
 
 .lnt-w1-failures {
