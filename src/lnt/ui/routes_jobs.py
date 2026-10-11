@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
+from lnt.instrument.live_gate import DeviceBusyError
 from lnt.runtime.scheduler import AnalysisQueueFullError
 from lnt.ui.dependencies import (
     AppServices,
@@ -41,7 +42,7 @@ async def start_job(request: JobRequest, services: _Services) -> JSONResponse:
     """Запускает единственную фоновую задачу и возвращает первый снимок."""
     try:
         snapshot = await services.jobs.start(request)
-    except (JobBusyError, AnalysisQueueFullError) as error:
+    except (JobBusyError, AnalysisQueueFullError, DeviceBusyError) as error:
         raise map_domain_error(error) from error
     return JSONResponse(snapshot.to_payload(), status_code=status.HTTP_202_ACCEPTED)
 

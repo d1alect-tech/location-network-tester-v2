@@ -7,6 +7,7 @@ from typing import Final
 from fastapi import FastAPI, HTTPException, Request, status
 
 from lnt.errors import InputError
+from lnt.instrument.live_gate import DeviceBusyError, LivePreflightBlockedError
 from lnt.runtime.scheduler import AnalysisQueueFullError
 from lnt.ui.jobs import (
     JobBusyError,
@@ -77,8 +78,12 @@ def http_unprocessable(message: str) -> HTTPException:
 def map_domain_error(exc: Exception) -> HTTPException:
     """Преобразует ожидаемые синхронные ошибки маршрутов в HTTP-ошибки."""
     match exc:
-        case InputError():
+        case InputError() | LivePreflightBlockedError():
+            # Блокер preflight live-старта маппится как некорректный вход: 422 с причиной.
             return http_unprocessable(str(exc))
+        case DeviceBusyError():
+            # Прибор во владении живой вкладки: 409 для job-захвата.
+            return http_conflict(str(exc))
         case JobBusyError():
             return http_conflict("уже выполняется задача")
         case AnalysisQueueFullError():

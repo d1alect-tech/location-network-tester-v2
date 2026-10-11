@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Final, assert_never
 
+from lnt.instrument.live_gate import LiveOwnership
 from lnt.runtime.scheduler import OperationClass, OperationScheduler
 from lnt.runtime.store import JobStore
 from lnt.ui.job_state import JobSnapshot, advance, new_job
@@ -61,12 +62,14 @@ class JobManager:
         root: Path,
         store: JobStore,
         scheduler: OperationScheduler | None = None,
+        live_ownership: LiveOwnership | None = None,
     ) -> None:
         """Создаёт менеджер с сериализацией железа и ограниченным CPU-пулом."""
         self._backend: JobBackend = backend
         self._root: Path = root
         self._store: JobStore = store
         self._scheduler: OperationScheduler = scheduler or OperationScheduler()
+        self._live_ownership: LiveOwnership | None = live_ownership
         self._registry: dict[str, JobSnapshot] = {}
         self._changes: dict[str, asyncio.Event] = {}
         self._cancellations: dict[str, threading.Event] = {}
@@ -74,6 +77,9 @@ class JobManager:
 
     async def start(self, request: JobRequest) -> JobSnapshot:
         """Регистрирует задачу и запускает её в рабочем потоке."""
+        if JobKind(request.kind) is JobKind.CAPTURE and self._live_ownership is not None:
+            # Живая вкладка владеет прибором: отказ до durable-записи задачи (409).
+            self._live_ownership.require_device_free()
         async with self._lock:
             snapshot = new_job(JobKind(request.kind))
             operation_class = _operation_class(snapshot.kind)
