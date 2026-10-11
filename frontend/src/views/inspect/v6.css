@@ -117,6 +117,21 @@
   border-right: 1px solid var(--lnt-line);
 }
 
+/* Мобильная ширина: колонки складываются в стек, каталог — ограниченной
+ * высоты сверху, иначе рейка 336px съедает весь вьюпорт 390px. */
+@media (max-width: 900px) {
+  .app-v6 .app-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .app-v6 .col-cat {
+    max-height: 40vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--lnt-line);
+  }
+}
+
 /* Рельс каталога прокручивается внутри своей колонки: <table> не создаёт
    scroll-контейнер (overflow к display:table не применяется), поэтому область
    прокрутки владеет панель. Без неё 30 строк рисуются наружу — ниже
@@ -614,15 +629,12 @@
   display: none;
 }
 
-.app-v6 [data-showcase="spectrum"]:not(.is-gram) .gram-bar {
-  display: none;
-}
-
 /* §2.3: фокус-рамка видима у каждого органа. */
 .app-v6 .cat-search:focus-visible,
 .app-v6 .cat-sort:focus-visible,
 .app-v6 .tbl-cat tbody tr[data-session]:focus-visible,
 .app-v6 .gram-mode:focus-visible,
+.app-v6 .gram-detector:focus-visible,
 .app-v6 .view-toggle-btn:focus-visible,
 .app-v6 [data-cat-clear]:focus-visible,
 .app-v6 [data-pair-swap]:focus-visible {
@@ -692,9 +704,40 @@
 
 .app-v6 .gram-scale {
   font: 400 11px / 16px var(--lnt-mono);
-  color: var(--lnt-text-dim);
+  color: var(--lnt-text-sec);
   flex: none;
   white-space: nowrap;
+}
+
+/* Базовая тихая кнопка инспекции: токены, контраст 4.5+, цель 44px. */
+.app-v6 .btn-quiet,
+.app-v6 .gram-mode,
+.app-v6 .gram-detector,
+.app-v6 .view-toggle-btn {
+  min-height: var(--lnt-control-height);
+  padding: 0 var(--lnt-space-3);
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-control);
+  background: var(--lnt-field);
+  color: var(--lnt-text-sec);
+  font: 500 13px / 18px var(--lnt-ui);
+  cursor: pointer;
+}
+
+.app-v6 .btn-quiet:hover:not(:disabled),
+.app-v6 .gram-mode:hover:not(:disabled),
+.app-v6 .gram-detector:hover:not(:disabled),
+.app-v6 .view-toggle-btn:hover:not(:disabled) {
+  color: var(--lnt-text);
+  border-color: var(--lnt-line-struct);
+}
+
+.app-v6 .btn-quiet:disabled,
+.app-v6 .gram-mode:disabled,
+.app-v6 .gram-detector:disabled,
+.app-v6 .view-toggle-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .app-v6 .gram-canvas-wrap {
@@ -742,6 +785,154 @@
   color: var(--lnt-text);
   background: var(--lnt-field);
   border-color: var(--lnt-line-struct);
+}
+
+/* ── Единая шапка спектр+грам (G5): группы с подписями ──────────────────
+ * Одна секция, одна шапка: Вид / Спектр / Спектрограмма. Кластер грама не
+ * исчезает в режиме спектра — состояние читается всегда, приглушённо. */
+
+.app-v6 .signal-hd {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  min-height: 44px;
+  flex-wrap: wrap;
+}
+
+.app-v6 .signal-cluster {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 12px;
+  min-width: 0;
+  border-right: 1px solid var(--lnt-line);
+}
+
+.app-v6 .signal-cluster[data-signal-cluster="spectrum"] {
+  flex: 1 1 auto;
+}
+
+.app-v6 .signal-cluster[data-signal-cluster="gram"] {
+  border-right: 0;
+}
+
+.app-v6 .signal-cluster-cap {
+  font: 700 10px / 14px var(--lnt-ui);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+}
+
+/* Активная группа читается ярче подписью, не прозрачностью: органы грама
+   остаются кликабельными и контрастными в любом виде. */
+.app-v6 .signal-cluster[data-active] .signal-cluster-cap {
+  color: var(--lnt-text);
+}
+
+.app-v6 .signal-cluster-bd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.app-v6 .signal-hd .view-toggle {
+  margin-left: 0;
+}
+
+/* Селекторы кластера «Спектр»: компактные контролы с подписью-капсом,
+ * как в эталоне G5 — шапка не превращается в слепую свалку слотов. */
+.app-v6 .spectrum-selectors,
+.app-v6 .spectrum-units {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.app-v6 .spectrum-selectors label,
+.app-v6 .spectrum-units label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 700 10px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+}
+
+.app-v6 .spectrum-selectors select,
+.app-v6 .spectrum-units select {
+  height: 32px;
+  max-width: 120px;
+  padding: 0 8px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  color: var(--lnt-text);
+  font: 400 13px / 18px var(--lnt-ui);
+}
+
+.app-v6 .selectors-meta {
+  font: 400 11px / 16px var(--lnt-mono);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Приглушение снято: непрозрачность роняла контраст органов (axe
+   color-contrast). Состояние группы несёт подпись, а не прозрачность. */
+
+/* Вход содержимого секции на смене пары: 200ms ease-out, transform/opacity. */
+@keyframes lnt-signal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.app-v6 .signal-bd.is-enter {
+  animation: lnt-signal-enter var(--lnt-t-enter) var(--lnt-ease-out) both;
+}
+
+/* Частые зоны содержимого: ноль движения. */
+.app-v6 .frame,
+.app-v6 .gram,
+.app-v6 .view-toggle,
+.app-v6 .plane-toggle,
+.app-v6 .delta-strip,
+.app-v6 .spectrum-markers {
+  transition: none;
+}
+
+/* НАХОДКА F4: hidden проигрывал авторским display (статус-строка 44px и
+   фантомная рамка жили всегда). Атрибут сильнее авторских правил. */
+.app-v6 [hidden] {
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  .app-v6 .signal-cluster {
+    flex: 1 1 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--lnt-line);
+    padding-block: 6px;
+  }
+
+  .app-v6 .signal-cluster[data-signal-cluster="gram"] {
+    border-bottom: 0;
+  }
 }
 
 /* ── Сворачиваемые панели под лентой анализа ─────────────────────────── */
@@ -822,5 +1013,9 @@
 @media (prefers-reduced-motion: reduce) {
   .app-v6 .panel.is-loading .frame {
     opacity: 1;
+  }
+
+  .app-v6 .signal-bd.is-enter {
+    animation: none;
   }
 }

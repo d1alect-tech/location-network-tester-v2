@@ -1,22 +1,17 @@
-import type { ChartHandle } from "../../components/charts/types";
-import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { el } from "../../components/primitives/dom";
 import type { GramDetector, GramMode, GramPairClient, GramPairTile } from "./gramPair";
 import { createGramPair } from "./gramPair";
 import { createOrientedSpectrogramView } from "./spectrogramOrient";
 
-export type InspectV6GramPanel = {
-  readonly gramHost: HTMLElement;
-  readonly gramBar: HTMLElement;
-};
-
-export type InspectV6GramDeps = {
+export type GramSectionDeps = {
   readonly client: GramPairClient;
-  readonly spectrumPanel: InspectV6GramPanel;
-  readonly createView?: (options: UplotViewOptions) => ChartHandle;
+  /** Кластер шапки секции: кнопки режима/детектора, readout, шкала. */
+  readonly toolbarHost: HTMLElement;
+  /** Тело сигнального окна: канвас спектрограммы. */
+  readonly canvasHost: HTMLElement;
 };
 
-export type InspectV6GramHandle = {
+export type GramSectionHandle = {
   refresh(a: string | null, b: string | null): Promise<void>;
   dispose(): void;
 };
@@ -69,10 +64,10 @@ function signedDb(value: number): string {
   return rounded < 0 ? `−${formatDb(-rounded)}` : `+${formatDb(rounded)}`;
 }
 
-export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle {
-  const { client, spectrumPanel } = deps;
+export function createGramSection(deps: GramSectionDeps): GramSectionHandle {
+  const { client } = deps;
   const oriented = createOrientedSpectrogramView();
-  spectrumPanel.gramHost.append(oriented.root);
+  deps.canvasHost.append(oriented.root);
   const gramPair = createGramPair({ client });
   let generation = 0;
 
@@ -122,7 +117,7 @@ export function wireInspectV6Gram(deps: InspectV6GramDeps): InspectV6GramHandle 
     className: "gram-scale",
     attrs: { role: "status", "aria-label": "Шкала спектрограммы" },
   });
-  spectrumPanel.gramBar.append(modes, detectors, readout, scale);
+  deps.toolbarHost.append(modes, detectors, readout, scale);
 
   function deltaButton(): HTMLButtonElement | undefined {
     return buttons.find((button) => button.getAttribute("data-spectrogram-mode") === "delta");

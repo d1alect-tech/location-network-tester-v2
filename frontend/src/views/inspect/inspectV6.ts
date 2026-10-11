@@ -14,13 +14,12 @@ import { cyclesFromMeters, paintChannelbarFromPayload } from "./channelbarPaint"
 import { summarizeDelta } from "./deltaSummary";
 import type { GramPairClient } from "./gramPair";
 import { ticketToCaptureParams } from "./inspectTicket";
-import { wireInspectV6Gram } from "./inspectV6Gram";
 import type { AnalysisBandClient } from "./inspectV6Load";
 import { loadAnalysisBand } from "./inspectV6Load";
 import { createPairState } from "./pairState";
 import { createPairbar } from "./pairbarV6";
+import { createSpectrumGramSection } from "./spectrumGramSection";
 import type { SpectrumPanelClient } from "./spectrumPanelV6";
-import { createSpectrumPanel } from "./spectrumPanelV6";
 import { createV6Chrome } from "./v6Chrome";
 import { wireInspectDeviceStatus } from "./v6DeviceStatus";
 import type { V6ExtrasClient } from "./v6Extras";
@@ -73,7 +72,7 @@ export async function mountInspectV6(
     pair,
     onPick: (id) => pair.pick(id),
   });
-  const spectrumPanel = createSpectrumPanel({ client, createView: opts.createView });
+  const signalSection = createSpectrumGramSection({ client, createView: opts.createView });
   const analysisBand = createAnalysisBand();
   const extras = createV6Extras({
     client,
@@ -87,18 +86,13 @@ export async function mountInspectV6(
           }),
         }),
   });
-  const gram = wireInspectV6Gram({
-    client,
-    spectrumPanel,
-    createView: opts.createView,
-  });
 
   // U2: channel-bar первой строкой главной колонки.
   const channelbar = createChannelbar();
   const colCat = el("div", { className: "col-cat" }, [catalogColumn.root]);
   const colMain = el("div", { className: "col-main" }, [
     channelbar.root,
-    spectrumPanel.root,
+    signalSection.root,
     analysisBand.root,
     extras.root,
   ]);
@@ -133,13 +127,12 @@ export async function mountInspectV6(
     extras.setSession(null);
     try {
       const [, bandData] = await Promise.all([
-        spectrumPanel.load(a, b),
+        signalSection.setPair(a, b),
         loadAnalysisBand(client, a, b, pairController.signal),
-        gram.refresh(a, b),
       ]);
       if (disposed || gen !== pairGeneration) return;
       analysisBand.update(bandData);
-      const payloads = spectrumPanel.payloads();
+      const payloads = signalSection.payloads();
       paintChannelbarFromPayload(channelbar, payloads.a, cyclesFromMeters(bandData.meters));
       pairbar.setDelta(
         payloads.b === null
@@ -189,8 +182,7 @@ export async function mountInspectV6(
     pairController.abort();
     stopDeviceStatus();
     unsubscribe();
-    gram.dispose();
-    spectrumPanel.destroy();
+    signalSection.destroy();
     extras.destroy();
     root.remove();
   };

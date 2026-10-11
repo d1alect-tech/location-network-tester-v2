@@ -209,6 +209,54 @@ test("V6-P3: каталог — группы, сортировка, поиск, 
   await expect(cat.locator("[data-cat-empty]")).toBeVisible();
 });
 
+test("V6-P3b: единая шапка спектр+грам — три кластера, органы грама в своём", async ({ page }) => {
+  mockApi(installMockBackend(page));
+  await page.goto(BASE);
+  await expect(page.locator(".app-v6")).toBeVisible();
+  const panel = page.locator('.col-main [data-showcase="spectrum"]');
+  const header = panel.locator(".panel-hd.signal-hd");
+  await expect(header.locator("[data-signal-cluster]")).toHaveCount(3);
+  await expect(
+    header.locator('[data-signal-cluster="gram"] [data-gram-bar] [data-spectrogram-mode]'),
+  ).toHaveCount(3);
+  await expect(
+    header.locator('[data-signal-cluster="gram"] [data-gram-bar] [data-spectrogram-mode]').first(),
+  ).toBeVisible();
+  const gramCluster = header.locator('[data-signal-cluster="gram"]');
+  const spectrumCluster = header.locator('[data-signal-cluster="spectrum"]');
+  await expect(spectrumCluster).toHaveAttribute("data-active", "");
+  await expect(gramCluster).not.toHaveAttribute("data-active", "");
+  await panel.locator('[data-spectrum-view="gram"]').click();
+  await expect(gramCluster).toHaveAttribute("data-active", "");
+  await expect(spectrumCluster).not.toHaveAttribute("data-active", "");
+  await panel.locator('[data-spectrum-view="spectrum"]').click();
+  await expect(spectrumCluster).toHaveAttribute("data-active", "");
+});
+
+test("V6-P3c: быстрые смены пары не оставляют оракулов: один чарт на секцию", async ({ page }) => {
+  mockApi(installMockBackend(page));
+  await page.goto(BASE);
+  await expect(page.locator(".app-v6")).toBeVisible();
+  const rows = page.locator(".tbl-cat tbody tr[data-session]");
+  for (let i = 0; i < 6; i += 1) {
+    await rows.nth(i % 2).click();
+  }
+  const panel = page.locator('.col-main [data-showcase="spectrum"]');
+  await expect(panel.locator(".uplot")).toHaveCount(1);
+  const painted = await panel
+    .locator(".uplot canvas")
+    .first()
+    .evaluate((node) => {
+      const canvas = node as HTMLCanvasElement;
+      const ctx = canvas.getContext("2d");
+      if (ctx === null) return false;
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 3; i < data.length; i += 4) if (data[i] !== 0) return true;
+      return false;
+    });
+  expect(painted).toBe(true);
+});
+
 test("V6-P4: дельта пика из трасс, глиф направления", async ({ page }) => {
   mockApi(installMockBackend(page));
   await page.goto(BASE);

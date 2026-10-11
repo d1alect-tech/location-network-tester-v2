@@ -41,15 +41,29 @@ export type SpectrumPanelClient = {
   };
 };
 
+/** B3: слоты спектрограммы создаёт секция, панель лишь размещает их у себя. */
+export type SpectrumPanelSlots = {
+  readonly gramBar: HTMLElement;
+  readonly gramHost: HTMLElement;
+};
+
+/** Состав шапки: секция собирает из частей свою композицию (G5). */
+export type SpectrumHeaderParts = {
+  readonly viewToggle: HTMLElement;
+  readonly planeToggle: HTMLElement;
+  readonly rbw: HTMLElement;
+  readonly selectors: HTMLElement;
+};
+
 export type SpectrumPanelOptions = {
   readonly client: SpectrumPanelClient;
   readonly createView?: (options: UplotViewOptions) => ChartHandle;
+  readonly slots?: SpectrumPanelSlots;
+  readonly composeHeader?: (parts: SpectrumHeaderParts) => HTMLElement;
 };
 
 export type SpectrumPanelHandle = {
   readonly root: HTMLElement;
-  readonly gramHost: HTMLElement;
-  readonly gramBar: HTMLElement;
   load(a: string, b: string | null): Promise<void>;
   /** U2/U3: последние пейлоады пары (null — пара не загружена). */
   payloads(): { readonly a: SpectrumPayload | null; readonly b: SpectrumPayload | null };
@@ -99,17 +113,25 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
   const deltaStrip = createDeltaStrip();
   const planeControl = createPlaneControl(() => reloadPlane());
   const extras = createSpectrumExtras();
-  const gramBar = el("div", { className: "gram-bar" });
-  const header = el("div", { className: "panel-hd" }, [
-    title,
+  const gramBar = opts.slots?.gramBar ?? el("div", { className: "gram-bar" });
+  const gramHost = opts.slots?.gramHost ?? el("div", { className: "gram" });
+  const headerParts: SpectrumHeaderParts = {
     viewToggle,
-    planeControl.toggle,
-    planeControl.rbw,
-    extras.selects,
-    gramBar,
-  ]);
+    planeToggle: planeControl.toggle,
+    rbw: planeControl.rbw,
+    selectors: extras.selects,
+  };
+  const header =
+    opts.composeHeader?.(headerParts) ??
+    el("div", { className: "panel-hd" }, [
+      title,
+      viewToggle,
+      planeControl.toggle,
+      planeControl.rbw,
+      extras.selects,
+      gramBar,
+    ]);
   const frame = el("div", { className: "frame" });
-  const gramHost = el("div", { className: "gram" });
   const statusText = el("span", {});
   const retryButton = el("button", {
     className: "lnt-btn btn-quiet",
@@ -241,8 +263,6 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
 
   return {
     root,
-    gramHost,
-    gramBar,
     load,
     payloads: () => ({ a: lastPayload, b: lastPayloadB }),
     setView,
