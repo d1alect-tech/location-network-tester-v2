@@ -20,6 +20,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from threading import RLock
 from typing import TYPE_CHECKING, Final, Protocol
 
@@ -61,6 +62,20 @@ if TYPE_CHECKING:
 LIVE_BUSY_MESSAGE_RU: Final = "устройство занято вкладкой"
 
 EnvironmentProbe = Callable[[], CaptureEnvironment]
+
+
+class LiveMode(StrEnum):
+    """Происхождение отсчётов живого потока: железо или фейк-прибор.
+
+    Объявляется тем, кто собрал гейт (``scope_factory`` знает только он), и
+    отдаётся панелью ОТДЕЛЬНЫМ полем статуса: sim-поток измерим так же, как
+    железный, но подпись «Симуляция» обязательна — режим не выводится из
+    состояния владения и не угадывается по наличию кадров.
+    """
+
+    REAL = "real"
+    SIM = "sim"
+
 
 # Модель входа живой вкладки: тот же номинальный RC-шунт, что у измерения по
 # умолчанию в панели (``ui/routes_device._setup``); preflight сверяет её с типом.
@@ -125,6 +140,7 @@ class LiveCaptureGate:
         adc_calibration: AdcCalibration | None = None,
         cancellation_token: CancellationToken = NEVER_CANCELLED,
         poll_timeout_ms: int = MAX_POLL_TIMEOUT_MS,
+        mode: LiveMode = LiveMode.REAL,
     ) -> None:
         """Запоминает зависимости; прибор не открывает и preflight не запускает."""
         self._scope_factory: Final = scope_factory
@@ -139,6 +155,12 @@ class LiveCaptureGate:
         self._poll_timeout_ms: Final = poll_timeout_ms
         self._lock: Final = RLock()
         self._service: InstrumentService | None = None
+        self._mode: Final = mode
+
+    @property
+    def mode(self) -> LiveMode:
+        """Происхождение отсчётов потока: объявлено при сборке гейта."""
+        return self._mode
 
     @property
     def service(self) -> InstrumentService | None:

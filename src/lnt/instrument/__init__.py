@@ -6,7 +6,8 @@
 (сборка кадров из блоков прибора) и фейки ``FakeHantekScope``/``ManualClock``
 для работы без железа и без ``sleep`` в тестах, а ``LiveCaptureGate`` —
 preflight-гейт live-старта и владение прибором для job-захвата (409, пока
-вкладка держит ручку).
+вкладка держит ручку); ``LiveMode`` — объявленное при сборке гейта
+происхождение отсчётов (real/sim).
 """
 
 from .fake_scope import FakeHantekScope, ManualClock
@@ -15,6 +16,7 @@ from .live_gate import (
     LIVE_BUSY_MESSAGE_RU,
     DeviceBusyError,
     LiveCaptureGate,
+    LiveMode,
     LiveOwnership,
     LivePreflightBlockedError,
     LiveStartConfig,
@@ -40,6 +42,7 @@ __all__ = [
     "InstrumentState",
     "LiveCaptureGate",
     "LiveFrame",
+    "LiveMode",
     "LiveOwnership",
     "LivePreflightBlockedError",
     "LiveStartConfig",

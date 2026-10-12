@@ -7,7 +7,11 @@ from typing import Final
 from fastapi import FastAPI, HTTPException, Request, status
 
 from lnt.errors import InputError
-from lnt.instrument.live_gate import DeviceBusyError, LivePreflightBlockedError
+from lnt.instrument.live_gate import (
+    DeviceBusyError,
+    LiveCaptureGate,
+    LivePreflightBlockedError,
+)
 from lnt.runtime.scheduler import AnalysisQueueFullError
 from lnt.ui.jobs import (
     JobBusyError,
@@ -32,6 +36,10 @@ class AppServices:
     runtime_db: Path
     jobs: JobManager
     research_jobs: ResearchJobService | None = None
+    # Единственный владелец живого режима (прибор + preflight-гейт): маршруты
+    # /api/live/* читают статус только из него. None — владелец не зарегистрирован
+    # (создание и dispose в lifespan делает очередь 6, запуск ленивый — по POST).
+    instrument: LiveCaptureGate | None = None
 
 
 def install_services(app: FastAPI, services: AppServices) -> None:
