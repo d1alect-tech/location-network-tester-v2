@@ -24,3 +24,16 @@ export function saLevelToDisplay(levelDb: number, unit: SaDisplayUnit): number {
 export function saYAxisLabel(unit: SaDisplayUnit): string {
   return unit === "dbv" ? "Уровень, дБ" : "Уровень, В/√Гц";
 }
+
+/** Частота для таблиц и показаний: кГц/МГц с одной десятой. */
+export function formatHz(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} МГц`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)} кГц`;
+  return `${Math.round(value)} Гц`;
+}
+
+/** Уровень/превышение в дБ — одна десятая; мусор остаётся прочерком. */
+export function formatDb(value: number): string {
+  return Number.isFinite(value) ? value.toFixed(1) : "—";
+}

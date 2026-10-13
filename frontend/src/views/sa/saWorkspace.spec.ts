@@ -18,6 +18,7 @@ import { type MockLntBackend, installMockBackend } from "../../testkit/mockBacke
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const EVIDENCE_DIR = resolve(__dirname, "../../../../.omo/evidence/scope-sa-tabs/task-14");
+const EVIDENCE_DIR_15 = resolve(__dirname, "../../../../.omo/evidence/scope-sa-tabs/task-15");
 const BASE = "http://127.0.0.1:4101/static/v2/";
 
 let backend: MockLntBackend;
@@ -157,6 +158,67 @@ test("switch #/scope→#/sa: zero stop/start requests, same live session (IS-3)"
   await page.setViewportSize({ width: 1280, height: 1600 });
   await page.locator(".lnt-sa-workspace").screenshot({
     path: resolve(EVIDENCE_DIR, "sa-joined-1280.png"),
+  });
+});
+
+test("markers: chart clicks place up to 4 markers, 5th rejected, peak search highlights", async ({
+  page,
+}) => {
+  await openSa(page);
+  // Высокий вьюпорт: поле графика (≈940px) целиком видно — клики мышью
+  // по абсолютным координатам попадают в него, а не в документ мимо.
+  await page.setViewportSize({ width: 1280, height: 1600 });
+  await page.locator("#lnt-sa-run").click();
+  await expect(page.locator(".lnt-sa-figure .lnt-uplot-host canvas").first()).toBeVisible();
+  await expect(page.locator(".lnt-sa-sweep")).not.toHaveText("—");
+
+  // Клик по полю графика (u-over): перевод пикселей в частоту делает
+  // uPlot (posToVal) — проверяется настоящий путь, не тестовый шов.
+  // Свип перерисовывает график каждые ~150 мс (u-over заменяется целиком),
+  // поэтому скроллится стабильная фигура, а каждая постановка маркера
+  // подтверждается и повторяется (до 10 попыток, без удачи по таймингу).
+  async function clickPlot(fraction: number): Promise<void> {
+    await page.locator(".lnt-sa-figure").scrollIntoViewIfNeeded();
+    const plot = await page.locator(".lnt-sa-figure .u-over").boundingBox();
+    if (plot === null || plot.width === 0) return;
+    await page.mouse.click(plot.x + plot.width * fraction, plot.y + plot.height / 2);
+  }
+
+  for (const [index, fraction] of [0.2, 0.35, 0.5, 0.65].entries()) {
+    const expected = index + 1;
+    let placed = false;
+    for (let attempt = 0; attempt < 10 && !placed; attempt += 1) {
+      await clickPlot(fraction);
+      placed = (await page.locator("[data-sa-markers] tbody tr").count()) === expected;
+    }
+    expect(placed, `маркер №${expected} не поставлен`).toBe(true);
+  }
+  await expect(page.locator("[data-sa-markers] tbody tr")).toHaveCount(4);
+
+  // Пятый маркер — видимый отказ, таблица не растёт.
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await clickPlot(0.8);
+    if (await page.locator(".lnt-sa-marker-notice").isVisible()) break;
+  }
+  await expect(page.locator("[data-sa-markers] tbody tr")).toHaveCount(4);
+  await expect(page.locator(".lnt-sa-marker-notice")).toBeVisible();
+
+  // Клик мимо графика (заголовок вкладки) — маркеров не прибавилось.
+  await page.locator(".lnt-sa-workspace h2").click();
+  await expect(page.locator("[data-sa-markers] tbody tr")).toHaveCount(4);
+
+  // Поиск пиков: тон мока один — максимум в таблице и подсветка на графике.
+  await page.locator("#lnt-sa-peak-search").click();
+  await expect(page.locator("[data-sa-peaks] tbody tr")).toHaveCount(1);
+  await expect(page.locator("[data-sa-peaks] tbody tr").first()).toContainText("507.9 кГц");
+
+  mkdirSync(EVIDENCE_DIR_15, { recursive: true });
+  await page.locator(".lnt-sa-workspace").screenshot({
+    path: resolve(EVIDENCE_DIR_15, "sa-markers-1280.png"),
+  });
+  await page.setViewportSize({ width: 375, height: 1200 });
+  await page.locator(".lnt-sa-workspace").screenshot({
+    path: resolve(EVIDENCE_DIR_15, "sa-markers-375.png"),
   });
 });
 

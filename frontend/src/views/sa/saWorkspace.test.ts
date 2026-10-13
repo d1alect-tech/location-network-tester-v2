@@ -12,6 +12,7 @@ import { LntApiClient } from "../../api/client";
 import { createLiveApi } from "../../api/client-live";
 import type { LiveSpectrumPayload, LiveStatePayload, LiveTrigger } from "../../api/types-live";
 import type { ChartHandle, ChartRenderRequest } from "../../components/charts/types";
+import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { MARKER_WINDOW_OPTIONS } from "../inspect/spectrumSelectors";
 import { mountSaWorkspace } from "./saWorkspace";
 
@@ -136,9 +137,15 @@ function sweep(index: number): LiveSpectrumPayload {
   };
 }
 
-/** Рендер-шов: перехват запросов графика без uPlot. */
-function fakeChartView(): { createView: () => ChartHandle; requests: ChartRenderRequest[] } {
+/** Рендер-шов: перехват запросов графика без uPlot; опции фабрики
+ * (onClick маркеров, плагины) записываются для сценариев Todo 15. */
+function fakeChartView(): {
+  createView: (options: UplotViewOptions) => ChartHandle;
+  requests: ChartRenderRequest[];
+  chartOptions: () => UplotViewOptions | null;
+} {
   const requests: ChartRenderRequest[] = [];
+  let captured: UplotViewOptions | null = null;
   const handle: ChartHandle = {
     root: document.createElement("div"),
     render: (request) => {
@@ -148,7 +155,14 @@ function fakeChartView(): { createView: () => ChartHandle; requests: ChartRender
     getData: () => null,
     destroy: () => undefined,
   };
-  return { createView: () => handle, requests };
+  return {
+    createView: (options: UplotViewOptions) => {
+      captured = options;
+      return handle;
+    },
+    requests,
+    chartOptions: () => captured,
+  };
 }
 
 async function flush(): Promise<void> {
@@ -165,6 +179,7 @@ function mountStub(
 ): {
   container: HTMLElement;
   requests: ChartRenderRequest[];
+  chartOptions: () => UplotViewOptions | null;
 } {
   vi.stubGlobal("EventSource", FakeLiveEventSource);
   const container = document.createElement("div");
@@ -178,7 +193,7 @@ function mountStub(
       spectrum: { createView: view.createView },
     }),
   );
-  return { container, requests: view.requests };
+  return { container, requests: view.requests, chartOptions: view.chartOptions };
 }
 
 afterEach(() => {
@@ -309,5 +324,149 @@ describe("saWorkspace skeleton (Todo 14)", () => {
 
     expect(FakeLiveEventSource.instances[0]?.closed).toBe(true);
     expect(log.stops).toBe(0);
+  });
+});
+
+describe("sa markers and peak search (Todo 15)", () => {
+  /** Свип с тремя пиками: тон 3 кГц и два слабее (порядок prominence). */
+  function sweepWithPeaks(index: number): LiveSpectrumPayload {
+    return {
+      frame_index: index,
+      freq: [1000, 2000, 3000, 4000],
+      psd_db: [-60, -40, -30, -50],
+      peaks: [
+        { frequency_hz: 3000, level_db: -30, prominence_db: 30, q_factor: 12.5 },
+        { frequency_hz: 1500, level_db: -42, prominence_db: 12, q_factor: null },
+        { frequency_hz: 2000, level_db: -40, prominence_db: 8, q_factor: null },
+      ],
+      meta: { enbw: 75, resolution: 125, window: "hann", rbw: 50 },
+    };
+  }
+
+  function markerRows(container: HTMLElement): HTMLElement[] {
+    return [...container.querySelectorAll("[data-sa-markers] tbody tr")] as HTMLElement[];
+  }
+
+  async function mountedWithSweep(): Promise<{
+    log: LiveLog;
+    container: HTMLElement;
+    requests: ChartRenderRequest[];
+    chartOptions: () => UplotViewOptions | null;
+  }> {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: [] };
+    const mounted = mountStub(log, { state: { ...IDLE } });
+    await flush();
+    FakeLiveEventSource.instances[0]?.emit("spectrum", sweep(3));
+    await flush();
+    return { log, ...mounted };
+  }
+
+  it("клик по спектру ставит маркер с отсчётом ±1 бин и параболой", async () => {
+    const mounted = await mountedWithSweep();
+    // До поиска пиков аннотации в запросе пусты.
+    expect(mounted.requests.at(-1)?.peaks).toEqual([]);
+
+    mounted.chartOptions()?.onClick?.(2600);
+    await flush();
+
+    const rows = markerRows(mounted.container);
+    expect(rows).toHaveLength(1);
+    const cells = rows[0]?.querySelectorAll("td");
+    expect(cells?.[0]?.textContent).toBe("M1");
+    expect(cells?.[1]?.textContent).toBe("2.8 кГц");
+    expect(cells?.[2]?.textContent).toBe("-29.6");
+    expect(mounted.container.querySelector(".lnt-sa-marker-notice")?.hasAttribute("hidden")).toBe(
+      true,
+    );
+  });
+
+  it("пятый маркер отклоняется: видимый отказ, без падения", async () => {
+    const mounted = await mountedWithSweep();
+    for (const freq of [1100, 1300, 1600, 2100]) {
+      mounted.chartOptions()?.onClick?.(freq);
+    }
+    await flush();
+    expect(markerRows(mounted.container)).toHaveLength(4);
+
+    mounted.chartOptions()?.onClick?.(2600);
+    await flush();
+
+    expect(markerRows(mounted.container)).toHaveLength(4);
+    const notice = mounted.container.querySelector(".lnt-sa-marker-notice");
+    expect(notice?.hasAttribute("hidden")).toBe(false);
+    expect(notice?.textContent).toContain("4");
+  });
+
+  it("peak search подсвечивает топ-пики текущей трассы и таблицу", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: [] };
+    const mounted = mountStub(log, { state: { ...IDLE } });
+    await flush();
+    FakeLiveEventSource.instances[0]?.emit("spectrum", sweepWithPeaks(5));
+    await flush();
+    expect(mounted.requests.at(-1)?.peaks).toEqual([]);
+
+    (mounted.container.querySelector("#lnt-sa-peak-search") as HTMLButtonElement).click();
+    await flush();
+
+    // Подсветка идёт в рендер-запрос тем же снимком, что и в таблицу.
+    expect(mounted.requests.at(-1)?.peaks).toEqual([
+      { frequency_hz: 3000, level_db: -30, prominence_db: 30, q_factor: 12.5 },
+      { frequency_hz: 1500, level_db: -42, prominence_db: 12, q_factor: Number.NaN },
+      { frequency_hz: 2000, level_db: -40, prominence_db: 8, q_factor: Number.NaN },
+    ]);
+    const peakRows = [...mounted.container.querySelectorAll("[data-sa-peaks] tbody tr")];
+    expect(peakRows).toHaveLength(3);
+    const first = peakRows[0]?.querySelectorAll("td");
+    expect(first?.[0]?.textContent).toBe("3.0 кГц");
+    expect(first?.[1]?.textContent).toBe("-30.0");
+    expect(first?.[2]?.textContent).toBe("30.0");
+    expect(first?.[3]?.textContent).toBe("12.50");
+  });
+
+  it("клик мимо графика не ставит маркер", async () => {
+    const mounted = await mountedWithSweep();
+    mounted.container
+      .querySelector(".lnt-sa-readout")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    mounted.container.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+
+    expect(markerRows(mounted.container)).toHaveLength(0);
+    expect(mounted.container.querySelector("[data-sa-markers-empty]")?.hasAttribute("hidden")).toBe(
+      false,
+    );
+    expect(mounted.container.querySelector(".lnt-sa-marker-notice")?.hasAttribute("hidden")).toBe(
+      true,
+    );
+  });
+
+  it("маркеры клиентские: постановка не трогает сеть", async () => {
+    const mounted = await mountedWithSweep();
+    for (const freq of [1100, 1300, 1600, 2100]) {
+      mounted.chartOptions()?.onClick?.(freq);
+    }
+    await flush();
+    expect(markerRows(mounted.container)).toHaveLength(4);
+    expect(mounted.log.starts).toHaveLength(0);
+    expect(mounted.log.configs).toHaveLength(0);
+    expect(FakeLiveEventSource.instances).toHaveLength(1);
+  });
+
+  it("«Убрать маркеры» очищает таблицу и снимает отказ", async () => {
+    const mounted = await mountedWithSweep();
+    mounted.chartOptions()?.onClick?.(2600);
+    await flush();
+    expect(markerRows(mounted.container)).toHaveLength(1);
+
+    (mounted.container.querySelector("#lnt-sa-markers-clear") as HTMLButtonElement).click();
+    await flush();
+
+    expect(markerRows(mounted.container)).toHaveLength(0);
+    expect(mounted.container.querySelector("[data-sa-markers-empty]")?.hasAttribute("hidden")).toBe(
+      false,
+    );
+    expect(mounted.container.querySelector(".lnt-sa-marker-notice")?.hasAttribute("hidden")).toBe(
+      true,
+    );
   });
 });

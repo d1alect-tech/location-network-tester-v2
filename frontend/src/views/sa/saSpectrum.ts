@@ -5,9 +5,15 @@
  * полосы (линейная по умолчанию, лог — опция: prepareAligned отбрасывает
  * f≤0), ось Y — авто. Ожидание/отказ свипа — видимый статус. */
 
+import type uPlot from "uplot";
+import { createPeaksPlugin } from "../../components/charts/annotations";
 import { readChartTheme } from "../../components/charts/theme";
 import type { ChartTheme } from "../../components/charts/theme";
-import type { ChartRenderRequest, ChartRenderSeries } from "../../components/charts/types";
+import type {
+  ChartPeak,
+  ChartRenderRequest,
+  ChartRenderSeries,
+} from "../../components/charts/types";
 import { createUplotView } from "../../components/charts/uplotView";
 import { el } from "../../components/primitives/dom";
 import type { SaTraceKind, SaTraceStore } from "./saTraceStore";
@@ -24,11 +30,23 @@ export interface SaSpectrumViewOptions {
   traces: ReadonlySet<SaTraceKind>;
 }
 
+/** Вертикаль маркера пользователя на графике: частота и бирка M1..M4. */
+export interface SaMarkerLine {
+  readonly frequencyHz: number;
+  readonly label: string;
+}
+
 export interface SaSpectrumOptions {
   /** Тестовый шов (паттерн scopeWaveform): фабрика хэндла графика. */
   createView?: typeof createUplotView;
   /** Узел управления трассами (saTraceControls) над графиком. */
   controls?: Node;
+  /** Маркеры пользователя: геттер для отрисовки плагином. */
+  markers?: () => readonly SaMarkerLine[];
+  /** Пики поиска (снимок свипа): подсветка + peaks рендер-запроса. */
+  peaks?: () => readonly ChartPeak[];
+  /** Клик по полю графика: частота в Гц (перевод — на стороне uPlot). */
+  onFrequencyClick?: (frequencyHz: number) => void;
 }
 
 export interface SaSpectrumHandle {
@@ -60,6 +78,51 @@ function seriesStyle(
   return { ...base, color: theme.ok, dash: DASH_AVG };
 }
 
+interface SaMarkersPluginOptions {
+  markers: () => readonly SaMarkerLine[];
+  color: string;
+  tagBackground: string;
+  tagText: string;
+  font: string;
+}
+
+/** Маркеры на канве: сплошная вертикаль + бирка «M1» на верхней кромке
+ * поля (цвет — --lnt-delta, бирка — фон панели). Сплошная линия и бирка
+ * отличают маркер от штриховых трасс склада. */
+function createSaMarkersPlugin(options: SaMarkersPluginOptions): uPlot.Plugin {
+  const TAG_HEIGHT = 14;
+  return {
+    hooks: {
+      draw(self: uPlot): void {
+        const markers = options.markers();
+        if (markers.length === 0) return;
+        const ctx = self.ctx;
+        const { top, height } = self.bbox;
+        ctx.save();
+        ctx.strokeStyle = options.color;
+        ctx.lineWidth = 1;
+        ctx.font = options.font;
+        for (const marker of markers) {
+          if (!Number.isFinite(marker.frequencyHz)) continue;
+          const x = self.valToPos(marker.frequencyHz, "x");
+          ctx.beginPath();
+          ctx.moveTo(x, top);
+          ctx.lineTo(x, top + height);
+          ctx.stroke();
+          const width = ctx.measureText(marker.label).width + 8;
+          ctx.fillStyle = options.tagBackground;
+          ctx.fillRect(x - width / 2, top, width, TAG_HEIGHT);
+          ctx.fillStyle = options.tagText;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(marker.label, x, top + TAG_HEIGHT / 2);
+        }
+        ctx.restore();
+      },
+    },
+  };
+}
+
 export function mountSaSpectrum(options: SaSpectrumOptions = {}): SaSpectrumHandle {
   const factory = options.createView ?? createUplotView;
   const figure = el("div", { className: "lnt-sa-figure" });
@@ -68,7 +131,27 @@ export function mountSaSpectrum(options: SaSpectrumOptions = {}): SaSpectrumHand
     text: "ожидание свипа…",
     attrs: { role: "status", "data-sa-wave-state": "waiting" },
   });
-  const chart = factory({ container: figure, syncKey: SYNC_KEY });
+  // Цвета аннотаций фиксируются на монтировании (паритет workbench):
+  // пики поиска — accentB, маркеры — delta с биркой на фоне панели.
+  const theme = readChartTheme();
+  const chart = factory({
+    container: figure,
+    syncKey: SYNC_KEY,
+    onClick: options.onFrequencyClick,
+    peaksPlugin: createPeaksPlugin({
+      peaks: options.peaks ?? (() => []),
+      color: theme.accentB,
+    }),
+    plugins: [
+      createSaMarkersPlugin({
+        markers: options.markers ?? (() => []),
+        color: theme.delta,
+        tagBackground: theme.panel,
+        tagText: theme.fgSecondary,
+        font: `10px ${theme.fontMono}`,
+      }),
+    ],
+  });
   figure.append(chart.root);
   const bodyChildren: Node[] = [];
   if (options.controls !== undefined) bodyChildren.push(options.controls);
@@ -127,6 +210,7 @@ export function mountSaSpectrum(options: SaSpectrumOptions = {}): SaSpectrumHand
       xLog: view.xLog,
       xRange: view.xLog ? undefined : [freq[0] ?? 0, freq[freq.length - 1] ?? 0],
       series,
+      peaks: options.peaks === undefined ? [] : options.peaks(),
     };
     chart.render(request);
   }

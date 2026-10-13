@@ -216,7 +216,10 @@
 .lnt-sa-workspace .lnt-sa-sim-badge[hidden],
 .lnt-sa-workspace .lnt-sa-busy[hidden],
 .lnt-sa-workspace .lnt-sa-error-text[hidden],
-.lnt-sa-workspace .lnt-sa-wave-status[hidden] {
+.lnt-sa-workspace .lnt-sa-wave-status[hidden],
+.lnt-sa-workspace .lnt-sa-marker-notice[hidden],
+.lnt-sa-workspace .lnt-sa-table[hidden],
+.lnt-sa-workspace .lnt-sa-table-empty[hidden] {
   display: none;
 }
 
@@ -359,6 +362,57 @@
   background: transparent;
   color: var(--lnt-text-sec);
   font: 400 12px / 16px var(--lnt-ui);
+}
+
+/* ── Маркеры и пики (Todo 15): инструменты, отказ, таблицы ─────────────── */
+
+.lnt-sa-workspace .lnt-sa-marker-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.lnt-sa-workspace .lnt-sa-marker-notice {
+  font: 400 12px / 16px var(--lnt-ui);
+  color: color-mix(in srgb, var(--lnt-err) 60%, var(--lnt-text));
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.lnt-sa-workspace .lnt-sa-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font: 400 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.lnt-sa-workspace .lnt-sa-table th {
+  text-align: left;
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--lnt-line);
+}
+
+.lnt-sa-workspace .lnt-sa-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--lnt-line);
+  color: var(--lnt-text);
+  overflow-wrap: anywhere;
+}
+
+/* Бирка маркера в таблице — тот же --lnt-delta, что и вертикаль на графике. */
+
+.lnt-sa-workspace .lnt-sa-marker-tag {
+  color: var(--lnt-delta);
+  font-weight: 600;
+}
+
+.lnt-sa-workspace .lnt-sa-table-empty {
+  margin: 0;
 }
 
 @media (max-width: 767px) {

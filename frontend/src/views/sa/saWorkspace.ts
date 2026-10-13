@@ -12,10 +12,11 @@ import type { LntApiClient } from "../../api/client";
 import { createDeviceApi } from "../../api/client-device";
 import { sharedLiveApi } from "../../api/client-live";
 import type { LiveApi } from "../../api/client-live";
-import type { LiveSaConfig, LiveStatePayload } from "../../api/types-live";
+import type { LiveSaConfig, LiveSaPeak, LiveStatePayload } from "../../api/types-live";
 import { DEFAULT_LIVE_SA_CONFIG, DEFAULT_LIVE_START_REQUEST } from "../../api/types-live";
 import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
+import { buildSaMarkerPanel } from "./saMarkerPanel";
 import {
   LIVE_STATE_TEXT,
   buildSaReadoutSection,
@@ -63,9 +64,20 @@ export function mountSaWorkspace(container: HTMLElement, options: SaWorkspaceOpt
       spectrum.rerender(viewOptions());
     },
   });
+  // Пики последнего свипа — вход поиска пиков (Todo 15); маркеры и
+  // снимок пиков живут только на клиенте, на сервер не уходят.
+  let lastPeaks: readonly LiveSaPeak[] = [];
+  const markerPanel = buildSaMarkerPanel({
+    store,
+    sweepPeaks: () => lastPeaks,
+    rerender: () => spectrum.rerender(viewOptions()),
+  });
   const spectrum = mountSaSpectrum({
     createView: options.spectrum?.createView,
     controls: traceControls.root,
+    markers: markerPanel.markerLines,
+    peaks: markerPanel.peakHighlight,
+    onFrequencyClick: markerPanel.placeMarker,
   });
   const status = buildSaStatusSection();
   const readout = buildSaReadoutSection();
@@ -82,6 +94,7 @@ export function mountSaWorkspace(container: HTMLElement, options: SaWorkspaceOpt
         status.root,
         selectors.root,
         spectrum.root,
+        markerPanel.root,
         readout.root,
       ],
     ),
@@ -215,6 +228,7 @@ export function mountSaWorkspace(container: HTMLElement, options: SaWorkspaceOpt
         spectrum.showProblem();
         return;
       }
+      lastPeaks = payload.peaks;
       spectrum.applyStore(store, viewOptions());
       readout.applySpectrum(payload, store.sweepCount());
     },

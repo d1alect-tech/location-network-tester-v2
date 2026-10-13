@@ -94,7 +94,9 @@ export class LiveStore {
     const psdDb: number[] = [];
     const span = config === null ? 0 : config.band_high_hz - config.band_low_hz;
     const toneHz =
-      config === null ? TONE_INDEX : config.band_low_hz + (span * TONE_INDEX) / (SPECTRUM_POINTS - 1);
+      config === null
+        ? TONE_INDEX
+        : config.band_low_hz + (span * TONE_INDEX) / (SPECTRUM_POINTS - 1);
     const width = Math.max(span, 1) / 40;
     for (let i = 0; i < SPECTRUM_POINTS; i += 1) {
       const f = config === null ? i : config.band_low_hz + (span * i) / (SPECTRUM_POINTS - 1);

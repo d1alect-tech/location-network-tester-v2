@@ -14,6 +14,11 @@ export interface UplotViewOptions {
   onCursor?: (index: number | null) => void;
   /** Плагин аннотаций пиков/полос. */
   peaksPlugin?: uPlot.Plugin;
+  /** Дополнительные плагины поверх peaksPlugin (маркеры SA). */
+  plugins?: uPlot.Plugin[];
+  /** Клик по полю графика: значение оси X (драг-зум подавляется).
+   * Перевод пикселей в данные — на стороне uPlot (posToVal). */
+  onClick?: (xValue: number) => void;
 }
 
 /** Совместная очистка X и всех серий: индекс с невалидной координатой
@@ -65,13 +70,42 @@ export function createUplotView(options: UplotViewOptions): ChartHandle {
     options.onCursor?.(self.cursor.idx ?? null);
   }
 
+  const CLICK_SLOP_PX = 3;
+
+  /** Клик-выбор на поле графика: только прямое попадание в само поле
+   * (как bind.click uPlot), движение свыше CLICK_SLOP_PX — драг-зум,
+   * выбор не считается. Слушатели живут на over конкретного инстанса
+   * и умирают вместе с ним при перерисовке. */
+  function attachClick(plot: uPlot, onClick: (xValue: number) => void): void {
+    let downX = Number.NaN;
+    let downY = Number.NaN;
+    plot.over.addEventListener("mousedown", (event) => {
+      downX = event.clientX;
+      downY = event.clientY;
+    });
+    plot.over.addEventListener("click", (event) => {
+      if (event.target !== plot.over) return;
+      if (
+        Math.abs(event.clientX - downX) > CLICK_SLOP_PX ||
+        Math.abs(event.clientY - downY) > CLICK_SLOP_PX
+      ) {
+        return;
+      }
+      const rect = plot.over.getBoundingClientRect();
+      const left = event.clientX - rect.left;
+      if (left < 0 || left > rect.width) return;
+      const xValue = plot.posToVal(left, "x");
+      if (Number.isFinite(xValue)) onClick(xValue);
+    });
+  }
+
   function draw(width: number, height: number): void {
     if (lastRequest === null || width <= 0 || height <= 0) return;
     const target = ensureHost();
     target.replaceChildren();
     plot?.destroy();
     const aligned = prepareAligned(lastRequest);
-    plot = new uPlot(
+    const instance = new uPlot(
       buildUplotOptions({
         request: lastRequest,
         theme,
@@ -80,10 +114,13 @@ export function createUplotView(options: UplotViewOptions): ChartHandle {
         syncKey: options.syncKey,
         onCursor: emitCursor,
         peaksPlugin: options.peaksPlugin,
+        plugins: options.plugins,
       }),
       aligned,
       target,
     );
+    plot = instance;
+    if (options.onClick !== undefined) attachClick(instance, options.onClick);
   }
 
   const observer =

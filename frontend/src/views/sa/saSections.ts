@@ -7,6 +7,7 @@
 
 import type { LiveInstrumentState, LiveSpectrumPayload } from "../../api/types-live";
 import { el } from "../../components/primitives/dom";
+import { formatHz } from "./saUnits";
 
 export const LIVE_STATE_TEXT: Record<LiveInstrumentState, string> = {
   idle: "не запущен",
@@ -142,11 +143,4 @@ export function errorBlock(text: string): HTMLElement {
     el("span", { className: "banner-glyph", text: "✕", attrs: { "aria-hidden": "true" } }),
     el("p", { className: "banner-msg", text }),
   ]);
-}
-
-function formatHz(value: number): string {
-  if (!Number.isFinite(value)) return "—";
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} МГц`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)} кГц`;
-  return `${Math.round(value)} Гц`;
 }

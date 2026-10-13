@@ -16,6 +16,8 @@ export interface UplotBuildContext {
   onCursor: (self: uPlot) => void;
   /** Плагин аннотаций пиков/полос (может отсутствовать). */
   peaksPlugin?: uPlot.Plugin;
+  /** Дополнительные плагины поверх peaksPlugin (маркеры SA). */
+  plugins?: readonly uPlot.Plugin[];
 }
 
 const LOG_RANGE: uPlot.Range.Function = (_self, initMin, initMax) =>
@@ -76,5 +78,8 @@ export function buildUplotOptions(ctx: UplotBuildContext): uPlot.Options {
     hooks: { setCursor: [ctx.onCursor] },
   };
   if (ctx.peaksPlugin !== undefined) options.plugins = [ctx.peaksPlugin];
+  if (ctx.plugins !== undefined && ctx.plugins.length > 0) {
+    options.plugins = [...(options.plugins ?? []), ...ctx.plugins];
+  }
   return options;
 }
