@@ -9,7 +9,7 @@ import { type MockLntBackend, installMockBackend } from "./testkit/mockBackend";
 
 const BASE = "http://127.0.0.1:4101/static/v2/";
 
-const TABS = 6; // Каталог, Захват, Инспекция, Эксперименты, Отчёты, Настройки (A3: prepare убит)
+const TABS = 8; // Каталог, Захват, Осциллограф, Спектроанализатор, Инспекция, Эксперименты, Отчёты, Настройки
 
 const ROUTES = ["catalog", "capture", "inspect", "experiments", "reports", "settings"] as const;
 
@@ -52,7 +52,7 @@ test("S1: общая V6-шапка и статус-бар на всех марш
   mockInspectApi(installMockBackend(page));
   for (const route of ROUTES) {
     await page.goto(`${BASE}#/${route}`);
-    // Единая шапка витрины: бренд, таббар из 6 вкладок, статус устройства.
+    // Единая шапка витрины: бренд, таббар из 8 вкладок, статус устройства.
     const header = page.locator("header.hdr");
     await expect(header, `маршрут #/${route}: шапка .hdr`).toBeVisible();
     await expect(header.locator(".hdr-brand")).toHaveText("LNT");

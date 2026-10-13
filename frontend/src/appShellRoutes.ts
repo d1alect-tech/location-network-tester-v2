@@ -6,6 +6,7 @@ export type Route =
   | "catalog"
   | "capture"
   | "scope"
+  | "sa"
   | "inspect"
   | "experiments"
   | "reports"
@@ -21,6 +22,12 @@ export const ROUTES: Record<Route, { title: string; desc: string }> = {
     title: "Осциллограф",
     desc: "Живой режим развёртки: непрерывный поток кадров, Run/Stop и статус владения прибором.",
   },
+  // BEGIN Todo 14: приборная вкладка «Спектроанализатор» (группа live-маршрутов).
+  sa: {
+    title: "Спектроанализатор",
+    desc: "Живые трассы спектра: clear-write, min/max-hold и бегущее среднее; полоса и RBW на ходу.",
+  },
+  // END Todo 14
   // END Todo 7
   inspect: {
     title: "Инспекция",

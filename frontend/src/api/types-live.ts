@@ -77,10 +77,71 @@ export const DEFAULT_LIVE_START_REQUEST: LiveStartRequest = {
   },
 };
 
+/** Детектор трасс SA: зеркало KNOWN_DETECTORS (psd/models.py); выборки
+ * (sample) в MVP нет — только эти четыре. */
+export type LiveSaDetector = "mean" | "rms" | "max-hold" | "min-hold";
+
+/** Окно SA: пять известных (паритет MARKER_WINDOW_OPTIONS инспекции). */
+export type LiveSaWindow = "hann" | "flattop" | "kaiser" | "blackman" | "rect";
+
+/** SA-конфигурация живого режима: зеркало SaConfig (instrument/sa.py).
+ * Границы (Найквист, геометрия полосы) проверяет бэкенд (422). */
+export interface LiveSaConfig {
+  rbw_hz: number;
+  window: LiveSaWindow;
+  band_low_hz: number;
+  band_high_hz: number;
+  detector: LiveSaDetector;
+}
+
+/** Дефолт SA-конфигурации вкладки: RBW/окно/детектор — дефолты домена
+ * (50 Гц, hann, mean), полоса — до Найквиста дефолтного старта 8 МГц. */
+export const DEFAULT_LIVE_SA_CONFIG: LiveSaConfig = {
+  rbw_hz: 50,
+  window: "hann",
+  band_low_hz: 0,
+  band_high_hz: 4_000_000,
+  detector: "mean",
+};
+
+/** Пик трассы SA: частота, уровень, prominence и Q (до прореживания). */
+export interface LiveSaPeak {
+  frequency_hz: number;
+  level_db: number;
+  prominence_db: number;
+  q_factor: number | null;
+}
+
+/** Метаданные трассы SA: ENBW, разрешение сетки, окно и выбранный RBW. */
+export interface LiveSaMeta {
+  enbw: number;
+  resolution: number;
+  window: string;
+  rbw: number;
+}
+
+/** Трасса SA одного свипа (событие spectrum): одна серия в дБ и пики
+ * полного разрешения. psd_db = 10·log10(PSD В²/Гц). */
+export interface LiveSpectrumPayload {
+  frame_index: number;
+  freq: number[];
+  psd_db: number[];
+  peaks: LiveSaPeak[];
+  meta: LiveSaMeta;
+}
+
+/** Тело POST /api/live/config: триггер целиком + опциональный SA-контур.
+ * sa отсутствует — контур не трогается; явный null — выключает. */
+export interface LiveConfigRequest extends LiveTrigger {
+  sa?: LiveSaConfig | null;
+}
+
 /** Подписка на живой поток (GET /api/live/frames): именованные события
- * frame/heartbeat и объявления состояния соединения. */
+ * frame/spectrum/heartbeat и объявления состояния соединения. Вкладка
+ * подписывается на нужные ей события — прочие необязательны. */
 export interface LiveWatchHandlers {
-  onFrame(frame: LiveFramePayload): void;
+  onFrame?(frame: LiveFramePayload): void;
+  onSpectrum?(spectrum: LiveSpectrumPayload): void;
   onState(state: LiveStatePayload): void;
   onConnection(kind: "live" | "reconnecting"): void;
 }

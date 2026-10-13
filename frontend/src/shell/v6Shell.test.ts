@@ -5,6 +5,7 @@ const TAB_ROUTES = [
   "catalog",
   "capture",
   "scope",
+  "sa",
   "inspect",
   "experiments",
   "reports",
@@ -12,7 +13,7 @@ const TAB_ROUTES = [
 ] as const;
 
 describe("createV6ShellHeader", () => {
-  it("builds header.hdr with brand LNT and seven tab links in route order", () => {
+  it("builds header.hdr with brand LNT and eight tab links in route order", () => {
     // Given / When
     const { root } = createV6ShellHeader({ activeRoute: "inspect" });
 
@@ -22,7 +23,7 @@ describe("createV6ShellHeader", () => {
     expect(root.querySelector(".hdr-brand")?.textContent).toBe("LNT");
 
     const links = [...root.querySelectorAll(".tabbar a.snav-item")];
-    expect(links).toHaveLength(7);
+    expect(links).toHaveLength(8);
     expect(links.map((link) => link.getAttribute("data-route"))).toEqual([...TAB_ROUTES]);
     expect(links.map((link) => link.id)).toEqual(TAB_ROUTES.map((route) => `nav-${route}`));
     expect(links.map((link) => link.getAttribute("href"))).toEqual(

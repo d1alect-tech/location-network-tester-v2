@@ -15,6 +15,8 @@ import { RouteStore } from "./state/routeState";
 import "./components/charts/charts.css";
 import { type V6ShellHeader, createV6ShellHeader, createV6ShellStatusbar } from "./shell/v6Shell";
 import { mountInspectV6 } from "./views/inspect/inspectV6";
+// Todo 14: рабочая область «Спектроанализатор» (#/sa).
+import { mountSaWorkspace } from "./views/sa/saWorkspace";
 // Todo 7: рабочая область «Осциллограф» (#/scope).
 import { mountScopeWorkspace } from "./views/scope/scopeWorkspace";
 
@@ -228,6 +230,18 @@ export class AppShell {
       return;
     }
     // END Todo 7
+
+    // BEGIN Todo 14: маршрут «Спектроанализатор» — live-трассы SA (#/sa).
+    if (this.currentRoute === "sa") {
+      viewContainer.innerHTML = "";
+      viewContainer.className = "view-container";
+      this.activeViewCleanup = mountSaWorkspace(viewContainer as HTMLElement, {
+        client: this.apiClient,
+      });
+      this.mountedRoute = this.currentRoute;
+      return;
+    }
+    // END Todo 14
 
     // --- Инспекция V6: окно сравнения под общей оболочкой ---
     if (this.currentRoute === "inspect") {

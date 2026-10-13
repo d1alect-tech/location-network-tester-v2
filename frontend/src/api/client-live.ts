@@ -2,7 +2,7 @@
  * и SSE-кадры. Один экземпляр на панель — вкладки «Осциллограф» и «Анализатор»
  * (sa) делят состояние владения и поток. POST /api/live/* — мутации с
  * заголовком запуска (client.requestJson mutation: true); SSE — EventSource
- * с именованными событиями frame/heartbeat, родное переподключение, при
+ * с именованными событиями frame/spectrum/heartbeat, родное переподключение, при
  * затишье после сбоя — fallback-опрос GET /api/live/state (паттерн
  * capture/sse.ts). Подписка до старта разрешена: без захвата приходят
  * heartbeat-события со статусом владения. */
@@ -10,8 +10,9 @@
 import { LntApiClient } from "./client";
 import type { RequestOptions } from "./client";
 import { ApiError } from "./errors";
-import { isLiveFramePayload, isLiveStatePayload } from "./guards-live";
+import { isLiveFramePayload, isLiveSpectrumPayload, isLiveStatePayload } from "./guards-live";
 import type {
+  LiveConfigRequest,
   LiveSseDeps,
   LiveStartRequest,
   LiveStatePayload,
@@ -30,6 +31,8 @@ export interface LiveApi {
   start(request: LiveStartRequest, options?: RequestOptions): Promise<LiveStatePayload>;
   /** POST /api/live/stop — освобождает прибор (идемпотентно). */
   stop(options?: RequestOptions): Promise<LiveStatePayload>;
+  /** POST /api/live/config — триггер на ходу + опциональный SA-контур. */
+  updateConfig(config: LiveConfigRequest, options?: RequestOptions): Promise<LiveStatePayload>;
   /** POST /api/live/config — триггер на ходу, без перезапуска захвата. */
   updateTrigger(trigger: LiveTrigger, options?: RequestOptions): Promise<LiveStatePayload>;
   /** Авто-стоп по правилу маршрутов: POST только если поток считался активным. */
@@ -74,6 +77,7 @@ export function createLiveApi(client: LntApiClient): LiveApi {
     state: (options = {}) => readState(options),
     start: (request, options = {}) => mutate("/api/live/start", request, options),
     stop,
+    updateConfig: (config, options = {}) => mutate("/api/live/config", config, options),
     updateTrigger: (trigger, options = {}) => mutate("/api/live/config", trigger, options),
     stopIfActive: async (options = {}) => {
       if (!active) return;
@@ -135,8 +139,9 @@ export function createLiveApi(client: LntApiClient): LiveApi {
         announce("live");
       };
 
-      // Бэкенд шлёт именованные события (ServerSentEvent(event="frame"/"heartbeat")),
-      // поэтому подписка через addEventListener: onmessage их не доставляет.
+      // Бэкенд шлёт именованные события (ServerSentEvent(event="frame"/
+      // "spectrum"/"heartbeat"), поэтому подписка через addEventListener:
+      // onmessage их не доставляет.
       const onNamedEvent = (event: Event): void => {
         if (closed) return;
         clearStaleTimer();
@@ -147,7 +152,11 @@ export function createLiveApi(client: LntApiClient): LiveApi {
           return; // некорректный кадр игнорируется, поток продолжается
         }
         if (isLiveFramePayload(parsed)) {
-          handlers.onFrame(parsed);
+          handlers.onFrame?.(parsed);
+          return;
+        }
+        if (isLiveSpectrumPayload(parsed)) {
+          handlers.onSpectrum?.(parsed);
           return;
         }
         if (isLiveStatePayload(parsed)) {
@@ -156,6 +165,7 @@ export function createLiveApi(client: LntApiClient): LiveApi {
         }
       };
       source.addEventListener("frame", onNamedEvent);
+      source.addEventListener("spectrum", onNamedEvent);
       source.addEventListener("heartbeat", onNamedEvent);
 
       source.onerror = () => {

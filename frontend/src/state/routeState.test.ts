@@ -38,6 +38,9 @@ describe("parseHash", () => {
   it("WORKSPACE_ROUTES no longer lists the killed prepare route (A3)", () => {
     expect(WORKSPACE_ROUTES).not.toContain("prepare");
     expect(WORKSPACE_ROUTES).toContain("capture");
+    // Todo 14: приборная группа {scope, sa} валидна для parseHash.
+    expect(WORKSPACE_ROUTES).toContain("scope");
+    expect(WORKSPACE_ROUTES).toContain("sa");
   });
 });
 

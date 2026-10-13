@@ -33,10 +33,12 @@ async function openScope(page: Page): Promise<void> {
 test("scope tab opens from the tabbar with device status and the sim badge", async ({ page }) => {
   await openScope(page);
 
-  // Таббар: «Осциллограф» сразу после «Захвата», активна текущая вкладка.
+  // Таббар: «Осциллограф» сразу после «Захвата», «Спектроанализатор» после
+  // него, активна текущая вкладка.
   const links = page.locator(".tabbar a.snav-item");
-  await expect(links).toHaveCount(7);
+  await expect(links).toHaveCount(8);
   await expect(links.nth(2)).toHaveAttribute("data-route", "scope");
+  await expect(links.nth(3)).toHaveAttribute("data-route", "sa");
   await expect(links.nth(2)).toHaveAttribute("aria-current", "page");
   await expect(page.locator("#nav-scope")).toHaveAttribute("href", "#/scope");
 

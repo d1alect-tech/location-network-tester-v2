@@ -4,8 +4,9 @@ import { AppShell } from "./AppShell";
 /**
  * Базовый характеризационный тест: фиксирует наблюдаемое поведение AppShell.
  * С todo 39 в ROUTES добавлен раздел «Каталог»; с Todo 7 — «Осциллограф»
- * сразу после «Захвата» (группа live-маршрутов {scope, sa}), ссылок стало
- * семь; остальные гарантии маршрутизации сохранены дословно.
+ * сразу после «Захвата», с Todo 14 — «Спектроанализатор» после него (группа
+ * live-маршрутов {scope, sa}), ссылок стало восемь; остальные гарантии
+ * маршрутизации сохранены дословно.
  * T5: маршрут «Каталог» монтирует настоящий воркспейс (.lnt-cat-workspace),
  * плейсхолдер-заглушка удалена — фолбэк-тесты следуют новой реальности.
  */
@@ -21,13 +22,14 @@ describe("AppShell (baseline characterization)", () => {
     document.body.appendChild(container);
   });
 
-  it("renders seven navigation links matching V6 tabbar", () => {
+  it("renders eight navigation links matching V6 tabbar", () => {
     const shell = new AppShell(container);
     shell.init();
     const links = container.querySelectorAll<HTMLAnchorElement>(".snav-item");
-    expect(links.length).toBe(7);
+    expect(links.length).toBe(8);
     expect(container.querySelector("#nav-capture")).not.toBeNull();
     expect(container.querySelector("#nav-catalog")).not.toBeNull();
+    expect(container.querySelector("#nav-sa")).not.toBeNull();
     expect(links[0]?.href).toMatch(/#\/catalog$/);
   });
 

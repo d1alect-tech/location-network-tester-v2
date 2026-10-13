@@ -4,6 +4,10 @@
 export interface ChartTheme {
   accentA: string;
   accentB: string;
+  /** Дельта/OK-серии (трассы SA: min-hold/среднее) — те же токены, что
+   * маркеры курсоров развёртки. */
+  delta: string;
+  ok: string;
   panel: string;
   canvasBg: string;
   fgSecondary: string;
@@ -18,6 +22,8 @@ export interface ChartTheme {
 const FALLBACK: ChartTheme = {
   accentA: "#5681ff",
   accentB: "#e68619",
+  delta: "#b7a6ff",
+  ok: "#3dbd8a",
   panel: "#323232",
   canvasBg: "#1d1d1d",
   fgSecondary: "#d1d1d1",
@@ -37,6 +43,8 @@ export function readChartTheme(root: Element = document.documentElement): ChartT
   return {
     accentA: token(styles, "--lnt-accent-a") || FALLBACK.accentA,
     accentB: token(styles, "--lnt-accent-b") || FALLBACK.accentB,
+    delta: token(styles, "--lnt-delta") || FALLBACK.delta,
+    ok: token(styles, "--lnt-ok") || FALLBACK.ok,
     panel: token(styles, "--lnt-bg-panel") || FALLBACK.panel,
     canvasBg: token(styles, "--lnt-bg-canvas") || FALLBACK.canvasBg,
     fgSecondary: token(styles, "--lnt-fg-secondary") || FALLBACK.fgSecondary,
