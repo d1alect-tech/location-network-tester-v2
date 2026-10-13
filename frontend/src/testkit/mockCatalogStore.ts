@@ -11,6 +11,7 @@ import type {
   LegacySessionItem,
   ProfileRevision,
 } from "../api/types";
+import { storageDirName } from "../views/inspect/sessionAlias";
 import {
   type CorpusRow,
   contextFor,
@@ -52,12 +53,23 @@ export class CatalogStore {
     this.profilesStore = defaultProfiles();
   }
 
-  /** Заменяет выдачу каталога (inspect-фикстуры спек). */
+  /** Заменяет выдачу каталога (inspect-фикстуры спек).
+   * Сидированная сессия = дисковая с артефактами (detail/spectrum сидятся
+   * тем же бэкендом): /api/sessions выводит её analyzed=true, имя ряда =
+   * joinKey (имя каталога из storage_path, иначе id). Ровно один источник
+   * честных analyzed=false — corpus-фикстура (seedCorpus); пустой конструктор
+   * остаётся пустым (честный null-пара boot). */
   seedCatalog(items: CatalogSession[]): void {
     this.sessions.length = 0;
     this.storagePaths.clear();
     this.rowPaths.clear();
-    this.legacyRows = [];
+    this.legacyRows = items.map((session) => ({
+      name: storageDirName(session.storage_path) ?? session.id,
+      status: "valid",
+      error: null,
+      analyzed: true,
+      summary: null,
+    }));
     for (const session of items) {
       this.sessions.push(session);
       this.storagePaths.set(session.id, `/sessions/${session.id}`);

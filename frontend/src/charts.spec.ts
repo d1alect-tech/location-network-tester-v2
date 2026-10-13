@@ -128,13 +128,14 @@ test("log-ось и дельта пиков", async ({ page }) => {
 
   const deltaCell = band.locator("[data-delta]").first();
   await expect(deltaCell).toBeVisible();
-  // 10*log10(8e-3/1e-2) ≈ -0.969 → минус, глиф ▼.
+  // Boot по keyset (задача 6): A = НОВЕЙШАЯ проанализированная = capture-002,
+  // B = capture-001. Дельта B−A = 10*log10(1e-2/8e-3) ≈ +0.969 → плюс, глиф ▲.
   const value = Number(await deltaCell.getAttribute("data-delta"));
-  expect(Math.abs(value - -0.969)).toBeLessThan(0.05);
-  await expect(deltaCell).toContainText("▼");
+  expect(Math.abs(value - 0.969)).toBeLessThan(0.05);
+  await expect(deltaCell).toContainText("▲");
 
   await page.locator("[data-pair-swap]").click();
-  await expect(page.locator(".pairbar [data-pair='a']")).toContainText("стенд-Б");
+  await expect(page.locator(".pairbar [data-pair='a']")).toContainText("стенд-А");
 
   const screenshotPath = path.join(os.tmpdir(), "lnt-v6-overlay-charts.png");
   await page.screenshot({ path: screenshotPath, fullPage: true });
