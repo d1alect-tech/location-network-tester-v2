@@ -183,7 +183,8 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
       const { a: payloadA, b: payloadB } = payloads;
       planeControl.paintRbw(payloadA);
       extras.paint({ payloadA, payloadB, analysis: detail.analysis });
-      peaksA = peaksFromDetail(detailForPeaks(a, detail));
+      // Задача 9: пики — только из РЕАЛЬНОГО detail-конверта (без фабрикации).
+      peaksA = peaksFromDetail(detailForPeaks(detail));
       lastPayload = payloadA;
       lastPayloadB = payloadB;
       const suffix = planeControl.plane() === "input-referred" ? " · вход" : "";

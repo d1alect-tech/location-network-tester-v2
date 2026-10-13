@@ -319,6 +319,51 @@ function spectrumStatus(): HTMLElement | null {
   return document.querySelector<HTMLElement>("[data-spectrum-status]");
 }
 
+describe("spectrumPanelV6: пики только из РЕАЛЬНОГО detail-конверта (задача 9)", () => {
+  const PEAK = { frequency_hz: 1000, level_db: -40, prominence_db: 12, q_factor: 8 };
+
+  it("load рендерит пики из полного конверта с честными флагами", async () => {
+    const { createView, views } = makeFakeViewFactory();
+    const panel = createSpectrumPanel({
+      client: {
+        plots: {
+          spectrum: async () => SPECTRUM_A,
+          detail: async () => ({
+            name: "a",
+            manifest: {},
+            analysis: { spectrum: { peaks: [PEAK] } },
+            spectrum_available: false,
+            waveform_available: false,
+            ch2_available: false,
+          }),
+        },
+      },
+      createView,
+    });
+
+    await panel.load("a", null);
+
+    expect(views[0]?.renders[0]?.peaks).toHaveLength(1);
+  });
+
+  it("detail без конверта → ноль пиков, доступность не выдумывается", async () => {
+    const { createView, views } = makeFakeViewFactory();
+    const panel = createSpectrumPanel({
+      client: {
+        plots: {
+          spectrum: async () => SPECTRUM_A,
+          detail: async () => ({ analysis: { spectrum: { peaks: [PEAK] } } }),
+        },
+      },
+      createView,
+    });
+
+    await panel.load("a", null);
+
+    expect(views[0]?.renders[0]?.peaks).toHaveLength(0);
+  });
+});
+
 describe("spectrumPanelV6: скелетон, stale-метка и CTA пересчёта (очередь A1)", () => {
   it("во время загрузки показывает русскую строку состояния", async () => {
     // Given
