@@ -9,6 +9,7 @@ import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { el } from "../../components/primitives/dom";
 import type { RouteStore } from "../../state/routeState";
 import { EMPTY_METERS, createAnalysisBand } from "./analysisBand";
+import { pickBootPair } from "./bootPick";
 import { createCatalogColumn } from "./catalogColumn";
 import type { LegacyRow } from "./catalogJoinedSource";
 import { loadJoinedCatalog } from "./catalogJoinedSource";
@@ -196,13 +197,24 @@ export async function mountInspectV6(
       const params = routes.get().params;
       const fromRouteA = paramId(params, "a");
       const fromRouteB = paramId(params, "b");
-      if (fromRouteA !== undefined) pair.pick(alias.get(fromRouteA) ?? fromRouteA);
-      if (fromRouteB !== undefined) pair.pick(alias.get(fromRouteB) ?? fromRouteB);
-      if (pair.get().a !== null) return;
-      const first = page.sessions[0];
-      const second = page.sessions[1];
-      if (first !== undefined) pair.pick(first.id);
-      if (second !== undefined) pair.pick(second.id);
+      if (fromRouteA !== undefined || fromRouteB !== undefined) {
+        // Deep-link/pick по обоим ключам D1: алиас канонизирует dir-name в id,
+        // duplicate_id (F-8) остаётся именем каталога — setPair атомарно.
+        pair.setPair({
+          a: fromRouteA === undefined ? null : (alias.get(fromRouteA) ?? fromRouteA),
+          b: fromRouteB === undefined ? null : (alias.get(fromRouteB) ?? fromRouteB),
+        });
+        return;
+      }
+      // Авто-выбор: первые ДВА проанализированных в именованном keyset-порядке
+      // (JOIN, не health). Ноль кандидатов → null-пара, рейл покажет причины.
+      pair.setPair(
+        pickBootPair({
+          sessions: page.sessions,
+          analyzedByDir: page.analyzedByDir,
+          invalidByDir: page.invalidByDir,
+        }),
+      );
     } catch (error) {
       // no-excuse-ok: catch — inspect v6 boot boundary
       chrome.showError(reasonFromError(error));

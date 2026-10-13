@@ -6,6 +6,7 @@ import {
   UNANALYZED_LABEL,
   glyphForTone,
 } from "../../components/status/sessionHealth";
+import { loadKey } from "./bootPick";
 import { type CatalogRow, roleOf } from "./catalogColumnModel";
 import type { PairStateValue } from "./pairState";
 
@@ -82,7 +83,7 @@ export interface CatalogRowRenderCtx {
   readonly pair: PairStateValue;
   readonly analyzedOf: (session: CatalogSession) => boolean | undefined;
   readonly invalidOf: (session: CatalogSession) => string | undefined;
-  readonly onPick: (sessionId: string) => void;
+  readonly onPick: (loadKey: string) => void;
   readonly onFocus: (sessionId: string) => void;
 }
 
@@ -148,7 +149,8 @@ function moveFocus(event: KeyboardEvent, row: HTMLElement): boolean {
 
 function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLTableRowElement {
   const day = dayKey(session.created_utc);
-  const role = roleOf(session.id, ctx.pair);
+  const role = roleOf(session, loadKey, ctx.pair);
+  const key = loadKey(session);
   const roleCell = el("td");
   const labelCell = el("td", { className: "cat-label-cell" });
   if (role !== null) {
@@ -173,7 +175,14 @@ function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLT
   const dateText = ctx.grouped ? formatTime(session.created_utc) : day === "unknown" ? "—" : day;
   const row = el(
     "tr",
-    { attrs: { "data-session": session.id, "data-cat-date": day, tabindex: "-1" } },
+    {
+      attrs: {
+        "data-session": session.id,
+        "data-rowkey": key !== session.id ? key : session.id,
+        "data-cat-date": day,
+        tabindex: "-1",
+      },
+    },
     [
       roleCell,
       labelCell,
@@ -184,13 +193,13 @@ function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLT
   row.addEventListener("focus", () => focusRow(row, ctx));
   row.addEventListener("click", () => {
     row.focus();
-    ctx.onPick(session.id);
+    ctx.onPick(key);
   });
   row.addEventListener("keydown", (event) => {
     if (moveFocus(event, row)) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    ctx.onPick(session.id);
+    ctx.onPick(key);
   });
   return row;
 }

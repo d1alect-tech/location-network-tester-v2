@@ -1,4 +1,5 @@
 import type { CatalogSession } from "../../api/types";
+import { compareCatalogKey } from "./bootPick";
 
 export type CatalogSort = "date" | "label";
 export type SortDir = "asc" | "desc";
@@ -72,13 +73,28 @@ export function buildCatalogRows(options: BuildCatalogRowsOptions): readonly Cat
   }
 
   const sortedDays = Array.from(groups.keys()).sort((dayA, dayB) => {
+    // R3: unknown-группа — зеркало API (COALESCE '' DESC): при date/desc она
+    // идёт ПОСЛЕДНЕЙ, при date/asc — первой. До этого negated localeCompare
+    // ставил unknown ПЕРВОЙ при desc, и первый видимый ряд рейла никогда не
+    // совпадал с boot-рядом из API-порядка.
+    if (dayA === "unknown" || dayB === "unknown") {
+      if (dayA === dayB) return 0;
+      const unknownLast = dir === "desc";
+      if (dayA === "unknown") return unknownLast ? 1 : -1;
+      return unknownLast ? -1 : 1;
+    }
     const cmp = dayA.localeCompare(dayB);
     return dir === "asc" ? cmp : -cmp;
   });
 
   const rows: CatalogRow[] = [];
   for (const day of sortedDays) {
-    const daySessions = groups.get(day) ?? [];
+    const daySessions = (groups.get(day) ?? []).sort((a, b) => {
+      // Внутри дня — именованный keyset-порядок (зеркало API), а не порядок
+      // вставки: первый ряд группы === первый кандидат boot в тот же день.
+      const cmp = compareCatalogKey(a, b);
+      return dir === "asc" ? -cmp : cmp;
+    });
     rows.push({
       kind: "group",
       day,
@@ -97,10 +113,14 @@ export function buildCatalogRows(options: BuildCatalogRowsOptions): readonly Cat
 }
 
 export function roleOf(
-  sessionId: string,
+  session: CatalogSession,
+  loadKeyOf: (session: CatalogSession) => string,
   pair: { a: string | null; b: string | null },
 ): "a" | "b" | null {
-  if (sessionId === pair.a) return "a";
-  if (sessionId === pair.b) return "b";
+  // Пара хранит КЛЮЧИ ЗАГРУЗКИ (dir-name для дублей): роль ищется по обоим
+  // ключам D1 — id строки и её loadKey.
+  const keys = new Set([session.id, loadKeyOf(session)]);
+  if (pair.a !== null && keys.has(pair.a)) return "a";
+  if (pair.b !== null && keys.has(pair.b)) return "b";
   return null;
 }

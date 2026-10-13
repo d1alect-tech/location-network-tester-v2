@@ -12,7 +12,7 @@ export type CatalogColumnClient = JoinedCatalogClient;
 export interface CatalogColumnOptions {
   readonly client: CatalogColumnClient;
   readonly pair: PairStateHandle;
-  readonly onPick: (sessionId: string) => void;
+  readonly onPick: (loadKey: string) => void;
 }
 
 export interface CatalogColumnHandle {
@@ -115,9 +115,14 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
           pair,
           analyzedOf: (session) => analyzedByDir.get(joinKey(session)),
           invalidOf: (session) => invalidByDir.get(joinKey(session)),
-          onPick: (id) => {
-            opts.onPick(id);
-            tbody.querySelector<HTMLElement>(`tr[data-session="${CSS.escape(id)}"]`)?.focus();
+          onPick: (key) => {
+            opts.onPick(key);
+            const escaped = CSS.escape(key);
+            tbody
+              .querySelector<HTMLElement>(
+                `tr[data-rowkey="${escaped}"], tr[data-session="${escaped}"]`,
+              )
+              ?.focus();
           },
           onFocus: (id) => {
             activeSession = id;
@@ -125,12 +130,14 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
         }),
       );
     }
-    const renderedSessions = [...tbody.querySelectorAll<HTMLElement>("tr[data-session]")];
-    const active = renderedSessions.find((row) => row.dataset.session === activeSession);
+    const renderedSessions = [...tbody.querySelectorAll<HTMLElement>("tr[data-rowkey]")];
+    const active = renderedSessions.find(
+      (row) => row.dataset.rowkey === activeSession || row.dataset.session === activeSession,
+    );
     const tabStop = active ?? renderedSessions[0];
     if (tabStop !== undefined) {
       tabStop.tabIndex = 0;
-      activeSession = tabStop.dataset.session ?? null;
+      activeSession = tabStop.dataset.rowkey ?? tabStop.dataset.session ?? null;
     }
     found.textContent = String(visible);
   }

@@ -45,9 +45,12 @@ const WAVE: WaveformPayload = {
 };
 
 function fakeClient() {
+  // Mount-мир: обе сессии проанализированы (legacy analyzed=true по dir-ключу
+  // с запасным id) — иначе boot по JOIN честно выберет null-пару.
+  const analyzed = (name: string) => ({ name, status: "valid", error: null, analyzed: true });
   return {
     catalogSessions: async () => ({ items: [SESSION_A, SESSION_B], next_cursor: null }),
-    legacySessions: async () => ({ sessions: [] }),
+    legacySessions: async () => ({ sessions: [analyzed("sess-a"), analyzed("sess-b")] }),
     plots: {
       spectrum: async () => SPECTRUM,
       detail: async () => DETAIL,
@@ -145,8 +148,10 @@ describe("mountInspectV6", () => {
   });
 
   it.each(["resolve", "reject"] as const)(
-    "ignores a stale first-pair analysis %s after the auto-picked pair completes",
+    "drops a stale pair refresh %s once the newer pair completes",
     async (outcome) => {
+      // Given: boot грузит пару по двум вызовам detail; первый висячий.
+      // stale: ручной pick во время загрузки делает поколение 1 устаревшим.
       let settle!: (detail: SessionDetailPayload) => void;
       let fail!: (error: Error) => void;
       const staleDetail = new Promise<SessionDetailPayload>((resolve, reject) => {
@@ -180,6 +185,18 @@ describe("mountInspectV6", () => {
       });
       cleanups.push(cleanup);
 
+      // When: пользователь армит A и кликает ряд B, пока грузится первая
+      // пара — поколение 1 (a=sess-a, b=sess-b) устаревает, побеждает
+      // поколение 2 (a=sess-b, b=null): A переставлен на вторую строку,
+      // detail дергается дважды, выигрывает второй ответ.
+      const rows = container.querySelectorAll("tr[data-session]");
+      const secondRow = rows[1];
+      if (!(secondRow instanceof HTMLElement)) throw new Error("no second row");
+      const slotA = container.querySelector('[data-pair="a"]');
+      if (!(slotA instanceof HTMLElement)) throw new Error("no slot a");
+      slotA.click();
+      secondRow.click();
+
       await vi.waitFor(() => {
         expect(container.querySelector('[data-chbar="segments"]')?.textContent).toBe("222");
       });
@@ -188,13 +205,13 @@ describe("mountInspectV6", () => {
       await flush();
 
       expect(container.querySelector('[data-chbar="segments"]')?.textContent).toBe("222");
-      expect(container.querySelector('[data-pair="b"] .pair-name')?.textContent).toBe("Beta");
+      expect(container.querySelector('[data-pair="a"] .pair-name')?.textContent).toBe("Beta");
       expect(container.querySelector<HTMLElement>("[data-inspect-error]")?.hidden).toBe(true);
     },
   );
 
-  it("fetches the base detail once per pair change: spectrum, band and analysis-v2 share it", async () => {
-    // Given: каталог из двух сессий — авто-подхват делает две смены пары.
+  it("fetches the base detail once per atomic boot pair: spectrum, band and analysis-v2 share it", async () => {
+    // Given: каталог из двух проанализированных — boot делает ОДИН setPair.
     const bandDetail: SessionDetailPayload = {
       ...DETAIL,
       analysis: { needle: { cycles_analyzed: 130 } },
@@ -219,8 +236,8 @@ describe("mountInspectV6", () => {
     });
     await flush();
 
-    // Then: по одному detail на смену пары, а не по одному на потребителя.
-    expect(detail).toHaveBeenCalledTimes(2);
+    // Then: один detail на атомарный setPair, а не по одному на потребителя.
+    expect(detail).toHaveBeenCalledTimes(1);
   });
 
   it("F-1: deep-link по имени каталога наполняет слот пары метой каталога", async () => {
