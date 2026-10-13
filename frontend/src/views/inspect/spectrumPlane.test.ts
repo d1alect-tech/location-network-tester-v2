@@ -182,6 +182,32 @@ describe("createSpectrumPanel: тумблер плоскости", () => {
     expect(last?.series[0]?.values).toEqual([1e-4, 1e-2, 1e-6]);
   });
 
+  it("задача 3: 409 входа остаётся тихим — scope-fallback без проброса в ленту", async () => {
+    // Silent-by-design (spectrumPanelRequest.ts catch 404/409): job-busy 409
+    // на input-referred НЕ становится тостом pair-load — панель молча рисует scope.
+    const { createView, views } = makeFakeViewFactory();
+    const client = {
+      plots: {
+        spectrum: async (): Promise<SpectrumPayload> => SCOPE_A,
+        spectrumInputReferred: async (): Promise<never> => {
+          throw new ApiError("conflict", { status: 409, detail: "уже выполняется другая задача" });
+        },
+        detail: async () => ({ analysis: { ch1_input_reference: { status: "available" } } }),
+      },
+    };
+    const panel = createSpectrumPanel({ client, createView });
+    await panel.load("a", null);
+
+    planeButton(panel, "input-referred")?.click();
+    await vi.waitFor(() => {
+      expect((views[0]?.renders.length ?? 0) >= 2).toBe(true);
+    });
+    const last = views[0]?.renders[views[0]?.renders.length - 1];
+    // Нарисован scope-пейлоад: fallback состоялся, запрос не проброшен наверх.
+    expect(last?.series[0]?.values).toEqual([1e-4, 1e-2, 1e-6]);
+    expect(panel.root.querySelector<HTMLElement>("[data-spectrum-status]")?.hidden).not.toBe(false);
+  });
+
   it("если вход недоступен одной сессии, рисует всю пару в scope и правит подписи", async () => {
     const scopeB: SpectrumPayload = {
       ...SCOPE_A,

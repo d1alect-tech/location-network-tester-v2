@@ -5,6 +5,7 @@
 import type { SessionDetailPayload, SpectrumPayload } from "../../api/types-plots";
 import { el } from "../../components/primitives/dom";
 import { createDeltaStrip } from "./deltaStrip";
+import { REASON_UNAVAILABLE } from "./pairLoadOutcome";
 import { isRecord, needleOf } from "./w1Parse";
 
 export type Meter = {
@@ -21,7 +22,9 @@ export type PeakRow = {
   readonly q: number;
 };
 
-const UNAVAILABLE = "н/д";
+// «н/д» — ЗНАЧЕНИЕ отсутствия из единого словаря причин (задача 3, D2);
+// пин analysisBand.test.ts живёт на значении, источник — pairLoadOutcome.
+const UNAVAILABLE = REASON_UNAVAILABLE;
 const FLAT_DB = 0.05;
 const WIDE_CHARS = 11;
 const LONG_CHARS = 10;

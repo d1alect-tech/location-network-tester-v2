@@ -17,6 +17,7 @@ import { ticketToCaptureParams } from "./inspectTicket";
 import type { AnalysisBandClient } from "./inspectV6Load";
 import { loadAnalysisBand } from "./inspectV6Load";
 import { createPairDetail } from "./pairDetail";
+import { type PairLoadFailure, pairLoadOutcomeFrom, reasonFromError } from "./pairLoadOutcome";
 import { createPairState } from "./pairState";
 import { createPairbar } from "./pairbarV6";
 import { buildSessionAlias, indexSessionMeta } from "./sessionAlias";
@@ -42,10 +43,6 @@ export type InspectV6Opts = {
   readonly routes: RouteStore;
   readonly createView?: (options: UplotViewOptions) => ChartHandle;
 };
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Неизвестная ошибка";
-}
 
 function paramId(params: Record<string, string>, key: string): string | undefined {
   const value = params[key];
@@ -165,7 +162,10 @@ export async function mountInspectV6(
     } catch (error) {
       if (disposed || gen !== pairGeneration || isAbortError(error)) return;
       // no-excuse-ok: catch — inspect v6 pair-refresh boundary
-      chrome.showError(errorMessage(error));
+      // D2: исход пары из единого словаря причин; reason уходит через
+      // существующий сеттер ленты (canned-префикс + серверный detail 409/422).
+      const outcome: PairLoadFailure = pairLoadOutcomeFrom(error);
+      chrome.showError(outcome.reason);
     }
   }
 
@@ -196,7 +196,7 @@ export async function mountInspectV6(
       if (second !== undefined) pair.pick(second.id);
     } catch (error) {
       // no-excuse-ok: catch — inspect v6 boot boundary
-      chrome.showError(errorMessage(error));
+      chrome.showError(reasonFromError(error));
     }
   }
 

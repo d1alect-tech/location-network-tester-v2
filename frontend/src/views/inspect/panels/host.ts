@@ -4,6 +4,11 @@
  * посчитана» / «недостаточно циклов») вместо молчаливого исчезновения. */
 
 import { clearElement, el } from "../../../components/primitives/dom";
+import {
+  REASON_NO_ARTIFACT,
+  branchNotComputedReason,
+  insufficientCyclesReason,
+} from "../pairLoadOutcome";
 import type { ThdWindow } from "../thdVerdict";
 import { THD_MIN_CYCLES } from "../thdVerdict";
 import { burstCount, parseWindows, peakNotch } from "../w1Parse";
@@ -53,7 +58,8 @@ export type PanelHostHandle = {
   bind(input: PanelHostInput, signal: AbortSignal): Promise<PanelHostScalars>;
 };
 
-export const ABSENT_ARTIFACT = "нет артефакта";
+// Фраза из единого словаря причин (задача 3, D2); реэкспорт сохранён для пинов.
+export const ABSENT_ARTIFACT = REASON_NO_ARTIFACT;
 
 export function harmonicsVisible(cycles: number, failures: readonly BranchFailure[]): boolean {
   if (cycles < THD_MIN_CYCLES) return false;
@@ -105,8 +111,7 @@ function absentChip(kind: string, label: string, reason: string, tone: PanelAbse
 }
 
 function failedChip(kind: string, label: string, failure: BranchFailure): PanelAbsence {
-  const message = failure.message === "" ? "" : `: ${failure.message}`;
-  return absentChip(kind, label, `ветка не посчитана${message}`, "failed");
+  return absentChip(kind, label, branchNotComputedReason(failure.message), "failed");
 }
 
 export function createPanelHost(options: {
@@ -158,7 +163,7 @@ export function createPanelHost(options: {
           absentChip(
             kind,
             label,
-            `недостаточно циклов (${String(input.cycles)} из ${String(THD_MIN_CYCLES)})`,
+            insufficientCyclesReason(input.cycles, THD_MIN_CYCLES),
             "withheld",
           ),
         );

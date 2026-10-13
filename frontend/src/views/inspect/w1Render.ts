@@ -3,6 +3,7 @@
  * никакого innerHTML; значения проходят formatScalar продукта. */
 
 import { clearElement, el } from "../../components/primitives/dom";
+import { namedBranchNotComputedReason } from "./pairLoadOutcome";
 import type { PanelAbsence } from "./panels/host";
 import type { ThdVerdict } from "./thdVerdict";
 import type { BranchFailure, Scalar } from "./w1Parse";
@@ -65,7 +66,7 @@ export function renderScalars(host: HTMLElement, scalars: readonly Scalar[]): vo
 export function renderFailures(host: HTMLElement, failures: readonly BranchFailure[]): void {
   clearElement(host);
   for (const row of failures) {
-    host.append(el("li", { text: `ветка ${row.branch} не посчитана: ${row.message}` }));
+    host.append(el("li", { text: namedBranchNotComputedReason(row.branch, row.message) }));
   }
 }
 

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { ApiError } from "../../api/errors";
 import type { CatalogSession } from "../../api/types";
 import { buildSpectrogramNpz } from "../../test-support/spectrogramNpz";
 import { type MockLntBackend, installMockBackend } from "../../testkit/mockBackend";
@@ -339,4 +340,51 @@ test("V6-P9: пустой каталог — заглушка и прочерк�
   await expect(page.locator(".col-cat [data-cat-empty]")).toBeVisible();
   await expect(page.locator(".pairbar [data-pair='a']")).toContainText("—");
   await expect(page.locator(".pairbar [data-pair='b']")).toContainText("—");
+});
+
+test("V6-P10: 409 с серверным detail на pair-load — причина видна после canned-префикса", async ({
+  page,
+}) => {
+  // Given: mock-бэкенд засеян, но detail/spectrum базы отвечают 409 с detail.
+  const backend = installMockBackend(page);
+  mockApi(backend);
+  const detailText = "идентификатор сессии неоднозначен: 'syn-quiet-seed6022'";
+  await page.route("**/api/sessions/capture-001*", (route) =>
+    route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: detailText }),
+    }),
+  );
+
+  // When
+  await page.goto(BASE);
+
+  // Then: лента ошибки видна; reason = canned-префикс + пробел + серверный detail.
+  const band = page.locator("[data-inspect-error]");
+  await expect(band).toBeVisible({ timeout: 15_000 });
+  await expect(band).toContainText(detailText);
+  expect(await band.textContent()).toBe(`${new ApiError("conflict").message} ${detailText}`);
+});
+
+test("V6-P11: 500 без detail на pair-load — честный failed из словаря, без «undefined»", async ({
+  page,
+}) => {
+  // Given: сервер базы отвечает 500 с пустым JSON-телом — detail нет.
+  const backend = installMockBackend(page);
+  mockApi(backend);
+  await page.route("**/api/sessions/capture-001*", (route) =>
+    route.fulfill({ status: 500, contentType: "application/json", body: "{}" }),
+  );
+
+  // When
+  await page.goto(BASE);
+
+  // Then: только canned-префикс http-ошибки, без «undefined», вид не упал.
+  const band = page.locator("[data-inspect-error]");
+  await expect(band).toBeVisible({ timeout: 15_000 });
+  const text = (await band.textContent()) ?? "";
+  expect(text).toBe(new ApiError("http", { status: 500 }).message);
+  expect(text).not.toContain("undefined");
+  await expect(page.locator(".app-v6")).toBeVisible();
 });

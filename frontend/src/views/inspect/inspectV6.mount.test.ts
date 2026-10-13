@@ -326,4 +326,66 @@ describe("mountInspectV6", () => {
     // Then
     expect(container.querySelector(".app-v6")).toBeNull();
   });
+
+  /** Задача 3 (D2/C5): ошибка pair-load уходит в ленту через существующий
+   * сеттер showError; reason = canned-префикс + серверный detail. */
+  function failingClient(error: unknown) {
+    return {
+      ...fakeClient(),
+      plots: {
+        ...fakeClient().plots,
+        detail: async (): Promise<SessionDetailPayload> => {
+          throw error;
+        },
+      },
+    };
+  }
+
+  it("задача 3: 409 с detail на pair-load — detail виден в ленте после canned-префикса", async () => {
+    // Given: detail базы отвечает 409 с серверным detail (дубль идентификатора).
+    const detailText = "идентификатор сессии неоднозначен: 'syn-quiet-seed6022'";
+    const conflict = new ApiError("conflict", { status: 409, detail: detailText });
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    // When
+    const cleanup = await mountInspectV6(container, {
+      client: failingClient(conflict),
+      routes: new RouteStore(),
+      createView: fakeCreateView(),
+    });
+    cleanups.push(cleanup);
+
+    // Then: лента видна, текст = canned-префикс + пробел + detail (точный порядок).
+    await vi.waitFor(() => {
+      expect(container.querySelector<HTMLElement>("[data-inspect-error]")?.hidden).toBe(false);
+    });
+    const band = container.querySelector<HTMLElement>("[data-inspect-error]");
+    expect(band?.textContent).toBe(`${conflict.message} ${detailText}`);
+    expect(band?.textContent).not.toContain("undefined");
+  });
+
+  it("задача 3: 500 без detail — честный failed из словаря, без «undefined» и без краша", async () => {
+    // Given: сервер вернул 500 с пустым телом — detail нет.
+    const serverError = new ApiError("http", { status: 500 });
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    // When
+    const cleanup = await mountInspectV6(container, {
+      client: failingClient(serverError),
+      routes: new RouteStore(),
+      createView: fakeCreateView(),
+    });
+    cleanups.push(cleanup);
+
+    // Then: только canned-префикс; вид смонтирован и жив.
+    await vi.waitFor(() => {
+      expect(container.querySelector<HTMLElement>("[data-inspect-error]")?.hidden).toBe(false);
+    });
+    const band = container.querySelector<HTMLElement>("[data-inspect-error]");
+    expect(band?.textContent).toBe(serverError.message);
+    expect(band?.textContent).not.toContain("undefined");
+    expect(container.querySelector(".app-v6")).toBeInstanceOf(HTMLElement);
+  });
 });
