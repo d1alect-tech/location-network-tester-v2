@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LntApiClient } from "../../api/client";
 import { ApiError } from "../../api/errors";
+import type { JobSnapshot } from "../../api/types-jobs";
 import type { SessionDetailPayload } from "../../api/types-plots";
 import { createW1Chrome } from "./w1Chrome";
 import { CTA_LABEL, MISSING_BANNER, NO_SESSION_SUMMARY, SESSION_CAPTION } from "./w1Chrome";
@@ -260,5 +261,166 @@ describe("createW1Chrome (B2: единый выбор сессии)", () => {
     const done: () => void = release ?? (() => undefined);
     done();
     await vi.waitFor(() => expect(busy).toEqual([true, false]));
+  });
+});
+
+/* ---------- Задача 8: post-job reload + честный SSE-прогресс ---------- */
+
+type FrameListener = (event: MessageEvent<string>) => void;
+
+/** jsdom не реализует EventSource — фальшивый конструктор по контракту sse.ts. */
+class FakeEventSource {
+  static readonly instances: FakeEventSource[] = [];
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  closed = false;
+  private readonly frames = new Set<FrameListener>();
+
+  constructor(public url: string) {
+    FakeEventSource.instances.push(this);
+  }
+
+  addEventListener(type: string, listener: FrameListener): void {
+    if (type === "snapshot") this.frames.add(listener);
+  }
+
+  close(): void {
+    this.closed = true;
+  }
+
+  emit(snapshot: JobSnapshot): void {
+    const event = new MessageEvent("snapshot", { data: JSON.stringify(snapshot) });
+    for (const listener of this.frames) listener(event);
+  }
+}
+
+const FAKE_EVENT_SOURCE = FakeEventSource as unknown as typeof EventSource;
+
+function jobSnap(overrides: Partial<JobSnapshot>): JobSnapshot {
+  return {
+    schema_version: 1,
+    version: 1,
+    job_id: "job-8",
+    kind: "analyze",
+    status: "queued",
+    stage: "queued",
+    series_index: null,
+    series_total: null,
+    written_sessions: [],
+    result: null,
+    error_code: null,
+    error_message: null,
+    ...overrides,
+  };
+}
+
+describe("createW1Chrome (задача 8: rerun честен)", () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+    FakeEventSource.instances.length = 0;
+  });
+
+  it("успешная задача перезабирает данные пары через колбэк хоста, без перевыбора", async () => {
+    // Given: jobs.start сразу возвращает терминальный успех.
+    const { client, raw } = fakeClient({ [POINTER_FILE]: POINTER });
+    const jobsApi = raw as unknown as {
+      jobs: { start: () => Promise<JobSnapshot> };
+    };
+    jobsApi.jobs.start = vi.fn(async () => jobSnap({ status: "succeeded", stage: "done" }));
+    const reloads: number[] = [];
+    const chrome = createW1Chrome({
+      client,
+      detail: async () => detailPayload(200),
+      sessionTypeOf: () => "measurement",
+      onJobReload: () => reloads.push(1),
+    });
+    document.body.append(chrome.bar, chrome.root);
+    chrome.setSession("sess-a");
+
+    // When
+    chrome.bar.querySelector<HTMLButtonElement>(".av2-cta")?.click();
+
+    // Then: хост перезабрал данные пары ровно один раз — без ручного перевыбора.
+    await vi.waitFor(() => expect(reloads).toHaveLength(1));
+  });
+
+  it("прогресс из реальных SSE-стадий: без серийных данных — indeterminate, никогда 0.5", async () => {
+    // Given: задача стартует queued, поток приносит running/analyzing, серийных
+    // данных у анализа нет — прогресс обязан быть честным indeterminate.
+    const { client, raw } = fakeClient({ [POINTER_FILE]: POINTER });
+    const jobsApi = raw as unknown as {
+      jobs: { start: () => Promise<JobSnapshot>; get: (jobId: string) => Promise<JobSnapshot> };
+    };
+    jobsApi.jobs.start = vi.fn(async () => jobSnap({ status: "queued", stage: "queued" }));
+    jobsApi.jobs.get = vi.fn(async () =>
+      jobSnap({ version: 2, status: "running", stage: "analyzing" }),
+    );
+    const chrome = createW1Chrome({
+      client,
+      detail: async () => detailPayload(200),
+      sessionTypeOf: () => "measurement",
+      jobWatch: { eventSourceCtor: FAKE_EVENT_SOURCE, pollIntervalMs: 50 },
+    });
+    document.body.append(chrome.bar, chrome.root);
+    chrome.setSession("sess-a");
+
+    // When
+    chrome.bar.querySelector<HTMLButtonElement>(".av2-cta")?.click();
+    await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0];
+    source?.emit(jobSnap({ version: 2, status: "running", stage: "analyzing" }));
+
+    // Then: стадия из словаря, aria-busy, бар пуст — доля не выдумывается.
+    await vi.waitFor(() =>
+      expect(chrome.root.querySelector(".lnt-progress-text")?.textContent).toBe("Стадия: анализ"),
+    );
+    expect(chrome.root.querySelector(".lnt-progress-bar")?.getAttribute("aria-busy")).toBe("true");
+    const fill = chrome.root.querySelector<HTMLElement>(".lnt-w1-job-bar");
+    expect(fill?.style.transform).toBe("scaleX(0)");
+
+    // Терминальный снимок: готово, полный бар, статус — из словаря статусов.
+    source?.emit(jobSnap({ version: 3, status: "succeeded", stage: "done" }));
+    await vi.waitFor(() =>
+      expect(chrome.root.querySelector(".lnt-progress-text")?.textContent).toBe("Готово"),
+    );
+    expect(chrome.root.querySelector(".lnt-progress-bar")?.getAttribute("aria-valuenow")).toBe("1");
+    expect(fill?.style.transform).toBe("scaleX(1)");
+    expect(chrome.root.querySelector(".lnt-w1-job-status")?.textContent).toBe("Задача завершена");
+  });
+
+  it("обрыв связи: подряд неудачные опросы дают честный failed(reason) из словаря и снимают busy", async () => {
+    // Given: задача запущена, сервер «гаснет» — опрос задачи отдаёт 500.
+    const { client, raw } = fakeClient({ [POINTER_FILE]: POINTER });
+    const jobsApi = raw as unknown as {
+      jobs: { start: () => Promise<JobSnapshot>; get: (jobId: string) => Promise<JobSnapshot> };
+    };
+    jobsApi.jobs.start = vi.fn(async () => jobSnap({ status: "queued", stage: "queued" }));
+    jobsApi.jobs.get = vi.fn(async () => {
+      throw new ApiError("http", { status: 500, detail: "задача недоступна" });
+    });
+    const busy: boolean[] = [];
+    const reloads: number[] = [];
+    const chrome = createW1Chrome({
+      client,
+      detail: async () => detailPayload(200),
+      sessionTypeOf: () => "measurement",
+      onJobBusy: (value) => busy.push(value),
+      onJobReload: () => reloads.push(1),
+      jobWatch: { eventSourceCtor: FAKE_EVENT_SOURCE, pollIntervalMs: 1, giveUpAfterPolls: 2 },
+    });
+    document.body.append(chrome.bar, chrome.root);
+    chrome.setSession("sess-a");
+
+    // When
+    chrome.bar.querySelector<HTMLButtonElement>(".av2-cta")?.click();
+
+    // Then: ожидание прервано, busy снят (контролы разблокированы), причина —
+    // из словаря задачи 3: canned-префикс + серверный detail, без выдуманных строк.
+    await vi.waitFor(() => expect(busy).toEqual([true, false]));
+    const status = chrome.root.querySelector(".lnt-w1-job-status");
+    expect(status?.textContent).toContain("Задача завершилась с ошибкой");
+    expect(status?.textContent).toContain("Сервер вернул ошибку. задача недоступна");
+    // Данные не перезабирались: задача не подтвердилась успешной.
+    expect(reloads).toHaveLength(0);
   });
 });

@@ -178,16 +178,30 @@
   gap: var(--lnt-space-2);
 }
 
-/* IS-4: заполнение — transform: scaleX (100–250 мс, --lnt-ease-out);
- * геометрия трека неизменна (width: 100%), прогресс задаёт TS. */
+/* Задача 8: трек задачи — createJobProgress (.lnt-progress-bar, роль
+ * progressbar + текст стадии из SSE-снимков); заполнение — тот же
+ * канонический transform: scaleX (120 мс, --lnt-ease-out). Доля — только
+ * из реальных серийных данных; без них честный indeterminate: пусто, не 0.5. */
+.lnt-w1-job-rail .lnt-progress-bar {
+  position: relative;
+  overflow: hidden;
+}
+
 .lnt-w1-job-bar {
-  height: 8px;
-  width: 100%;
+  position: absolute;
+  inset: 0;
   background-color: var(--lnt-accent-a);
-  border-radius: var(--lnt-radius-status);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 120ms var(--lnt-ease-out);
+}
+
+.lnt-w1-job-status {
+  margin: 0;
+  color: var(--lnt-fg-secondary);
+  font-size: 13px;
+  line-height: 19px;
+  overflow-wrap: anywhere;
 }
 
 .lnt-w1-failures {

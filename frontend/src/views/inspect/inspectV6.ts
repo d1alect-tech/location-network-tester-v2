@@ -98,6 +98,12 @@ export async function mountInspectV6(
     detail: detailStore.load,
     sessionTypeOf,
     onJobBusy: (busy) => pairbar.setBusy(busy),
+    // Задача 8 (D1e): успешная задача анализа перезабирает данные пары тем
+    // же конвейером pair-load, что и смена пары (onPairChange — эффект
+    // setPair; literal setPair на неизменной паре — no-op, см. pairState).
+    onJobReload: () => {
+      void onPairChange();
+    },
     ...(client instanceof LntApiClient
       ? {}
       : {

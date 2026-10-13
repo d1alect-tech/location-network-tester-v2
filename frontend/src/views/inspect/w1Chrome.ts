@@ -9,12 +9,13 @@ import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { createExtendedRun } from "./extendedRun";
 import type { DetailLoader } from "./pairDetail";
-import { REASON_NO_ARTIFACT } from "./pairLoadOutcome";
+import { REASON_NO_ARTIFACT, reasonFromError } from "./pairLoadOutcome";
 import { createPanelHost } from "./panels/host";
 import type { PanelAbsence } from "./panels/host";
 import { loadW1Session } from "./w1ChromeLoad";
-import { parseFailures } from "./w1Parse";
-import { renderAbsent, renderFailures, renderScalars, renderVerdict } from "./w1Render";
+import type { W1JobWatchOptions } from "./w1JobProgress";
+import { createW1JobRail } from "./w1JobRail";
+import { renderAbsent, renderScalars, renderVerdict } from "./w1Render";
 import "./w1Chrome.css";
 
 export const MISSING_BANNER =
@@ -34,6 +35,12 @@ export type W1ChromeOptions = {
   readonly sessionTypeOf?: (session: string) => string;
   /** Состояние in-flight задачи анализа: парбар блокирует контролы (job-busy). */
   readonly onJobBusy?: (busy: boolean) => void;
+  /** Успешная задача анализа: данные пары перезабираются хостом тем же
+   * конвейером, что и смена пары (literal setPair на неизменной паре —
+   * no-op по контракту задачи 5, поэтому отдельный канал). */
+  readonly onJobReload?: () => void;
+  /** Внедрение планировщиков SSE-ожидания: юнит-тесты без EventSource. */
+  readonly jobWatch?: W1JobWatchOptions;
 };
 
 export interface W1ChromeHandle {
@@ -116,16 +123,13 @@ export function createW1Chrome(options: W1ChromeOptions): W1ChromeHandle {
     panelsHost,
   ]);
   panelsBlock.hidden = true;
-  const jobBar = el("div", { className: "lnt-w1-job-bar" });
-  const failuresHost = el("ul", { className: "lnt-w1-failures" });
-  const jobRail = el("div", { className: "lnt-w1-job-rail" }, [jobBar, failuresHost]);
-  jobRail.hidden = true;
+  const jobRail = createW1JobRail();
   const root = el("div", { className: "av2-body" }, [
     banner,
     scalarsBlock,
     extended.root,
     panelsBlock,
-    jobRail,
+    jobRail.root,
   ]);
 
   function publish(panelCount: number, scalarCount: number): void {
@@ -182,17 +186,27 @@ export function createW1Chrome(options: W1ChromeOptions): W1ChromeHandle {
     publish(state.panelCount, state.scalars.length);
   }
 
+  /** Задача 8 (D1e/R5): rerun честен — старт задачи, живой SSE-прогресс из
+   * реальных стадий (сфабрикованный scaleX-хардкод удалён), терминал с
+   * исходом; успех перезабирает данные пары (onJobReload), недоступность
+   * задачи — честный failed(reason) из словаря задач 3, контролы не виснут. */
   async function rerun(): Promise<void> {
     const current = session;
     if (current === null) return;
     options.onJobBusy?.(true);
     try {
       await client.ensureReady();
-      jobRail.hidden = false;
-      jobBar.style.transform = "scaleX(0.5)";
-      const snap = await client.jobs.start({ kind: "analyze", session_name: current });
-      renderFailures(failuresHost, parseFailures(snap.result));
-      jobBar.style.transform = snap.status === "succeeded" ? "scaleX(1)" : "scaleX(0.5)";
+      jobRail.show();
+      const started = await client.jobs.start({ kind: "analyze", session_name: current });
+      const final = await jobRail.awaitTerminal(
+        started,
+        () => client.jobs.get(started.job_id),
+        options.jobWatch,
+      );
+      if (final.status === "succeeded") options.onJobReload?.();
+    } catch (error) {
+      if (isAbortError(error)) return;
+      jobRail.paintFailure(reasonFromError(error));
     } finally {
       options.onJobBusy?.(false);
     }
@@ -238,6 +252,7 @@ export function createW1Chrome(options: W1ChromeOptions): W1ChromeHandle {
     destroy() {
       generation += 1;
       loadAbort.abort();
+      jobRail.close();
       extended.destroy();
       bar.remove();
       root.remove();

@@ -514,3 +514,94 @@ test("extended-run CTA clears the fixed statusbar at the end of the scroll", asy
   expect(geometry?.clearance).toBeGreaterThanOrEqual(32);
   expect(geometry?.hitInside).toBe(true);
 });
+
+/* ---------- Задача 8: post-job reload + честный SSE-прогресс ---------- */
+
+test("T8-1: rerun по CTA — прогресс по реальным SSE-стадиям, пара перезабирается без перевыбора", async ({
+  page,
+}) => {
+  // Given: v1-сессия без v2-указателя: баннер на месте, панелей нет;
+  // счётчик detail-запросов фиксирует единственный boot-фетч пары.
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t8-rerun");
+  mockSessionDetail(backend, "t8-rerun", "v1-only/metrics.json");
+  const detailRequests: string[] = [];
+  page.on("request", (request) => {
+    const urlPath = new URL(request.url()).pathname.replace(/^\/static\/v2/, "");
+    if (urlPath === "/api/sessions/t8-rerun") detailRequests.push(urlPath);
+  });
+  await openW1Chrome(page, "t8-rerun");
+  const chrome = page.locator(".lnt-w1-chrome");
+  await expect(chrome.locator(".lnt-w1-banner")).toBeVisible();
+  const bootDetailRequests = detailRequests.length;
+
+  // When: CTA запускает задачу анализа; первая SSE-доставка честно показывает
+  // стадию анализа — серийных данных нет, доля не выдумывается (indeterminate).
+  await page.getByRole("button", { name: CTA }).click();
+  const rail = chrome.locator(".lnt-w1-job-rail");
+  await expect(rail).toBeVisible();
+  await expect(rail.locator(".lnt-progress-text")).toHaveText("Стадия: анализ");
+  await expect(rail.locator(".lnt-progress-bar")).toHaveAttribute("aria-busy", "true");
+  // «задача завершилась и записала v2-артефакты»: сиды обновлены ДО доставки
+  // терминального снимка — перезагрузка обязана подхватить их сама.
+  backend.seedAnalysisPointer("t8-rerun", { artifact_key: ARTIFACT_KEY });
+  mockSessionDetail(backend, "t8-rerun", "measurement/metrics.json");
+  backend.seedArtifact(
+    "t8-rerun",
+    ARTIFACT_KEY,
+    "harmonics.json",
+    readFixture("measurement/harmonics.json"),
+  );
+  backend.pumpAll();
+
+  // Then: терминальное состояние прогресса (полный бар, без aria-busy) и
+  // данные пары перезабраны БЕЗ ручного перевыбора: detail запрошен снова,
+  // v2-панели и скаляры появились, баннер ушёл, сводка пересчитана.
+  await expect(rail.locator(".lnt-progress-text")).toHaveText("Готово");
+  await expect(rail.locator(".lnt-progress-bar")).toHaveAttribute("aria-valuenow", "1");
+  await expect(rail.locator(".lnt-progress-bar")).not.toHaveAttribute("aria-busy");
+  expect(detailRequests).toHaveLength(bootDetailRequests + 1);
+  await expect(chrome.locator('[data-panel="harmonics"]')).toHaveCount(1);
+  await expect(chrome.locator("[data-scalar]")).toHaveCount(2);
+  await expect(chrome.locator(".lnt-w1-banner")).toBeHidden();
+  await expect(chrome.locator("[data-role=w1-sum-value]")).toContainText("панелей 1");
+  await expectNoErrorBand(page);
+});
+
+test("T8-2: обрыв SSE mid-job — честный failed(reason) из словаря, контролы разблокированы", async ({
+  page,
+}) => {
+  // Given: v1-сессия; задача анализа запущена и прошла в стадию анализа,
+  // job-busy держит контролы пары заблокированными.
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t8-break");
+  mockSessionDetail(backend, "t8-break", "v1-only/metrics.json");
+  await openW1Chrome(page, "t8-break");
+  const chrome = page.locator(".lnt-w1-chrome");
+  await expect(chrome.locator(".lnt-w1-banner")).toBeVisible();
+  await page.getByRole("button", { name: CTA }).click();
+  const rail = chrome.locator(".lnt-w1-job-rail");
+  await expect(rail.locator(".lnt-progress-text")).toHaveText("Стадия: анализ");
+  await expect(page.locator(".pair-slot[data-pair='a']")).toBeDisabled();
+
+  // When: сервер «гаснет» mid-job — SSE-поток рвётся, опрос задачи отдаёт 500.
+  await page.route(/\/api\/jobs\/[^/]+\/events$/, async (route) => {
+    await route.abort();
+  });
+  await page.route(/\/api\/jobs\/[^/]+$/, async (route) => {
+    await route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "задача недоступна" }),
+    });
+  });
+
+  // Then: подряд неудачные опросы прерывают ожидание — причина честная, из
+  // словаря задачи 3 (canned-префикс + серверный detail), busy снят, слоты живы.
+  await expect(rail.locator(".lnt-w1-job-status")).toContainText("Сервер вернул ошибку.", {
+    timeout: 20000,
+  });
+  await expect(rail.locator(".lnt-w1-job-status")).toContainText("задача недоступна");
+  await expect(page.locator(".pair-slot[data-pair='a']")).not.toBeDisabled();
+  await expectNoErrorBand(page);
+});
