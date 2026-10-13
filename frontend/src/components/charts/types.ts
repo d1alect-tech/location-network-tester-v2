@@ -30,6 +30,10 @@ export interface ChartRenderRequest {
   series: readonly ChartRenderSeries[];
   /** Вертикальные аннотации пиков (только спектр). */
   peaks?: readonly ChartPeak[];
+  /** Фиксированное окно оси X (живая развёртка): без авто-подгонки. */
+  xRange?: readonly [number, number];
+  /** Фиксированное окно оси Y: сетка стабильна между кадрами. */
+  yRange?: readonly [number, number];
 }
 
 export interface ChartHandle {

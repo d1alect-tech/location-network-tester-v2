@@ -32,7 +32,8 @@ function axis(label: string, theme: ChartTheme): uPlot.Axis {
   };
 }
 
-function scale(log: boolean | undefined): uPlot.Scale {
+function scale(log: boolean | undefined, fixed?: readonly [number, number]): uPlot.Scale {
+  if (fixed !== undefined) return { time: false, range: [fixed[0], fixed[1]] };
   if (!log) return { time: false };
   return { time: false, distr: 3, log: 10, range: LOG_RANGE };
 }
@@ -56,7 +57,7 @@ export function buildUplotOptions(ctx: UplotBuildContext): uPlot.Options {
     height,
     class: "lnt-uplot",
     series,
-    scales: { x: scale(request.xLog), y: scale(request.yLog) },
+    scales: { x: scale(request.xLog, request.xRange), y: scale(request.yLog, request.yRange) },
     axes: [axis(request.xLabel, theme), axis(request.yLabel, theme)],
     legend: {
       show: true,

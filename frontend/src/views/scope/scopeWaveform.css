@@ -1,0 +1,135 @@
+/* Живая развёртка (Todo 8, scopeWaveform): управление (В/дел общая таблица,
+ * пробник, инверсии) + фигура uPlot + статус NaN/клипа. Скоуп
+ * .lnt-scope-workspace, как scope.css; токены — рантайм v2-tokens.css,
+ * новых :root-токенов нет. Базовые .panel/.btn — scope.css (Todo 7). */
+
+.lnt-scope-workspace .lnt-scope-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.lnt-scope-workspace .lnt-scope-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: none;
+}
+
+.lnt-scope-workspace .lnt-scope-field .field-label,
+.lnt-scope-workspace .lnt-scope-check .field-label {
+  font: 600 12px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+}
+
+.lnt-scope-workspace .ctl {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-field, var(--lnt-chrome));
+  color: var(--lnt-text);
+  font: 400 14px / 20px var(--lnt-ui);
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-scope-workspace .ctl:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-scope-workspace .ctl:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -1px;
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-scope-workspace .lnt-scope-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  cursor: pointer;
+  flex: none;
+}
+
+.lnt-scope-workspace .lnt-scope-check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--lnt-accent);
+}
+
+.lnt-scope-workspace .lnt-scope-vdiv-effective {
+  font: 400 14px / 20px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--lnt-text);
+  margin: 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+/* Фигура развёртки: высоты графиков — токены charts.css, свой скоуп. */
+
+.lnt-scope-workspace .lnt-scope-figure {
+  position: relative;
+  min-width: 0;
+}
+
+.lnt-scope-workspace .lnt-scope-figure .lnt-uplot-root,
+.lnt-scope-workspace .lnt-scope-figure .lnt-uplot-host {
+  inline-size: 100%;
+  block-size: var(--lnt-chart-height-mobile);
+}
+
+@media (min-width: 768px) {
+  .lnt-scope-workspace .lnt-scope-figure .lnt-uplot-root,
+  .lnt-scope-workspace .lnt-scope-figure .lnt-uplot-host {
+    block-size: var(--lnt-chart-height-tablet);
+  }
+}
+
+@media (min-width: 1280px) {
+  .lnt-scope-workspace .lnt-scope-figure .lnt-uplot-root,
+  .lnt-scope-workspace .lnt-scope-figure .lnt-uplot-host {
+    block-size: var(--lnt-chart-height-desktop);
+  }
+}
+
+/* Статус кадра: проблема (NaN/клип) — предупреждающий бейдж (паттерн
+ * .lnt-scope-sim-badge, контраст axe-проверен в Todo 7); ожидание/пустой
+ * кадр — нейтральный текст-статус. */
+
+.lnt-scope-workspace .lnt-scope-wave-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border: 1px solid var(--lnt-warn);
+  border-radius: var(--lnt-r-pill);
+  background: var(--lnt-status-warn-bg);
+  color: var(--lnt-warn);
+  font: 600 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.02em;
+  margin: 0;
+  flex: none;
+}
+
+.lnt-scope-workspace .lnt-scope-wave-status[hidden] {
+  display: none;
+}
+
+.lnt-scope-workspace .lnt-scope-wave-status[data-wave-state="waiting"],
+.lnt-scope-workspace .lnt-scope-wave-status[data-wave-state="empty"] {
+  border-color: var(--lnt-line);
+  background: transparent;
+  color: var(--lnt-text-sec);
+  font: 400 12px / 16px var(--lnt-ui);
+}
+
+@media (max-width: 767px) {
+  .lnt-scope-workspace .lnt-scope-controls {
+    gap: 8px;
+  }
+}

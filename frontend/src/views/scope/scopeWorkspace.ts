@@ -1,10 +1,11 @@
-/** Рабочая область «Осциллограф» (#/scope, Todo 7 — скелет live-режима):
- * статус устройства (GET /api/device/state) и владения (GET /api/live/state
- * + heartbeat SSE), Run/Stop (POST с nonce; скелет шлёт зеркало дефолтов
- * InstrumentService), показания потока из кадров. Правило остановки:
- * размонтирование закрывает подписку, но НЕ останавливает захват — авто-stop
- * при выходе из группы маршрутов {scope, sa} делает AppShell
- * (client-live.LIVE_ROUTE_GROUP). */
+/** Рабочая область «Осциллограф» (#/scope, Todo 7 — скелет live-режима;
+ * Todo 8 — живая развёртка): статус устройства (GET /api/device/state) и
+ * владения (GET /api/live/state + heartbeat SSE), Run/Stop (POST с nonce;
+ * тело запуска несёт выбранные В/дел и пробник из селекторов развёртки),
+ * показания потока из кадров и рендер кадров общим uPlot-стеком
+ * (scopeWaveform). Правило остановки: размонтирование закрывает подписку,
+ * но НЕ останавливает захват — авто-stop при выходе из группы маршрутов
+ * {scope, sa} делает AppShell (client-live.LIVE_ROUTE_GROUP). */
 
 import type { LntApiClient } from "../../api/client";
 import { createDeviceApi } from "../../api/client-device";
@@ -14,6 +15,9 @@ import type { LiveStatePayload } from "../../api/types-live";
 import { DEFAULT_LIVE_START_REQUEST } from "../../api/types-live";
 import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
+import { buildScopeControls } from "./scopeControls";
+import { DEFAULT_SCOPE_SETTINGS } from "./scopeScale";
+import type { ScopeDisplaySettings } from "./scopeScale";
 import { buildScopeScreen } from "./scopeScreen";
 import {
   LIVE_STATE_TEXT,
@@ -21,12 +25,16 @@ import {
   buildScopeStatusSection,
   errorBlock,
 } from "./scopeSections";
+import { mountScopeWaveform } from "./scopeWaveform";
+import type { ScopeWaveformOptions } from "./scopeWaveform";
 import "./scope.css";
 
 export interface ScopeWorkspaceOptions {
   client: LntApiClient;
   /** Live-контур; по умолчанию — общий singleton (осциллограф + анализатор). */
   live?: LiveApi;
+  /** Шов рендера развёртки: тесты подменяют хэндл графика. */
+  waveform?: ScopeWaveformOptions;
 }
 
 function messageOf(error: unknown): string {
@@ -43,6 +51,18 @@ export function mountScopeWorkspace(
   const screen = buildScopeScreen();
   const readout = buildScopeReadoutSection();
 
+  let settings: ScopeDisplaySettings = { ...DEFAULT_SCOPE_SETTINGS };
+  const controls = buildScopeControls((next) => {
+    settings = next;
+    // Последний кадр перерисовывается под новые настройки; V/div и пробник
+    // уходят в железо со следующим Run (config на ходу меняет только триггер).
+    waveform.rerender(settings);
+  });
+  const waveform = mountScopeWaveform({
+    createView: options.waveform?.createView,
+    controls: controls.root,
+  });
+
   container.append(
     el(
       "div",
@@ -51,6 +71,7 @@ export function mountScopeWorkspace(
         el("h2", { className: "placeholder-title t-page", text: "Осциллограф" }),
         status.root,
         screen.root,
+        waveform.root,
         readout.root,
       ],
     ),
@@ -106,7 +127,14 @@ export function mountScopeWorkspace(
     updateButtons();
     clearElement(status.errorHost);
     try {
-      applyState(await live.start(DEFAULT_LIVE_START_REQUEST));
+      applyState(
+        await live.start({
+          ...DEFAULT_LIVE_START_REQUEST,
+          // V/div и пробник из селекторов развёртки; триггер — зеркало дефолтов.
+          ch1_range_v: settings.vDiv,
+          ch1_probe_multiplier: settings.probe,
+        }),
+      );
       announcePolite("Живой режим запущен");
     } catch (error) {
       showError(`Не удалось запустить живой режим: ${messageOf(error)}.`);
@@ -140,6 +168,7 @@ export function mountScopeWorkspace(
     onFrame: (frame) => {
       readout.applyFrame(frame);
       screen.applyFrame(frame);
+      waveform.applyFrame(frame, settings);
     },
     onState: applyState,
     onConnection: (kind) => {
@@ -156,5 +185,6 @@ export function mountScopeWorkspace(
     // Только подписка: авто-stop — решение AppShell по группе маршрутов.
     stream.close();
     screen.dispose();
+    waveform.destroy();
   };
 }
