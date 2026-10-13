@@ -14,6 +14,7 @@ import type { LiveStatePayload } from "../../api/types-live";
 import { DEFAULT_LIVE_START_REQUEST } from "../../api/types-live";
 import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
+import { buildScopeScreen } from "./scopeScreen";
 import {
   LIVE_STATE_TEXT,
   buildScopeReadoutSection,
@@ -39,6 +40,7 @@ export function mountScopeWorkspace(
   const live = options.live ?? sharedLiveApi();
   const device = createDeviceApi(options.client);
   const status = buildScopeStatusSection();
+  const screen = buildScopeScreen();
   const readout = buildScopeReadoutSection();
 
   container.append(
@@ -48,6 +50,7 @@ export function mountScopeWorkspace(
       [
         el("h2", { className: "placeholder-title t-page", text: "Осциллограф" }),
         status.root,
+        screen.root,
         readout.root,
       ],
     ),
@@ -134,7 +137,10 @@ export function mountScopeWorkspace(
   // Подписка до старта разрешена (routes_live.py): без захвата приходят
   // heartbeat-события со статусом владения — вкладка жива и до Run.
   const stream = live.watchFrames({
-    onFrame: (frame) => readout.applyFrame(frame),
+    onFrame: (frame) => {
+      readout.applyFrame(frame);
+      screen.applyFrame(frame);
+    },
     onState: applyState,
     onConnection: (kind) => {
       readout.connection.textContent = kind === "live" ? "передача данных" : "переподключение…";
@@ -149,5 +155,6 @@ export function mountScopeWorkspace(
   return () => {
     // Только подписка: авто-stop — решение AppShell по группе маршрутов.
     stream.close();
+    screen.dispose();
   };
 }

@@ -387,3 +387,42 @@ describe("live route group rule (Todo 7)", () => {
     expect(container.querySelector(".lnt-scope-workspace")).toBeNull();
   });
 });
+
+describe("scopeWorkspace: экран послесвечения и истории (Todo 11)", () => {
+  afterEach(() => {
+    window.localStorage.removeItem("lnt.scope.persistence");
+  });
+
+  it("SSE-кадры питают экран истории; прокрутка показывает прошлый кадр", async () => {
+    // Given: смонтированная вкладка с открытой подпиской.
+    const log: LiveLog = { starts: [], stops: 0, states: 0 };
+    const container = mountStub(log, { state: { ...IDLE } });
+    await flush();
+
+    // Панель экрана стоит между прибором и показаниями потока.
+    const screen = container.querySelector(".lnt-scope-screen");
+    expect(screen).toBeInstanceOf(HTMLElement);
+    expect(screen?.querySelector(".lnt-scope-persistence")).toBeInstanceOf(HTMLCanvasElement);
+    const toggle = screen?.querySelector("#lnt-scope-persistence-toggle") as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+
+    // When: SSE приносит три кадра.
+    const source = FakeLiveEventSource.instances[0];
+    for (const i of [10, 11, 12]) source?.emit("frame", frame(i));
+    await flush();
+
+    // Then: ползунок истории дорос до двух кадров назад, подпись — живой кадр.
+    const slider = screen?.querySelector("#lnt-scope-history") as HTMLInputElement;
+    expect(slider.max).toBe("2");
+    const note = screen?.querySelector(".lnt-scope-screen-note") as HTMLElement;
+    expect(note.textContent).toContain("кадр 12");
+
+    // When: прокрутка на два кадра назад.
+    slider.value = "2";
+    slider.dispatchEvent(new Event("input", { bubbles: true }));
+
+    // Then: экран показывает прошлый кадр 10, не живой.
+    expect(note.textContent).toContain("кадр 10");
+    expect(note.textContent).toContain("назад");
+  });
+});

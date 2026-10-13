@@ -224,6 +224,90 @@
   display: none;
 }
 
+/* ── Экран: послесвечение и история (Todo 11) ─────────────────────────── */
+
+.lnt-scope-workspace .lnt-scope-viewport {
+  position: relative;
+  height: var(--lnt-waveform-height);
+  min-width: 0;
+  background: var(--lnt-canvas);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  overflow: hidden;
+}
+
+.lnt-scope-workspace .lnt-scope-viewport canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.lnt-scope-workspace .lnt-scope-screen-note {
+  position: absolute;
+  top: 6px;
+  left: 10px;
+  margin: 0;
+  color: var(--lnt-text-sec);
+  pointer-events: none;
+}
+
+.lnt-scope-workspace .lnt-scope-screen-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Ряд тумблера — вся зона кликабельна (label[for]), тач-таргет 44px. */
+.lnt-scope-workspace .lnt-scope-screen-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--lnt-control-height);
+  cursor: pointer;
+}
+
+.lnt-scope-workspace .lnt-scope-toggle {
+  width: var(--lnt-checkbox-size);
+  height: var(--lnt-checkbox-size);
+  margin: 0;
+  accent-color: var(--lnt-accent);
+}
+
+.lnt-scope-workspace .lnt-scope-toggle-label {
+  font: 400 13px / 16px var(--lnt-ui);
+  color: var(--lnt-text);
+}
+
+.lnt-scope-workspace .lnt-scope-screen-history {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+  min-height: var(--lnt-control-height);
+}
+
+.lnt-scope-workspace .lnt-scope-history-label {
+  flex: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lnt-scope-workspace .lnt-scope-history-slider {
+  flex: 1;
+  min-width: 140px;
+  min-height: 32px;
+  margin: 0;
+  accent-color: var(--lnt-accent);
+}
+
+.lnt-scope-workspace .lnt-scope-screen-history .btn {
+  flex: none;
+}
+
 @media (max-width: 767px) {
   .lnt-scope-workspace .readout-grid {
     grid-template-columns: 1fr;
@@ -236,5 +320,9 @@
 
   .lnt-scope-workspace .panel-bd {
     padding: 8px;
+  }
+
+  .lnt-scope-workspace .lnt-scope-screen-history {
+    min-width: 0;
   }
 }
