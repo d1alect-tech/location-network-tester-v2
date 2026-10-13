@@ -9,13 +9,22 @@ import type {
   LiveFramePayload,
   LiveInstrumentState,
   LiveMode,
+  LiveStartRequest,
   LiveStatePayload,
+  LiveTrigger,
 } from "../api/types-live";
 import { type MockHttpReply, type MockHttpRequest, failure, nonceRejected, ok } from "./mockHttp";
 
 const LIVE_ALREADY_RUNNING = "живой режим уже запущен: сначала stop";
 const LIVE_NOT_RUNNING = "живой режим не запущен: сначала start";
 const LIVE_BUSY_MESSAGE = "устройство занято вкладкой";
+const AUTO_TRIGGER: LiveTrigger = {
+  level_v: 0,
+  slope: "rising",
+  source: "ch1",
+  mode: "auto",
+  auto_timeout_s: 0.2,
+};
 
 const FRAME_POINTS = 32;
 
@@ -38,30 +47,23 @@ export class LiveStore {
   readonly startedRequests: Record<string, unknown>[] = [];
   readonly stopRequests: unknown[] = [];
   readonly configRequests: Record<string, unknown>[] = [];
+  /** Действующий триггер сервиса (зеркало start/config): SINGLE в кадре. */
+  runningTrigger: LiveTrigger | null = null;
 
   statePayload(): LiveStatePayload {
     return {
       state: this.state,
       mode: this.mode,
       busy_reason: this.state === "running" ? LIVE_BUSY_MESSAGE : null,
-      trigger:
-        this.state === "running"
-          ? {
-              level_v: 0,
-              slope: "rising",
-              source: "ch1",
-              mode: "auto",
-              auto_timeout_s: 0.2,
-            }
-          : null,
+      trigger: this.state === "running" ? (this.runningTrigger ?? AUTO_TRIGGER) : null,
     };
   }
 
-  private framePayload(): LiveFramePayload {
+  private framePayload(single: boolean): LiveFramePayload {
     this.frameIndex += 1;
     return {
       frame_index: this.frameIndex,
-      triggered: this.frameIndex % 2 === 0,
+      triggered: single || this.frameIndex % 2 === 0,
       emitted_at_s: this.frameIndex / 30,
       dropped_samples: 0,
       skipped_frames: 0,
@@ -74,14 +76,19 @@ export class LiveStore {
     };
   }
 
-  /** Тело SSE-потока: heartbeat статуса + кадры, пока идёт захват. */
+  /** Тело SSE-потока: heartbeat статуса + кадры, пока идёт захват.
+   * SINGLE — контракт InstrumentService: ровно один сработавший кадр,
+   * затем прибор освобождён (state=stopped); дальше только heartbeat. */
   private framesBody(): string {
     let body = "retry: 150\n\n";
     body += `event: heartbeat\ndata: ${JSON.stringify(this.statePayload())}\n\n`;
-    for (let i = 0; i < this.framesPerResponse && this.state === "running"; i += 1) {
-      const frame = this.framePayload();
+    const single = this.state === "running" && this.runningTrigger?.mode === "single";
+    const limit = single ? 1 : this.framesPerResponse;
+    for (let i = 0; i < limit && this.state === "running"; i += 1) {
+      const frame = this.framePayload(single);
       body += `event: frame\nid: ${frame.frame_index}\ndata: ${JSON.stringify(frame)}\n\n`;
     }
+    if (single) this.state = "stopped";
     return body;
   }
 
@@ -93,6 +100,7 @@ export class LiveStore {
       if (!request.nonceOk) return nonceRejected();
       if (this.state === "running") return failure(409, { detail: LIVE_ALREADY_RUNNING });
       this.startedRequests.push(request.bodyJson<Record<string, unknown>>());
+      this.runningTrigger = request.bodyJson<LiveStartRequest>().trigger ?? null;
       this.state = "running";
       return ok(this.statePayload());
     }
@@ -100,12 +108,14 @@ export class LiveStore {
       if (!request.nonceOk) return nonceRejected();
       this.stopRequests.push(request.bodyJson<Record<string, unknown>>());
       this.state = "stopped";
+      this.runningTrigger = null;
       return ok(this.statePayload());
     }
     if (path === "/api/live/config" && method === "POST") {
       if (!request.nonceOk) return nonceRejected();
       if (this.state !== "running") return failure(409, { detail: LIVE_NOT_RUNNING });
       this.configRequests.push(request.bodyJson<Record<string, unknown>>());
+      this.runningTrigger = request.bodyJson<LiveTrigger>();
       return ok(this.statePayload());
     }
     if (path === "/api/live/frames" && method === "GET") {

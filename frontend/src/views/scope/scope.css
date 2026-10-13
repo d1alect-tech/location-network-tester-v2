@@ -224,6 +224,87 @@
   display: none;
 }
 
+/* ── Триггер-панель и частота дискретизации (Todo 9) ──────────────────── */
+
+.lnt-scope-workspace .lnt-scope-field-label {
+  font: 600 12px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+}
+
+.lnt-scope-workspace .lnt-scope-trig-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+/* Сегментные группы (паттерн gram-mode[aria-pressed], kit.css §2):
+ * тач-таргет 44px, выбор — акцентная подложка, фокус — общий :focus-visible. */
+.lnt-scope-workspace .lnt-scope-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lnt-scope-workspace .lnt-scope-seg-btn {
+  min-height: var(--lnt-control-height);
+  padding: 0 12px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-elev);
+  color: var(--lnt-text-sec);
+  font: 600 13px / 16px var(--lnt-ui);
+  cursor: pointer;
+  transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
+    var(--lnt-ease);
+}
+
+.lnt-scope-workspace .lnt-scope-seg-btn:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-scope-workspace .lnt-scope-seg-btn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--lnt-accent) 22%, var(--lnt-elev));
+  border-color: var(--lnt-accent);
+  color: var(--lnt-text);
+}
+
+/* Поле уровня: те же контуры, что .ctl развёртки, но таргет 44px. */
+.lnt-scope-workspace .lnt-scope-ctl {
+  width: 100%;
+  min-height: var(--lnt-control-height);
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-field, var(--lnt-chrome));
+  color: var(--lnt-text);
+  font: 400 14px / 20px var(--lnt-ui);
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.lnt-scope-workspace .lnt-scope-ctl:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-scope-workspace .lnt-scope-ctl[aria-invalid="true"] {
+  border-color: var(--lnt-err);
+}
+
+/* Ошибка уровня (role=alert): тон err светлее текста — контраст на панели
+ * выше 4.5:1, чистый --lnt-err на --lnt-panel даёт 4.2:1. */
+.lnt-scope-workspace .lnt-scope-error-text {
+  font: 400 12px / 16px var(--lnt-ui);
+  color: color-mix(in srgb, var(--lnt-err) 60%, var(--lnt-text));
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  .lnt-scope-workspace .lnt-scope-trig-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Экран: послесвечение и история (Todo 11) ─────────────────────────── */
 
 .lnt-scope-workspace .lnt-scope-viewport {

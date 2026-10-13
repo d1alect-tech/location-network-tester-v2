@@ -1,23 +1,25 @@
 /** Рабочая область «Осциллограф» (#/scope, Todo 7 — скелет live-режима;
- * Todo 8 — живая развёртка): статус устройства (GET /api/device/state) и
- * владения (GET /api/live/state + heartbeat SSE), Run/Stop (POST с nonce;
- * тело запуска несёт выбранные В/дел и пробник из селекторов развёртки),
- * показания потока из кадров и рендер кадров общим uPlot-стеком
- * (scopeWaveform). Правило остановки: размонтирование закрывает подписку,
- * но НЕ останавливает захват — авто-stop при выходе из группы маршрутов
- * {scope, sa} делает AppShell (client-live.LIVE_ROUTE_GROUP). */
+ * Todo 8 — живая развёртка; Todo 9 — триггер-панель AUTO/NORMAL/SINGLE и
+ * rate-селектор): статус устройства (GET /api/device/state) и владения
+ * (GET /api/live/state + heartbeat SSE), Run/Stop (POST с nonce; тело
+ * запуска несёт выбранные В/дел, пробник, частоту и триггер), показания
+ * потока из кадров и рендер кадров общим uPlot-стеком (scopeWaveform).
+ * Правило остановки: размонтирование закрывает подписку, но НЕ останавливает
+ * захват — авто-stop при выходе из группы маршрутов {scope, sa} делает
+ * AppShell (client-live.LIVE_ROUTE_GROUP). */
 
 import type { LntApiClient } from "../../api/client";
 import { createDeviceApi } from "../../api/client-device";
 import { sharedLiveApi } from "../../api/client-live";
 import type { LiveApi } from "../../api/client-live";
-import type { LiveStatePayload } from "../../api/types-live";
+import type { LiveStatePayload, LiveTrigger } from "../../api/types-live";
 import { DEFAULT_LIVE_START_REQUEST } from "../../api/types-live";
 import { createUplotView } from "../../components/charts/uplotView";
 import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { buildScopeControls } from "./scopeControls";
 import { buildScopeCursorSection } from "./scopeCursorSection";
+import { buildScopeRateField } from "./scopeRateField";
 import { DEFAULT_SCOPE_SETTINGS } from "./scopeScale";
 import type { ScopeDisplaySettings } from "./scopeScale";
 import { buildScopeScreen } from "./scopeScreen";
@@ -28,6 +30,7 @@ import {
   buildScopeStatusSection,
   errorBlock,
 } from "./scopeSections";
+import { buildScopeTriggerSection } from "./scopeTrigger";
 import { mountScopeWaveform } from "./scopeWaveform";
 import type { ScopeWaveformOptions } from "./scopeWaveform";
 import "./scope.css";
@@ -50,7 +53,17 @@ export function mountScopeWorkspace(
 ): () => void {
   const live = options.live ?? sharedLiveApi();
   const device = createDeviceApi(options.client);
-  const status = buildScopeStatusSection();
+  // Триггер-панель (Todo 9) держит стейджинг до старта; на ходу изменения
+  // уходят конфигом. Частота — тоже настройка запуска: слот в панели «Прибор».
+  const rateField = buildScopeRateField();
+  const triggerPanel = buildScopeTriggerSection({
+    onTriggerChange: (trigger) => {
+      // Живой захват — триггер применяется на ходу (POST /api/live/config);
+      // без захвата панель просто стейджится до следующего Run.
+      if (lastState?.state === "running") void configTrigger(trigger);
+    },
+  });
+  const status = buildScopeStatusSection({ rateField: rateField.root });
   const screen = buildScopeScreen();
   const cursors = buildScopeCursorSection();
   const measure = buildScopeMeasureSection();
@@ -81,6 +94,7 @@ export function mountScopeWorkspace(
       [
         el("h2", { className: "placeholder-title t-page", text: "Осциллограф" }),
         status.root,
+        triggerPanel.root,
         screen.root,
         waveform.root,
         cursors.root,
@@ -94,6 +108,8 @@ export function mountScopeWorkspace(
   let lastState: LiveStatePayload | null = null;
   /** Порог фронта для измерений: уровень триггера, пока его источник CH1. */
   let triggerLevelV: number | null = null;
+  /** SINGLE: подтверждение остановки уже отправлено (защита от повторов). */
+  let singleStopSent = false;
 
   function updateButtons(): void {
     const running = lastState?.state === "running";
@@ -110,6 +126,11 @@ export function mountScopeWorkspace(
     status.simBadge.hidden = state.mode !== "sim";
     status.busyLine.hidden = state.busy_reason === null;
     if (state.busy_reason !== null) status.busyLine.textContent = state.busy_reason;
+    // Истина сервиса о триггере — только при живом захвате: остановленный
+    // прибор не затирает стейджинг панели (SINGLE остаётся выбранным к повтору).
+    if (state.state === "running" && state.trigger !== null) {
+      triggerPanel.paintTrigger(state.trigger);
+    }
     updateButtons();
   }
 
@@ -140,6 +161,14 @@ export function mountScopeWorkspace(
   }
 
   async function runLive(): Promise<void> {
+    // Невалидный уровень не уходит на сервер: честная ошибка до пуска, POST нет.
+    const levelError = triggerPanel.validationError();
+    if (levelError !== null) {
+      showError(`Запуск отклонён: ${levelError}`);
+      triggerPanel.focusLevel();
+      return;
+    }
+    singleStopSent = false;
     busy = true;
     updateButtons();
     clearElement(status.errorHost);
@@ -147,9 +176,12 @@ export function mountScopeWorkspace(
       applyState(
         await live.start({
           ...DEFAULT_LIVE_START_REQUEST,
-          // V/div и пробник из селекторов развёртки; триггер — зеркало дефолтов.
+          // V/div и пробник из селекторов развёртки; частота и триггер —
+          // из панели Todo 9 (стейджинг до старта, конфиг на ходу).
           ch1_range_v: settings.vDiv,
           ch1_probe_multiplier: settings.probe,
+          sample_rate_hz: rateField.rateHz(),
+          trigger: triggerPanel.getTrigger(),
         }),
       );
       announcePolite("Живой режим запущен");
@@ -176,6 +208,16 @@ export function mountScopeWorkspace(
     }
   }
 
+  /** Триггер на ходу (POST /api/live/config): захват не перезапускается. */
+  async function configTrigger(trigger: LiveTrigger): Promise<void> {
+    clearElement(status.errorHost);
+    try {
+      applyState(await live.updateTrigger(trigger));
+    } catch (error) {
+      showError(`Не удалось применить триггер: ${messageOf(error)}.`);
+    }
+  }
+
   status.runButton.addEventListener("click", () => void runLive());
   status.stopButton.addEventListener("click", () => void stopLive());
 
@@ -188,6 +230,16 @@ export function mountScopeWorkspace(
       waveform.applyFrame(frame, settings);
       cursors.applyFrame(frame);
       measure.applyFrame(frame, triggerLevelV);
+      // SINGLE: сервер отпускает прибор после кадра — панель подтверждает
+      // остановку явным stop-ом (идемпотентно), ровно один раз.
+      if (
+        lastState?.state === "running" &&
+        lastState.trigger?.mode === "single" &&
+        !singleStopSent
+      ) {
+        singleStopSent = true;
+        void stopLive();
+      }
     },
     onState: applyState,
     onConnection: (kind) => {

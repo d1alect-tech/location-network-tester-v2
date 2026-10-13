@@ -38,7 +38,13 @@ export interface ScopeStatusView {
   readonly stopButton: HTMLButtonElement;
 }
 
-export function buildScopeStatusSection(): ScopeStatusView {
+export interface ScopeStatusOptions {
+  /** Слот rate-селектора (scopeRateField, Todo 9): панель «Прибор» только
+   * монтирует узел — слушатели и стейджинг живут в самом поле/workspace. */
+  rateField?: HTMLElement;
+}
+
+export function buildScopeStatusSection(options: ScopeStatusOptions = {}): ScopeStatusView {
   const deviceHost = el("div", {
     className: "lnt-scope-device",
     attrs: { role: "status" },
@@ -64,18 +70,20 @@ export function buildScopeStatusSection(): ScopeStatusView {
   stopButton.disabled = true;
   const errorHost = el("div", { className: "lnt-scope-error-host" });
 
+  const stateRow = el("div", { className: "lnt-scope-state-row" }, [stateLine, simBadge]);
+  const actions = el("div", { className: "form-actions" }, [runButton, stopButton]);
+  const body: Node[] = [deviceHost, stateRow, busyLine];
+  // Частота дискретизации — настройка запуска прибора: рядом с Run/Stop,
+  // стейджится на следующий старт (на ходу частота не меняется).
+  if (options.rateField !== undefined) body.push(options.rateField);
+  body.push(actions, errorHost);
+
   return {
     root: el("section", { className: "panel lnt-scope-section lnt-scope-status" }, [
       el("div", { className: "panel-hd" }, [
         el("h3", { className: "panel-title", text: "Прибор" }),
       ]),
-      el("div", { className: "panel-bd" }, [
-        deviceHost,
-        el("div", { className: "lnt-scope-state-row" }, [stateLine, simBadge]),
-        busyLine,
-        el("div", { className: "form-actions" }, [runButton, stopButton]),
-        errorHost,
-      ]),
+      el("div", { className: "panel-bd" }, body),
     ]),
     deviceHost,
     stateLine,
