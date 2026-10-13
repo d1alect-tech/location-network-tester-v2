@@ -92,6 +92,17 @@ export async function mountInspectV6(
   const analysisBand = createAnalysisBand();
   analysisBand.update({ meters: [...EMPTY_METERS], peaks: [] });
   analysisBand.paintDelta(null, null);
+  analysisBand.paintPeaksDelta(null, null);
+  // Задача 10 (D3): Δ-семейство (пики таблицы, Δ-полоса, Δср пары) считается
+  // из пейлоадов ОТОБРАЖАЕМОЙ плоскости — тот же провод, что кормит соседний
+  // график (onPayloads панели), а не отдельный scope-фетч ленты. Смена
+  // плоскости перезабирает Δ тем же каналом; payload отсутствует — честное
+  // «—» + причина из словаря задачи 3, без scope-plane fallback.
+  signalSection.onPayloads((a, b, reason) => {
+    analysisBand.paintPeaksDelta(a, b, reason);
+    analysisBand.paintDelta(a, b);
+    pairbar.setDelta(b === null ? null : summarizeDelta(a?.psd_v2_per_hz, b.psd_v2_per_hz));
+  });
   const extras = createV6Extras({
     client,
     createView: opts.createView,
@@ -156,22 +167,17 @@ export async function mountInspectV6(
     paintChannelbarFromPayload(channelbar, null, null);
     analysisBand.update({ meters: [...EMPTY_METERS], peaks: [] });
     analysisBand.paintDelta(null, null);
+    analysisBand.paintPeaksDelta(null, null);
     extras.setPair(null, null);
     try {
       const [, bandData] = await Promise.all([
         signalSection.setPair(a, b),
-        loadAnalysisBand(client, a, b, pairController.signal, detailStore.load),
+        loadAnalysisBand(client, a, pairController.signal, detailStore.load),
       ]);
       if (disposed || gen !== pairGeneration) return;
       analysisBand.update(bandData);
       const payloads = signalSection.payloads();
-      analysisBand.paintDelta(payloads.a, payloads.b);
       paintChannelbarFromPayload(channelbar, payloads.a, cyclesFromMeters(bandData.meters));
-      pairbar.setDelta(
-        payloads.b === null
-          ? null
-          : summarizeDelta(payloads.a?.psd_v2_per_hz, payloads.b.psd_v2_per_hz),
-      );
       extras.setPair(a, b);
     } catch (error) {
       if (disposed || gen !== pairGeneration || isAbortError(error)) return;

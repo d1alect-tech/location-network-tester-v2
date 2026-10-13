@@ -12,3 +12,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Задача 10 (D3): причина отсутствия Δ у таблицы пиков — тот же видимый
+ * соседний узел, но в шапке таблицы (.band-peaks), НЕ внутри td.delta:
+ * пиннутое значение ячейки «—» байт-в-байт не меняется. Токены те же. */
+.app-v6 .band-peaks .band-cell-reason {
+  font: 400 11px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

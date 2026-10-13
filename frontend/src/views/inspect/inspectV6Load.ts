@@ -1,8 +1,6 @@
-import type { SessionDetailPayload, SpectrumPayload } from "../../api/types-plots";
-import type { Meter, PeakRow } from "./analysisBand";
-import { metersFromDetail } from "./analysisBand";
+import type { SessionDetailPayload } from "../../api/types-plots";
+import { type Meter, type PeakRow, metersFromDetail } from "./analysisBand";
 import type { DetailLoader } from "./pairDetail";
-import { peakDeltas } from "./peaksDelta";
 import { isRecord } from "./w1Parse";
 
 export type AnalysisBandClient = {
@@ -11,11 +9,6 @@ export type AnalysisBandClient = {
       name: string,
       options?: { readonly signal?: AbortSignal },
     ) => Promise<SessionDetailPayload>;
-    spectrum: (
-      name: string,
-      maxPoints?: number,
-      options?: { readonly signal?: AbortSignal },
-    ) => Promise<SpectrumPayload>;
   };
 };
 
@@ -65,10 +58,13 @@ function withDelta(peak: ParsedPeak, deltaDb: number | null): PeakRow {
   };
 }
 
+/** Загрузка ленты анализа (задача 10/D3): метры и пики из detail базы.
+ * Δ пиков больше НЕ считается отдельным scope-фетчем — его кормит лента из
+ * пейлоадов отображаемой плоскости (panel payloads, onPayloads), чтобы Δ
+ * всегда был из той же плоскости, что график рядом. */
 export async function loadAnalysisBand(
   client: AnalysisBandClient,
   a: string,
-  b: string | null,
   signal?: AbortSignal,
   detail?: DetailLoader,
 ): Promise<{ meters: Meter[]; peaks: PeakRow[] }> {
@@ -77,16 +73,5 @@ export async function loadAnalysisBand(
   const payload = await loadDetail(a, { signal });
   const meters = metersFromDetail(payload);
   const parsed = peaksFromAnalysis(payload);
-  if (b === null) {
-    return { meters, peaks: parsed.map((peak) => withDelta(peak, null)) };
-  }
-  const [specA, specB] = await Promise.all([
-    client.plots.spectrum(a, undefined, { signal }),
-    client.plots.spectrum(b, undefined, { signal }),
-  ]);
-  const deltas = peakDeltas(specA.frequency_hz, specA.psd_v2_per_hz, specB.psd_v2_per_hz, parsed);
-  return {
-    meters,
-    peaks: parsed.map((peak, index) => withDelta(peak, deltas[index]?.deltaDb ?? null)),
-  };
+  return { meters, peaks: parsed.map((peak) => withDelta(peak, null)) };
 }

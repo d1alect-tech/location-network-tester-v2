@@ -14,6 +14,7 @@ import type {
   SpectrumHeaderParts,
   SpectrumPanelClient,
   SpectrumPanelHandle,
+  SpectrumPayloadsListener,
 } from "./spectrumPanelV6";
 import { createSpectrumPanel } from "./spectrumPanelV6";
 
@@ -22,6 +23,8 @@ export type SpectrumGramClient = SpectrumPanelClient & GramPairClient;
 export type SpectrumGramSectionHandle = InspectSection & {
   setPair(a: string | null, b: string | null): Promise<void>;
   payloads(): { readonly a: SpectrumPayload | null; readonly b: SpectrumPayload | null };
+  /** Задача 10 (D3): провод пейлоадов отображаемой плоскости к Δ-потребителям. */
+  onPayloads(cb: SpectrumPayloadsListener): void;
 };
 
 export type SpectrumGramSectionOpts = {
@@ -110,6 +113,9 @@ export function createSpectrumGramSection(
       replayEnter();
     },
     payloads: () => panel.payloads(),
+    onPayloads(cb) {
+      panel.onPayloads(cb);
+    },
     destroy() {
       gram.dispose();
       panel.destroy();
