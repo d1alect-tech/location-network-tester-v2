@@ -8,9 +8,18 @@ import type {
   CatalogSession,
   ContextResponse,
   ContextUpdateRequest,
+  LegacySessionItem,
   ProfileRevision,
 } from "../api/types";
-import { contextFor, defaultProfiles, generateSessions } from "./catalogFixture";
+import {
+  type CorpusRow,
+  contextFor,
+  corpusCatalogEntries,
+  corpusLegacySessions,
+  corpusRows,
+  defaultProfiles,
+  generateSessions,
+} from "./catalogFixture";
 import { type MockHttpReply, type MockHttpRequest, nonceRejected, notFound, ok } from "./mockHttp";
 
 export interface CatalogFilters {
@@ -26,6 +35,9 @@ export interface CatalogFilters {
 export class CatalogStore {
   readonly sessions: CatalogSession[];
   private readonly storagePaths = new Map<string, string>();
+  /** Путь хранения по идентичности строки: у сиблингов duplicate_id один id. */
+  private readonly rowPaths = new Map<CatalogSession, string>();
+  private legacyRows: LegacySessionItem[] = [];
   private readonly contexts = new Map<string, ContextResponse>();
   private profilesStore: ProfileRevision[];
   /** Сессии, для которых следующий PUT вернёт 409 (конкурентная правка). */
@@ -44,6 +56,8 @@ export class CatalogStore {
   seedCatalog(items: CatalogSession[]): void {
     this.sessions.length = 0;
     this.storagePaths.clear();
+    this.rowPaths.clear();
+    this.legacyRows = [];
     for (const session of items) {
       this.sessions.push(session);
       this.storagePaths.set(session.id, `/sessions/${session.id}`);
@@ -62,6 +76,29 @@ export class CatalogStore {
       tags: [...context.tags, "конкурент"],
     });
     this.conflictQueue.add(sessionId);
+  }
+
+  /** Сидит корпус-фикстуру (ui-refactor-3 задача 1): строки каталога, их пути
+   * хранения и legacy-ряды /api/sessions. Каталог без разбирающегося манифеста
+   * контекста не получает: его строка ключуется именем каталога. */
+  seedCorpus(rows: readonly CorpusRow[] = corpusRows()): void {
+    this.sessions.length = 0;
+    this.storagePaths.clear();
+    this.rowPaths.clear();
+    this.legacyRows = corpusLegacySessions(rows);
+    for (const entry of corpusCatalogEntries(rows)) {
+      this.sessions.push(entry.session);
+      this.rowPaths.set(entry.session, entry.storagePath);
+      if (entry.row.sessionId === null || entry.row.manifestError !== null) continue;
+      if (!this.contexts.has(entry.row.sessionId)) {
+        this.contexts.set(entry.row.sessionId, contextFor(entry.session));
+      }
+    }
+  }
+
+  /** Ряды legacy GET /api/sessions: ключи — ИМЕНА КАТАЛОГОВ (sessions.py:58-104). */
+  legacySessions(): LegacySessionItem[] {
+    return this.legacyRows.map((row) => ({ ...row }));
   }
 
   catalog(searchParams: URLSearchParams): CatalogPage {
@@ -111,16 +148,36 @@ export class CatalogStore {
       });
       if (start === -1) start = 0;
     }
-    const items = matched.slice(start, start + pageSize);
-    const last = items.at(-1);
+    const pageRows = matched.slice(start, start + pageSize);
+    const includePaths = includePathsRequested(searchParams);
+    const last = pageRows.at(-1);
     const hasMore = start + pageSize < matched.length;
     return {
-      items,
+      items: pageRows.map((session) => this.projectRow(session, includePaths)),
       next_cursor:
-        hasMore && last
-          ? encodeCursor(last.created_utc, last.id, this.storagePaths.get(last.id) ?? "/")
-          : null,
+        hasMore && last ? encodeCursor(last.created_utc, last.id, this.cursorPathFor(last)) : null,
     };
+  }
+
+  /** include_paths повторяет routes_catalog.py:94: путь хранения виден только по
+   * явному запросу. Реальный бэкенд отдаёт ключ с null; мок без запроса ключ НЕ
+   * добавляет, а явно сидированный storage_path строки не затирает: существующие
+   * deep-equal спеки целы, а потребитель читает `storage_path ?? id` одинаково
+   * для null и undefined. */
+  private projectRow(session: CatalogSession, includePaths: boolean): CatalogSession {
+    if (!includePaths || "storage_path" in session) return session;
+    return { ...session, storage_path: this.storagePathFor(session) };
+  }
+
+  private storagePathFor(session: CatalogSession): string {
+    return (
+      this.rowPaths.get(session) ?? this.storagePaths.get(session.id) ?? `/sessions/${session.id}`
+    );
+  }
+
+  /** Компонент keyset-курсора: у корпуса-фикстуры путь зависит от строки. */
+  private cursorPathFor(session: CatalogSession): string {
+    return this.rowPaths.get(session) ?? this.storagePaths.get(session.id) ?? "/";
   }
 
   getContext(sessionId: string): ContextResponse | null {
@@ -193,6 +250,13 @@ export class CatalogStore {
   }
 }
 
+/** Парсинг bool query-параметра как в FastAPI (models_catalog.py:78). */
+function includePathsRequested(searchParams: URLSearchParams): boolean {
+  const raw = searchParams.get("include_paths");
+  if (raw === null) return false;
+  return ["true", "1", "yes", "on"].includes(raw.trim().toLowerCase());
+}
+
 export function encodeCursor(
   createdUtc: string | null,
   sessionId: string,
@@ -211,6 +275,11 @@ function decodeCursor(raw: string): [string | null, string, string] {
 /** Маршруты каталога/контекста/профилей; null — не наш путь. */
 export function handleCatalog(store: CatalogStore, request: MockHttpRequest): MockHttpReply | null {
   const { method, path } = request;
+  // Legacy-список дисковых сессий (routes_sessions.py:120 → sessions_payload):
+  // ключи — ИМЕНА КАТАЛОГОВ, include_paths здесь не поддерживается.
+  if (path === "/api/sessions" && method === "GET") {
+    return ok({ sessions: store.legacySessions() });
+  }
   if (path === "/api/catalog/sessions" && method === "GET") {
     return ok(store.catalog(request.searchParams));
   }

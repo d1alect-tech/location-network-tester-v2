@@ -13,6 +13,15 @@ import type { Page, Route } from "@playwright/test";
 import type { CatalogSession } from "../api/types";
 import type { DeviceStateValue } from "../api/types-device";
 import type { JobSnapshot } from "../api/types-jobs";
+import {
+  CORPUS_V2_ARTIFACT_KEY,
+  type CorpusRow,
+  corpusAmbiguousSessionIds,
+  corpusDetailBlindDirs,
+  corpusDetails,
+  corpusRows,
+  corpusV2Dir,
+} from "./catalogFixture";
 import { CatalogStore, handleCatalog } from "./mockCatalogStore";
 import { buildPreflight, devicePayload } from "./mockDevice";
 import { BUILD_ID, type FixtureSession, NONCE, researchSessions } from "./mockGolden";
@@ -27,6 +36,8 @@ export interface MockBackendOptions {
   /** Размер генерируемого каталога (0 — только research-сессии). */
   catalogSize?: number;
   catalogSeed?: number;
+  /** Корпус-фикстура (задача 1): `true` — corpusRows(), массив — свои строки. */
+  corpus?: readonly CorpusRow[] | true;
 }
 
 interface ArtifactSeed {
@@ -59,6 +70,10 @@ export class MockLntBackend {
     { recipe_id?: string; artifact_key: string } | null
   >();
   private readonly artifacts = new Map<string, ArtifactSeed>();
+  /** session_id более чем одного каталога корпуса: detail/spectrum дают 409. */
+  private readonly ambiguousIds = new Set<string>();
+  /** Каталоги корпуса без валидного манифеста: detail-200 невозможен (404). */
+  private readonly detailBlindDirs = new Set<string>();
 
   constructor(options: MockBackendOptions = {}) {
     this.deviceState = options.deviceState ?? "ready";
@@ -68,7 +83,26 @@ export class MockLntBackend {
       const generated = new CatalogStore(size, options.catalogSeed ?? 39);
       this.catalog.seedCatalog([...generated.sessions]);
     }
+    if (options.corpus) {
+      this.seedCorpus(options.corpus === true ? corpusRows() : options.corpus);
+    }
     this.researchSessions = researchSessions();
+  }
+
+  /** Корпус-фикстура (ui-refactor-3 задача 1): строки каталога с storage_path
+   * на include_paths, legacy-ряды /api/sessions по именам каталогов и честные
+   * detail-флаги (analysis:null + false-пермутации). Неоднозначный session_id
+   * даёт 409, каталог без валидного манифеста — 404: fabricated-200 из
+   * catalog-fallback здесь не проходит (зеркало api_support.py:32-36). */
+  seedCorpus(rows: readonly CorpusRow[] = corpusRows()): void {
+    this.catalog.seedCorpus(rows);
+    this.ambiguousIds.clear();
+    for (const id of corpusAmbiguousSessionIds(rows)) this.ambiguousIds.add(id);
+    this.detailBlindDirs.clear();
+    for (const dir of corpusDetailBlindDirs(rows)) this.detailBlindDirs.add(dir);
+    for (const [key, payload] of corpusDetails(rows)) this.details.set(key, payload);
+    const v2Dir = corpusV2Dir(rows);
+    if (v2Dir !== null) this.seedAnalysisPointer(v2Dir, { artifact_key: CORPUS_V2_ARTIFACT_KEY });
   }
 
   // ---- хуки спек (имена сохранены от трёх старых моков) ----
@@ -181,6 +215,9 @@ export class MockLntBackend {
     }
     const catalogItem = this.catalog.sessions.find((item) => item.id === id);
     if (catalogItem) {
+      // Каталог корпуса без валидного манифеста: detail-200 невозможен
+      // (payloads.py:71-73 читает манифест), fabricated-ответ был бы ложью.
+      if (this.detailBlindDirs.has(id)) return null;
       return {
         name: catalogItem.id,
         manifest: {},
@@ -234,6 +271,9 @@ export class MockLntBackend {
     if (sessionMatch) {
       const id = decodeURIComponent(sessionMatch[1] ?? "");
       const suffix = sessionMatch[2] ?? "";
+      // Неоднозначный session_id: реальный сервер отвечает 409 на любом
+      // Inspect-эндпоинте (api_support.py:32-36); имя каталога резолвится однозначно.
+      if (method === "GET" && this.ambiguousIds.has(id)) return ambiguousSession();
       if (suffix === "" && method === "GET") {
         const detail = this.sessionDetail(id);
         return detail
@@ -261,6 +301,7 @@ export class MockLntBackend {
     );
     if (pointerMatch && method === "GET") {
       const id = decodeURIComponent(pointerMatch[1] ?? "");
+      if (this.ambiguousIds.has(id)) return ambiguousSession();
       const pointer = this.pointers.get(id) ?? null;
       if (!pointer) return { status: 404, body: { detail: "нет указателя" } };
       return {
@@ -272,6 +313,9 @@ export class MockLntBackend {
       path,
     );
     if (artifactMatch && method === "GET") {
+      if (this.ambiguousIds.has(decodeURIComponent(artifactMatch[1] ?? ""))) {
+        return ambiguousSession();
+      }
       const key = `${decodeURIComponent(artifactMatch[1] ?? "")}/${decodeURIComponent(artifactMatch[2] ?? "")}/${decodeURIComponent(artifactMatch[3] ?? "")}`;
       const seed = this.artifacts.get(key);
       if (!seed) return { status: 404, body: { detail: "not found" } };
@@ -316,6 +360,11 @@ export class MockLntBackend {
     }
     await route.fulfill(toFulfill(reply));
   }
+}
+
+/** 409 неоднозначности: зеркало api_support.py:32-36 (SessionAmbiguousError). */
+function ambiguousSession(): MockHttpReply {
+  return { status: 409, body: { detail: "идентификатор сессии неоднозначен" } };
 }
 
 function toFulfill(reply: MockHttpReply): Parameters<Route["fulfill"]>[0] {
