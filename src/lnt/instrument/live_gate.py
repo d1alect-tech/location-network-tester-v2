@@ -36,6 +36,7 @@ from lnt.instrument.frames import (
     DEFAULT_MAX_BUFFERED_BLOCKS,
     UNSTABLE_LEAD_SAMPLES,
 )
+from lnt.instrument.sa import SaEngine
 from lnt.instrument.service import (
     DEFAULT_CH1_RANGE_V,
     DEFAULT_SAMPLE_RATE_HZ,
@@ -156,11 +157,19 @@ class LiveCaptureGate:
         self._lock: Final = RLock()
         self._service: InstrumentService | None = None
         self._mode: Final = mode
+        # Живой SA-контур: конфигурация и кольцо живут здесь, пересчёт на свип
+        # гоняет SSE-контур панели (владелец потока), а не гейт.
+        self._spectrum: Final = SaEngine()
 
     @property
     def mode(self) -> LiveMode:
         """Происхождение отсчётов потока: объявлено при сборке гейта."""
         return self._mode
+
+    @property
+    def spectrum(self) -> SaEngine:
+        """Живой SA-контур: конфигурация и кольцо потока (см. ``instrument/sa``)."""
+        return self._spectrum
 
     @property
     def service(self) -> InstrumentService | None:
@@ -203,6 +212,10 @@ class LiveCaptureGate:
             blockers = self._blockers(config)
             if blockers:
                 raise LivePreflightBlockedError(blockers)
+            # SA-контур перезапускается вместе с захватом: кольцо пустое, конфигурация
+            # сброшена (как триггер), подписка одна — кадры не задваиваются по стримам.
+            self._spectrum.reset()
+            service.subscribe(self._spectrum.offer)
             service.start()
             self._service = service
             return service

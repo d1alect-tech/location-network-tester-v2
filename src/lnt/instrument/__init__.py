@@ -7,7 +7,8 @@
 для работы без железа и без ``sleep`` в тестах, а ``LiveCaptureGate`` —
 preflight-гейт live-старта и владение прибором для job-захвата (409, пока
 вкладка держит ручку); ``LiveMode`` — объявленное при сборке гейта
-происхождение отсчётов (real/sim).
+происхождение отсчётов (real/sim), а ``SaConfig``/``SaEngine`` — живой
+SA-контур: конфигурация, кольцо потока и пересчёт спектра на свип.
 """
 
 from .fake_scope import FakeHantekScope, ManualClock
@@ -21,6 +22,7 @@ from .live_gate import (
     LivePreflightBlockedError,
     LiveStartConfig,
 )
+from .sa import SaConfig, SaEngine, SaTrace
 from .service import InstrumentService, InstrumentState
 from .trigger import (
     DEFAULT_AUTO_TIMEOUT_S,
@@ -47,6 +49,9 @@ __all__ = [
     "LivePreflightBlockedError",
     "LiveStartConfig",
     "ManualClock",
+    "SaConfig",
+    "SaEngine",
+    "SaTrace",
     "TriggerConfig",
     "TriggerMode",
     "TriggerSlope",
