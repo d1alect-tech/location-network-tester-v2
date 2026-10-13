@@ -1,0 +1,22 @@
+/* Причина отсутствия analysis-v2 (задача 7, G1/Q3 = A): сиблинг счётчика
+ * сводки в самой <summary> — виден без раскрытия, счётчик не перезаписывается.
+ * Палитра — warn-чипы честного отсутствия; v6.css не растёт (отдельный файл). */
+
+.app-v6 .av2-sum-reason {
+  flex: none;
+  max-inline-size: 50%;
+  padding: 1px var(--lnt-space-2);
+  background-color: var(--lnt-status-warn-bg);
+  border: 1px solid var(--lnt-status-warn);
+  border-radius: var(--lnt-radius-status);
+  color: var(--lnt-text-sec);
+  font: 400 12px / 16px var(--lnt-ui);
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+/* Авторский display перекрыл бы UA-скрытие [hidden] — гасим явно. */
+.app-v6 .av2-sum-reason[hidden] {
+  display: none;
+}

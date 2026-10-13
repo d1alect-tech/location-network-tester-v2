@@ -15,6 +15,7 @@ import type { DetailLoader } from "./pairDetail";
 import type { InspectSection } from "./section";
 import { createW1Chrome } from "./w1Chrome";
 import { NO_SESSION_SUMMARY } from "./w1Chrome";
+import "./w1SumReason.css";
 
 export type V6ExtrasClient = {
   readonly plots: {
@@ -32,6 +33,9 @@ export type V6ExtrasChrome = {
   readonly root: HTMLElement;
   setSession(session: string | null): void;
   onSummary(listener: (text: string) => void): void;
+  /** Причина отсутствия анализа v2 в свёрнутой шапке (задача 7, G1/Q3 = A).
+   * Опционален: стаб inspectV6 и фейки тестов его не несут. */
+  onAbsenceReason?(listener: (reason: string | null) => void): void;
   destroy(): void;
 };
 
@@ -92,8 +96,19 @@ export function createV6Extras(opts: V6ExtrasOpts): V6ExtrasHandle {
     text: NO_SESSION_SUMMARY,
     attrs: { "data-role": "w1-sum-value" },
   });
+  // G1/Q3 = A: причина отсутствия v2 — сиблинг счётчика в самой <summary>,
+  // виден без раскрытия (закрытый details прячет всё, кроме summary).
+  const summaryReason = el("span", {
+    className: "av2-sum-reason",
+    attrs: { "data-role": "w1-absence-reason" },
+  });
+  summaryReason.hidden = true;
   const w1Details = el("details", { className: "av2-disclosure", attrs: { "data-extra": "w1" } }, [
-    el("summary", {}, [el("span", { className: "av2-sum-label", text: W1_LABEL }), summaryValue]),
+    el("summary", {}, [
+      el("span", { className: "av2-sum-label", text: W1_LABEL }),
+      summaryValue,
+      summaryReason,
+    ]),
     chrome.root,
   ]);
   const root = el(
@@ -106,6 +121,10 @@ export function createV6Extras(opts: V6ExtrasOpts): V6ExtrasHandle {
   );
   chrome.onSummary((text) => {
     summaryValue.textContent = text;
+  });
+  chrome.onAbsenceReason?.((reason) => {
+    summaryReason.textContent = reason ?? "";
+    summaryReason.hidden = reason === null;
   });
 
   let session: string | null = null;

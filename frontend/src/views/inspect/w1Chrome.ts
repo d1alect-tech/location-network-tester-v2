@@ -9,6 +9,7 @@ import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { createExtendedRun } from "./extendedRun";
 import type { DetailLoader } from "./pairDetail";
+import { REASON_NO_ARTIFACT } from "./pairLoadOutcome";
 import { createPanelHost } from "./panels/host";
 import type { PanelAbsence } from "./panels/host";
 import { loadW1Session } from "./w1ChromeLoad";
@@ -43,6 +44,9 @@ export interface W1ChromeHandle {
   setSession(session: string | null): void;
   /** Сводка для свёрнутой шапки раскрытия: «панелей N · скаляров M/4». */
   onSummary(listener: (text: string) => void): void;
+  /** Причина отсутствия анализа v2 (G1/Q3 = A): сиблинг счётчика сводки,
+   * null — анализа нет причина не нужна. Канал onSummary отвергнут вердиктом. */
+  onAbsenceReason(listener: (reason: string | null) => void): void;
   destroy(): void;
 }
 
@@ -59,6 +63,8 @@ export function createW1Chrome(options: W1ChromeOptions): W1ChromeHandle {
   let generation = 0;
   let session: string | null = null;
   let summary: ((text: string) => void) | null = null;
+  let absence: ((reason: string | null) => void) | null = null;
+  let absenceReason: string | null = null;
 
   const verdictHost = el("span", { className: "av2-verdict", attrs: { "data-role": "verdict" } });
   const sessionId = el("span", {
@@ -126,6 +132,13 @@ export function createW1Chrome(options: W1ChromeOptions): W1ChromeHandle {
     summary?.(session === null ? NO_SESSION_SUMMARY : summaryText(panelCount, scalarCount));
   }
 
+  /** Провод словаря задач 3 на NO-POINTER пути: причина уходит в свёрнутую
+   * шапку (сиблинг счётчика), не трогая пиннутый текст сводки. */
+  function publishAbsence(reason: string | null): void {
+    absenceReason = reason;
+    absence?.(reason);
+  }
+
   function paintSession(): void {
     sessionId.textContent = session ?? "—";
     sessionId.setAttribute("data-session-id", session ?? "");
@@ -159,6 +172,7 @@ export function createW1Chrome(options: W1ChromeOptions): W1ChromeHandle {
     if (gen !== generation) return;
     banner.hidden = state.hasPointer;
     banner.textContent = state.hasPointer ? "" : MISSING_BANNER;
+    publishAbsence(state.hasPointer ? null : REASON_NO_ARTIFACT);
     panelsBlock.hidden = !state.hasPointer;
     panelsTitle.textContent = `${PANELS_TITLE} · ${String(state.panelCount)}`;
     paintAbsent(state.absent);
@@ -209,12 +223,17 @@ export function createW1Chrome(options: W1ChromeOptions): W1ChromeHandle {
       resetBody();
       extended.setSession(next);
       publish(0, 0);
+      publishAbsence(null);
       if (next === null) return;
       void loadSession(next, generation).catch(report);
     },
     onSummary(listener) {
       summary = listener;
       listener(session === null ? NO_SESSION_SUMMARY : summaryText(0, 0));
+    },
+    onAbsenceReason(listener) {
+      absence = listener;
+      listener(absenceReason);
     },
     destroy() {
       generation += 1;
