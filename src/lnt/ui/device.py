@@ -1,7 +1,9 @@
-"""Безопасная диагностика Hantek 6022BE для панели управления."""
+"""Безопасная диагностика Hantek 6022BE и пробы диска для панели управления."""
 
+import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final
 
 from lnt.device_diagnostics import (
@@ -121,3 +123,16 @@ def diagnose_device(
                         detail=str(exc),
                     )
     return _legacy_status(diagnose_device_state(_SnapshotProbe(snapshot)))
+
+
+def disk_free_bytes(path: Path) -> int:
+    """Свободное место тома ближайшего существующего предка ``path``.
+
+    Корень сессий может ещё не существовать (панель создаёт его в lifespan), а
+    ``shutil.disk_usage`` требует существующий путь: подъём к предку даёт честный
+    объём тома вместо исключения и вместо фабрикации нуля.
+    """
+    current = path
+    while not current.exists():
+        current = current.parent
+    return shutil.disk_usage(current).free

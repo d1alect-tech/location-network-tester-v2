@@ -1,8 +1,6 @@
 """Неинвазивные маршруты устройства и capture preflight."""
 
-import shutil
 from dataclasses import asdict
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -24,7 +22,7 @@ from lnt.types import (
     TransformerLineProbe,
 )
 from lnt.ui.dependencies import AppServices, get_services
-from lnt.ui.device import diagnose_device
+from lnt.ui.device import diagnose_device, disk_free_bytes
 from lnt.ui.models_capture import CapturePreflightBody
 
 router = APIRouter(prefix="/api")
@@ -66,7 +64,7 @@ def capture_preflight(body: CapturePreflightBody, services: _Services) -> JSONRe
         ),
         CaptureEnvironment(
             device_state=status.state,
-            free_bytes=shutil.disk_usage(_existing_parent(services.root)).free,
+            free_bytes=disk_free_bytes(services.root),
             root_writable=services.root.exists() and services.root.is_dir(),
             baseline_compatibility=(
                 BaselineCompatibility.INCOMPATIBLE
@@ -117,10 +115,3 @@ def _setup(
                 nominal_secondary_v=6.0,
                 probe_multiplier=10.0,
             )
-
-
-def _existing_parent(path: Path) -> Path:
-    current = path
-    while not current.exists():
-        current = current.parent
-    return current

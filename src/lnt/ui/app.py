@@ -15,6 +15,7 @@ from starlette.responses import Response
 
 from lnt.app_paths import resolve_app_paths
 from lnt.catalog.reconcile import reconcile_catalog
+from lnt.instrument.live_gate import LiveCaptureGate
 from lnt.runtime.store import JobStore
 from lnt.ui import (
     routes_analysis_v2,
@@ -23,6 +24,7 @@ from lnt.ui import (
     routes_device,
     routes_experiments,
     routes_jobs,
+    routes_live,
     routes_profiles,
     routes_quality,
     routes_research,
@@ -31,6 +33,7 @@ from lnt.ui import (
 )
 from lnt.ui.dependencies import AppServices, install_services
 from lnt.ui.jobs import JobManager
+from lnt.ui.live_owner import build_live_gate
 from lnt.ui.operations import JobBackend, LntBackend
 from lnt.ui.research_jobs import ResearchJobService
 from lnt.ui.security import LocalSecurityMiddleware, create_security_context
@@ -38,15 +41,20 @@ from lnt.ui.security import LocalSecurityMiddleware, create_security_context
 _STATIC: Final = Path(__file__).with_name("static")
 
 
-def create_app(
+def create_app(  # noqa: PLR0913 - панель прибора: каждая ручка kw-only и с дефолтом
     *,
     root: Path,
     backend: JobBackend | None = None,
     catalog_db: Path | None = None,
     runtime_db: Path | None = None,
     index_catalog: bool = False,
+    instrument: LiveCaptureGate | None = None,
 ) -> FastAPI:
-    """Создаёт изолированный экземпляр панели для указанного каталога сессий."""
+    """Создаёт изолированный экземпляр панели для указанного каталога сессий.
+
+    ``instrument`` — внедряемый владелец живого режима (стенды и симуляция); без
+    него lifespan собирает production-гейт сам (``ui.live_owner``).
+    """
     security = create_security_context(_STATIC)
     hashed_app_name = f"app.{security.static_asset_hash}.js"
 
@@ -62,10 +70,15 @@ def create_app(
             reconcile_catalog(root, selected_catalog)
         store = JobStore(runtime_path)
         store.interrupt_nonterminal()
+        # Единственный владелец live: один и тот же объект видят маршруты
+        # /api/live/* и гейт job-захвата (409). Прибор здесь не открывается —
+        # ``InstrumentService`` создаёт только POST /api/live/start.
+        live_gate = instrument if instrument is not None else build_live_gate(root)
         manager = JobManager(
             backend=backend if backend is not None else LntBackend(),
             root=root,
             store=store,
+            live_ownership=live_gate,
         )
         research_jobs = ResearchJobService(store)
         install_services(
@@ -76,12 +89,17 @@ def create_app(
                 runtime_db=runtime_path,
                 jobs=manager,
                 research_jobs=research_jobs,
+                instrument=live_gate,
             ),
         )
         app.state.lnt_security = security
         try:
             yield
         finally:
+            # dispose владельца live первым: активный захват освобождает ручку
+            # контрактом stop -> финальный кадр -> close_handle (идемпотентно, а
+            # незапущенный live прибор не трогает), и только затем гасятся воркеры.
+            live_gate.stop()
             research_jobs.close()
             await manager.aclose()
 
@@ -125,6 +143,7 @@ def create_app(
     app.include_router(routes_statistics.router)
     app.include_router(routes_research.router)
     app.include_router(routes_quality.router)
+    app.include_router(routes_live.router)
 
     def hashed_app() -> FileResponse:
         response = FileResponse(_STATIC / "app.js", media_type="text/javascript")

@@ -37,8 +37,10 @@ class AppServices:
     jobs: JobManager
     research_jobs: ResearchJobService | None = None
     # Единственный владелец живого режима (прибор + preflight-гейт): маршруты
-    # /api/live/* читают статус только из него. None — владелец не зарегистрирован
-    # (создание и dispose в lifespan делает очередь 6, запуск ленивый — по POST).
+    # /api/live/* читают статус только из него, а job-захват получает тот же объект
+    # гейтом 409 (``JobManager(live_ownership=...)``). Регистрирует и освобождает
+    # его lifespan ``create_app``; прибор открывается лениво — по POST
+    # /api/live/start. None — владелец не зарегистрирован (стенды без live: 503).
     instrument: LiveCaptureGate | None = None
 
 
