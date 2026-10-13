@@ -5,6 +5,7 @@
 export const WORKSPACE_ROUTES = [
   "catalog",
   "capture",
+  "scope",
   "inspect",
   "experiments",
   "reports",

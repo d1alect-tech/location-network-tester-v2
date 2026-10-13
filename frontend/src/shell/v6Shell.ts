@@ -4,6 +4,7 @@ import { el } from "../components/primitives/dom";
 export const V6_ROUTES = [
   "catalog",
   "capture",
+  "scope",
   "inspect",
   "experiments",
   "reports",
@@ -15,6 +16,7 @@ export type V6Route = (typeof V6_ROUTES)[number];
 const TITLES = {
   catalog: "Каталог",
   capture: "Захват",
+  scope: "Осциллограф",
   inspect: "Инспекция",
   experiments: "Эксперименты",
   reports: "Отчёты",

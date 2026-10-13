@@ -17,7 +17,7 @@ describe("AppShell Router & Error Boundary", () => {
     const nav = container.querySelector("nav");
     expect(nav).not.toBeNull();
     const links = container.querySelectorAll(".snav-item");
-    expect(links.length).toBe(6);
+    expect(links.length).toBe(7);
   });
 
   it("should render error boundary when an error is thrown", () => {

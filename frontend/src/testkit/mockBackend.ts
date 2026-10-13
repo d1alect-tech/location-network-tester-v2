@@ -13,11 +13,13 @@ import type { Page, Route } from "@playwright/test";
 import type { CatalogSession } from "../api/types";
 import type { DeviceStateValue } from "../api/types-device";
 import type { JobSnapshot } from "../api/types-jobs";
+import type { LiveMode } from "../api/types-live";
 import { CatalogStore, handleCatalog } from "./mockCatalogStore";
 import { buildPreflight, devicePayload } from "./mockDevice";
 import { BUILD_ID, type FixtureSession, NONCE, researchSessions } from "./mockGolden";
 import { type MockHttpReply, type MockHttpRequest, isApiPath, stripStaticPrefix } from "./mockHttp";
 import { JobStore, handleJobs } from "./mockJobStore";
+import { LiveStore, handleLive } from "./mockLiveStore";
 import { ResearchStore, handleResearch } from "./mockResearchStore";
 
 export interface MockBackendOptions {
@@ -27,6 +29,8 @@ export interface MockBackendOptions {
   /** Размер генерируемого каталога (0 — только research-сессии). */
   catalogSize?: number;
   catalogSeed?: number;
+  /** Происхождение live-отсчётов: sim по умолчанию (мок-прибора нет). */
+  liveMode?: LiveMode;
 }
 
 interface ArtifactSeed {
@@ -47,6 +51,8 @@ export class MockLntBackend {
   readonly catalog = new CatalogStore(0);
   readonly jobs = new JobStore();
   readonly research = new ResearchStore();
+  /** Живой режим (routes_live.py): start/stop/config с nonce + SSE-кадры. */
+  readonly live = new LiveStore();
   deviceState: DeviceStateValue = "ready";
   readonly preflightRequests: Record<string, unknown>[] = [];
   private readonly researchSessions: FixtureSession[];
@@ -62,6 +68,7 @@ export class MockLntBackend {
 
   constructor(options: MockBackendOptions = {}) {
     this.deviceState = options.deviceState ?? "ready";
+    this.live.mode = options.liveMode ?? "sim";
     if (options.existingJob) this.jobs.existingJob = options.existingJob;
     const size = options.catalogSize ?? 0;
     if (size > 0) {
@@ -214,6 +221,8 @@ export class MockLntBackend {
       this.preflightRequests.push(body);
       return { status: 200, body: buildPreflight(this.deviceState, body) };
     }
+    const liveReply = handleLive(this.live, request);
+    if (liveReply) return liveReply;
     const jobsReply = handleJobs(this.jobs, request);
     if (jobsReply) return jobsReply;
     if (path === "/api/catalog/sessions" && method === "GET") {

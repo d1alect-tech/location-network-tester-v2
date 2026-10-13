@@ -1,5 +1,7 @@
 import "./style.css";
 import { LntApiClient } from "./api/client";
+// Todo 7: live-контур приборных вкладок («Осциллограф», далее «Анализатор»).
+import { LIVE_ROUTE_GROUP, sharedLiveApi } from "./api/client-live";
 import { captureParamsToPrefill } from "./capture/captureDeepLink";
 // BEGIN Todo 40: регистрация рабочего процесса захвата (аддитивно, один блок).
 import { createCaptureView } from "./capture/captureView";
@@ -12,15 +14,30 @@ import { RouteStore } from "./state/routeState";
 import "./components/charts/charts.css";
 import { type V6ShellHeader, createV6ShellHeader, createV6ShellStatusbar } from "./shell/v6Shell";
 import { mountInspectV6 } from "./views/inspect/inspectV6";
+// Todo 7: рабочая область «Осциллограф» (#/scope).
+import { mountScopeWorkspace } from "./views/scope/scopeWorkspace";
 
 // Simple Hash Router
-export type Route = "catalog" | "capture" | "inspect" | "experiments" | "reports" | "settings";
+export type Route =
+  | "catalog"
+  | "capture"
+  | "scope"
+  | "inspect"
+  | "experiments"
+  | "reports"
+  | "settings";
 
 export const ROUTES: Record<Route, { title: string; desc: string }> = {
   capture: {
     title: "Захват",
     desc: "Запуск одиночных или серийных измерений, отображение активной задачи.",
   },
+  // BEGIN Todo 7: приборные вкладки (группа live-маршрутов {scope, sa}).
+  scope: {
+    title: "Осциллограф",
+    desc: "Живой режим развёртки: непрерывный поток кадров, Run/Stop и статус владения прибором.",
+  },
+  // END Todo 7
   inspect: {
     title: "Инспекция",
     desc: "Детальный анализ выбранной сессии, просмотр спектра мощности (PSD).",
@@ -132,6 +149,10 @@ export class AppShell {
       const route: Route = parsed.route in ROUTES ? (parsed.route as Route) : "catalog";
       if (route !== this.currentRoute) {
         announcePolite(`Раздел: ${ROUTES[route].title}`);
+        // Todo 7: live-поток останавливается только при выходе из группы
+        // приборных вкладок {scope, sa}; смена маршрута внутри группы и
+        // смена query того же маршрута поток не трогают.
+        this.stopLiveIfLeavingGroup(route);
       }
       this.currentRoute = route;
       this.updateActiveNav();
@@ -150,6 +171,20 @@ export class AppShell {
   private updateActiveNav(): void {
     this.v6Header?.setActiveRoute(this.currentRoute);
   }
+
+  // BEGIN Todo 7
+  /** Авто-stop живого режима при выходе из группы маршрутов {scope, sa}:
+   * POST /api/live/stop уходит, только если панель считала захват активным. */
+  private stopLiveIfLeavingGroup(next: Route): void {
+    if (!LIVE_ROUTE_GROUP.has(this.currentRoute) || LIVE_ROUTE_GROUP.has(next)) return;
+    void sharedLiveApi()
+      .stopIfActive()
+      .catch((error: unknown) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        announcePolite(`Не удалось остановить живой режим: ${reason}`);
+      });
+  }
+  // END Todo 7
 
   private renderView(): void {
     const viewContainer = this.container.querySelector("#view-container");
@@ -225,6 +260,18 @@ export class AppShell {
       return;
     }
     // END Todo 40
+
+    // BEGIN Todo 7: маршрут «Осциллограф» — скелет live-режима (Run/Stop, SSE).
+    if (this.currentRoute === "scope") {
+      viewContainer.innerHTML = "";
+      viewContainer.className = "view-container";
+      this.activeViewCleanup = mountScopeWorkspace(viewContainer as HTMLElement, {
+        client: this.apiClient,
+      });
+      this.mountedRoute = this.currentRoute;
+      return;
+    }
+    // END Todo 7
 
     // --- Инспекция V6: окно сравнения под общей оболочкой ---
     if (this.currentRoute === "inspect") {
