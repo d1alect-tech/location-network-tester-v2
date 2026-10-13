@@ -39,6 +39,7 @@ export type V6ExtrasChromeDeps = {
   readonly client: unknown;
   readonly detail?: DetailLoader;
   readonly sessionTypeOf?: (session: string) => string;
+  readonly onJobBusy?: (busy: boolean) => void;
 };
 
 export type V6ExtrasOpts = {
@@ -49,6 +50,7 @@ export type V6ExtrasOpts = {
   /** Тип сессии из каталога инспекции (ITIC только у line_quality, CM/DM у cm_dm). */
   readonly sessionTypeOf?: (session: string) => string;
   readonly createChrome?: (deps: V6ExtrasChromeDeps) => V6ExtrasChrome;
+  readonly onJobBusy?: (busy: boolean) => void;
 };
 
 export type V6ExtrasHandle = InspectSection;
@@ -63,6 +65,7 @@ function defaultCreateChrome(deps: V6ExtrasChromeDeps): V6ExtrasChrome {
       client: deps.client,
       detail: deps.detail,
       sessionTypeOf: deps.sessionTypeOf,
+      onJobBusy: deps.onJobBusy,
     });
   }
   throw new TypeError("v6 extras default chrome needs LntApiClient");
@@ -74,6 +77,7 @@ export function createV6Extras(opts: V6ExtrasOpts): V6ExtrasHandle {
     client: opts.client,
     detail: opts.detail,
     sessionTypeOf: opts.sessionTypeOf,
+    onJobBusy: opts.onJobBusy,
   });
   const theme = readChartTheme();
   const waveHost = el("div", { className: "v6-extras-wave" });

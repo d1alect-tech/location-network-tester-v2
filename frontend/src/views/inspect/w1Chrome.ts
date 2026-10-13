@@ -31,6 +31,8 @@ export type W1ChromeOptions = {
   readonly detail?: DetailLoader;
   /** Тип сессии из каталога инспекции — единственного источника выбора. */
   readonly sessionTypeOf?: (session: string) => string;
+  /** Состояние in-flight задачи анализа: парбар блокирует контролы (job-busy). */
+  readonly onJobBusy?: (busy: boolean) => void;
 };
 
 export interface W1ChromeHandle {
@@ -169,12 +171,17 @@ export function createW1Chrome(options: W1ChromeOptions): W1ChromeHandle {
   async function rerun(): Promise<void> {
     const current = session;
     if (current === null) return;
-    await client.ensureReady();
-    jobRail.hidden = false;
-    jobBar.style.transform = "scaleX(0.5)";
-    const snap = await client.jobs.start({ kind: "analyze", session_name: current });
-    renderFailures(failuresHost, parseFailures(snap.result));
-    jobBar.style.transform = snap.status === "succeeded" ? "scaleX(1)" : "scaleX(0.5)";
+    options.onJobBusy?.(true);
+    try {
+      await client.ensureReady();
+      jobRail.hidden = false;
+      jobBar.style.transform = "scaleX(0.5)";
+      const snap = await client.jobs.start({ kind: "analyze", session_name: current });
+      renderFailures(failuresHost, parseFailures(snap.result));
+      jobBar.style.transform = snap.status === "succeeded" ? "scaleX(1)" : "scaleX(0.5)";
+    } finally {
+      options.onJobBusy?.(false);
+    }
   }
 
   function report(error: unknown): void {

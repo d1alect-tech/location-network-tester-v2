@@ -74,7 +74,10 @@ export async function mountInspectV6(
     chrome,
     client instanceof LntApiClient ? createDeviceApi(client) : undefined,
   );
-  const pairbar = createPairbar({ onSwap: () => pair.swap() });
+  const pairbar = createPairbar({
+    onSwap: () => pair.swap(),
+    onArm: (slot) => pair.arm(slot),
+  });
   const catalogColumn = createCatalogColumn({
     client,
     pair,
@@ -93,6 +96,7 @@ export async function mountInspectV6(
     createView: opts.createView,
     detail: detailStore.load,
     sessionTypeOf,
+    onJobBusy: (busy) => pairbar.setBusy(busy),
     ...(client instanceof LntApiClient
       ? {}
       : {
@@ -173,6 +177,7 @@ export async function mountInspectV6(
   }
 
   const unsubscribe = pair.subscribe(() => {
+    pairbar.setArmed(pair.armed());
     void onPairChange();
   });
 

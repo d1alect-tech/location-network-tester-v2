@@ -230,4 +230,35 @@ describe("createW1Chrome (B2: единый выбор сессии)", () => {
     expect(chrome.root.querySelector(".lnt-w1-job-rail")).not.toBeNull();
     expect(chrome.root.querySelector<HTMLElement>(".lnt-w1-job-rail")?.hidden).toBe(false);
   });
+
+  it("signals job-busy true→false around the analyze job (event, not sleep)", async () => {
+    const { client } = fakeClient({ [POINTER_FILE]: POINTER });
+    const busy: boolean[] = [];
+    let release: (() => void) | null = null;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const jobs = client as unknown as {
+      jobs: { start: (request: unknown) => Promise<unknown> };
+    };
+    const started = jobs.jobs.start;
+    jobs.jobs.start = async (request: unknown): Promise<unknown> => {
+      await gate;
+      return started.call(jobs.jobs, request);
+    };
+    const chrome = createW1Chrome({
+      client,
+      detail: async () => detailPayload(200),
+      sessionTypeOf: () => "measurement",
+      onJobBusy: (value) => busy.push(value),
+    });
+    document.body.append(chrome.bar, chrome.root);
+    chrome.setSession("sess-a");
+    chrome.bar.querySelector<HTMLButtonElement>(".av2-cta")?.click();
+
+    await vi.waitFor(() => expect(busy).toEqual([true]));
+    const done: () => void = release ?? (() => undefined);
+    done();
+    await vi.waitFor(() => expect(busy).toEqual([true, false]));
+  });
 });

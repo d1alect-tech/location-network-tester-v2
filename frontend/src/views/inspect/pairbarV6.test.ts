@@ -31,9 +31,49 @@ describe("createPairbar", () => {
 
   it("clicking the swap control calls onSwap once", () => {
     const onSwap = vi.fn();
-    const { root } = createPairbar({ onSwap });
-    root.querySelector<HTMLButtonElement>("[data-pair-swap]")?.click();
+    const bar = createPairbar({ onSwap });
+    bar.setPair(session("стенд-А", "id-a"), session("стенд-Б", "id-b"));
+    bar.root.querySelector<HTMLButtonElement>("[data-pair-swap]")?.click();
     expect(onSwap).toHaveBeenCalledTimes(1);
+  });
+
+  it("swap disabled iff B пуст: мёртвый контрол закрыт", () => {
+    const onSwap = vi.fn();
+    const bar = createPairbar({ onSwap });
+    const swap = () => bar.root.querySelector<HTMLButtonElement>("[data-pair-swap]");
+    expect(swap()?.disabled).toBe(true);
+    swap()?.click();
+    expect(onSwap).not.toHaveBeenCalled();
+    bar.setPair(session("стенд-А", "id-a"), null);
+    expect(swap()?.disabled).toBe(true);
+    bar.setPair(session("стенд-А", "id-a"), session("стенд-Б", "id-b"));
+    expect(swap()?.disabled).toBe(false);
+  });
+
+  it("arm: клик слота зовёт onArm, setArmed подсвечивает и жмёт aria-pressed", () => {
+    const onArm = vi.fn();
+    const bar = createPairbar({ onSwap: () => {}, onArm });
+    bar.root.querySelector<HTMLElement>('[data-pair="a"]')?.click();
+    expect(onArm).toHaveBeenCalledWith("a");
+    bar.setArmed("a");
+    expect(bar.root.querySelector('[data-pair="a"]')?.getAttribute("aria-pressed")).toBe("true");
+    expect(bar.root.querySelector('[data-pair="a"]')?.classList.contains("pair-armed")).toBe(true);
+    expect(bar.root.querySelector('[data-pair="b"]')?.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("setBusy блокирует слоты и swap, снятие возвращает swap по B", () => {
+    const bar = createPairbar({ onSwap: () => {} });
+    bar.setPair(session("стенд-А", "id-a"), session("стенд-Б", "id-b"));
+    bar.setBusy(true);
+    expect(bar.root.querySelector<HTMLButtonElement>('[data-pair="a"]')?.disabled).toBe(true);
+    expect(bar.root.querySelector<HTMLButtonElement>("[data-pair-swap]")?.disabled).toBe(true);
+    bar.setBusy(false);
+    expect(bar.root.querySelector<HTMLButtonElement>('[data-pair="a"]')?.disabled).toBe(false);
+    expect(bar.root.querySelector<HTMLButtonElement>("[data-pair-swap]")?.disabled).toBe(false);
+    bar.setPair(session("стенд-А", "id-a"), null);
+    bar.setBusy(true);
+    bar.setBusy(false);
+    expect(bar.root.querySelector<HTMLButtonElement>("[data-pair-swap]")?.disabled).toBe(true);
   });
 
   it("U3/U4: бейджи всегда на месте", () => {

@@ -388,3 +388,68 @@ test("V6-P11: 500 без detail на pair-load — честный failed из с
   expect(text).not.toContain("undefined");
   await expect(page.locator(".app-v6")).toBeVisible();
 });
+
+test("V6-P12: arm слот A мышь + Enter: следующий клик ряда заменяет ТОЛЬКО A", async ({ page }) => {
+  const THREE = [
+    ...CATALOG.items,
+    {
+      id: "capture-003",
+      health: "ok",
+      created_utc: "2026-07-30T08:00:00Z",
+      source: "capture",
+      session_type: "capture",
+      profile: "quiet",
+      label: "стенд-В",
+      storage_path: null,
+    },
+  ] as CatalogSession[];
+  const backend = installMockBackend(page);
+  backend.seedCatalog(THREE);
+  backend.seedSessionDetail("capture-001", detail("capture-001", true));
+  backend.seedSessionDetail("capture-002", detail("capture-002", true));
+  backend.seedSessionDetail("capture-003", detail("capture-003", true));
+  backend.seedSpectrum("capture-001", SPECTRUM_A);
+  backend.seedSpectrum("capture-002", SPECTRUM_B);
+  backend.seedSpectrum("capture-003", SPECTRUM_A);
+  backend.seedWaveform("capture-001", WAVEFORM);
+  await page.goto(BASE);
+  const slotA = page.locator(".pairbar [data-pair='a']");
+  const slotB = page.locator(".pairbar [data-pair='b']");
+  await expect(slotA).toContainText("стенд-А");
+  await expect(slotB).toContainText("стенд-Б");
+
+  await slotA.click();
+  await expect(slotA).toHaveAttribute("aria-pressed", "true");
+  await page.locator('.tbl-cat tbody tr[data-session="capture-003"]').click();
+  await expect(slotA).toContainText("стенд-В");
+  await expect(slotB).toContainText("стенд-Б");
+  await expect(slotA).toHaveAttribute("aria-pressed", "false");
+
+  await slotB.click();
+  await page.locator('.tbl-cat tbody tr[data-session="capture-001"]').click();
+  await expect(slotA).toContainText("стенд-В");
+  await expect(slotB).toContainText("стенд-А");
+
+  await slotA.focus();
+  await page.keyboard.press("Enter");
+  await expect(slotA).toHaveAttribute("aria-pressed", "true");
+  await page.locator('.tbl-cat tbody tr[data-session="capture-002"]').click();
+  await expect(slotA).toContainText("стенд-Б");
+  await expect(slotB).toContainText("стенд-А");
+});
+
+test("V6-P13: swap disabled при пустом B — мёртвый контрол закрыт", async ({ page }) => {
+  const ONE = [CATALOG.items[0]] as CatalogSession[];
+  const backend = installMockBackend(page);
+  backend.seedCatalog(ONE);
+  backend.seedSessionDetail("capture-001", detail("capture-001", true));
+  backend.seedSpectrum("capture-001", SPECTRUM_A);
+  backend.seedWaveform("capture-001", WAVEFORM);
+  await page.goto(BASE);
+  const slotA = page.locator(".pairbar [data-pair='a']");
+  const slotB = page.locator(".pairbar [data-pair='b']");
+  const swap = page.locator(".pairbar [data-pair-swap]");
+  await expect(slotA).toContainText("стенд-А");
+  await expect(slotB).toContainText("—");
+  await expect(swap).toBeDisabled();
+});

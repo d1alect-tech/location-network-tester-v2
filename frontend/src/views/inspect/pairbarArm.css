@@ -1,0 +1,26 @@
+.app-v6 .pair-slot {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  border-radius: var(--lnt-radius-status);
+}
+
+.app-v6 .pair-slot:focus-visible {
+  outline: var(--lnt-focus-width) solid var(--lnt-accent-a);
+  outline-offset: var(--lnt-focus-offset);
+}
+
+.app-v6 .pair-slot.pair-armed {
+  outline: var(--lnt-focus-width) solid var(--lnt-accent-a);
+  outline-offset: var(--lnt-focus-offset);
+  background-color: var(--lnt-status-warn-bg);
+}
+
+.app-v6 .pair-slot:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
