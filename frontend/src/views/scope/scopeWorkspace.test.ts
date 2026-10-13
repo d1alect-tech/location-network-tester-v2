@@ -426,3 +426,79 @@ describe("scopeWorkspace: экран послесвечения и истори�
     expect(note.textContent).toContain("назад");
   });
 });
+describe("scope measurements and cursors (Todo 10)", () => {
+  /** Синус 1.25 кГц (2.5 периода в окне 2 мс): аналитическая истина. */
+  function measureFrame(): LiveFramePayload {
+    const points = 200;
+    const windowS = 0.002;
+    const ch1: LiveChannelSeries = {
+      time_s: Array.from({ length: points }, (_, i) => (i / points) * windowS),
+      voltage_v: Array.from(
+        { length: points },
+        (_, i) => 1.7 * Math.sin((2 * Math.PI * 2.5 * i) / points),
+      ),
+      point_count: points,
+    };
+    return {
+      frame_index: 1,
+      triggered: true,
+      emitted_at_s: 0,
+      dropped_samples: 0,
+      skipped_frames: 0,
+      sample_rate_hz: 8_000_000,
+      frame_samples: 4096,
+      decimated: true,
+      calibration_used: false,
+      ch1,
+      ch2: { time_s: [], voltage_v: [], point_count: 0 },
+    };
+  }
+
+  function zeroFrame(): LiveFramePayload {
+    return {
+      ...measureFrame(),
+      ch1: {
+        time_s: Array.from({ length: 64 }, (_, i) => i * 1e-5),
+        voltage_v: Array.from({ length: 64 }, () => 0),
+        point_count: 64,
+      },
+    };
+  }
+
+  it("frame updates CH1 measurements: Vpp/VRMS/f/T/D по аналитической истине", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0 };
+    const container = mountStub(log, { state: { ...IDLE } });
+    await flush();
+
+    // Панели Todo 10 смонтированы: курсоры экрана + измерения CH1.
+    expect(container.querySelector(".lnt-scope-cursors")).toBeInstanceOf(HTMLElement);
+    expect(container.querySelector(".lnt-scope-measure")).toBeInstanceOf(HTMLElement);
+
+    FakeLiveEventSource.instances[0]?.emit("frame", measureFrame());
+    await flush();
+
+    // Истина синуса: Vpp=3.4 В, VRMS=1.7/√2, f=1.25 кГц, T=800 мкс, D=50%.
+    expect(container.querySelector(".lnt-scope-vpp")?.textContent).toBe("3.400 В");
+    expect(container.querySelector(".lnt-scope-rms")?.textContent).toBe("1.202 В");
+    expect(container.querySelector(".lnt-scope-freq")?.textContent).toBe("1.250 кГц");
+    expect(container.querySelector(".lnt-scope-period")?.textContent).toBe("800.000 мкс");
+    expect(container.querySelector(".lnt-scope-duty")?.textContent).toBe("50.0 %");
+
+    // Курсоры по окну кадра t_last−t_0 = 1.99 мс: Δt=0.995 мс, ΔV=2 В.
+    expect(container.querySelector(".lnt-scope-cursor-dt")?.textContent).toBe("995.000 мкс");
+    expect(container.querySelector(".lnt-scope-cursor-dv")?.textContent).toBe("2.000 В");
+  });
+
+  it("нулевой кадр: все измерения «—», никогда NaN", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0 };
+    const container = mountStub(log, { state: { ...IDLE } });
+    await flush();
+
+    FakeLiveEventSource.instances[0]?.emit("frame", zeroFrame());
+    await flush();
+
+    for (const cls of ["vpp", "vmax", "vmin", "rms", "freq", "period", "duty"]) {
+      expect(container.querySelector(`.lnt-scope-${cls}`)?.textContent).toBe("—");
+    }
+  });
+});

@@ -1,11 +1,20 @@
-/** Статические секции и показания вкладки «Осциллограф» (Todo 7, скелет).
+/** Статические секции и показания вкладки «Осциллограф» (Todo 7, Todo 10).
  * Панельная система V6 (kit.css §5.2, как settingsSections): section.panel >
  * .panel-hd/.panel-title + .panel-bd, показания — .readout-grid. Только
  * построение DOM из готовых данных и форматирование: без сети, без
- * состояния, без слушателей — интерактив остаётся в scopeWorkspace. */
+ * состояния, без слушателей — интерактив остаётся в scopeWorkspace
+ * (курсоры экрана — в scopeCursorSection). */
 
 import type { LiveFramePayload, LiveInstrumentState } from "../../api/types-live";
 import { el } from "../../components/primitives/dom";
+import {
+  formatDutyValue,
+  formatFrequencyValue,
+  formatMeasurement,
+  formatPeriodValue,
+  formatVoltsValue,
+  measureSeries,
+} from "./scopeMeasurements";
 
 export const LIVE_STATE_TEXT: Record<LiveInstrumentState, string> = {
   idle: "не запущен",
@@ -131,6 +140,64 @@ export function buildScopeReadoutSection(): ScopeReadoutView {
       dropped.textContent = String(frame.dropped_samples);
       skipped.textContent = String(frame.skipped_frames);
       calibration.textContent = frame.calibration_used ? "по таблице АЦП" : "по номинальной шкале";
+    },
+  };
+}
+
+/** Показания измерений канала CH1 (Todo 10): чистый measureSeries +
+ * форматтеры; null → «—» (нет измерения), никогда NaN. Порог фронта —
+ * уровень триггера CH1 (или середина размаха без триггера). */
+export interface ScopeMeasureView {
+  readonly root: HTMLElement;
+  applyFrame(frame: LiveFramePayload, levelV: number | null): void;
+}
+
+export function buildScopeMeasureSection(): ScopeMeasureView {
+  const vpp = el("dd", { className: "t-mono lnt-scope-vpp", text: "—" });
+  const vmax = el("dd", { className: "t-mono lnt-scope-vmax", text: "—" });
+  const vmin = el("dd", { className: "t-mono lnt-scope-vmin", text: "—" });
+  const rms = el("dd", { className: "t-mono lnt-scope-rms", text: "—" });
+  const freq = el("dd", { className: "t-mono lnt-scope-freq", text: "—" });
+  const period = el("dd", { className: "t-mono lnt-scope-period", text: "—" });
+  const duty = el("dd", { className: "t-mono lnt-scope-duty", text: "—" });
+
+  const row = (label: string, value: HTMLElement): Node[] => [
+    el("dt", { className: "readout-label", text: label }),
+    value,
+  ];
+
+  return {
+    root: el("section", { className: "panel lnt-scope-section lnt-scope-measure" }, [
+      el("div", { className: "panel-hd" }, [
+        el("h3", { className: "panel-title", text: "Измерения CH1" }),
+      ]),
+      el("div", { className: "panel-bd" }, [
+        el(
+          "dl",
+          { className: "readout-grid" },
+          row("Vpp", vpp)
+            .concat(row("Vmax", vmax))
+            .concat(row("Vmin", vmin))
+            .concat(row("VRMS", rms))
+            .concat(row("f (фронт)", freq))
+            .concat(row("T", period))
+            .concat(row("D (высокий)", duty)),
+        ),
+        el("p", {
+          className: "t-compact",
+          text: "По отсчётам кадра CH1; АЦП 8 бит — уровни сырые, без калибровочных заявлений.",
+        }),
+      ]),
+    ]),
+    applyFrame(frame: LiveFramePayload, levelV: number | null): void {
+      const m = measureSeries(frame.ch1, levelV);
+      vpp.textContent = formatMeasurement(m.vppV, formatVoltsValue);
+      vmax.textContent = formatMeasurement(m.vmaxV, formatVoltsValue);
+      vmin.textContent = formatMeasurement(m.vminV, formatVoltsValue);
+      rms.textContent = formatMeasurement(m.rmsV, formatVoltsValue);
+      freq.textContent = formatMeasurement(m.frequencyHz, formatFrequencyValue);
+      period.textContent = formatMeasurement(m.periodS, formatPeriodValue);
+      duty.textContent = formatMeasurement(m.duty, formatDutyValue);
     },
   };
 }

@@ -13,14 +13,17 @@ import { sharedLiveApi } from "../../api/client-live";
 import type { LiveApi } from "../../api/client-live";
 import type { LiveStatePayload } from "../../api/types-live";
 import { DEFAULT_LIVE_START_REQUEST } from "../../api/types-live";
+import { createUplotView } from "../../components/charts/uplotView";
 import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { buildScopeControls } from "./scopeControls";
+import { buildScopeCursorSection } from "./scopeCursorSection";
 import { DEFAULT_SCOPE_SETTINGS } from "./scopeScale";
 import type { ScopeDisplaySettings } from "./scopeScale";
 import { buildScopeScreen } from "./scopeScreen";
 import {
   LIVE_STATE_TEXT,
+  buildScopeMeasureSection,
   buildScopeReadoutSection,
   buildScopeStatusSection,
   errorBlock,
@@ -49,6 +52,8 @@ export function mountScopeWorkspace(
   const device = createDeviceApi(options.client);
   const status = buildScopeStatusSection();
   const screen = buildScopeScreen();
+  const cursors = buildScopeCursorSection();
+  const measure = buildScopeMeasureSection();
   const readout = buildScopeReadoutSection();
 
   let settings: ScopeDisplaySettings = { ...DEFAULT_SCOPE_SETTINGS };
@@ -58,8 +63,14 @@ export function mountScopeWorkspace(
     // уходят в железо со следующим Run (config на ходу меняет только триггер).
     waveform.rerender(settings);
   });
+  // Шов createView пробрасывает плагин линий курсоров (Todo 10) в общий
+  // стек uPlot: плагин живёт в каждой пересборке графика.
   const waveform = mountScopeWaveform({
-    createView: options.waveform?.createView,
+    createView: (viewOptions) =>
+      (options.waveform?.createView ?? createUplotView)({
+        ...viewOptions,
+        peaksPlugin: cursors.plugin,
+      }),
     controls: controls.root,
   });
 
@@ -72,6 +83,8 @@ export function mountScopeWorkspace(
         status.root,
         screen.root,
         waveform.root,
+        cursors.root,
+        measure.root,
         readout.root,
       ],
     ),
@@ -79,6 +92,8 @@ export function mountScopeWorkspace(
 
   let busy = false;
   let lastState: LiveStatePayload | null = null;
+  /** Порог фронта для измерений: уровень триггера, пока его источник CH1. */
+  let triggerLevelV: number | null = null;
 
   function updateButtons(): void {
     const running = lastState?.state === "running";
@@ -88,6 +103,8 @@ export function mountScopeWorkspace(
 
   function applyState(state: LiveStatePayload): void {
     lastState = state;
+    triggerLevelV =
+      state.trigger !== null && state.trigger.source === "ch1" ? state.trigger.level_v : null;
     status.stateLine.setAttribute("data-live-state", state.state);
     status.stateLine.textContent = `Живой режим: ${LIVE_STATE_TEXT[state.state]}`;
     status.simBadge.hidden = state.mode !== "sim";
@@ -169,6 +186,8 @@ export function mountScopeWorkspace(
       readout.applyFrame(frame);
       screen.applyFrame(frame);
       waveform.applyFrame(frame, settings);
+      cursors.applyFrame(frame);
+      measure.applyFrame(frame, triggerLevelV);
     },
     onState: applyState,
     onConnection: (kind) => {
