@@ -3,21 +3,7 @@
  * Терминология DESIGN.md: «папка» — группировка, «идентификатор сессии» — id,
  * «метка» — label, «профиль» — profile. Эти понятия не смешиваются. */
 
-import type { SessionHealth } from "../../api/types";
-
-/** Русские подписи health-кодов с тоном бейджа (не только цвет). */
-export const HEALTH_LABELS: Record<
-  SessionHealth,
-  { label: string; tone: "ok" | "warn" | "error" }
-> = {
-  ok: { label: "Исправна", tone: "ok" },
-  corrupt_manifest: { label: "Повреждён манифест", tone: "error" },
-  missing_files: { label: "Нет файлов", tone: "error" },
-  partial: { label: "Частичная", tone: "warn" },
-  duplicate_id: { label: "Дубль идентификатора", tone: "warn" },
-  context_invalid: { label: "Контекст повреждён", tone: "error" },
-  analysis_invalid: { label: "Анализ некорректен", tone: "error" },
-};
+export { HEALTH_LABELS } from "../../components/status/sessionHealth";
 
 export const SESSION_TYPE_LABELS: Record<string, string> = {
   capture: "Захват",

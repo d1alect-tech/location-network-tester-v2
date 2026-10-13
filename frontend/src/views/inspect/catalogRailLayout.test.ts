@@ -164,7 +164,10 @@ const requireEl = (root: Element, selector: string): HTMLElement => {
 /** Реальный рельс в реальной обвязке «#/inspect»: цепочка селекторов каскада. */
 async function mountRail() {
   const column = createCatalogColumn({
-    client: { catalogSessions: async () => ({ items: SESSIONS }) },
+    client: {
+      catalogSessions: async () => ({ items: SESSIONS }),
+      legacySessions: async () => ({ sessions: [] }),
+    },
     pair: createPairState(),
     onPick: vi.fn(),
   });

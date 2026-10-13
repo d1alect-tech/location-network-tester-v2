@@ -1,7 +1,8 @@
 /** Полоса пары A/B инспекции v6: База / Сравнение, глиф health, обмен слотов. */
 
-import type { CatalogSession, SessionHealth } from "../../api/types";
+import type { CatalogSession } from "../../api/types";
 import { clearElement, el } from "../../components/primitives/dom";
+import { HEALTH_LABELS, glyphForTone } from "../../components/status/sessionHealth";
 import { type DeltaSummary, formatDeltaDb } from "./deltaSummary";
 
 export interface PairbarV6Options {
@@ -13,16 +14,6 @@ export interface PairbarV6Handle {
   setPair(base: CatalogSession | null, compare: CatalogSession | null): void;
   setDelta(summary: DeltaSummary | null): void;
 }
-
-const HEALTH_GLYPH = {
-  ok: "●",
-  partial: "▲",
-  duplicate_id: "▲",
-  corrupt_manifest: "✕",
-  missing_files: "✕",
-  context_invalid: "✕",
-  analysis_invalid: "✕",
-} as const satisfies Record<SessionHealth, string>;
 
 function sessionName(session: CatalogSession | null): string {
   if (session === null) return "—";
@@ -41,12 +32,13 @@ function sessionMeta(session: CatalogSession | null): string {
 }
 
 function healthGlyph(session: CatalogSession | null): HTMLElement {
-  const health = session === null ? "unknown" : session.health;
-  const mark = session === null ? "·" : HEALTH_GLYPH[session.health];
+  const health = session === null ? null : HEALTH_LABELS[session.health];
+  const mark = health === null ? "·" : glyphForTone(health.tone);
+  const label = session === null ? "unknown" : (health?.label ?? session.health);
   return el("span", {
-    className: `glyph glyph-${health}`,
+    className: `glyph glyph-${session === null ? "unknown" : session.health}`,
     text: mark,
-    attrs: { title: health, "aria-label": health },
+    attrs: { title: label, "aria-label": label },
   });
 }
 

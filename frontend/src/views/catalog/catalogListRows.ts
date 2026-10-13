@@ -5,7 +5,8 @@
 
 import type { CatalogSession } from "../../api/types";
 import { el } from "../../components/primitives/dom";
-import { HEALTH_LABELS, sessionTypeLabel } from "./catalogModel";
+import { HEALTH_LABELS, glyphForTone } from "../../components/status/sessionHealth";
+import { sessionTypeLabel } from "./catalogModel";
 
 export type SortKey = "label" | "type" | "date";
 export type SortDir = "ascending" | "descending";
@@ -15,12 +16,6 @@ const DAY_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "lo
 const ROLE_TITLE: Readonly<Record<"a" | "b", string>> = {
   a: "Слот А полосы сравнения: база",
   b: "Слот Б полосы сравнения: сравнение",
-};
-
-const GLYPH_BY_TONE: Readonly<Record<string, string>> = {
-  ok: "●",
-  warn: "▲",
-  error: "✕",
 };
 
 export function dayKey(createdUtc: string | null): string {
@@ -113,7 +108,7 @@ export function renderRow(
 
   const pill = el("span", { className: `lnt-status-pill lnt-tone-${health.tone}` });
   const glyph = el("span", { attrs: { "aria-hidden": "true" } });
-  glyph.textContent = GLYPH_BY_TONE[health.tone] ?? "●";
+  glyph.textContent = glyphForTone(health.tone);
   pill.append(glyph, document.createTextNode(health.label));
   const stateCell = el(
     "td",

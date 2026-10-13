@@ -10,6 +10,8 @@ import { el } from "../../components/primitives/dom";
 import type { RouteStore } from "../../state/routeState";
 import { EMPTY_METERS, createAnalysisBand } from "./analysisBand";
 import { createCatalogColumn } from "./catalogColumn";
+import type { LegacyRow } from "./catalogJoinedSource";
+import { loadJoinedCatalog } from "./catalogJoinedSource";
 import { cyclesFromMeters, paintChannelbarFromPayload } from "./channelbarPaint";
 import { summarizeDelta } from "./deltaSummary";
 import type { GramPairClient } from "./gramPair";
@@ -36,6 +38,7 @@ export type InspectV6Client = SpectrumPanelClient &
       query?: CatalogQuery,
       options?: unknown,
     ): Promise<{ readonly items: readonly CatalogSession[] }>;
+    legacySessions(options?: unknown): Promise<{ readonly sessions: readonly LegacyRow[] }>;
   };
 
 export type InspectV6Opts = {
@@ -175,13 +178,14 @@ export async function mountInspectV6(
 
   async function boot(): Promise<void> {
     try {
-      // include_paths: имя каталога сессии нужно, чтобы принять оба ключа D1.
-      const page = await client.catalogSessions({ page_size: 200, include_paths: true });
+      // Один reload кормит бут и рейл (B unified): include_paths даёт имена
+      // каталогов для обоих ключей D1, legacySessions — analyzed для JOIN.
+      const page = await loadJoinedCatalog(client);
       if (disposed) return;
-      const alias = buildSessionAlias(page.items);
+      const alias = buildSessionAlias(page.sessions);
       // Мета слота пары ищется по обоим ключам D1: dir-name-строка с
       // duplicate_id не канонизируется (F-8), поэтому её ключ остаётся именем.
-      for (const item of page.items) indexSessionMeta(sessionMap, item);
+      for (const item of page.sessions) indexSessionMeta(sessionMap, item);
       await catalogColumn.reload();
       if (disposed) return;
       const params = routes.get().params;
@@ -190,8 +194,8 @@ export async function mountInspectV6(
       if (fromRouteA !== undefined) pair.pick(alias.get(fromRouteA) ?? fromRouteA);
       if (fromRouteB !== undefined) pair.pick(alias.get(fromRouteB) ?? fromRouteB);
       if (pair.get().a !== null) return;
-      const first = page.items[0];
-      const second = page.items[1];
+      const first = page.sessions[0];
+      const second = page.sessions[1];
       if (first !== undefined) pair.pick(first.id);
       if (second !== undefined) pair.pick(second.id);
     } catch (error) {

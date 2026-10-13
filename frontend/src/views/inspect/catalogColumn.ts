@@ -1,15 +1,13 @@
-import type { CatalogQuery, CatalogSession } from "../../api/types";
+import type { CatalogSession } from "../../api/types";
+import "./catalogColumnHealth.css";
 import { clearElement, el } from "../../components/primitives/dom";
 import { type CatalogSort, type SortDir, buildCatalogRows } from "./catalogColumnModel";
 import { renderCatalogRow } from "./catalogColumnRender";
+import type { JoinedCatalogClient } from "./catalogJoinedSource";
+import { joinKey, loadJoinedCatalog } from "./catalogJoinedSource";
 import type { PairStateHandle } from "./pairState";
 
-export interface CatalogColumnClient {
-  catalogSessions(
-    query?: CatalogQuery,
-    options?: unknown,
-  ): Promise<{ readonly items: readonly CatalogSession[] }>;
-}
+export type CatalogColumnClient = JoinedCatalogClient;
 
 export interface CatalogColumnOptions {
   readonly client: CatalogColumnClient;
@@ -35,6 +33,8 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
   let dir: SortDir = "desc";
   let query = "";
   let sessions: readonly CatalogSession[] = [];
+  let analyzedByDir: ReadonlyMap<string, boolean> = new Map();
+  let invalidByDir: ReadonlyMap<string, string> = new Map();
   let activeSession: string | null = null;
 
   const found = el("span", { className: "cat-found", attrs: { "data-cat-found": "" } });
@@ -113,6 +113,8 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
         renderCatalogRow(row, {
           grouped: sort === "date",
           pair,
+          analyzedOf: (session) => analyzedByDir.get(joinKey(session)),
+          invalidOf: (session) => invalidByDir.get(joinKey(session)),
           onPick: (id) => {
             opts.onPick(id);
             tbody.querySelector<HTMLElement>(`tr[data-session="${CSS.escape(id)}"]`)?.focus();
@@ -172,8 +174,10 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
   return {
     root,
     async reload(): Promise<void> {
-      const page = await opts.client.catalogSessions({ page_size: 200 });
-      sessions = page.items;
+      const page = await loadJoinedCatalog(opts.client);
+      sessions = page.sessions;
+      analyzedByDir = page.analyzedByDir;
+      invalidByDir = page.invalidByDir;
       render();
     },
   };

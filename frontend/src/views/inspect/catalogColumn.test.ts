@@ -21,6 +21,7 @@ const s2 = session("s2", "2026-08-29T14:30:00Z", "Beta");
 function fakeClient(items: CatalogSession[]) {
   return {
     catalogSessions: async () => ({ items }),
+    legacySessions: async () => ({ sessions: [] }),
   };
 }
 

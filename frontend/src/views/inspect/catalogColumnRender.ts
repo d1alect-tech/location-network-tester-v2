@@ -1,5 +1,11 @@
 import type { CatalogSession } from "../../api/types";
 import { el } from "../../components/primitives/dom";
+import {
+  ANALYZED_LABEL,
+  HEALTH_LABELS,
+  UNANALYZED_LABEL,
+  glyphForTone,
+} from "../../components/status/sessionHealth";
 import { type CatalogRow, roleOf } from "./catalogColumnModel";
 import type { PairStateValue } from "./pairState";
 
@@ -74,8 +80,45 @@ function renderEmpty(): HTMLTableRowElement {
 export interface CatalogRowRenderCtx {
   readonly grouped: boolean;
   readonly pair: PairStateValue;
+  readonly analyzedOf: (session: CatalogSession) => boolean | undefined;
+  readonly invalidOf: (session: CatalogSession) => string | undefined;
   readonly onPick: (sessionId: string) => void;
   readonly onFocus: (sessionId: string) => void;
+}
+
+function healthPill(session: CatalogSession): HTMLElement {
+  const health = HEALTH_LABELS[session.health];
+  const pill = el("span", {
+    className: `lnt-status-pill lnt-tone-${health.tone} cat-health`,
+    attrs: { "data-cat-health": session.health, title: `Состояние: ${health.label}` },
+  });
+  pill.append(
+    el("span", { text: glyphForTone(health.tone), attrs: { "aria-hidden": "true" } }),
+    document.createTextNode(health.label),
+  );
+  return pill;
+}
+
+function analyzedPill(analyzed: boolean, invalid: string | undefined): HTMLElement | null {
+  if (invalid !== undefined) {
+    return el("span", {
+      className: "lnt-status-pill lnt-tone-error cat-analyzed",
+      text: invalid,
+      attrs: { "data-cat-analyzed": "invalid", title: invalid },
+    });
+  }
+  if (analyzed) {
+    return el("span", {
+      className: "lnt-status-pill lnt-tone-ok cat-analyzed",
+      text: ANALYZED_LABEL,
+      attrs: { "data-cat-analyzed": "yes", title: ANALYZED_LABEL },
+    });
+  }
+  return el("span", {
+    className: "lnt-status-pill lnt-tone-warn cat-analyzed",
+    text: UNANALYZED_LABEL,
+    attrs: { "data-cat-analyzed": "no", title: UNANALYZED_LABEL },
+  });
 }
 
 function focusRow(row: HTMLElement, ctx: CatalogRowRenderCtx): void {
@@ -110,6 +153,13 @@ function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLT
   const labelCell = el("td", { className: "cat-label-cell" });
   if (role !== null) {
     labelCell.append(roleChip(role));
+  }
+  labelCell.append(healthPill(session));
+  const analyzed = ctx.analyzedOf(session);
+  const invalid = ctx.invalidOf(session);
+  if (analyzed !== undefined || invalid !== undefined) {
+    const pill = analyzedPill(analyzed ?? false, invalid);
+    if (pill !== null) labelCell.append(pill);
   }
   // V6: полное имя — в title, обрезанное эллипсисом читается по наведению.
   const fullLabel = session.label ?? session.id;

@@ -47,6 +47,7 @@ const WAVE: WaveformPayload = {
 function fakeClient() {
   return {
     catalogSessions: async () => ({ items: [SESSION_A, SESSION_B], next_cursor: null }),
+    legacySessions: async () => ({ sessions: [] }),
     plots: {
       spectrum: async () => SPECTRUM,
       detail: async () => DETAIL,
