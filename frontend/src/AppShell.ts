@@ -2,6 +2,7 @@ import "./style.css";
 import { LntApiClient } from "./api/client";
 // Todo 7: live-контур приборных вкладок («Осциллограф», далее «Анализатор»).
 import { LIVE_ROUTE_GROUP, sharedLiveApi } from "./api/client-live";
+import { ROUTES, type Route } from "./appShellRoutes";
 import { captureParamsToPrefill } from "./capture/captureDeepLink";
 // BEGIN Todo 40: регистрация рабочего процесса захвата (аддитивно, один блок).
 import { createCaptureView } from "./capture/captureView";
@@ -16,51 +17,6 @@ import { type V6ShellHeader, createV6ShellHeader, createV6ShellStatusbar } from 
 import { mountInspectV6 } from "./views/inspect/inspectV6";
 // Todo 7: рабочая область «Осциллограф» (#/scope).
 import { mountScopeWorkspace } from "./views/scope/scopeWorkspace";
-
-// Simple Hash Router
-export type Route =
-  | "catalog"
-  | "capture"
-  | "scope"
-  | "inspect"
-  | "experiments"
-  | "reports"
-  | "settings";
-
-export const ROUTES: Record<Route, { title: string; desc: string }> = {
-  capture: {
-    title: "Захват",
-    desc: "Запуск одиночных или серийных измерений, отображение активной задачи.",
-  },
-  // BEGIN Todo 7: приборные вкладки (группа live-маршрутов {scope, sa}).
-  scope: {
-    title: "Осциллограф",
-    desc: "Живой режим развёртки: непрерывный поток кадров, Run/Stop и статус владения прибором.",
-  },
-  // END Todo 7
-  inspect: {
-    title: "Инспекция",
-    desc: "Детальный анализ выбранной сессии, просмотр спектра мощности (PSD).",
-  },
-  experiments: {
-    title: "Эксперименты",
-    desc: "Группировка сессий по протоколам (A/B, A/B/A, повторные серии).",
-  },
-  reports: {
-    title: "Отчёты",
-    desc: "Генерация научных отчетов с полной прослеживаемостью (provenance).",
-  },
-  settings: {
-    title: "Настройки",
-    desc: "Управление путями сессий, базами данных, резервным копированием.",
-  },
-  // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
-  catalog: {
-    title: "Каталог",
-    desc: "Поиск и фильтрация сессий, инспектор контекста, управление профилями.",
-  },
-  // ===== END T39 CATALOG REGISTRATION =====
-};
 
 import { type ThemeController, createThemePreference } from "./state/themePreference";
 // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
