@@ -60,8 +60,9 @@ FRAME_SAMPLES = 4096
 FRAMES_PER_BLOCK = BLOCK_SAMPLES_PER_CHANNEL // FRAME_SAMPLES
 SEED = 2026
 PROFILE = "bad"
-# Порог за пределами +-5 В диапазона: пересечение недостижимо ни на одном отсчёте.
-NEVER_CROSS_V = 100.0
+# Порог выше амплитуды сети (±3 В), но в окне триггера (±5 В): пересечение
+# недостижимо ни на одном отсчёте, а конфиг остаётся валидным.
+NEVER_CROSS_V = 4.9
 LF_PEAK_V = 3.0
 RANGE_V = 5.0
 TRIGGER_LEVEL_V = 0.0
@@ -812,6 +813,29 @@ def test_trigger_config_rejects_a_non_finite_level(level_v: float) -> None:
 def test_trigger_config_rejects_a_non_positive_auto_timeout(timeout_s: float) -> None:
     with pytest.raises(InputError):
         TriggerConfig(level_v=TRIGGER_LEVEL_V, auto_timeout_s=timeout_s)
+
+
+@pytest.mark.parametrize("level_v", [-5.0, -4.999, 0.0, 4.999, 5.0])
+def test_trigger_config_accepts_levels_inside_the_input_window(level_v: float) -> None:
+    config = TriggerConfig(level_v=level_v)
+
+    assert config.level_v == level_v
+
+
+@pytest.mark.parametrize("level_v", [5.001, -5.001])
+def test_trigger_config_rejects_levels_outside_the_input_window(level_v: float) -> None:
+    # Порог вне окна входа ±5 В: явная ошибка с пределами, а не молчаливый
+    # NORMAL без кадров (граница ±5 В раньше жила только на клиенте).
+    with pytest.raises(InputError, match="вне диапазона") as excinfo:
+        TriggerConfig(level_v=level_v)
+
+    assert "−5…+5 В" in str(excinfo.value)
+
+
+def test_trigger_config_requires_a_level() -> None:
+    # Отсутствующий уровень — не молчаливый ноль: поле обязательное.
+    with pytest.raises(TypeError):
+        TriggerConfig(slope=TriggerSlope.RISING)
 
 
 # ---------------------------------------------------------------------------

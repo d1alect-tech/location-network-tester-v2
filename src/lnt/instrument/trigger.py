@@ -20,6 +20,9 @@ Float32Array = NDArray[np.float32]
 
 # Пауза без фронта, после которой AUTO выдаёт кадр развёртки (как sweep на DSO).
 DEFAULT_AUTO_TIMEOUT_S: Final = 0.2
+# Окно входа 5 В (диапазон прибора): порог триггера живёт внутри ±5 В,
+# как и клэмп уровня на клиенте (frontend TRIGGER_LEVEL_LIMIT_V).
+TRIGGER_LEVEL_LIMIT_V: Final = 5.0
 
 
 class TriggerSource(StrEnum):
@@ -55,9 +58,14 @@ class TriggerConfig:
     auto_timeout_s: float = DEFAULT_AUTO_TIMEOUT_S
 
     def __post_init__(self) -> None:
-        """Отклоняет нефизичный порог и неположительный таймаут AUTO-развёртки."""
+        """Отклоняет порог вне окна входа −5…+5 В и неположительный таймаут AUTO."""
         if not math.isfinite(self.level_v):
             raise InputError(f"триггер: уровень {self.level_v} В должен быть конечным")
+        if not -TRIGGER_LEVEL_LIMIT_V <= self.level_v <= TRIGGER_LEVEL_LIMIT_V:
+            raise InputError(
+                f"триггер: уровень {self.level_v} В вне диапазона "
+                f"−{TRIGGER_LEVEL_LIMIT_V:g}…+{TRIGGER_LEVEL_LIMIT_V:g} В",
+            )
         if not math.isfinite(self.auto_timeout_s) or self.auto_timeout_s <= 0.0:
             raise InputError(
                 f"триггер: auto_timeout_s {self.auto_timeout_s} с должен быть конечным и > 0",

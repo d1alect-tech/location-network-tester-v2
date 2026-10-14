@@ -66,7 +66,12 @@ class _StrictModel(BaseModel):
 
 
 class LiveTriggerModel(_StrictModel):
-    """Триггер живого потока: зеркало ``TriggerConfig``, правда — в сервисе."""
+    """Триггер живого потока: зеркало ``TriggerConfig``, правда — в сервисе.
+
+    Уровень — конечное число окна входа −5…+5 В (как клэмп клиента): границы
+    проверяет доменная ``TriggerConfig`` в ``to_config`` — typed ``InputError``
+    → 422 one-line с пределами (паттерн ``LiveSaConfigModel``/``SaConfig``).
+    """
 
     level_v: _FiniteFloat = 0.0
     slope: TriggerSlope = TriggerSlope.RISING

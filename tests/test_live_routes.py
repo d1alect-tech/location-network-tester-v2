@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Final
 
 import pytest
 from fastapi import FastAPI
+from pydantic import ValidationError
 from starlette.testclient import TestClient
 
 from lnt.capture_preflight import BaselineCompatibility, CaptureEnvironment
@@ -53,6 +54,7 @@ from lnt.ui.models_live import (
     MAX_FRAME_POINTS,
     LiveFramePayload,
     LiveStatePayload,
+    LiveTriggerModel,
 )
 from lnt.ui.operations import LntBackend
 
@@ -66,12 +68,12 @@ if TYPE_CHECKING:
     from lnt.scope_io import ScopeProtocol
 
 # Тот же детерминированный стенд, что в test_live_gate: 1 МГц (код 1), профиль
-# «bad», порог 100 В недостижим — кадры даёт только AUTO-развёртка.
+# «bad», порог 4.9 В выше сети (±3 В) и в окне триггера — недостижим.
 RATE_HZ: Final = 1_000_000.0
 CADENCE_S: Final = BLOCK_SAMPLES_PER_CHANNEL / RATE_HZ
 PROFILE: Final = "bad"
 SEED: Final = 2026
-NEVER_CROSS_V: Final = 100.0
+NEVER_CROSS_V: Final = 4.9
 HUGE_FREE_BYTES: Final = 10**12
 # Вольты после масштаба АЦП ограничены диапазоном +-5 В (raw uint8 был бы 0..255).
 VOLTS_BOUND: Final = 5.2
@@ -676,6 +678,84 @@ def test_config_requires_running_capture(rig: Rig) -> None:
     assert idle.json()["detail"] == LIVE_NOT_RUNNING_RU
     assert stopped.status_code == 409
     assert invalid.status_code == 422
+
+
+@pytest.mark.parametrize("level_v", [5.001, -5.001])
+def test_out_of_range_trigger_level_is_rejected_with_limits(rig: Rig, level_v: float) -> None:
+    start_body = {**START_BODY, "trigger": {**START_BODY["trigger"], "level_v": level_v}}
+    with TestClient(rig.app) as client:
+        started = client.post("/api/live/start", headers=rig.headers, json=start_body)
+        rejected_untouched = (rig.gate.is_active, rig.factory.calls)
+        assert rig.start(client).status_code == 200
+        configured = client.post(
+            "/api/live/config",
+            headers=rig.headers,
+            json={**TRIGGER_BODY, "level_v": level_v},
+        )
+
+    assert started.status_code == 422
+    detail = started.json()["detail"]
+    # Стиль routes_live: one-line тело с пределами, как у прочих 422 домена.
+    assert isinstance(detail, str)
+    assert f"уровень {level_v} В" in detail
+    assert "−5…+5 В" in detail
+    # Отказ до прибора: владение не взято, фабрика не звана.
+    assert rejected_untouched == (False, 0)
+    # Допустимые значения не задеты: валидный уровень стартует как прежде.
+    assert rig.gate.is_active is True
+    # Конфиг на ходу: захват жив, чужой уровень не применён.
+    assert configured.status_code == 422
+    assert configured.json()["detail"] == detail
+    service = rig.gate.service
+    assert service is not None
+    assert service.trigger.level_v == NEVER_CROSS_V
+    assert rig.scope.calls.count("open_handle") == 1
+
+
+@pytest.mark.parametrize("level_v", [-5.0, -4.999, 0.0, 4.999, 5.0])
+def test_boundary_trigger_levels_are_accepted_on_config(rig: Rig, level_v: float) -> None:
+    body = {**TRIGGER_BODY, "level_v": level_v}
+    with TestClient(rig.app) as client:
+        assert rig.start(client).status_code == 200
+        response = client.post("/api/live/config", headers=rig.headers, json=body)
+
+    assert response.status_code == 200
+    assert response.json()["trigger"] == body
+
+
+@pytest.mark.parametrize("level_v", [float("inf"), float("nan")])
+def test_live_trigger_model_rejects_non_finite_levels(level_v: float) -> None:
+    # Инфинити/NaN не выражаются стандартным JSON с клиента: границу
+    # конечности запросной модели проверяем на самой модели.
+    with pytest.raises(ValidationError):
+        LiveTriggerModel.model_validate({"level_v": level_v})
+
+
+def test_null_trigger_level_is_unprocessable(rig: Rig) -> None:
+    body = {**START_BODY, "trigger": {**START_BODY["trigger"], "level_v": None}}
+    with TestClient(rig.app) as client:
+        response = client.post("/api/live/start", headers=rig.headers, json=body)
+
+    assert response.status_code == 422
+    assert rig.gate.is_active is False
+    assert rig.factory.calls == 0
+
+
+def test_absent_trigger_level_keeps_the_zero_default(rig: Rig) -> None:
+    # Отсутствующее поле — дефолт 0.0 («не менять»), не отказ: валидное
+    # поведение wire-контракта диапазон не трогает.
+    body = {**START_BODY, "trigger": {"mode": "auto", "auto_timeout_s": CADENCE_S}}
+    with TestClient(rig.app) as client:
+        started = client.post("/api/live/start", headers=rig.headers, json=body)
+
+    assert started.status_code == 200
+    assert started.json()["trigger"] == {
+        "level_v": 0.0,
+        "slope": "rising",
+        "source": "ch1",
+        "mode": "auto",
+        "auto_timeout_s": CADENCE_S,
+    }
 
 
 # ---------------------------------------------------------------------------

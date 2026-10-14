@@ -62,13 +62,13 @@ if TYPE_CHECKING:
     from lnt.ui.security import SecurityContext
 
 # Тот же детерминированный стенд, что в test_instrument_service: 1 МГц (код 1),
-# профиль «bad», порог 100 В недостижим — кадры даёт только AUTO-развёртка.
+# профиль «bad», порог 4.9 В выше сети (±3 В) и в окне триггера — недостижим.
 RATE_HZ = 1_000_000.0
 RATE_CODE = 1
 CADENCE_S = BLOCK_SAMPLES_PER_CHANNEL / RATE_HZ
 PROFILE = "bad"
 SEED = 2026
-NEVER_CROSS_V = 100.0
+NEVER_CROSS_V = 4.9
 TRIGGER_LEVEL_V = 0.0
 HUGE_FREE_BYTES = 10**12
 
