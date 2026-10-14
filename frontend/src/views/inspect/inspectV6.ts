@@ -77,12 +77,16 @@ export async function mountInspectV6(
   );
   const pairbar = createPairbar({
     onSwap: () => pair.swap(),
-    onArm: (slot) => pair.arm(slot),
+    // M1 (todo 5): слот-клик парбара не мутирует пару — фокус на первый
+    // ряд рейла (focusRail пульсирует кнопки назначаемого слота).
+    onSlotTap: (slot) => catalogColumn.focusRail(slot),
   });
   const catalogColumn = createCatalogColumn({
     client,
     pair,
     onPick: (id) => pair.pick(id),
+    // M1 (todo 5): кнопки «А»/«Б» строки — точное назначение слота.
+    onAssign: (slot, loadKey) => pair.assignSlot(slot, loadKey),
   });
   const signalSection = createSpectrumGramSection({
     client,

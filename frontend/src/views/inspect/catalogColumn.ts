@@ -5,7 +5,7 @@ import { type CatalogSort, type SortDir, buildCatalogRows } from "./catalogColum
 import { renderCatalogRow } from "./catalogColumnRender";
 import type { JoinedCatalogClient } from "./catalogJoinedSource";
 import { joinKey, loadJoinedCatalog } from "./catalogJoinedSource";
-import type { PairStateHandle } from "./pairState";
+import type { PairSlot, PairStateHandle } from "./pairState";
 
 export type CatalogColumnClient = JoinedCatalogClient;
 
@@ -13,11 +13,16 @@ export interface CatalogColumnOptions {
   readonly client: CatalogColumnClient;
   readonly pair: PairStateHandle;
   readonly onPick: (loadKey: string) => void;
+  /** M1 (todo 4): точное назначение слота кнопкой «А»/«Б» строки;
+   * провод к pair.assignSlot появляется в todo 5 (inspectV6). */
+  readonly onAssign?: (slot: PairSlot, loadKey: string) => void;
 }
 
 export interface CatalogColumnHandle {
   readonly root: HTMLElement;
   reload(): Promise<void>;
+  /** Слот-клик pairbar (todo 5): фокус возвращается на первый ряд рейла. */
+  focusRail(slot: PairSlot): void;
 }
 
 function assertNever(value: never): never {
@@ -124,6 +129,17 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
               )
               ?.focus();
           },
+          onAssign: (slot, key) => {
+            opts.onAssign?.(slot, key);
+            // Фокус re-grab — паттерн onPick-замыкания: пара меняется,
+            // render пересобирает tbody, фокус возвращается на ту же строку.
+            const escaped = CSS.escape(key);
+            tbody
+              .querySelector<HTMLElement>(
+                `tr[data-rowkey="${escaped}"], tr[data-session="${escaped}"]`,
+              )
+              ?.focus();
+          },
           onFocus: (id) => {
             activeSession = id;
           },
@@ -178,8 +194,34 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
     render();
   });
 
+  // M1 (todo 5): transient-пульс кнопок назначения. animationend всплывает
+  // до document; листенёр снимает [data-pulse] у любой кнопки. Под
+  // prefers-reduced-motion токен вовсе не ставится (focusRail), поэтому
+  // «зависший» атрибут с animation:none невозможен.
+  document.addEventListener("animationend", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.hasAttribute("data-pulse")) {
+      target.removeAttribute("data-pulse");
+    }
+  });
+
+  function focusRail(slot: PairSlot): void {
+    // M1: слот-клик pairbar НЕ мутирует пару; фокус — на первый ряд рейла
+    // + пульс кнопок назначаемого слота (токен-ассерты, не тайминг).
+    const rows = [...tbody.querySelectorAll<HTMLElement>("tr[data-rowkey]")];
+    const first = rows[0];
+    if (first === undefined) return;
+    for (const item of rows) item.tabIndex = item === first ? 0 : -1;
+    first.focus();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    for (const button of tbody.querySelectorAll<HTMLElement>(`[data-assign="${slot}"]`)) {
+      button.setAttribute("data-pulse", "");
+    }
+  }
+
   return {
     root,
+    focusRail,
     async reload(): Promise<void> {
       const page = await loadJoinedCatalog(opts.client);
       sessions = page.sessions;

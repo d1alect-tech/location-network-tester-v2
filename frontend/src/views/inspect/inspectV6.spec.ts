@@ -389,7 +389,9 @@ test("V6-P11: 500 без detail на pair-load — честный failed из с
   await expect(page.locator(".app-v6")).toBeVisible();
 });
 
-test("V6-P12: arm слот A мышь + Enter: следующий клик ряда заменяет ТОЛЬКО A", async ({ page }) => {
+test("V6-P12 (M1): клик ряда пишет в B, «А» ряда в B переносит его в A, слот-клик — фокус, KeyA/KeyB", async ({
+  page,
+}) => {
   const THREE = [
     ...CATALOG.items,
     {
@@ -418,24 +420,33 @@ test("V6-P12: arm слот A мышь + Enter: следующий клик ря�
   await expect(slotA).toContainText("стенд-А");
   await expect(slotB).toContainText("стенд-Б");
 
-  await slotA.click();
-  await expect(slotA).toHaveAttribute("aria-pressed", "true");
-  await page.locator('.tbl-cat tbody tr[data-session="capture-003"]').click();
+  // Клик тела незапаренного ряда → B (сравнить с базой), A не тронут.
+  const row3 = page.locator('.tbl-cat tbody tr[data-session="capture-003"]');
+  await row3.click();
+  await expect(slotA).toContainText("стенд-А");
+  await expect(slotB).toContainText("стенд-В");
+
+  // Кнопка «А» ряда в B → move: ряд в A, B освобождён.
+  await row3.locator('[data-assign="a"]').click();
   await expect(slotA).toContainText("стенд-В");
-  await expect(slotB).toContainText("стенд-Б");
+  await expect(slotB).toContainText("—");
+
+  // Слот-клик: фокус первого ряда рейла, пара не меняется, арм не включается.
+  await slotA.click();
+  await expect(page.locator(".tbl-cat tbody tr[data-session]").first()).toBeFocused();
+  await expect(slotA).toContainText("стенд-В");
+  await expect(slotB).toContainText("—");
   await expect(slotA).toHaveAttribute("aria-pressed", "false");
 
-  await slotB.click();
-  await page.locator('.tbl-cat tbody tr[data-session="capture-001"]').click();
-  await expect(slotA).toContainText("стенд-В");
-  await expect(slotB).toContainText("стенд-А");
-
-  await slotA.focus();
-  await page.keyboard.press("Enter");
-  await expect(slotA).toHaveAttribute("aria-pressed", "true");
-  await page.locator('.tbl-cat tbody tr[data-session="capture-002"]').click();
-  await expect(slotA).toContainText("стенд-Б");
-  await expect(slotB).toContainText("стенд-А");
+  // KeyA/KeyB на сфокусированном ряду (event.code — физические клавиши).
+  await page.locator('.tbl-cat tbody tr[data-session="capture-001"]').focus();
+  await page.keyboard.press("KeyA");
+  await expect(slotA).toContainText("стенд-А");
+  await expect(slotB).toContainText("—");
+  await page.locator('.tbl-cat tbody tr[data-session="capture-002"]').focus();
+  await page.keyboard.press("KeyB");
+  await expect(slotA).toContainText("стенд-А");
+  await expect(slotB).toContainText("стенд-Б");
 });
 
 test("V6-P13: swap disabled при пустом B — мёртвый контрол закрыт", async ({ page }) => {

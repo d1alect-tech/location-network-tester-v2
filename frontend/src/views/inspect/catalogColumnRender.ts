@@ -7,8 +7,9 @@ import {
   glyphForTone,
 } from "../../components/status/sessionHealth";
 import { loadKey } from "./bootPick";
+import { assignButtons } from "./catalogAssign";
 import { type CatalogRow, roleOf } from "./catalogColumnModel";
-import type { PairStateValue } from "./pairState";
+import type { PairSlot, PairStateValue } from "./pairState";
 
 const DAY_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" });
 
@@ -84,6 +85,7 @@ export interface CatalogRowRenderCtx {
   readonly analyzedOf: (session: CatalogSession) => boolean | undefined;
   readonly invalidOf: (session: CatalogSession) => string | undefined;
   readonly onPick: (loadKey: string) => void;
+  readonly onAssign: (slot: PairSlot, loadKey: string) => void;
   readonly onFocus: (sessionId: string) => void;
 }
 
@@ -152,6 +154,13 @@ function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLT
   const role = roleOf(session, loadKey, ctx.pair);
   const key = loadKey(session);
   const roleCell = el("td");
+  // M1 (todo 4): кнопки «А»/«Б» живут в roleCell; чип роли — в labelCell.
+  const assign = assignButtons(
+    { id: session.id, name: session.label, loadKey: key, health: session.health },
+    role,
+  );
+  assign.onAssign = ctx.onAssign;
+  roleCell.append(assign.el);
   const labelCell = el("td", { className: "cat-label-cell" });
   if (role !== null) {
     labelCell.append(roleChip(role));
@@ -181,6 +190,8 @@ function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLT
         "data-rowkey": key !== session.id ? key : session.id,
         "data-cat-date": day,
         tabindex: "-1",
+        // M1: эхо-состояние строки — кромка/тинт по data-in-pair (стили todo 5).
+        ...(role !== null ? { "data-in-pair": role } : {}),
       },
     },
     [
@@ -196,6 +207,9 @@ function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLT
     ctx.onPick(key);
   });
   row.addEventListener("keydown", (event) => {
+    // M1: KeyA/KeyB (event.code, физические клавиши); ввод в текстовых
+    // полях (в т.ч. поиск) игнорируется внутри handleKeydown.
+    assign.handleKeydown(event);
     if (moveFocus(event, row)) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();

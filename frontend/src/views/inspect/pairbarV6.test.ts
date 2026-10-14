@@ -50,11 +50,19 @@ describe("createPairbar", () => {
     expect(swap()?.disabled).toBe(false);
   });
 
-  it("arm: клик слота зовёт onArm, setArmed подсвечивает и жмёт aria-pressed", () => {
-    const onArm = vi.fn();
-    const bar = createPairbar({ onSwap: () => {}, onArm });
+  it("onSlotTap: клик слота зовёт onSlotTap без режима арма; setArmed — прямой API", () => {
+    const onSlotTap = vi.fn();
+    const bar = createPairbar({ onSwap: () => {}, onSlotTap });
     bar.root.querySelector<HTMLElement>('[data-pair="a"]')?.click();
-    expect(onArm).toHaveBeenCalledWith("a");
+    expect(onSlotTap).toHaveBeenCalledTimes(1);
+    expect(onSlotTap).toHaveBeenCalledWith("a");
+    bar.root.querySelector<HTMLElement>('[data-pair="b"]')?.click();
+    expect(onSlotTap).toHaveBeenCalledTimes(2);
+    expect(onSlotTap).toHaveBeenLastCalledWith("b");
+    // M1: клик слота не входит в режим — пара не армится, подсветки нет.
+    expect(bar.root.querySelector('[data-pair="a"]')?.getAttribute("aria-pressed")).toBe("false");
+    expect(bar.root.querySelector('[data-pair="a"]')?.classList.contains("pair-armed")).toBe(false);
+    // setArmed (dormant API) напрямую подсвечивает и жмёт aria-pressed.
     bar.setArmed("a");
     expect(bar.root.querySelector('[data-pair="a"]')?.getAttribute("aria-pressed")).toBe("true");
     expect(bar.root.querySelector('[data-pair="a"]')?.classList.contains("pair-armed")).toBe(true);

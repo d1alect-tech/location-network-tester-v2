@@ -27,12 +27,11 @@ async function openCorpusRow(page: import("@playwright/test").Page, rowkey: stri
   installMockBackend(page, { corpus: true });
   await page.goto(BASE);
   await expect(page.locator(".app-v6")).toBeVisible();
-  // Boot занимает ОБА слота (первые две analyzed): pick без эрма пишет в B,
-  // а лента показывает базу A — эрмим A, затем клик строку назначает в A.
-  await page.locator(".pairbar [data-pair='a']").click();
+  // Boot занимает ОБА слота (первые две analyzed): клик тела строки писал бы
+  // в B, а ленте нужна база A — кнопка «А» строки назначает её в A напрямую.
   const row = page.locator(`.col-cat tr[data-rowkey="${rowkey}"]`);
   await expect(row).toBeVisible();
-  await row.click();
+  await row.locator('[data-assign="a"]').click();
 }
 
 for (const [dir, rowkey] of [

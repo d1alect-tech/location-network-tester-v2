@@ -17,11 +17,10 @@ test("T7-1: непроанализированная база — причина
   await page.goto(BASE);
   await expect(page.locator(".app-v6")).toBeVisible();
 
-  // Замена базы пары: arm слота A + клик непроанализированного ряда (dir-ключ).
-  await page.locator(".pairbar [data-pair='a']").click();
+  // Замена базы пары: кнопка «А» непроанализированного ряда (dir-ключ).
   const row = page.locator(`.col-cat tr[data-rowkey="${UNANALYZED_ID}"]`);
   await expect(row).toBeVisible();
-  await row.click();
+  await row.locator('[data-assign="a"]').click();
 
   // Раскрытие НЕ открывалось — причина обязана жить в самой <summary>.
   const w1 = page.locator('.v6-extras details[data-extra="w1"]');

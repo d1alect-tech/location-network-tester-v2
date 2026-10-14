@@ -1,0 +1,138 @@
+/* Inspect V6 — M1 (план inspect-v1-selection-ux, todo 5): видимые кнопки
+   назначения «А»/«Б» на строках каталога + эхо-статус строки (кромка/тинт).
+   Цвета ролей — переменные --lnt-role-a/--lnt-role-b на .app-v6 (значения
+   как у чипов .cat-role-a/b из v6.css; single-owner волны 6 — этот файл).
+   Стиль повторяет одобренный владельцем прототип V1
+   (frontend/prototypes/inspect-flow.html), адаптированный под плотность R3-A:
+   кнопки в строку, а не столбиком (строка 26px, --lnt-table-row-min). */
+
+.app-v6 {
+  --lnt-role-a: #9db4ff;
+  --lnt-role-b: #f0a95c;
+}
+
+/* Колонка ролей: две кнопки 16px + зазор 2px + паддинг 8px слева
+   (width — content-box: 42px контента + 8px паддинга = 50px бордера;
+   было 52px контента при кнопках 20px — todo 7, фикс longids: ужали
+   кнопки и зазор, 10px бордера отдано ячейке метки;
+   перекрывает v6.css каскадом импорта). */
+.app-v6 .cat-v6 .tbl-cat tr > :first-child {
+  width: 42px;
+}
+
+.app-v6 .cat-v6 .tbl-cat tbody td:first-child > span {
+  display: flex;
+  gap: 2px;
+}
+
+/* Пилюли labelCell сжимаемы с эллипсисом (todo 7, фикс longids).
+ * Раньше (22→52px) пилюли были flex 0 0 auto из catalogColumnHealth.css:
+ * при нехватке места они не сжимались и выталкивали метку в ноль
+ * (minLabelW=0) и рисались поверх колонки «Тип» (~133px вылета).
+ * Теперь flex 0 1 auto + min-width 0: пилюли уступают, метка держит пол.
+ * display: inline-block нужен для честного «…»: text-overflow не
+ * применяется к flex-контейнеру, а флекс-айтем блочится в block.
+ * Глиф здоровья отделён от текста margin'ом: flex-gap пилюли при
+ * блочном display не работает. Полный текст — в title атрибуте. */
+.app-v6 .cat-label-cell .cat-health,
+.app-v6 .cat-label-cell .cat-analyzed {
+  display: inline-block;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-v6 .cat-label-cell .cat-health > span {
+  margin-right: var(--lnt-space-2);
+}
+
+/* Метка строки не схлопывается в ноль (фикс провала «labels keep
+ * nonzero width»: minLabelW=0 на 8 строках при 1440). Пол 4ch, не 8ch:
+ * ячейка метки после фикса — 83px контента (content-box, type 120px +
+ * date 66px бордера несжимаемы), полы 8ch(57.6)+пилюли(16×2)+зазоры(16)
+ * = 105.6 > 83 гарантированный вылет; 4ch = 28.8, сумма полов 76.8 ≤ 83. */
+.app-v6 .cat-label-cell .cell-ellipsis {
+  min-width: 4ch;
+}
+
+.app-v6 .cat-assign {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: var(--lnt-table-row-min);
+  padding: 0;
+  font: 700 11px / 14px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  background: transparent;
+  border: var(--lnt-border-width) solid transparent;
+  border-radius: var(--lnt-r-ctl);
+  cursor: pointer;
+}
+
+/* 2px focus-ring; смещение внутрь — кнопка 16px, внешний offset срезался бы
+   соседями. */
+.app-v6 .cat-assign:focus {
+  outline: var(--lnt-focus-width) solid var(--lnt-accent-a);
+  outline-offset: calc(-1 * var(--lnt-focus-offset));
+}
+
+/* Нажатая кнопка = чип роли: тот же глиф и цвет (aria-pressed из
+   assignButtons). Заливка — цвет роли, как в прототипе V1. */
+.app-v6 .cat-assign[data-assign="a"]:hover,
+.app-v6 .cat-assign[aria-pressed="true"][data-assign="a"] {
+  background: color-mix(in srgb, var(--lnt-role-a) 18%, transparent);
+  color: var(--lnt-role-a);
+}
+
+.app-v6 .cat-assign[data-assign="b"]:hover,
+.app-v6 .cat-assign[aria-pressed="true"][data-assign="b"] {
+  background: color-mix(in srgb, var(--lnt-role-b) 18%, transparent);
+  color: var(--lnt-role-b);
+}
+
+/* Эхо-статус строки без hover: слабый тинт цвета роли + кромка 2px слева.
+   Кромка на td (не tr): таблица .tbl-cat под глобальным .tbl идёт с
+   border-collapse, тень на tr под collapse не красится. */
+.app-v6 .cat-v6 .tbl-cat tr[data-in-pair="a"] {
+  background: color-mix(in srgb, var(--lnt-role-a) 10%, transparent);
+}
+
+.app-v6 .cat-v6 .tbl-cat tr[data-in-pair="a"] > :first-child {
+  box-shadow: inset 2px 0 0 var(--lnt-role-a);
+}
+
+.app-v6 .cat-v6 .tbl-cat tr[data-in-pair="b"] {
+  background: color-mix(in srgb, var(--lnt-role-b) 10%, transparent);
+}
+
+.app-v6 .cat-v6 .tbl-cat tr[data-in-pair="b"] > :first-child {
+  box-shadow: inset 2px 0 0 var(--lnt-role-b);
+}
+
+/* Слот-клик pairbar → пульс кнопок назначаемого слота: только opacity,
+   200ms (--lnt-t-enter), ease-out; transient-атрибут [data-pulse] ставит
+   focusRail, снимает документ-листенёр по animationend. */
+.app-v6 .cat-assign[data-pulse] {
+  animation: lnt-cat-pulse var(--lnt-t-enter) var(--lnt-ease-out);
+}
+
+@keyframes lnt-cat-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-v6 .cat-assign[data-pulse] {
+    animation: none;
+  }
+}

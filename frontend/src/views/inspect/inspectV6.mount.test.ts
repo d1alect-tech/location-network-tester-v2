@@ -152,6 +152,9 @@ describe("mountInspectV6", () => {
     async (outcome) => {
       // Given: boot грузит пару по двум вызовам detail; первый висячий.
       // stale: ручной pick во время загрузки делает поколение 1 устаревшим.
+      // Свежий hash: предыдущие тест файла оставляют ?a=… в общем jsdom-окне,
+      // RouteStore конструируется по нему — deep-link boot сломал бы расклад гонки.
+      window.location.hash = "";
       let settle!: (detail: SessionDetailPayload) => void;
       let fail!: (error: Error) => void;
       const staleDetail = new Promise<SessionDetailPayload>((resolve, reject) => {
@@ -185,17 +188,16 @@ describe("mountInspectV6", () => {
       });
       cleanups.push(cleanup);
 
-      // When: пользователь армит A и кликает ряд B, пока грузится первая
+      // When: пользователь жмёт «А» второй строки, пока грузится первая
       // пара — поколение 1 (a=sess-a, b=sess-b) устаревает, побеждает
       // поколение 2 (a=sess-b, b=null): A переставлен на вторую строку,
       // detail дергается дважды, выигрывает второй ответ.
       const rows = container.querySelectorAll("tr[data-session]");
       const secondRow = rows[1];
       if (!(secondRow instanceof HTMLElement)) throw new Error("no second row");
-      const slotA = container.querySelector('[data-pair="a"]');
-      if (!(slotA instanceof HTMLElement)) throw new Error("no slot a");
-      slotA.click();
-      secondRow.click();
+      const assignA = secondRow.querySelector('[data-assign="a"]');
+      if (!(assignA instanceof HTMLElement)) throw new Error("no assign button a");
+      assignA.click();
 
       await vi.waitFor(() => {
         expect(container.querySelector('[data-chbar="segments"]')?.textContent).toBe("222");

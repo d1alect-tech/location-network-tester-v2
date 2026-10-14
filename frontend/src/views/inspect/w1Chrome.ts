@@ -24,7 +24,8 @@ export const CTA_LABEL = "Пересчитать анализ (v2)";
 export const NO_SESSION_SUMMARY = "сессия не выбрана";
 export const SCALAR_SLOTS = 4;
 export const SESSION_CAPTION = "Сессия инспекции · база";
-export const SESSION_HINT = "Выбор в рейке каталога: первый клик — база, второй — сравнение.";
+export const SESSION_HINT =
+  "Выбор в каталоге: клик по строке — сравнение; кнопки А/Б — точное назначение.";
 export const PANELS_TITLE = "Сворачиваемые панели";
 
 export type W1ChromeOptions = {

@@ -9,7 +9,9 @@ import type { PairSlot } from "./pairState";
 
 export interface PairbarV6Options {
   readonly onSwap: () => void;
-  readonly onArm?: (slot: PairSlot) => void;
+  /** M1 (todo 5): слот-клик — не режим и не мутация пары: провод фокуса
+   * рейла каталога (пульс кнопок назначаемого слота). */
+  readonly onSlotTap?: (slot: PairSlot) => void;
 }
 
 export interface PairbarV6Handle {
@@ -62,11 +64,21 @@ function fillSlot(slotEl: HTMLElement, role: string, session: CatalogSession | n
 export function createPairbar(opts: PairbarV6Options): PairbarV6Handle {
   const slotA = el("button", {
     className: "pair-slot",
-    attrs: { type: "button", "data-pair": "a", "aria-pressed": "false" },
+    attrs: {
+      type: "button",
+      "data-pair": "a",
+      "aria-pressed": "false",
+      title: "База. Назначить: кнопка А у строки в каталоге",
+    },
   });
   const slotB = el("button", {
     className: "pair-slot",
-    attrs: { type: "button", "data-pair": "b", "aria-pressed": "false" },
+    attrs: {
+      type: "button",
+      "data-pair": "b",
+      "aria-pressed": "false",
+      title: "Сравнение. Назначить: клик по строке или кнопка Б",
+    },
   });
   const meanBadge = el("span", {
     className: "pair-badge",
@@ -85,8 +97,10 @@ export function createPairbar(opts: PairbarV6Options): PairbarV6Handle {
     attrs: { type: "button", "data-pair-swap": "" },
   });
   swap.addEventListener("click", () => opts.onSwap());
-  slotA.addEventListener("click", () => opts.onArm?.("a"));
-  slotB.addEventListener("click", () => opts.onArm?.("b"));
+  // M1 (todo 5): слот-клик — только onSlotTap (фокус рейла), не арм
+  // и не мутация пары.
+  slotA.addEventListener("click", () => opts.onSlotTap?.("a"));
+  slotB.addEventListener("click", () => opts.onSlotTap?.("b"));
   let busy = false;
   let compareNull = true;
   const root = el("div", { className: "pairbar" }, [
