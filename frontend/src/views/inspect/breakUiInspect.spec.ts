@@ -579,22 +579,24 @@ test("break-ui 14: рельс — поле с подсказкой и тихая
       search: box("[data-cat-search]"),
       clear: box("[data-cat-clear]"),
       tools: box(".cat-tools"),
-      thead: box(".tbl-cat thead"),
+      sortbar: box(".cat-sortbar"),
+      table: box(".tbl-cat"),
       clearFont: clearStyle?.fontFamily ?? "",
     };
   });
-  // Одна строка: поле и кнопка одной высоты (контракт целей), ряд не наезжает
-  // на шапку таблицы.
+  // Одна строка: поле и кнопка одной высоты (контракт целей), тулбар (поиск +
+  // строка сортировки) не наезжает на таблицу строк.
   expect(geo.search).not.toBeNull();
   expect(geo.clear).not.toBeNull();
   expect(geo.tools).not.toBeNull();
-  expect(geo.thead).not.toBeNull();
-  if (geo.search === null || geo.clear === null || geo.tools === null || geo.thead === null) {
+  expect(geo.sortbar).not.toBeNull();
+  expect(geo.table).not.toBeNull();
+  if (geo.search === null || geo.clear === null || geo.tools === null || geo.table === null) {
     return;
   }
   expect(Math.abs(geo.search.height - geo.clear.height)).toBeLessThanOrEqual(1);
   expect(geo.clear.height).toBeGreaterThanOrEqual(40);
-  expect(geo.tools.bottom).toBeLessThanOrEqual(geo.thead.top + 0.5);
+  expect(geo.tools.bottom).toBeLessThanOrEqual(geo.table.top + 0.5);
   // Кнопка сброса — тихая кнопка инспекции (IBM Plex), не UA-виджет.
   expect(geo.clearFont).toContain("IBM Plex");
   await rail.screenshot({ path: resolve(EVIDENCE_14, "rail-toolbar-1440.png") });

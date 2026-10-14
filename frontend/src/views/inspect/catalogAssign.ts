@@ -66,7 +66,7 @@ export function assignButtons(row: AssignRow, inPair: PairSlot | null): AssignBu
     b: renderButton("b", row, inPair === "b"),
   };
   const handle: AssignButtonsHandle = {
-    el: el("span", {}, [buttons.a, buttons.b]),
+    el: el("span", { className: "cat-assign-wrap" }, [buttons.a, buttons.b]),
     onAssign: () => {},
     handleKeydown(event) {
       if (event.code !== "KeyA" && event.code !== "KeyB") return;

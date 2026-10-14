@@ -1,5 +1,4 @@
 import type { CatalogSession } from "../../api/types";
-import "./catalogColumnHealth.css";
 import { clearElement, el } from "../../components/primitives/dom";
 import { type CatalogSort, type SortDir, buildCatalogRows } from "./catalogColumnModel";
 import { renderCatalogRow } from "./catalogColumnRender";
@@ -60,46 +59,35 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
   const labelBtn = el("button", {
     className: "cat-sort",
     text: "Метка",
-    attrs: { type: "button", "data-cat-sort": "label" },
+    attrs: { type: "button", "data-cat-sort": "label", "aria-sort": "none" },
   });
   const dateBtn = el("button", {
     className: "cat-sort",
     text: "Дата",
-    attrs: { type: "button", "data-cat-sort": "date" },
+    attrs: { type: "button", "data-cat-sort": "date", "aria-sort": "none" },
   });
-  const labelTh = el("th", { attrs: { scope: "col" } }, [labelBtn]);
-  const dateTh = el("th", { attrs: { scope: "col" } }, [dateBtn]);
+  const sortbar = el("div", { className: "cat-sortbar" }, [labelBtn, dateBtn]);
   const tbody = el("tbody");
-  const table = el("table", { className: "tbl tbl-cat" }, [
-    el("thead", {}, [
-      el("tr", {}, [
-        el("th", { attrs: { scope: "col" } }),
-        labelTh,
-        el("th", { attrs: { scope: "col" }, text: "Тип" }),
-        dateTh,
-      ]),
-    ]),
-    tbody,
-  ]);
+  const table = el("table", { className: "tbl tbl-cat" }, [tbody]);
 
   const root = el("section", { className: "panel cat-v6" }, [
     el("div", { className: "panel-hd" }, [
       el("h2", { className: "panel-title", text: "Каталог" }),
       found,
     ]),
-    el("div", { className: "cat-tools" }, [search, clear]),
+    el("div", { className: "cat-tools" }, [search, clear, sortbar]),
     table,
   ]);
 
   function syncAriaSort(): void {
     switch (sort) {
       case "label":
-        labelTh.setAttribute("aria-sort", ariaSortValue(dir));
-        dateTh.setAttribute("aria-sort", "none");
+        labelBtn.setAttribute("aria-sort", ariaSortValue(dir));
+        dateBtn.setAttribute("aria-sort", "none");
         return;
       case "date":
-        dateTh.setAttribute("aria-sort", ariaSortValue(dir));
-        labelTh.setAttribute("aria-sort", "none");
+        dateBtn.setAttribute("aria-sort", ariaSortValue(dir));
+        labelBtn.setAttribute("aria-sort", "none");
         return;
       default:
         assertNever(sort);

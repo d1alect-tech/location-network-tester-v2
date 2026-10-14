@@ -11,52 +11,6 @@
   --lnt-role-b: #f0a95c;
 }
 
-/* Колонка ролей: две кнопки 16px + зазор 2px + паддинг 8px слева
-   (width — content-box: 42px контента + 8px паддинга = 50px бордера;
-   было 52px контента при кнопках 20px — todo 7, фикс longids: ужали
-   кнопки и зазор, 10px бордера отдано ячейке метки;
-   перекрывает v6.css каскадом импорта). */
-.app-v6 .cat-v6 .tbl-cat tr > :first-child {
-  width: 42px;
-}
-
-.app-v6 .cat-v6 .tbl-cat tbody td:first-child > span {
-  display: flex;
-  gap: 2px;
-}
-
-/* Пилюли labelCell сжимаемы с эллипсисом (todo 7, фикс longids).
- * Раньше (22→52px) пилюли были flex 0 0 auto из catalogColumnHealth.css:
- * при нехватке места они не сжимались и выталкивали метку в ноль
- * (minLabelW=0) и рисались поверх колонки «Тип» (~133px вылета).
- * Теперь flex 0 1 auto + min-width 0: пилюли уступают, метка держит пол.
- * display: inline-block нужен для честного «…»: text-overflow не
- * применяется к flex-контейнеру, а флекс-айтем блочится в block.
- * Глиф здоровья отделён от текста margin'ом: flex-gap пилюли при
- * блочном display не работает. Полный текст — в title атрибуте. */
-.app-v6 .cat-label-cell .cat-health,
-.app-v6 .cat-label-cell .cat-analyzed {
-  display: inline-block;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 96px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.app-v6 .cat-label-cell .cat-health > span {
-  margin-right: var(--lnt-space-2);
-}
-
-/* Метка строки не схлопывается в ноль (фикс провала «labels keep
- * nonzero width»: minLabelW=0 на 8 строках при 1440). Пол 4ch, не 8ch:
- * ячейка метки после фикса — 83px контента (content-box, type 120px +
- * date 66px бордера несжимаемы), полы 8ch(57.6)+пилюли(16×2)+зазоры(16)
- * = 105.6 > 83 гарантированный вылет; 4ch = 28.8, сумма полов 76.8 ≤ 83. */
-.app-v6 .cat-label-cell .cell-ellipsis {
-  min-width: 4ch;
-}
-
 .app-v6 .cat-assign {
   display: inline-flex;
   flex: none;

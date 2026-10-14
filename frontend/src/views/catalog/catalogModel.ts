@@ -9,6 +9,8 @@ export const SESSION_TYPE_LABELS: Record<string, string> = {
   capture: "Захват",
   simulate: "Симуляция",
   line_quality: "Качество сети",
+  measurement: "Измерение",
+  self_noise: "Самошум",
 };
 
 export function sessionTypeLabel(value: string): string {

@@ -189,7 +189,6 @@ describe("createCatalogColumn", () => {
     sortLabel?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     expect(column.root.querySelectorAll("[data-cat-group]")).toHaveLength(0);
-    const labelTh = sortLabel?.closest("th");
-    expect(labelTh?.getAttribute("aria-sort")).toBe("ascending");
+    expect(sortLabel?.getAttribute("aria-sort")).toBe("ascending");
   });
 });

@@ -583,10 +583,6 @@
 }
 
 /* Заголовок колонки — настоящая кнопка: сортировка доступна и с клавиатуры (§6). */
-.app-v6 .cat-th {
-  padding: 0;
-}
-
 /* Шапка таблицы — плотность R3-A. */
 .app-v6 .cat-sort {
   display: flex;
@@ -605,20 +601,6 @@
 }
 
 .app-v6 .cat-sort:hover {
-  color: var(--lnt-text);
-}
-
-/* Направление читается глифом, а не только подсветкой колонки (§6). */
-.app-v6 .cat-th[aria-sort="ascending"] .cat-sort-mark::after {
-  content: "▲";
-}
-
-.app-v6 .cat-th[aria-sort="descending"] .cat-sort-mark::after {
-  content: "▼";
-}
-
-.app-v6 .cat-th[aria-sort="ascending"] .cat-sort,
-.app-v6 .cat-th[aria-sort="descending"] .cat-sort {
   color: var(--lnt-text);
 }
 
@@ -649,9 +631,12 @@
   color: var(--lnt-text-dim);
 }
 
+/* Строка 13: высота ряда — контент (двухстрочная .cat-row), паддинги в
+   .cat-row (catalogRowMarkup.css); фиксированные 26px и колоночные ширины
+   4-колоночной таблицы убраны. */
 .app-v6 .cat-v6 .tbl-cat tbody td {
-  height: var(--lnt-table-row-min);
-  padding: 0 8px;
+  padding: 0;
+  vertical-align: top;
 }
 
 .app-v6 .cat-v6 .tbl-cat {
@@ -659,39 +644,8 @@
   width: 100%;
 }
 
-.app-v6 .cat-v6 .tbl-cat tr > :first-child {
-  width: 22px;
-  padding-right: 0;
-}
-
-.app-v6 .cat-v6 .tbl-cat tr > :nth-child(3) {
-  width: 104px;
-}
-
-.app-v6 .cat-v6 .tbl-cat tr > :nth-child(4) {
-  width: 50px;
-}
-
-.app-v6 .cat-v6 .tbl-cat.is-flat tr > :nth-child(4) {
-  width: 90px;
-}
-
 .app-v6 .cat-group > th {
   width: auto;
-}
-
-.app-v6 .cat-label-cell {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.app-v6 .cat-label-cell .cell-ellipsis {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .app-v6 .cat-role {
@@ -712,10 +666,6 @@
 
 .app-v6 .cat-role-b {
   color: #f0a95c;
-}
-
-.app-v6 .cat-role-noise {
-  color: var(--lnt-text-dim);
 }
 
 .app-v6 .cat-empty {

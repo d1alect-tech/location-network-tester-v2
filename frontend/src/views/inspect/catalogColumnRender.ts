@@ -1,17 +1,18 @@
+/** Ряды рейла каталога инспекции. Строка 13 (план ui-refactor-3, F3-remedy):
+ * строка сессии — ОДНА colspan-ячейка с контуром .cat-row (линия метки +
+ * мета-строка под ней, вариант V1 «Мета под меткой»); инвариант владельца —
+ * ничего не обрезается и не наезжает (полный перенос метки, мета
+ * flex-wrap). Билдеры разметки — в catalogRowMarkup.ts. Атрибуты строк
+ * (data-session/data-rowkey/data-in-pair) — замороженный CONTRACT. */
+
 import type { CatalogSession } from "../../api/types";
 import { el } from "../../components/primitives/dom";
-import {
-  ANALYZED_LABEL,
-  HEALTH_LABELS,
-  UNANALYZED_LABEL,
-  glyphForTone,
-} from "../../components/status/sessionHealth";
 import { loadKey } from "./bootPick";
 import { assignButtons } from "./catalogAssign";
 import { type CatalogRow, roleOf } from "./catalogColumnModel";
+import { formatDay, labelSpan, metaLine, roleChip } from "./catalogRowMarkup";
+import "./catalogRowMarkup.css";
 import type { PairSlot, PairStateValue } from "./pairState";
-
-const DAY_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" });
 
 function assertNever(value: never): never {
   throw new Error(`unhandled catalog row ${String(value)}`);
@@ -21,37 +22,6 @@ function dayKey(createdUtc: string | null): string {
   if (!createdUtc) return "unknown";
   const matched = createdUtc.match(/^(\d{4}-\d{2}-\d{2})/);
   return matched?.[1] ?? "unknown";
-}
-
-function formatDay(day: string): string {
-  const parsed = new Date(`${day}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? day : DAY_FORMAT.format(parsed);
-}
-
-function formatTime(createdUtc: string | null): string {
-  if (!createdUtc) return "—";
-  const match = /T(\d{2}):(\d{2})/.exec(createdUtc);
-  if (!match) return "—";
-  return `${match[1]}:${match[2]}`;
-}
-
-function roleLetter(role: "a" | "b"): string {
-  switch (role) {
-    case "a":
-      return "А";
-    case "b":
-      return "Б";
-    default:
-      return assertNever(role);
-  }
-}
-
-function roleChip(role: "a" | "b"): HTMLElement {
-  return el("span", {
-    className: `cat-role cat-role-${role}`,
-    text: roleLetter(role),
-    attrs: { "data-cat-role": role },
-  });
 }
 
 function renderGroup(day: string, count: number): HTMLTableRowElement {
@@ -89,41 +59,6 @@ export interface CatalogRowRenderCtx {
   readonly onFocus: (sessionId: string) => void;
 }
 
-function healthPill(session: CatalogSession): HTMLElement {
-  const health = HEALTH_LABELS[session.health];
-  const pill = el("span", {
-    className: `lnt-status-pill lnt-tone-${health.tone} cat-health`,
-    attrs: { "data-cat-health": session.health, title: `Состояние: ${health.label}` },
-  });
-  pill.append(
-    el("span", { text: glyphForTone(health.tone), attrs: { "aria-hidden": "true" } }),
-    document.createTextNode(health.label),
-  );
-  return pill;
-}
-
-function analyzedPill(analyzed: boolean, invalid: string | undefined): HTMLElement | null {
-  if (invalid !== undefined) {
-    return el("span", {
-      className: "lnt-status-pill lnt-tone-error cat-analyzed",
-      text: invalid,
-      attrs: { "data-cat-analyzed": "invalid", title: invalid },
-    });
-  }
-  if (analyzed) {
-    return el("span", {
-      className: "lnt-status-pill lnt-tone-ok cat-analyzed",
-      text: ANALYZED_LABEL,
-      attrs: { "data-cat-analyzed": "yes", title: ANALYZED_LABEL },
-    });
-  }
-  return el("span", {
-    className: "lnt-status-pill lnt-tone-warn cat-analyzed",
-    text: UNANALYZED_LABEL,
-    attrs: { "data-cat-analyzed": "no", title: UNANALYZED_LABEL },
-  });
-}
-
 function focusRow(row: HTMLElement, ctx: CatalogRowRenderCtx): void {
   const rows = row.closest("tbody")?.querySelectorAll<HTMLElement>("tr[data-session]") ?? [];
   for (const item of rows) item.tabIndex = item === row ? 0 : -1;
@@ -153,35 +88,22 @@ function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLT
   const day = dayKey(session.created_utc);
   const role = roleOf(session, loadKey, ctx.pair);
   const key = loadKey(session);
-  const roleCell = el("td");
-  // M1 (todo 4): кнопки «А»/«Б» живут в roleCell; чип роли — в labelCell.
   const assign = assignButtons(
     { id: session.id, name: session.label, loadKey: key, health: session.health },
     role,
   );
   assign.onAssign = ctx.onAssign;
-  roleCell.append(assign.el);
-  const labelCell = el("td", { className: "cat-label-cell" });
+  const line1 = el("div", { className: "cat-line1" }, [assign.el]);
   if (role !== null) {
-    labelCell.append(roleChip(role));
+    line1.append(roleChip(role));
   }
-  labelCell.append(healthPill(session));
-  const analyzed = ctx.analyzedOf(session);
-  const invalid = ctx.invalidOf(session);
-  if (analyzed !== undefined || invalid !== undefined) {
-    const pill = analyzedPill(analyzed ?? false, invalid);
-    if (pill !== null) labelCell.append(pill);
-  }
-  // V6: полное имя — в title, обрезанное эллипсисом читается по наведению.
-  const fullLabel = session.label ?? session.id;
-  labelCell.append(
-    el("span", {
-      className: "cell-ellipsis",
-      text: fullLabel,
-      attrs: { "data-cat-label": "", title: fullLabel },
-    }),
-  );
-  const dateText = ctx.grouped ? formatTime(session.created_utc) : day === "unknown" ? "—" : day;
+  line1.append(labelSpan(session));
+  const cell = el("td", { attrs: { colspan: "4" } }, [
+    el("div", { className: "cat-row" }, [
+      line1,
+      metaLine(session, ctx.analyzedOf(session), ctx.invalidOf(session), ctx.grouped),
+    ]),
+  ]);
   const row = el(
     "tr",
     {
@@ -190,16 +112,10 @@ function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLT
         "data-rowkey": key !== session.id ? key : session.id,
         "data-cat-date": day,
         tabindex: "-1",
-        // M1: эхо-состояние строки — кромка/тинт по data-in-pair (стили todo 5).
         ...(role !== null ? { "data-in-pair": role } : {}),
       },
     },
-    [
-      roleCell,
-      labelCell,
-      el("td", { text: session.session_type ?? "—" }),
-      el("td", { text: dateText }),
-    ],
+    [cell],
   );
   row.addEventListener("focus", () => focusRow(row, ctx));
   row.addEventListener("click", () => {
@@ -207,8 +123,6 @@ function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLT
     ctx.onPick(key);
   });
   row.addEventListener("keydown", (event) => {
-    // M1: KeyA/KeyB (event.code, физические клавиши); ввод в текстовых
-    // полях (в т.ч. поиск) игнорируется внутри handleKeydown.
     assign.handleKeydown(event);
     if (moveFocus(event, row)) return;
     if (event.key !== "Enter" && event.key !== " ") return;

@@ -324,7 +324,12 @@ export const CORPUS_PARTIAL_DIR = ".partial-cap-20260807-101500";
 /** Каталог с неразбирающимся манифестом: legacy отдаёт status `invalid`. */
 export const CORPUS_TORN_MANIFEST_DIR = "cap-20260807-091500-torn";
 
-export type CorpusSessionType = "capture" | "simulate" | "line_quality";
+export type CorpusSessionType =
+  | "capture"
+  | "simulate"
+  | "line_quality"
+  | "measurement"
+  | "self_noise";
 
 /** Один каталог корпуса: ключ — имя каталога (`dir`), не session_id. */
 export interface CorpusRow {
