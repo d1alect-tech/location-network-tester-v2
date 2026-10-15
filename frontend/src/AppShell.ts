@@ -7,7 +7,6 @@ import { captureParamsToPrefill } from "./capture/captureDeepLink";
 // BEGIN Todo 40: регистрация рабочего процесса захвата (аддитивно, один блок).
 import { createCaptureView } from "./capture/captureView";
 import type { CaptureViewHandle } from "./capture/captureView";
-import { createLiveConflictSignal, signalLiveConflicts } from "./components/liveStrip/liveConflict";
 import { clearElement, el } from "./components/primitives/dom";
 import { announcePolite } from "./components/primitives/status";
 import { RouteStore } from "./state/routeState";
@@ -16,11 +15,9 @@ import { RouteStore } from "./state/routeState";
 import "./components/charts/charts.css";
 import { type V6ShellHeader, createV6ShellHeader, createV6ShellStatusbar } from "./shell/v6Shell";
 import { mountInspectV6 } from "./views/inspect/inspectV6";
-// Todo 14: рабочая область «Спектроанализатор» (#/sa).
-import { mountSaWorkspace } from "./views/sa/saWorkspace";
-// Todo 7: рабочая область «Осциллограф» (#/scope).
-import { mountScopeStrip } from "./views/scope/scopeStrip";
-import { mountScopeWorkspace } from "./views/scope/scopeWorkspace";
+// Задача 16: живые приборные вкладки (воркспейс + полоса liveStrip + 409-шов) —
+// сплит AppShell по зоне-карте §4; маршруты ниже зовут mountScopeTab/mountSaTab.
+import { mountSaTab, mountScopeTab } from "./views/liveTabs";
 
 import { type ThemeController, createThemePreference } from "./state/themePreference";
 // ===== BEGIN T39 CATALOG REGISTRATION (todo 39) =====
@@ -221,40 +218,21 @@ export class AppShell {
     }
     // END Todo 40
 
-    // BEGIN Todo 7: маршрут «Осциллограф» — скелет live-режима (Run/Stop, SSE).
+    // BEGIN Todo 7: маршрут «Осциллограф» — live-режим + полоса liveStrip.
     if (this.currentRoute === "scope") {
       viewContainer.innerHTML = "";
       viewContainer.className = "view-container";
-      // Задача 15: инструментированный live-контур — 409 старта уходит
-      // сигналом liveConflict (баннер с переходом), воркспейс без правок.
-      const conflictSignal = createLiveConflictSignal();
-      const live = signalLiveConflicts(sharedLiveApi(), conflictSignal);
-      const disposeWorkspace = mountScopeWorkspace(viewContainer as HTMLElement, {
-        client: this.apiClient,
-        live,
-      });
-      // Задача 14: полоса liveStrip монтируется ПОСЛЕ воркспейса и ре-парентит
-      // живые узлы контролов; dispose-цепочка отписывает полосу первой.
-      const disposeStrip = mountScopeStrip(viewContainer as HTMLElement, {
-        live,
-        conflictSignal,
-      });
-      this.activeViewCleanup = () => {
-        disposeStrip();
-        disposeWorkspace();
-      };
+      this.activeViewCleanup = mountScopeTab(viewContainer as HTMLElement, this.apiClient);
       this.mountedRoute = this.currentRoute;
       return;
     }
     // END Todo 7
 
-    // BEGIN Todo 14: маршрут «Спектроанализатор» — live-трассы SA (#/sa).
+    // BEGIN Todo 14: маршрут «Спектроанализатор» — live-трассы SA + полоса.
     if (this.currentRoute === "sa") {
       viewContainer.innerHTML = "";
       viewContainer.className = "view-container";
-      this.activeViewCleanup = mountSaWorkspace(viewContainer as HTMLElement, {
-        client: this.apiClient,
-      });
+      this.activeViewCleanup = mountSaTab(viewContainer as HTMLElement, this.apiClient);
       this.mountedRoute = this.currentRoute;
       return;
     }

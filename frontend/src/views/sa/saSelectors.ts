@@ -1,11 +1,14 @@
-/** Селекторы SA-конфигурации (Todo 14): RBW (10/30/50/100/300 Гц), окно
- * (пять известных — паритет MARKER_WINDOW_OPTIONS инспекции), детектор
- * (только KNOWN_DETECTORS; выборки нет), полоса start/stop. Геометрия
+/** Селекторы SA-конфигурации (Todo 14; задача 16 — RBW сегментами liveSeg):
+ * RBW (10/30/50/100/300 Гц — дискретный ≤5, грамматика §2 — инлайн-
+ * сегменты, контракт [data-sa-rbw] сохранён), окно (пять известных —
+ * паритет MARKER_WINDOW_OPTIONS инспекции), детектор (только
+ * KNOWN_DETECTORS; выборки нет), полоса start/stop. Геометрия
  * полосы и Найквист проверяет бэкенд (422) — локально отсекается только
  * явный мусор (пустая/отрицательная полоса). Без захвата панель
  * стейджится до запуска; на ходу изменения уходят POST /api/live/config. */
 
 import type { LiveSaConfig, LiveSaDetector, LiveSaWindow } from "../../api/types-live";
+import { createLiveSeg } from "../../components/liveStrip/liveSeg";
 import { el, nextId } from "../../components/primitives/dom";
 
 /** Паритет RBW_OPTIONS_HZ бэкенда (psd/windows.py) и MARKER_RBW_OPTIONS. */
@@ -57,15 +60,17 @@ function parseEdge(raw: string): number | null {
 }
 
 export function buildSaConfigSection(options: SaSelectorOptions): SaConfigSelectors {
-  const rbwId = nextId("sa-rbw");
-  const rbwSelect = el("select", {
-    className: "ctl",
-    attrs: { id: rbwId, "data-sa-rbw": "" },
-  });
-  for (const value of SA_RBW_OPTIONS) {
-    rbwSelect.append(el("option", { text: `${value} Гц`, attrs: { value: String(value) } }));
-  }
-  rbwSelect.value = String(options.initial.rbw_hz);
+  const rbwSeg = createLiveSeg(
+    {
+      key: "rbw",
+      kind: "ctl",
+      aria: "Разрешающая полоса (RBW), Гц",
+      options: SA_RBW_OPTIONS.map((rbw) => ({ value: String(rbw), text: String(rbw) })),
+      current: String(options.initial.rbw_hz),
+      groupAttrs: { "data-sa-rbw": "" },
+    },
+    () => commit(),
+  );
 
   const windowId = nextId("sa-window");
   const windowSelect = el("select", {
@@ -127,7 +132,7 @@ export function buildSaConfigSection(options: SaSelectorOptions): SaConfigSelect
     const high = parseEdge(highInput.value);
     if (low === null || high === null || high <= low) return null;
     return {
-      rbw_hz: Number(rbwSelect.value),
+      rbw_hz: Number(rbwSeg.selection()),
       window: windowSelect.value as LiveSaWindow,
       band_low_hz: low,
       band_high_hz: high,
@@ -147,7 +152,7 @@ export function buildSaConfigSection(options: SaSelectorOptions): SaConfigSelect
     options.onChange(config);
   }
 
-  for (const node of [rbwSelect, windowSelect, detectorSelect, lowInput, highInput]) {
+  for (const node of [windowSelect, detectorSelect, lowInput, highInput]) {
     node.addEventListener("change", commit);
   }
 
@@ -157,7 +162,10 @@ export function buildSaConfigSection(options: SaSelectorOptions): SaConfigSelect
     ]),
     el("div", { className: "panel-bd" }, [
       el("div", { className: "lnt-sa-config-grid" }, [
-        el("label", { className: "lnt-sa-field", text: "RBW", attrs: { for: rbwId } }, [rbwSelect]),
+        el("div", { className: "lnt-sa-field" }, [
+          el("span", { className: "lnt-sa-field-label", text: "RBW, Гц" }),
+          rbwSeg.root,
+        ]),
         el("label", { className: "lnt-sa-field", text: "Окно", attrs: { for: windowId } }, [
           windowSelect,
         ]),

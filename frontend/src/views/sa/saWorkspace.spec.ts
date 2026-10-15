@@ -51,11 +51,18 @@ test("sa tab opens from the tabbar after the scope tab with device status and si
   await expect(page.locator("#lnt-sa-stop")).toBeDisabled();
   await expect(page.locator("#lnt-sa-run")).toBeEnabled();
 
-  // Селекторы контракта: пять окон, четыре детектора, полоса по умолчанию.
+  // Задача 16: вкладка в общей полосе liveStrip — кнопки пуска в ЗАПУСК.
+  await expect(page.locator(".lnt-live-strip")).toBeVisible();
+  await expect(page.locator('[data-zone="run"] #lnt-sa-run')).toBeVisible();
+
+  // Селекторы контракта: пять окон, четыре детектора, полоса по умолчанию;
+  // RBW — пять инлайн-сегментов (дискретный ≤5, грамматика §2).
   const windowOptions = page.locator("[data-sa-window] option");
   await expect(windowOptions).toHaveCount(5);
   await expect(page.locator("[data-sa-detector] option")).toHaveCount(4);
   await expect(page.locator("[data-sa-band-high]")).toHaveValue("4000000");
+  await expect(page.locator("[data-sa-rbw] button")).toHaveCount(5);
+  await expect(page.locator('[data-sa-rbw] button[aria-pressed="true"]')).toHaveText("50");
 });
 
 test("Run starts live and shows the live spectrum trace with meta readout", async ({ page }) => {
@@ -203,8 +210,9 @@ test("markers: chart clicks place up to 4 markers, 5th rejected, peak search hig
   await expect(page.locator("[data-sa-markers] tbody tr")).toHaveCount(4);
   await expect(page.locator(".lnt-sa-marker-notice")).toBeVisible();
 
-  // Клик мимо графика (заголовок вкладки) — маркеров не прибавилось.
-  await page.locator(".lnt-sa-workspace h2").click();
+  // Клик мимо графика (панель показаний — заголовок скрыт полосой):
+  // маркеров не прибавилось.
+  await page.locator(".lnt-sa-readout").click();
   await expect(page.locator("[data-sa-markers] tbody tr")).toHaveCount(4);
 
   // Поиск пиков: тон мока один — максимум в таблице и подсветка на графике.

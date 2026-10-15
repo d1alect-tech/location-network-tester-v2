@@ -699,3 +699,90 @@
   outline: 2px solid var(--lnt-accent);
   outline-offset: 1px;
 }
+
+/* ── Задача 16: SA-вкладка — ре-парент узлов листа (saSelectors/saSections/
+   saTraceControls): кожа требует воркспейс-предка — полоса даёт
+   ре-парент-узлам собственный компактный скин (те же токены). */
+
+.lnt-live-strip .lnt-sa-state {
+  font: 400 10px / 12px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+}
+
+.lnt-live-strip .lnt-sa-busy {
+  font: 400 10px / 12px var(--lnt-ui);
+}
+
+/* Бейдж «Симуляция»: та же семантика предупреждения (зеркало scope.css). */
+.lnt-live-strip .lnt-sa-sim-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid var(--lnt-warn);
+  border-radius: var(--lnt-r-pill);
+  background: var(--lnt-status-warn-bg);
+  color: var(--lnt-warn);
+  font: 600 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex: none;
+}
+
+.lnt-live-strip .lnt-sa-sim-badge[hidden] {
+  display: none;
+}
+
+/* Ошибки запуска/остановки (errorHost в оверлее статус-зоны): высота
+   полосы не растёт (зона-карта §6); баннер — общий скин .banner выше. */
+.lnt-live-strip .lnt-sa-error-host {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 2px;
+  z-index: 3;
+}
+
+/* Тумблеры трасс (зона ТРАССЫ): ряд с 44px-таргетами, компактная подпись. */
+.lnt-live-strip .lnt-sa-trace-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.lnt-live-strip .lnt-sa-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  cursor: pointer;
+  flex: none;
+}
+
+.lnt-live-strip .lnt-sa-toggle {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--lnt-accent);
+}
+
+.lnt-live-strip .lnt-sa-toggle:disabled {
+  cursor: not-allowed;
+}
+
+.lnt-live-strip .lnt-sa-toggle-label {
+  font: 500 12px / 16px var(--lnt-ui);
+  color: var(--lnt-text);
+  white-space: nowrap;
+}
+
+/* Поля полосы SA в степперах: Гц-значения (7 цифр) шире уровня ±5 В. */
+.lnt-live-strip [data-ctl="span"] input[type="number"] {
+  width: 80px;
+}
+
+/* Полоса SA на узких экранах: группа ПОЛОСА (два степпера) переносится —
+   узкий вьюпорт не переполняется по горизонтали (AC1 по ширине). */
+.lnt-live-strip [data-ctl="span"] {
+  flex-wrap: wrap;
+}
