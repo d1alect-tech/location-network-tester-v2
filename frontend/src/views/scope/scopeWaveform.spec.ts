@@ -31,8 +31,9 @@ test("Run draws both channels on uPlot with the selected V/div and probe", async
   await openScope(page);
 
   // Выбранные В/дел и пробник уходят в тело запуска (диапазон общий на пару).
-  await page.locator("#lnt-scope-vdiv").selectOption("1");
-  await page.locator("#lnt-scope-probe").selectOption("10");
+  // Задача 14: В/дел и пробник — сегментные группы полосы liveStrip.
+  await page.locator("#lnt-scope-vdiv [data-value='1']").click();
+  await page.locator("#lnt-scope-probe [data-value='10']").click();
   await page.locator("#lnt-scope-run").click();
 
   // «Живой режим: запущен» — строгое совпадение: подстрока «запущен»
@@ -73,7 +74,7 @@ test("inversion toggle and probe re-render the sweep; label scales", async ({ pa
   await expect(page.locator(".lnt-scope-wave-status")).toBeHidden();
 
   // Пробник ×10 масштабирует подпись readout эффективных В/дел.
-  await page.locator("#lnt-scope-probe").selectOption("10");
+  await page.locator("#lnt-scope-probe [data-value='10']").click();
   await expect(page.locator(".lnt-scope-vdiv-effective")).toHaveText("50 В/дел");
 
   mkdirSync(EVIDENCE_DIR, { recursive: true });

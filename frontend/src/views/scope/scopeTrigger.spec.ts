@@ -35,24 +35,35 @@ test("trigger panel: honest labels, rate table, 44px targets, axe clean", async 
 
   const panel = page.locator(".lnt-scope-trigger");
   await expect(panel.locator(".panel-title")).toHaveText("Триггер");
-  await expect(panel.locator('[data-trigger-mode="single"]')).toHaveText("Одиночный");
+  // Задача 14: сегменты триггера ре-парентятся в полосу — ищем от корня.
+  await expect(page.locator('[data-trigger-mode="single"]')).toHaveText("Одиночный");
   await expect(panel.locator(".lnt-scope-coupling")).toContainText("DC");
 
-  // Таблица прибора (pins: LibUsbScope.py:74-99) — ровно семь записей.
-  await expect(page.locator("button[data-scope-rate]")).toHaveCount(7);
-  await expect(page.locator('[data-scope-rate="100000"]')).toHaveText("100 кГц");
-  await expect(page.locator('[data-scope-rate="8000000"]')).toHaveText("8 МГц");
-  await expect(page.locator('[data-scope-rate="8000000"]')).toHaveAttribute("aria-pressed", "true");
+  // Таблица прибора (pins: LibUsbScope.py:74-99) — ровно семь записей в
+  // списке чипа частоты (задача 14: слот — применённое, выбор отложен).
+  const rateField = page.locator(".lnt-scope-rate-field");
+  await expect(rateField.locator("[role='option']")).toHaveCount(7);
+  await expect(rateField.locator("[data-slot='rate']")).toHaveText("8 МГц");
+  await expect(
+    rateField.locator("[role='option'][data-value='100000'] .lnt-live-opt-text"),
+  ).toHaveText("100 кГц");
+  await expect(
+    rateField.locator("[role='option'][data-value='8000000'] .lnt-live-opt-text"),
+  ).toHaveText("8 МГц");
+  await expect(rateField.locator("[role='option'][data-value='8000000']")).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
 
   // Честность: панель не обещает AC-связь и holdoff.
   const text = (await panel.textContent()) ?? "";
   expect(text).not.toMatch(/\bAC\b/);
   expect(text).not.toContain("holdoff");
 
-  // A11y-пол: интерактивные цели не ниже 44px.
+  // A11y-пол: интерактивные цели не ниже 44px (чип частоты вместо семи кнопок).
   for (const selector of [
     '[data-trigger-mode="auto"]',
-    '[data-scope-rate="100000"]',
+    ".lnt-scope-rate-field .lnt-live-chip-btn",
     "#lnt-scope-level",
   ]) {
     const box = await page.locator(selector).boundingBox();

@@ -1,0 +1,569 @@
+/* Полоса liveStrip (задача 14, зона-карта 13): приборная полоса вкладок
+   «Осциллограф»/«Спектроанализатор». Токены компонента — на .app-v6-скоупе
+   (никогда :root, конвенция репо); кожа — дескрипторная полоса V1 (паттерны
+   core4/core.css + scope.css: один скин кликабельности, гравировка зон,
+   хайрлайны, «литые» клавиши run-кластера). Компактные виджеты: 2 линии по
+   44 px + статус 16 px; геометрия гейтится машиной в задаче 17. */
+
+.app-v6,
+.lnt-live-strip {
+  --lnt-run: var(--lnt-ok);
+  --lnt-run-bg: color-mix(in srgb, var(--lnt-ok) 16%, var(--lnt-elev));
+}
+
+.lnt-live-strip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: none;
+  padding: 1px 6px;
+  background: var(--lnt-panel);
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-radius-panel, 2px);
+  font: 400 12px / 16px var(--lnt-ui);
+}
+
+.lnt-live-strip p {
+  margin: 0;
+}
+
+.lnt-live-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0;
+}
+
+/* Межлинейная полоса 10px: в ней живут гравировки линии 2 и
+   zone-note/echo линии 1 — высота полосы от них не растёт (v1). */
+.lnt-live-line + .lnt-live-line {
+  margin-top: 10px;
+}
+
+.lnt-live-pzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px 8px 0;
+  border-left: 1px solid var(--lnt-line);
+}
+
+.lnt-live-line .lnt-live-pzone:first-child {
+  border-left: none;
+}
+
+/* Части линии 2: подпись — гравировка в межлинейной полосе, padding-top 2. */
+.lnt-live-pzone-late {
+  padding-top: 2px;
+}
+
+.lnt-live-pzone-late .lnt-live-pzone-label {
+  top: -12px;
+}
+
+.lnt-live-pzone-label {
+  position: absolute;
+  top: 1px;
+  left: 8px;
+  font: 600 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  text-shadow: 0 1px 0 var(--lnt-panel);
+}
+
+.lnt-live-prow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.lnt-live-ctl {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lnt-live-ctl-label {
+  font: 700 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+}
+
+/* Зона-эхо (эффективное В/дел): 10px-гравировка ПОД группой, absolute —
+   высота полосы не растёт; разведена по X с подписью зоны линии 2. */
+.lnt-live-ctl .lnt-live-echo {
+  position: absolute;
+  right: 0;
+  bottom: -12px;
+  font: 600 10px / 12px var(--lnt-mono);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+}
+
+/* Хинт зоны (грамматика тайминга частоты): 10px под группой, absolute. */
+.lnt-live-zone-note {
+  position: absolute;
+  left: 0;
+  bottom: -12px;
+  font: 400 10px / 12px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+}
+
+/* ── Сегмент-группа (дискрет ≤5): один скин кликабельности ─────────────── */
+
+.lnt-live-seg {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lnt-live-strip .lnt-live-seg-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-elev);
+  color: var(--lnt-text-sec);
+  font: 600 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
+    cubic-bezier(0.2, 0, 0, 1);
+}
+
+.lnt-live-strip .lnt-live-seg-btn:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-live-strip .lnt-live-seg-btn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--lnt-accent) 22%, var(--lnt-elev));
+  border-color: var(--lnt-accent);
+  color: var(--lnt-text);
+  font-weight: 700;
+}
+
+/* ── Чип + stateless listbox (дискрет >5): частота 150×44 ─────────────── */
+
+.lnt-live-chip {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.lnt-live-strip .lnt-live-chip-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 150px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+  font: 600 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
+    cubic-bezier(0.2, 0, 0, 1);
+}
+
+.lnt-live-strip .lnt-live-chip-btn:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-live-chip-caret {
+  color: var(--lnt-text-sec);
+  flex: none;
+}
+
+.lnt-live-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 190px;
+  padding: 4px;
+  background: var(--lnt-elev);
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-radius-control);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
+}
+
+.lnt-live-menu[hidden] {
+  display: none;
+}
+
+.lnt-live-menu-hd {
+  padding: 2px 6px;
+  font: 600 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+}
+
+.lnt-live-strip .lnt-live-opt {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--lnt-r-ctl);
+  background: transparent;
+  color: var(--lnt-text);
+  font: 500 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lnt-live-strip .lnt-live-opt:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-live-strip .lnt-live-opt[aria-selected="true"] {
+  background: color-mix(in srgb, var(--lnt-accent) 12%, var(--lnt-elev));
+  color: var(--lnt-text);
+}
+
+.lnt-live-opt-mark {
+  flex: none;
+  color: var(--lnt-run);
+  font: 600 12px / 16px var(--lnt-mono);
+}
+
+/* ── Степпер (непрерывный): −/+ вокруг живого числового поля ──────────── */
+
+.lnt-live-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lnt-live-strip .lnt-live-step-btn {
+  box-sizing: border-box;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+  font: 600 16px / 16px var(--lnt-mono);
+  cursor: pointer;
+  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
+    cubic-bezier(0.2, 0, 0, 1);
+}
+
+.lnt-live-strip .lnt-live-step-btn:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-live-strip .lnt-live-stepper input[type="number"] {
+  box-sizing: border-box;
+  width: 64px;
+  min-height: 44px;
+  padding: 0 6px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-field, var(--lnt-chrome));
+  color: var(--lnt-text);
+  font: 500 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* ── Run-кластер: «литые» клавиши 90×48, пара role=switch ─────────────── */
+
+.lnt-live-runctl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lnt-live-strip .lnt-live-runctl > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  min-width: 90px;
+  padding: 0 14px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--lnt-elev) 74%, white 26%) 0%,
+    var(--lnt-elev) 100%
+  );
+  color: var(--lnt-text);
+  font: 600 13px / 16px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3);
+  cursor: pointer;
+  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
+    cubic-bezier(0.2, 0, 0, 1);
+}
+
+.lnt-live-strip .lnt-live-runctl > button:active {
+  transform: translateY(1px);
+}
+
+.lnt-live-run-glyph {
+  font: 600 14px / 16px var(--lnt-mono);
+}
+
+.lnt-live-strip .lnt-live-runctl > button[aria-checked="true"] {
+  background: var(--lnt-run-bg);
+  border-color: var(--lnt-run);
+  color: var(--lnt-run);
+  font-weight: 700;
+}
+
+.lnt-live-runbadge {
+  font: 600 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border: 1px solid var(--lnt-run);
+  border-radius: var(--lnt-radius-control);
+  background: var(--lnt-run-bg);
+  color: var(--lnt-run);
+  white-space: nowrap;
+}
+
+/* ── Статус-зона полосы: staged-строка + статус + ошибки (оверлей) ────── */
+
+.lnt-live-bandstatus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  min-height: 12px;
+  font: 400 10px / 12px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+}
+
+.lnt-live-staged-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lnt-text-sec);
+}
+
+.lnt-live-mark {
+  font: 600 10px / 12px var(--lnt-mono);
+  color: var(--lnt-run);
+  white-space: nowrap;
+}
+
+.lnt-live-trig-state {
+  font: 600 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+}
+
+/* Ре-парент строк статуса воркспейса: ряд 10/12 (грамматика band-status v1). */
+.lnt-live-strip .lnt-scope-state {
+  font: 400 10px / 12px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+}
+
+.lnt-live-strip .lnt-scope-busy {
+  font: 400 10px / 12px var(--lnt-ui);
+}
+
+/* Ошибки запуска/остановки: absolute-оверлей над статус-строкой — высота
+   полосы не растёт (зона-карта §6). */
+.lnt-live-strip .lnt-scope-error-host {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 2px;
+  z-index: 3;
+}
+
+/* Ре-парент истории: подпись кадров — компактная. */
+
+.lnt-live-strip .lnt-scope-screen-note {
+  position: static;
+  font: 500 11px / 14px var(--lnt-mono);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+}
+
+/* Ре-парент ряда измерений: компактная 2×7 колонка — см. финальный блок ниже. */
+
+/* ── Фокус-контракт (AC17) и дисциплина движения ──────────────────────── */
+
+.lnt-live-strip :focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lnt-live-strip *,
+  .lnt-live-strip *::before,
+  .lnt-live-strip *::after {
+    transition: none;
+  }
+}
+
+/* ── Ре-парент узлов листа: кожа scope.css требует воркспейс-предка —
+   полоса даёт ре-парент-узлам собственный компактный скин (те же токены). */
+
+/* Сегменты триггера (.lnt-scope-seg-btn): один скин кликабельности полосы. */
+.lnt-live-strip .lnt-scope-seg-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-elev);
+  color: var(--lnt-text-sec);
+  font: 600 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
+    cubic-bezier(0.2, 0, 0, 1);
+}
+
+.lnt-live-strip .lnt-scope-seg-btn:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-live-strip .lnt-scope-seg-btn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--lnt-accent) 22%, var(--lnt-elev));
+  border-color: var(--lnt-accent);
+  color: var(--lnt-text);
+  font-weight: 700;
+}
+
+/* Кнопка «Живой» истории: компактный btn-secondary полосы. */
+.lnt-live-strip .btn {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+  font: 600 12px / 16px var(--lnt-ui);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
+    cubic-bezier(0.2, 0, 0, 1);
+}
+
+.lnt-live-strip .btn:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-live-strip .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Слайдер истории: фиксированная компактная дорожка (flex:1 воркспейса
+   растягивал линию 2 и заворачивал ТРИГГ на вторую строку). */
+.lnt-live-strip .lnt-scope-history-slider {
+  flex: 0 0 140px;
+  min-height: 44px;
+  margin: 0;
+  accent-color: var(--lnt-accent);
+}
+
+/* Бейдж «Симуляция»: та же семантика предупреждения (зеркало scope.css). */
+.lnt-live-strip .lnt-scope-sim-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid var(--lnt-warn);
+  border-radius: var(--lnt-r-pill);
+  background: var(--lnt-status-warn-bg);
+  color: var(--lnt-warn);
+  font: 600 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex: none;
+}
+
+.lnt-live-strip .lnt-scope-sim-badge[hidden] {
+  display: none;
+}
+
+/* Баннеры ошибок (errorHost в оверлее статус-зоны): компактная строка. */
+.lnt-live-strip .banner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid rgb(236 91 98 / 0.35);
+  border-left: 3px solid var(--lnt-err);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-status-error-bg);
+  min-width: 0;
+  font: 400 11px / 16px var(--lnt-ui);
+}
+
+.lnt-live-strip .banner-msg {
+  color: var(--lnt-text-sec);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.lnt-live-strip .banner-glyph {
+  color: var(--lnt-err);
+  font: 600 12px / 16px var(--lnt-ui);
+  flex: none;
+}
+
+/* Ре-парент measure-ряда (§3 scopeSections: «компактный вариант, эллипсис»):
+   readout-grid 2 колонки × N строк воркспейса → 2 строки × 7 колонок,
+   11px моно-ридауты; влезает в одну линию полосы с ТРИГГ (бюджет AC2). */
+.lnt-live-strip .readout-grid {
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, minmax(0, max-content));
+  gap: 2px 10px;
+  margin: 0;
+  max-width: 390px;
+}
+
+.lnt-live-strip .readout-grid dt,
+.lnt-live-strip .readout-grid dd {
+  margin: 0;
+  font: 500 11px / 14px var(--lnt-ui);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lnt-live-strip .readout-grid dt {
+  color: var(--lnt-text-sec);
+}
+
+.lnt-live-strip .readout-grid dd {
+  font-family: var(--lnt-mono);
+  color: var(--lnt-text);
+}

@@ -1,20 +1,21 @@
-/** Rate-селектор вкладки «Осциллограф» (Todo 9): частота дискретизации из
- * таблицы прибора, стейджится для следующего запуска. На ходу частоту
- * сервис не меняет (POST /api/live/config частоты не несёт) — подпись
- * говорит об этом честно. Таблица — pins PyHT6022/LibUsbScope.py:74-99
- * (Ho-Ro e65d52b); дуал-канальный предел 15 МГц выше всех записей,
- * дополнительная гейтинг-логика не нужна, свип-частот панель не
- * изобретает. Построение DOM + локальное состояние; сеть — в workspace. */
+/** Rate-поле вкладки «Осциллограф» (Todo 9; задача 14 — чип + stateless
+ * listbox): частота дискретизации из таблицы прибора, 7 опций > 5 — чип со
+ * слотом ПРИМЕНЁННОГО значения и меню, принадлежащим только чипу (Esc/клик
+ * мимо закрывают без изменений). Выбор — staged-цель следующего запуска: на
+ * ходу частота сервис не меняет (POST /api/live/config частоты не несёт);
+ * слот переводит применённое значение статус-модель полосы (scopeStatus).
+ * selectRate — программная дорога сброса/автосета (задача 15). Таблица —
+ * pins PyHT6022/LibUsbScope.py:74-99 (Ho-Ro e65d52b); построение DOM и
+ * локальное состояние, сеть — в workspace. */
 
 import { DEFAULT_LIVE_START_REQUEST } from "../../api/types-live";
+import { createLiveChip } from "../../components/liveStrip/liveChip";
 import { el } from "../../components/primitives/dom";
 
 /** Таблица частот прибора: 100 кГц…8 МГц, семь записей. */
 export const SCOPE_SAMPLE_RATES_HZ: readonly number[] = [
   100_000, 200_000, 500_000, 1_000_000, 2_000_000, 4_000_000, 8_000_000,
 ];
-
-const RATE_HINT = "Применяется при запуске захвата; на ходу частота не меняется.";
 
 export function rateLabelHz(hz: number): string {
   return hz >= 1_000_000 ? `${hz / 1_000_000} МГц` : `${hz / 1_000} кГц`;
@@ -23,48 +24,34 @@ export function rateLabelHz(hz: number): string {
 export interface ScopeRateField {
   readonly root: HTMLElement;
   rateHz(): number;
+  /** Программный выбор (сброс/автосет, задача 15): та же staged-дорога. */
+  selectRate(hz: number): void;
 }
 
-/** Rate-селектор: только таблица прибора, дефолт 8 МГц (InstrumentService). */
+/** Rate-поле: только таблица прибора, дефолт 8 МГц (InstrumentService). */
 export function buildScopeRateField(): ScopeRateField {
   let rate = DEFAULT_LIVE_START_REQUEST.sample_rate_hz;
-  const buttons = new Map<number, HTMLButtonElement>();
-  for (const hz of SCOPE_SAMPLE_RATES_HZ) {
-    buttons.set(
-      hz,
-      el("button", {
-        className: "lnt-scope-seg-btn lnt-scope-rate-btn",
+  const chip = createLiveChip(
+    {
+      key: "rate",
+      aria: "Частота дискретизации",
+      options: SCOPE_SAMPLE_RATES_HZ.map((hz) => ({
+        value: String(hz),
         text: rateLabelHz(hz),
-        attrs: {
-          type: "button",
-          "data-scope-rate": String(hz),
-          "aria-pressed": String(hz === rate),
-        },
-      }),
-    );
-  }
-  for (const [hz, button] of buttons) {
-    button.addEventListener("click", () => {
-      if (hz === rate) return;
-      rate = hz;
-      for (const [entry, node] of buttons) {
-        node.setAttribute("aria-pressed", String(entry === rate));
-      }
-    });
-  }
+      })),
+      current: String(DEFAULT_LIVE_START_REQUEST.sample_rate_hz),
+      menuTitle: "Частота · применяется при запуске",
+    },
+    (value) => {
+      rate = Number(value);
+    },
+  );
   return {
-    root: el("div", { className: "lnt-scope-field lnt-scope-rate-field" }, [
-      el("span", { className: "lnt-scope-field-label", text: "Частота дискретизации" }),
-      el(
-        "div",
-        {
-          className: "lnt-scope-seg lnt-scope-rate-seg",
-          attrs: { role: "group", "aria-label": "Частота дискретизации" },
-        },
-        [...buttons.values()],
-      ),
-      el("p", { className: "t-compact lnt-scope-hint", text: RATE_HINT }),
-    ]),
+    root: el("div", { className: "lnt-scope-field lnt-scope-rate-field" }, [chip.root]),
     rateHz: () => rate,
+    selectRate: (hz: number): void => {
+      rate = hz;
+      chip.markTarget(String(hz));
+    },
   };
 }

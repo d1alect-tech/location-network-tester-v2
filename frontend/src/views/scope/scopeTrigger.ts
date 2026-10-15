@@ -208,7 +208,11 @@ export function buildScopeTriggerSection(options: {
     sourceSeg.paint(trigger.source);
     slopeSeg.paint(trigger.slope);
     modeSeg.paint(trigger.mode);
-    levelInput.value = String(trigger.level_v);
+    // Правка уровня в фокусе честнее живого репейнта: heartbeat не затирает
+    // несохранённый ввод оператора (blur доставит его change-ом).
+    if (document.activeElement !== levelInput) {
+      levelInput.value = String(trigger.level_v);
+    }
   }
 
   function apply(patch: Partial<LiveTrigger>): void {

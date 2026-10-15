@@ -403,8 +403,9 @@ describe("scopeWorkspace: экран послесвечения и истори�
     const screen = container.querySelector(".lnt-scope-screen");
     expect(screen).toBeInstanceOf(HTMLElement);
     expect(screen?.querySelector(".lnt-scope-persistence")).toBeInstanceOf(HTMLCanvasElement);
-    const toggle = screen?.querySelector("#lnt-scope-persistence-toggle") as HTMLInputElement;
-    expect(toggle.checked).toBe(true);
+    // Тумблер послесвечения — сегмент Выкл|Вкл (задача 14): включён по умолчанию.
+    const persist = screen?.querySelector("#lnt-scope-persist [aria-pressed='true']");
+    expect(persist?.getAttribute("data-value")).toBe("on");
 
     // When: SSE приносит три кадра.
     const source = FakeLiveEventSource.instances[0];

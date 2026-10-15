@@ -43,8 +43,10 @@ describe("buildScopeScreen: панель экрана (Todo 11)", () => {
     expect(screen.root.querySelector(".lnt-scope-viewport")).toBeInstanceOf(HTMLElement);
     expect(screen.root.querySelector(".lnt-scope-persistence")).toBeInstanceOf(HTMLCanvasElement);
     expect(screen.root.querySelector(".lnt-scope-screen-trace")).toBeInstanceOf(HTMLCanvasElement);
-    const toggle = screen.root.querySelector("#lnt-scope-persistence-toggle") as HTMLInputElement;
-    expect(toggle.checked).toBe(true);
+    const persistSeg = screen.root.querySelector("#lnt-scope-persist");
+    expect(persistSeg?.querySelector('[data-value="on"]')?.getAttribute("aria-pressed")).toBe(
+      "true",
+    );
     expect(screen.isPersistenceOn()).toBe(true);
     const slider = screen.root.querySelector("#lnt-scope-history") as HTMLInputElement;
     expect(slider.value).toBe("0");
@@ -96,24 +98,22 @@ describe("buildScopeScreen: панель экрана (Todo 11)", () => {
     expect(live.disabled).toBe(true);
   });
 
-  it("тумблер послесвечения выключает слой и помнит выбор в localStorage", () => {
+  it("тумблер послесвечения (liveSeg Выкл/Вкл) выключает слой и помнит выбор в localStorage", () => {
     const first = buildScopeScreen();
-    const toggle = first.root.querySelector("#lnt-scope-persistence-toggle") as HTMLInputElement;
+    const offButton = first.root.querySelector<HTMLButtonElement>(
+      "#lnt-scope-persist [data-value='off']",
+    );
 
-    // When: оператор выключает послесвечение (jsdom не шлёт change на клик
-    // чекбокса — событие эмулируется, как это делает реальный браузер).
-    toggle.click();
-    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    // When: оператор выключает послесвечение сегментом «Выкл».
+    offButton?.click();
     expect(first.isPersistenceOn()).toBe(false);
     expect(window.localStorage.getItem(SCOPE_PERSISTENCE_STORAGE_KEY)).toBe("off");
 
     // Then: повторное монтирование помнит выключенное состояние.
     const second = buildScopeScreen();
     expect(second.isPersistenceOn()).toBe(false);
-    const secondToggle = second.root.querySelector(
-      "#lnt-scope-persistence-toggle",
-    ) as HTMLInputElement;
-    expect(secondToggle.checked).toBe(false);
+    const pressed = second.root.querySelector("#lnt-scope-persist [aria-pressed='true']");
+    expect(pressed?.getAttribute("data-value")).toBe("off");
   });
 
   it("кадры продолжают писаться в историю, пока экран прокручен назад", () => {

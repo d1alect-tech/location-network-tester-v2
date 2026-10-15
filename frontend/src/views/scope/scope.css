@@ -525,3 +525,35 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Задача 14: компактный leftover при смонтированной полосе liveStrip ──
+   Класс .lnt-scope-strip-mode ставит scopeStrip на корень воркспейса. Сокрытие
+   — НЕ удаление: модули живут и питаются кадрами (урок спайка r3 — скрытые
+   слайдеры курсоров остаются в DOM с живыми слушателями). Сверхманифестные
+   контролы (инверсия CH1/CH2, строка устройства) и ошибки уровня остаются
+   видимыми в главной области (BRIEF §1.4, зона-карта §8): панель «Прибор»
+   ужимается до строки устройства, панель «Триггер» — до ошибки уровня. */
+.lnt-scope-strip-mode .placeholder-title,
+.lnt-scope-strip-mode .panel-hd,
+.lnt-scope-strip-mode .lnt-scope-field-label,
+.lnt-scope-strip-mode .lnt-scope-hint,
+.lnt-scope-strip-mode .lnt-scope-mode-hint,
+.lnt-scope-strip-mode .lnt-scope-coupling,
+.lnt-scope-strip-mode .lnt-scope-state-row,
+.lnt-scope-strip-mode .lnt-scope-screen-controls {
+  display: none;
+}
+
+/* Поля панели триггера опустели (сегменты и уровень уехали в полосу):
+   обёртки складываются в contents — ошибка уровня [role=alert] видна. */
+.lnt-scope-strip-mode .lnt-scope-trig-grid .lnt-scope-field {
+  display: contents;
+}
+
+/* Ошибки уровня живут в главной области: заметная рамка вместо хрома поля. */
+.lnt-scope-strip-mode .lnt-scope-trigger [role="alert"] {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--lnt-err);
+  border-radius: var(--lnt-r-ctl);
+}

@@ -1,13 +1,15 @@
-/** Экран осциллографа (Todo 11): панель .lnt-scope-screen — вьюпорт с двумя
- * канвас-слоями (послесвечение ПОД трассой кадра; uPlot-волна тодо 8 встанет
- * поверх) и управление: тумблер «Послесвечение» (память localStorage) и
- * ползунок истории с кнопкой «Живой». Диапазон экрана ±5 В (дефолт
- * live-старта; V/div привяжет тодо 8). Пока экран прокручен назад, кадры
- * продолжают писаться в историю, послесвечение заморожено. Сторы бюджета
- * ограничены (scopePersistence/scopeHistory); наблюдатель ресайза
+/** Экран осциллографа (Todo 11; задача 14 — тумблер liveSeg): панель
+ * .lnt-scope-screen — вьюпорт с двумя канвас-слоями (послесвечение ПОД
+ * трассой кадра; uPlot-волна тодо 8 встанет поверх) и управление: тумблер
+ * «Послесвечение» Выкл|Вкл (память localStorage, замена чекбокса внутри
+ * scopeScreen) и ползунок истории с кнопкой «Живой». Диапазон экрана ±5 В
+ * (дефолт live-старта; V/div привяжет тодо 8). Пока экран прокручен назад,
+ * кадры продолжают писаться в историю, послесвечение заморожено. Сторы
+ * бюджета ограничены (scopePersistence/scopeHistory); наблюдатель ресайза
  * отключается dispose(). */
 
 import type { LiveFramePayload } from "../../api/types-live";
+import { createLiveSeg } from "../../components/liveStrip/liveSeg";
 import { el } from "../../components/primitives/dom";
 import { ScopeHistory } from "./scopeHistory";
 import { ScopePersistence } from "./scopePersistence";
@@ -65,15 +67,6 @@ export function buildScopeScreen(): ScopeScreenHandle {
     note,
   ]);
 
-  const toggle = el("input", {
-    className: "lnt-scope-toggle",
-    attrs: { type: "checkbox", id: "lnt-scope-persistence-toggle" },
-  });
-  const toggleLabel = el("label", {
-    className: "lnt-scope-toggle-label",
-    text: "Послесвечение",
-    attrs: { for: "lnt-scope-persistence-toggle" },
-  });
   const slider = el("input", {
     className: "lnt-scope-history-slider",
     attrs: {
@@ -93,8 +86,30 @@ export function buildScopeScreen(): ScopeScreenHandle {
     attrs: { type: "button", id: "lnt-scope-live" },
   });
   liveButton.disabled = true;
+  let persistenceOn = readPersistenceOn();
+  const persistSeg = createLiveSeg(
+    {
+      key: "persist",
+      kind: "local",
+      aria: "Послесвечение",
+      options: [
+        { value: "on", text: "Вкл" },
+        { value: "off", text: "Выкл" },
+      ],
+      current: persistenceOn ? "on" : "off",
+      groupAttrs: { id: "lnt-scope-persist" },
+    },
+    (value) => {
+      persistenceOn = value === "on";
+      writePersistenceOn(persistenceOn);
+      if (!persistenceOn) {
+        persistence.clear();
+        paintScopePersistence(persistenceCanvas, persistence);
+      }
+    },
+  );
   const controls = el("div", { className: "lnt-scope-screen-controls" }, [
-    el("div", { className: "lnt-scope-screen-toggle" }, [toggle, toggleLabel]),
+    el("div", { className: "lnt-scope-screen-toggle" }, [persistSeg.root]),
     el("div", { className: "lnt-scope-screen-history" }, [
       el("span", { className: "t-compact lnt-scope-history-label", text: "История" }),
       slider,
@@ -109,8 +124,6 @@ export function buildScopeScreen(): ScopeScreenHandle {
 
   const history = new ScopeHistory();
   const persistence = new ScopePersistence();
-  let persistenceOn = readPersistenceOn();
-  toggle.checked = persistenceOn;
   let offset = 0;
 
   function applyNote(): void {
@@ -164,14 +177,6 @@ export function buildScopeScreen(): ScopeScreenHandle {
     applyOffset(Number.parseInt(slider.value, 10) || 0);
   });
   liveButton.addEventListener("click", () => applyOffset(0));
-  toggle.addEventListener("change", () => {
-    persistenceOn = toggle.checked;
-    writePersistenceOn(persistenceOn);
-    if (!persistenceOn) {
-      persistence.clear();
-      paintScopePersistence(persistenceCanvas, persistence);
-    }
-  });
 
   // jsdom не знает ResizeObserver — там перерисовки по ресайзу нет.
   let observer: ResizeObserver | null = null;

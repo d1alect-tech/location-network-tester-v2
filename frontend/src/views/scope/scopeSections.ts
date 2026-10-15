@@ -1,11 +1,13 @@
 /** Статические секции и показания вкладки «Осциллограф» (Todo 7, Todo 10).
  * Панельная система V6 (kit.css §5.2, как settingsSections): section.panel >
  * .panel-hd/.panel-title + .panel-bd, показания — .readout-grid. Только
- * построение DOM из готовых данных и форматирование: без сети, без
- * состояния, без слушателей — интерактив остаётся в scopeWorkspace
- * (курсоры экрана — в scopeCursorSection). */
+ * построение DOM из готовых данных и форматирование: без сети — интерактив
+ * остаётся в scopeWorkspace (курсоры экрана — в scopeCursorSection).
+ * Исключение (задача 14): локальный тумблер измерений Выкл|Вкл — local-контроль
+ * полосы, чистая видимость ряда, без стейджинга. */
 
 import type { LiveFramePayload, LiveInstrumentState } from "../../api/types-live";
+import { createLiveSeg } from "../../components/liveStrip/liveSeg";
 import { el } from "../../components/primitives/dom";
 import {
   formatDutyValue,
@@ -174,23 +176,44 @@ export function buildScopeMeasureSection(): ScopeMeasureView {
     value,
   ];
 
+  const grid = el(
+    "dl",
+    { className: "readout-grid" },
+    row("Vpp", vpp)
+      .concat(row("Vmax", vmax))
+      .concat(row("Vmin", vmin))
+      .concat(row("VRMS", rms))
+      .concat(row("f (фронт)", freq))
+      .concat(row("T", period))
+      .concat(row("D (высокий)", duty)),
+  );
+  // Локальный тумблер измерений (local-контроль полосы): прячет ряд,
+  // БЕЗ стейджинга — мгновенно и без сети (зона-карта §3.4).
+  const measureSeg = createLiveSeg(
+    {
+      key: "measure",
+      kind: "local",
+      aria: "Измерения",
+      options: [
+        { value: "on", text: "Вкл" },
+        { value: "off", text: "Выкл" },
+      ],
+      current: "on",
+      groupAttrs: { id: "lnt-scope-measure" },
+    },
+    (value) => {
+      grid.hidden = value === "off";
+    },
+  );
+
   return {
     root: el("section", { className: "panel lnt-scope-section lnt-scope-measure" }, [
       el("div", { className: "panel-hd" }, [
         el("h3", { className: "panel-title", text: "Измерения CH1" }),
       ]),
       el("div", { className: "panel-bd" }, [
-        el(
-          "dl",
-          { className: "readout-grid" },
-          row("Vpp", vpp)
-            .concat(row("Vmax", vmax))
-            .concat(row("Vmin", vmin))
-            .concat(row("VRMS", rms))
-            .concat(row("f (фронт)", freq))
-            .concat(row("T", period))
-            .concat(row("D (высокий)", duty)),
-        ),
+        measureSeg.root,
+        grid,
         el("p", {
           className: "t-compact",
           text: "По отсчётам кадра CH1; АЦП 8 бит — уровни сырые, без калибровочных заявлений.",

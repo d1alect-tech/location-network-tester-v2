@@ -188,10 +188,12 @@ async function flush(): Promise<void> {
   for (let i = 0; i < 20; i += 1) await Promise.resolve();
 }
 
-function changeSelect(container: HTMLElement, selector: string, value: string): void {
-  const select = container.querySelector(selector) as HTMLSelectElement;
-  select.value = value;
-  select.dispatchEvent(new Event("change", { bubbles: true }));
+function pickSegment(container: HTMLElement, selector: string, value: string): void {
+  // Задача 14: В/дел и пробник — сегментные группы; выбор = клик по сегменту
+  // (живой слушатель scopeControls), эквивалент прежнего select.change.
+  const button = container.querySelector<HTMLButtonElement>(`${selector} [data-value="${value}"]`);
+  if (button === null) throw new Error(`нет сегмента ${value} в ${selector}`);
+  button.click();
 }
 
 afterEach(() => {
@@ -311,8 +313,8 @@ describe("scopeWorkspace wiring (Todo 8)", () => {
     const { container, log } = mountWorkspace();
     await flush();
 
-    changeSelect(container, "#lnt-scope-vdiv", "1");
-    changeSelect(container, "#lnt-scope-probe", "10");
+    pickSegment(container, "#lnt-scope-vdiv", "1");
+    pickSegment(container, "#lnt-scope-probe", "10");
     (container.querySelector("#lnt-scope-run") as HTMLButtonElement).click();
     await flush();
 
@@ -327,7 +329,7 @@ describe("scopeWorkspace wiring (Todo 8)", () => {
     const label = container.querySelector(".lnt-scope-vdiv-effective");
     expect(label?.textContent).toContain("5 В/дел");
 
-    changeSelect(container, "#lnt-scope-probe", "10");
+    pickSegment(container, "#lnt-scope-probe", "10");
     await flush();
     expect(label?.textContent).toContain("50 В/дел");
   });
@@ -341,7 +343,7 @@ describe("scopeWorkspace wiring (Todo 8)", () => {
     expect(chart.requests).toHaveLength(1);
     const before = chart.requests[0]?.yRange;
 
-    changeSelect(container, "#lnt-scope-vdiv", "0.5");
+    pickSegment(container, "#lnt-scope-vdiv", "0.5");
     await flush();
     expect(chart.requests).toHaveLength(2);
     expect(chart.requests[1]?.yRange).not.toEqual(before);

@@ -18,6 +18,7 @@ import { mountInspectV6 } from "./views/inspect/inspectV6";
 // Todo 14: рабочая область «Спектроанализатор» (#/sa).
 import { mountSaWorkspace } from "./views/sa/saWorkspace";
 // Todo 7: рабочая область «Осциллограф» (#/scope).
+import { mountScopeStrip } from "./views/scope/scopeStrip";
 import { mountScopeWorkspace } from "./views/scope/scopeWorkspace";
 
 import { type ThemeController, createThemePreference } from "./state/themePreference";
@@ -223,9 +224,16 @@ export class AppShell {
     if (this.currentRoute === "scope") {
       viewContainer.innerHTML = "";
       viewContainer.className = "view-container";
-      this.activeViewCleanup = mountScopeWorkspace(viewContainer as HTMLElement, {
+      const disposeWorkspace = mountScopeWorkspace(viewContainer as HTMLElement, {
         client: this.apiClient,
       });
+      // Задача 14: полоса liveStrip монтируется ПОСЛЕ воркспейса и ре-парентит
+      // живые узлы контролов; dispose-цепочка отписывает полосу первой.
+      const disposeStrip = mountScopeStrip(viewContainer as HTMLElement);
+      this.activeViewCleanup = () => {
+        disposeStrip();
+        disposeWorkspace();
+      };
       this.mountedRoute = this.currentRoute;
       return;
     }

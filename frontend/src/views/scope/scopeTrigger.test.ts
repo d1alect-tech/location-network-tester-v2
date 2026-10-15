@@ -264,28 +264,37 @@ describe("scopeTrigger view (Todo 9)", () => {
     expect(text).not.toContain("предтриггер");
   });
 
-  it("rate field: seven instrument rates, default 8 MHz, staged only", () => {
+  it("rate field: чип с семью частотами прибора, слот — применённое, выбор отложен", () => {
     const field = buildScopeRateField();
     document.body.append(field.root);
 
-    const labels = [...field.root.querySelectorAll("button[data-scope-rate]")].map(
-      (button) => button.textContent,
-    );
-    expect(labels).toEqual(["100 кГц", "200 кГц", "500 кГц", "1 МГц", "2 МГц", "4 МГц", "8 МГц"]);
+    // Слот показывает применённое значение; выбор в списке — staged-цель.
+    expect(field.root.querySelector("[data-slot='rate']")?.textContent).toBe("8 МГц");
     expect(field.rateHz()).toBe(8_000_000);
 
-    segButton(field.root, "data-scope-rate", "500000").click();
-    expect(field.rateHz()).toBe(500_000);
-    expect(segButton(field.root, "data-scope-rate", "500000").getAttribute("aria-pressed")).toBe(
-      "true",
+    (field.root.querySelector(".lnt-live-chip-btn") as HTMLButtonElement).click();
+    const labels = [...field.root.querySelectorAll("[role='option']")].map(
+      (option) => option.querySelector(".lnt-live-opt-text")?.textContent,
     );
-    expect(segButton(field.root, "data-scope-rate", "8000000").getAttribute("aria-pressed")).toBe(
-      "false",
-    );
+    expect(labels).toEqual(["100 кГц", "200 кГц", "500 кГц", "1 МГц", "2 МГц", "4 МГц", "8 МГц"]);
 
-    // Повторный клик по нажатой кнопке — пустой no-op, состояние то же.
-    segButton(field.root, "data-scope-rate", "500000").click();
+    (field.root.querySelector("[role='option'][data-value='500000']") as HTMLButtonElement).click();
     expect(field.rateHz()).toBe(500_000);
+    // Staged ≠ текущее: слот не меняется (цель помечает стрелкой scopeStatus
+    // полосы — стейджинг-реестр не часть поля).
+    expect(field.root.querySelector("[data-slot='rate']")?.textContent).toBe("8 МГц");
+
+    // Выбор применённого значения возвращает цель к базлайну (снятие стейджа —
+    // маркерами ведает scopeStatus полосы, здесь — только значение поля).
+    (field.root.querySelector(".lnt-live-chip-btn") as HTMLButtonElement).click();
+    (
+      field.root.querySelector("[role='option'][data-value='8000000']") as HTMLButtonElement
+    ).click();
+    expect(field.rateHz()).toBe(8_000_000);
+
+    // selectRate — программная дорога сброса/автосета (задачи 15).
+    field.selectRate(1_000_000);
+    expect(field.rateHz()).toBe(1_000_000);
   });
 
   it("seg clicks fire onTriggerChange with the full trigger; pressed follows", () => {
@@ -521,8 +530,15 @@ describe("scope workspace wiring (Todo 9)", () => {
     (container.querySelector("#lnt-scope-run") as HTMLButtonElement).click();
     await flush();
 
-    // На ходу частота не меняется: клик не шлёт конфиг.
-    segButton(container, "data-scope-rate", "1000000").click();
+    // На ходу частота не меняется: выбор в списке не шлёт конфиг.
+    (
+      container.querySelector(".lnt-scope-rate-field .lnt-live-chip-btn") as HTMLButtonElement
+    ).click();
+    (
+      container.querySelector(
+        ".lnt-scope-rate-field [role='option'][data-value='1000000']",
+      ) as HTMLButtonElement
+    ).click();
     await flush();
     expect(log.configs).toHaveLength(0);
 
