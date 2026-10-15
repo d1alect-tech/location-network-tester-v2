@@ -557,3 +557,58 @@
   border: 1px solid var(--lnt-err);
   border-radius: var(--lnt-r-ctl);
 }
+
+/* Панель «Курсоры» опустела (тумблер и ридаут уехали в полосу): тело
+   скрывается, слайдеры — скрытый leftover с живыми слушателями (drag
+   линий и readout продолжают жить; зона-карта §8.3). */
+.lnt-scope-strip-mode .lnt-scope-cursors .panel-bd {
+  display: none;
+}
+
+/* ── Задача 15: экранная линия триггера (DOM-оверлей, ±5 В) ───────────── */
+
+/* Hit-полоса 44 px (прототип v1.html): полоска 2 px по центру, зона
+   захвата — вся полоса; клавиатура — role=slider на линии. */
+.lnt-scope-workspace .lnt-scope-trig-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 44px;
+  z-index: 2;
+  cursor: grab;
+  touch-action: none;
+}
+
+.lnt-scope-workspace .lnt-scope-trig-line:active {
+  cursor: grabbing;
+}
+
+.lnt-scope-workspace .lnt-scope-trig-line-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 21px;
+  height: 2px;
+  background: var(--lnt-accent);
+}
+
+/* Флажок «ТРГ» без значения: значение живёт на степпере уровня (G1 —
+   значение печатается один раз); текст — токен текста (контраст 4,5+),
+   носитель — акцентная рамка. */
+.lnt-scope-workspace .lnt-scope-trig-line-tag {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  padding: 0 4px;
+  font: 600 10px / 12px var(--lnt-mono);
+  color: var(--lnt-text);
+  background: var(--lnt-panel);
+  border: 1px solid var(--lnt-accent);
+  border-radius: var(--lnt-r-ctl);
+}
+
+.lnt-scope-workspace .lnt-scope-trig-line:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -2px;
+}

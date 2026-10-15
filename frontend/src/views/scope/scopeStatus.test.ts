@@ -1,7 +1,7 @@
 /** Задача 14 RED: статус-модель вкладки «Осциллограф» — staged-реестр
  * (В/дел/пробник/частота всегда; триггер только при idle), маркеры
  * «→ …», глобальная строка «применится при следующем запуске: …»,
- * pendingCount, индикатор [data-trig-state] «в приборе · сразу»/«при
+ * pendingCount, индикатор [data-trig-state] «в приборе»/«при
  * запуске», перевод baseline при переходе в running (маркеры гаснут),
  * dispose отписывается. */
 
@@ -206,9 +206,7 @@ describe("mountScopeStatus: staged-реестр", () => {
 
     // Горячий контур: на ходу клики триггера не помечаются.
     emit(RUNNING);
-    expect(document.querySelector<HTMLElement>("[data-trig-state]")?.textContent).toBe(
-      "в приборе · сразу",
-    );
+    expect(document.querySelector<HTMLElement>("[data-trig-state]")?.textContent).toBe("в приборе");
     button(trigMode, '[data-trigger-mode="auto"]').click();
     expect(pending.at(-1)).toBe(0);
   });

@@ -3,12 +3,19 @@
  * зоны из scope-манифеста; run-контрол отражает live-источник (running →
  * «СТОП»); staged-сценарий «изменил В/дел → маркировка → Run → применилось,
  * маркировка снята»; негативный: staged-число частоты НЕ в слоте текущего
- * значения; dispose закрывает все live-подписки вкладки. */
+ * значения; dispose закрывает все live-подписки вкладки.
+ * Задача 15: линия триггера на экране, автосет/сброс/курсоры в ИЗМЕР,
+ * 409-клетка (сигнал конфликта + баннер с переходом). */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LntApiClient } from "../../api/client";
 import { createLiveApi } from "../../api/client-live";
 import type { LiveStatePayload } from "../../api/types-live";
+import {
+  LIVE_ALREADY_RUNNING_RU,
+  createLiveConflictSignal,
+  signalLiveConflicts,
+} from "../../components/liveStrip/liveConflict";
 import { mountScopeStrip } from "./scopeStrip";
 import { mountScopeWorkspace } from "./scopeWorkspace";
 
@@ -84,7 +91,10 @@ interface LiveLog {
   configs: number;
 }
 
-function liveStubFetch(log: LiveLog, live: { state: LiveStatePayload }): typeof fetch {
+function liveStubFetch(
+  log: LiveLog,
+  live: { state: LiveStatePayload; start409?: boolean },
+): typeof fetch {
   return (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     const json = (body: unknown, status = 200): Response =>
@@ -104,6 +114,10 @@ function liveStubFetch(log: LiveLog, live: { state: LiveStatePayload }): typeof 
         body: JSON.parse(String(init.body)) as Record<string, unknown>,
         nonce: headers["X-LNT-Mutation-Nonce"],
       });
+      if (live.start409 === true) {
+        // Живой захват уже идёт на другой вкладке: сервер отдаёт 409.
+        return json({ detail: LIVE_ALREADY_RUNNING_RU }, 409);
+      }
       live.state = RUNNING;
       return json(live.state);
     }
@@ -132,17 +146,26 @@ function emitAll(type: string, data: unknown): void {
 
 const cleanups: Array<() => void> = [];
 
-function mountTab(log: LiveLog, live: { state: LiveStatePayload }): HTMLElement {
+function mountTab(
+  log: LiveLog,
+  live: { state: LiveStatePayload; start409?: boolean },
+): {
+  container: HTMLElement;
+  conflict: ReturnType<typeof createLiveConflictSignal>;
+} {
   vi.stubGlobal("EventSource", FakeLiveEventSource);
   const container = document.createElement("div");
   document.body.append(container);
   const fetchImpl = liveStubFetch(log, live);
-  const liveApi = createLiveApi(new LntApiClient(fetchImpl));
+  // Проводка AppShell (задача 15): инструментированный live-контур — 409
+  // старта уходит сигналом liveConflict, а не правкой воркспейса.
+  const conflict = createLiveConflictSignal();
+  const liveApi = signalLiveConflicts(createLiveApi(new LntApiClient(fetchImpl)), conflict);
   cleanups.push(
     mountScopeWorkspace(container, { client: new LntApiClient(fetchImpl), live: liveApi }),
   );
-  cleanups.push(mountScopeStrip(container, { live: liveApi }));
-  return container;
+  cleanups.push(mountScopeStrip(container, { live: liveApi, conflictSignal: conflict }));
+  return { container, conflict };
 }
 
 afterEach(() => {
@@ -150,13 +173,14 @@ afterEach(() => {
   cleanups.length = 0;
   vi.unstubAllGlobals();
   FakeLiveEventSource.instances = [];
+  window.location.hash = "";
   document.body.replaceChildren();
 });
 
 describe("scopeStrip: полоса поверх воркспейса (задача 14)", () => {
   it("полоса рендерит зоны из scope-манифеста и ре-парентит живые узлы", async () => {
     const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
-    const container = mountTab(log, { state: { ...IDLE } });
+    const { container } = mountTab(log, { state: { ...IDLE } });
     await flush();
 
     // Зоны из манифеста: ВЕРТ/ГОРИЗ/ТРИГГ/ЗАПУСК/ИЗМЕР, две линии виджетов.
@@ -188,13 +212,14 @@ describe("scopeStrip: полоса поверх воркспейса (задач
     expect(
       container.querySelector(".lnt-scope-workspace")?.classList.contains("lnt-scope-strip-mode"),
     ).toBe(true);
-    // Подписки вкладки: воркспейс + статус + run-кластер.
-    expect(FakeLiveEventSource.instances).toHaveLength(3);
+    // Подписки вкладки: воркспейс + статус + run-кластер + автосет +
+    // линия триггера (собственная подписка истины сервиса).
+    expect(FakeLiveEventSource.instances).toHaveLength(5);
   });
 
   it("run-контрол отражает live-источник: running → «СТОП» в паре; dispose отписывается", async () => {
     const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
-    const container = mountTab(log, { state: { ...IDLE } });
+    const { container } = mountTab(log, { state: { ...IDLE } });
     await flush();
 
     const run = container.querySelector<HTMLButtonElement>("#lnt-scope-run");
@@ -223,7 +248,7 @@ describe("scopeStrip: полоса поверх воркспейса (задач
 
   it("staged-сценарий: изменил В/дел → маркировка → Run → применилось, маркировка снята", async () => {
     const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
-    const container = mountTab(log, { state: { ...IDLE } });
+    const { container } = mountTab(log, { state: { ...IDLE } });
     await flush();
 
     // When: оператор жмёт сегмент «1» без запуска.
@@ -256,7 +281,7 @@ describe("scopeStrip: полоса поверх воркспейса (задач
 
   it("негативный: staged-число частоты НЕ в элементе текущего значения", async () => {
     const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
-    const container = mountTab(log, { state: { ...IDLE } });
+    const { container } = mountTab(log, { state: { ...IDLE } });
     await flush();
 
     // Открываем stateless-меню частоты и выбираем 2 МГц без запуска.
@@ -278,5 +303,62 @@ describe("scopeStrip: полоса поверх воркспейса (задач
     emitAll("heartbeat", RUNNING);
     await flush();
     expect(slot?.textContent).toBe("2 МГц");
+  });
+
+  it("задача 15: линия триггера на экране; ИЗМЕР несёт курсоры/автосет/сброс", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+
+    // Линия триггера — DOM-оверлей на viewport экрана, синхронна полю.
+    const line = container.querySelector<HTMLElement>("[data-trigger-line]");
+    expect(line).toBeInstanceOf(HTMLElement);
+    expect(line?.closest(".lnt-scope-viewport")).toBeInstanceOf(HTMLElement);
+    const level = container.querySelector<HTMLInputElement>("#lnt-scope-level");
+    if (level === null) throw new Error("нет поля уровня");
+    level.value = "1";
+    level.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(line?.getAttribute("aria-valuenow")).toBe("1");
+
+    // ИЗМЕР: тумблер курсоров + ридаут Δt/ΔV; кнопки действий с эхом.
+    const cursors = container.querySelector('[data-local="cursors"]');
+    expect(cursors?.querySelectorAll("button")).toHaveLength(2);
+    expect(cursors?.querySelector(".readout-grid")).toBeInstanceOf(HTMLElement);
+    const autoset = container.querySelector('[data-action="autoset"] button');
+    expect(autoset?.textContent).toBe("Автосет");
+    const reset = container.querySelector('[data-action="reset"] button');
+    expect(reset?.textContent).toBe("Сброс");
+    expect(container.querySelector('[data-echo="autoset"]')).toBeInstanceOf(HTMLElement);
+    expect(container.querySelector('[data-echo="reset"]')).toBeInstanceOf(HTMLElement);
+  });
+
+  it("задача 15: 409 запуска — баннер с переходом; Run возвращается в исходное", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
+    const { container } = mountTab(log, { state: { ...IDLE }, start409: true });
+    await flush();
+
+    button(container, "#lnt-scope-run").click();
+    await flush();
+
+    // Баннер конфликта в статус-зоне: текст зеркала + кнопка перехода.
+    const banner = container.querySelector<HTMLElement>(".lnt-live-conflict");
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain("Запуск уже выполняется на вкладке «Спектроанализатор»");
+    expect(banner?.textContent).toContain(LIVE_ALREADY_RUNNING_RU);
+    // Run не залип: кнопка доступна, кластер в idle.
+    const run = container.querySelector<HTMLButtonElement>("#lnt-scope-run");
+    expect(run?.disabled).toBe(false);
+    expect(run?.getAttribute("aria-checked")).toBe("false");
+    expect(container.querySelector(".lnt-live-runctl")?.getAttribute("data-run-state")).toBe(
+      "idle",
+    );
+
+    // Кнопка «Перейти и остановить»: стоп + переход на вкладку-конкурента.
+    const goto = banner?.querySelector<HTMLButtonElement>(".lnt-live-conflict button");
+    if (!(goto instanceof HTMLButtonElement)) throw new Error("нет кнопки перехода");
+    goto.click();
+    await flush();
+    expect(log.stops).toBe(1);
+    expect(window.location.hash).toBe("#/sa");
   });
 });

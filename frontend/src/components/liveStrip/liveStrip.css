@@ -275,9 +275,11 @@
   border-color: var(--lnt-line-hot);
 }
 
+/* Степпер (задача 15: поле 56 px — уровень ±5.0 влезает, строка ТРИГГ
+   делит ширину с ИЗМЕР). */
 .lnt-live-strip .lnt-live-stepper input[type="number"] {
   box-sizing: border-box;
-  width: 64px;
+  width: 56px;
   min-height: 44px;
   padding: 0 6px;
   border: 1px solid var(--lnt-line-struct);
@@ -483,9 +485,10 @@
 }
 
 /* Слайдер истории: фиксированная компактная дорожка (flex:1 воркспейса
-   растягивал линию 2 и заворачивал ТРИГГ на вторую строку). */
+   растягивал линию 2 и заворачивал ТРИГГ на вторую строку). Задача 15:
+   128 px — общий бюджет ИЗМЕР со свежими группами (курсоры/действия). */
 .lnt-live-strip .lnt-scope-history-slider {
-  flex: 0 0 140px;
+  flex: 0 0 110px;
   min-height: 44px;
   margin: 0;
   accent-color: var(--lnt-accent);
@@ -566,4 +569,133 @@
 .lnt-live-strip .readout-grid dd {
   font-family: var(--lnt-mono);
   color: var(--lnt-text);
+}
+
+/* ── Задача 15: ИЗМЕР — порядок cursors/history/autoset/reset/measure/persist
+   и упаковка §3.4 (эллипсис ридаутов, одна строка эха) без роста высоты
+   полосы (138 px — kill-gate §6): значения сжимаются, NEVER не удаляются. */
+
+/* Ридаут курсоров: 6 пар в 2 строки, эллипсис (§3.4.1) — тумблер +
+   «Δt/ΔV» в общем бюджете строки ИЗМЕР. */
+.lnt-live-strip [data-local="cursors"] .readout-grid {
+  max-width: 100px;
+}
+
+/* Ряд измерений: эллипсис ячеек (§3.4.1) — значения сжимаются, NEVER не
+   удаляются; «Измерения: Выкл» гасит ряд и возвращает ширину строке. */
+.lnt-live-strip [data-local="measure"] .readout-grid {
+  max-width: 100px;
+}
+
+/* Подпись кадров истории: «кадр №N · M» — эллипсис при нехватке (§3.4.1). */
+.lnt-live-strip .lnt-scope-screen-note {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* «Живой» прокрутка истории: компактная подушка в общем бюджете строки. */
+.lnt-live-strip #lnt-scope-live {
+  padding: 0 8px;
+}
+
+/* Задача 15. Действия ИЗМЕР: автосет/сброс — один скин кликабельности
+   с сегментами (рамка на хроме = кнопка, 44 px target). */
+.lnt-live-strip .lnt-live-action-btn {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-panel);
+  color: var(--lnt-text);
+  font: 500 12px / 14px var(--lnt-ui);
+}
+
+.lnt-live-strip .lnt-live-action-btn:hover:not(:disabled) {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-live-strip .lnt-live-action-btn:active {
+  transform: translateY(1px);
+}
+
+.lnt-live-strip .lnt-live-action-btn:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: 1px;
+}
+
+/* Задача 15. Эхо-строки действий (автосет/сброс) — 10 px, эллипсис,
+   одна строка (§3.4.2); живут в статус-зоне — ноль px роста полосы. */
+.lnt-live-strip .lnt-live-echo-line {
+  min-width: 0;
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lnt-text-sec);
+}
+
+/* Задача 15. Статус-зона — одна строка: перенос запрещён (рост полосы
+   запрещён §6), избыток срезается эллипсисом слотов. */
+.lnt-live-bandstatus {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.lnt-live-bandstatus > * {
+  flex: none;
+  min-width: 0;
+}
+
+/* Задача 15. 409-баннер «Запуск уже выполняется на вкладке …»: честная
+   замена сырой ошибки (строка бэкенда — дословно), кнопка перехода;
+   живёт в errorHost (absolute-оверлей статус-зоны). */
+.lnt-live-strip .lnt-live-conflict {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--lnt-warn);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-panel);
+}
+
+.lnt-live-strip .lnt-live-conflict-text {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 12px / 16px var(--lnt-ui);
+  color: var(--lnt-text);
+}
+
+.lnt-live-strip .lnt-live-conflict-reason {
+  margin: 0;
+  flex: none;
+  white-space: nowrap;
+  font: 400 10px / 12px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+}
+
+.lnt-live-strip .lnt-live-conflict-goto {
+  flex: none;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-panel);
+  color: var(--lnt-text);
+  font: 500 12px / 14px var(--lnt-ui);
+}
+
+.lnt-live-strip .lnt-live-conflict-goto:hover:not(:disabled) {
+  border-color: var(--lnt-line-hot);
+}
+
+.lnt-live-strip .lnt-live-conflict-goto:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: 1px;
 }

@@ -7,6 +7,7 @@ import { captureParamsToPrefill } from "./capture/captureDeepLink";
 // BEGIN Todo 40: регистрация рабочего процесса захвата (аддитивно, один блок).
 import { createCaptureView } from "./capture/captureView";
 import type { CaptureViewHandle } from "./capture/captureView";
+import { createLiveConflictSignal, signalLiveConflicts } from "./components/liveStrip/liveConflict";
 import { clearElement, el } from "./components/primitives/dom";
 import { announcePolite } from "./components/primitives/status";
 import { RouteStore } from "./state/routeState";
@@ -224,12 +225,20 @@ export class AppShell {
     if (this.currentRoute === "scope") {
       viewContainer.innerHTML = "";
       viewContainer.className = "view-container";
+      // Задача 15: инструментированный live-контур — 409 старта уходит
+      // сигналом liveConflict (баннер с переходом), воркспейс без правок.
+      const conflictSignal = createLiveConflictSignal();
+      const live = signalLiveConflicts(sharedLiveApi(), conflictSignal);
       const disposeWorkspace = mountScopeWorkspace(viewContainer as HTMLElement, {
         client: this.apiClient,
+        live,
       });
       // Задача 14: полоса liveStrip монтируется ПОСЛЕ воркспейса и ре-парентит
       // живые узлы контролов; dispose-цепочка отписывает полосу первой.
-      const disposeStrip = mountScopeStrip(viewContainer as HTMLElement);
+      const disposeStrip = mountScopeStrip(viewContainer as HTMLElement, {
+        live,
+        conflictSignal,
+      });
       this.activeViewCleanup = () => {
         disposeStrip();
         disposeWorkspace();

@@ -4,7 +4,7 @@
  * ходу он горячий: конфиг уходит живыми слушателями воркспейса). Маркеры
  * «→ …» [data-live-mark] у контролов, глобальная строка «применится при
  * следующем запуске: …» [data-staged-line], pendingCount → бейдж run-кластера,
- * индикатор тайминга триггера [data-trig-state] «в приборе · сразу» / «при
+ * индикатор тайминга триггера [data-trig-state] «в приборе» / «при
  * запуске». Переход в running переводит baseline к staged-целям и гасит
  * маркеры (снапшот применённого); подписка live-источника закрывается
  * dispose — вместе со слушателями хостов. */
@@ -54,7 +54,7 @@ export interface ScopeStatusOptions {
 export interface ScopeStatusHandle {
   /** Строка «применится при следующем запуске: …» (роль статуса). */
   readonly stagedLine: HTMLElement;
-  /** Индикатор тайминга триггера «в приборе · сразу» / «при запуске». */
+  /** Индикатор тайминга триггера «в приборе» / «при запуске». */
   readonly trigState: HTMLElement;
   dispose(): void;
 }
@@ -146,7 +146,7 @@ export function mountScopeStatus(options: ScopeStatusOptions): ScopeStatusHandle
     onConnection: () => undefined,
     onState: (state: LiveStatePayload) => {
       const nowRunning = state.state === "running";
-      trigState.textContent = nowRunning ? "в приборе · сразу" : "при запуске";
+      trigState.textContent = nowRunning ? "в приборе" : "при запуске";
       if (nowRunning && !running) {
         // Снапшот применённого: staged-цели ушли в прибор — маркеры гаснут.
         for (const [key, entry] of staged) baseline[key] = entry.value;

@@ -7,7 +7,7 @@
 import type uPlot from "uplot";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LiveChannelSeries, LiveFramePayload } from "../../api/types-live";
-import { buildScopeCursorSection } from "./scopeCursorSection";
+import { buildScopeCursorSection, findScopeCursorView } from "./scopeCursorSection";
 
 function sine(
   points: number,
@@ -233,5 +233,49 @@ describe("scopeCursorSection: плагин линий на uPlot", () => {
     // Кадр с другим окном приходит, но окно осей графика остаётся истиной.
     section.applyFrame(frame());
     expect(section.root.querySelector(".lnt-scope-cursor-dt")?.textContent).toBe("1.000 мс");
+  });
+});
+
+describe("scopeCursorSection: тумблер Выкл|Вкл и поиск хэндла (задача 15)", () => {
+  it("тумблер Выкл|Вкл — local-контроль: линии гаснут, включение возвращает", () => {
+    const section = buildScopeCursorSection();
+    document.body.append(section.root);
+
+    const seg = section.root.querySelector<HTMLElement>('[data-local="cursors"]');
+    expect(seg).toBeInstanceOf(HTMLElement);
+    const off = seg?.querySelector<HTMLButtonElement>('[data-value="off"]');
+    if (off === null || off === undefined) throw new Error("нет кнопки Выкл");
+
+    expect(section.cursorsOn()).toBe(true);
+    off.click();
+    expect(section.cursorsOn()).toBe(false);
+
+    // Выкл: draw больше не рисует линии курсоров.
+    const fake = fakeContext();
+    const self = fakeUplot(fake.ctx, 0, 0.002);
+    const draw = section.plugin.hooks?.draw;
+    if (typeof draw === "function") draw(self);
+    expect(fake.strokes).toHaveLength(0);
+
+    const on = seg?.querySelector<HTMLButtonElement>('[data-value="on"]');
+    if (on === null || on === undefined) throw new Error("нет кнопки Вкл");
+    on.click();
+    expect(section.cursorsOn()).toBe(true);
+    if (typeof draw === "function") draw(self);
+    expect(fake.strokes).toHaveLength(4);
+  });
+
+  it("findScopeCursorView находит хэндл по корню секции; chart — после init", () => {
+    const section = buildScopeCursorSection();
+    document.body.append(section.root);
+
+    expect(findScopeCursorView(section.root)).toBe(section);
+    expect(section.chart()).toBeNull();
+
+    const fake = fakeContext();
+    const self = fakeUplot(fake.ctx, 0, 0.002);
+    const initHook = hookOf(section.plugin.hooks?.init);
+    initHook?.(self, {} as uPlot.Options, [] as unknown as uPlot.AlignedData);
+    expect(section.chart()).toBe(self);
   });
 });

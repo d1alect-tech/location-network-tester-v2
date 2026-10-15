@@ -1,5 +1,7 @@
 /** Курсоры осциллографа (Todo 10): ползунки T1/T2 (доли окна кадра) и
- * V1/V2 (вольты номинальной шкалы ±5 В) + readout Δt/ΔV. Линии рисует
+ * V1/V2 (вольты номинальной шкалы ±5 В) + readout Δt/ΔV. Тумблер
+ * Выкл|Вкл и поиск хэндла (findScopeCursorView, chart) — задача 15:
+ * полоса и drag линий берут состояние/геометрию без правок воркспейса. Линии рисует
  * uPlot-плагин (паттерн annotations.createPeaksPlugin: valToPos + bbox,
  * стиль из токенов) — плагин пробрасывается в стек развёртки через шов
  * createView в scopeWorkspace и живёт в каждой пересборке uPlot. Плагин
@@ -10,6 +12,7 @@
 
 import type uPlot from "uplot";
 import type { LiveFramePayload } from "../../api/types-live";
+import { createLiveSeg } from "../../components/liveStrip/liveSeg";
 import { el } from "../../components/primitives/dom";
 import {
   type CursorPositions,
@@ -24,12 +27,24 @@ import { drawCursorLines } from "./scopeCursorPaint";
 import { VOLT_CURSOR_SPAN_V, clampFraction } from "./scopeCursors";
 
 export interface ScopeCursorView {
-  /** Панель «Курсоры»: ползунки + readout Δt/ΔV. */
+  /** Панель «Курсоры»: тумблер линий + ползунки + readout Δt/ΔV. */
   readonly root: HTMLElement;
   /** Плагин линий курсоров для стека развёртки (шов createView). */
   readonly plugin: uPlot.Plugin;
   /** Кадр задаёт окно времени T-курсоров, пока график не сообщил своё. */
   applyFrame(frame: LiveFramePayload): void;
+  /** Тумблер Выкл|Вкл: линии гаснут, позиционирование живо (задача 15). */
+  cursorsOn(): boolean;
+  /** Текущий инстанс uPlot — геометрия для drag линий (scopeCursorDrag). */
+  chart(): uPlot | null;
+}
+
+/** Хэндлы секций по корню: полоса берёт геометрию/состояние без правок
+ * воркспейса (WeakMap — ключ живёт, пока жив DOM секции). */
+const viewsByRoot = new WeakMap<HTMLElement, ScopeCursorView>();
+
+export function findScopeCursorView(root: HTMLElement): ScopeCursorView | undefined {
+  return viewsByRoot.get(root);
 }
 
 /** Поле курсора: подпись + ползунок; возвращает обёртку и input. */
@@ -102,6 +117,26 @@ export function buildScopeCursorSection(): ScopeCursorView {
   let t0 = 0;
   /** Текущий инстанс uPlot (пересоздаётся на каждом кадре) для redraw. */
   let chart: uPlot | null = null;
+  /** Тумблер Выкл|Вкл: линии гаснут, позиции и readout живут (задача 15). */
+  let enabled = true;
+
+  const toggle = createLiveSeg(
+    {
+      key: "cursors",
+      kind: "local",
+      aria: "Линии курсоров",
+      options: [
+        { value: "off", text: "Выкл" },
+        { value: "on", text: "Вкл" },
+      ],
+      current: "on",
+      groupAttrs: { id: "lnt-scope-cursors" },
+    },
+    (value) => {
+      enabled = value === "on";
+      chart?.redraw();
+    },
+  );
 
   function updateCursorReadout(): void {
     const readout = cursorReadout(positions, windowS, t0);
@@ -152,7 +187,7 @@ export function buildScopeCursorSection(): ScopeCursorView {
         chart = self;
       },
       draw: (self: uPlot) => {
-        drawCursorLines(self, () => positions);
+        if (enabled) drawCursorLines(self, () => positions);
         // Окно X графика — истина для T-курсоров (зум честно попадает в Δt).
         const xScale = self.scales.x;
         const min = xScale?.min;
@@ -170,12 +205,13 @@ export function buildScopeCursorSection(): ScopeCursorView {
   // первого кадра; T-строки остаются «—» до окна кадра.
   updateCursorReadout();
 
-  return {
+  const view: ScopeCursorView = {
     root: el("section", { className: "panel lnt-scope-section lnt-scope-cursors" }, [
       el("div", { className: "panel-hd" }, [
         el("h3", { className: "panel-title", text: "Курсоры" }),
       ]),
       el("div", { className: "panel-bd" }, [
+        toggle.root,
         el("p", { className: "t-compact lnt-scope-legend" }, [
           el("span", { className: "lnt-scope-legend-item" }, [
             el("span", { className: "lnt-scope-legend-dot lnt-scope-dot-t" }),
@@ -216,5 +252,9 @@ export function buildScopeCursorSection(): ScopeCursorView {
       t0 = span === null ? 0 : (frame.ch1.time_s[0] ?? 0);
       updateCursorReadout();
     },
+    cursorsOn: () => enabled,
+    chart: () => chart,
   };
+  viewsByRoot.set(view.root, view);
+  return view;
 }

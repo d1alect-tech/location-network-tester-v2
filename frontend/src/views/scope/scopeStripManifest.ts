@@ -5,7 +5,9 @@
  * ЗАПУСК (слитый run-кластер). Линия 2: ИЗМЕР ведёт линию (история/
  * измерения/послесвечение), ТРИГГ продолжается правее (уровень-степпер +
  * индикатор тайминга). Курсоры и действия автосета/сброса добавляются
- * задачей 15 (семейство drag/действий) своими группами. */
+ * задачей 15 (семейство drag/действий) своими группами. Задача 15: ИЗМЕР
+ * ведёт порядок cursors, history, autoset, reset, measure, persist
+ * (квитанция задачи 5 §9d). */
 
 import type { LiveStripZoneDesc } from "../../components/liveStrip/liveStrip";
 
@@ -43,7 +45,14 @@ export const SCOPE_STRIP_ZONES: readonly LiveStripZoneDesc[] = [
     rows: [
       {
         line: 2,
-        groups: [{ local: "history" }, { local: "measure" }, { local: "persist" }],
+        groups: [
+          { local: "cursors" },
+          { local: "history" },
+          { action: "autoset" },
+          { action: "reset" },
+          { local: "measure" },
+          { local: "persist" },
+        ],
       },
     ],
   },
