@@ -612,3 +612,120 @@
   outline: 2px solid var(--lnt-accent);
   outline-offset: -2px;
 }
+
+/* ── Задача 17b: вертикальное сжатие вкладки в одно окно (AC1) ─────────
+   Воркспейс — приборная сетка: главная колонка (экран + фигура развёртки,
+   fr-строки дышат по высоте окна вида) + правый рельс показаний
+   (измерения/поток, зона-карта 13 §9: «полоса +140 вычитается из stage;
+   leftover-строки ужимаются»). Панели сигнальных окон раскрываются до
+   сеточных ячеек (display: contents): экран и фигура — прямые ячейки,
+   высота — из трека, не из токена. Курсоры — скрытый leftover (слайдеры
+   с живыми слушателями остаются в DOM, drag пишет в них). Мобильный
+   (≤767) контур не трогаем: колонка и прокрутка документа (Todo 44). */
+
+@media (min-width: 768px) {
+  .lnt-scope-workspace.lnt-scope-strip-mode {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-rows: auto minmax(0, 2fr) minmax(0, 3fr) auto;
+    gap: 4px 12px;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-status {
+    grid-area: 1 / 1;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-status .panel-bd {
+    padding: 2px 10px;
+    gap: 2px;
+  }
+
+  /* Инверсии CH1/CH2 — leftover-строка в шапке рельса (BRIEF §1.4). */
+  .lnt-scope-strip-mode .lnt-scope-controls {
+    grid-area: 1 / 2;
+    align-items: center;
+    gap: 4px 16px;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-screen,
+  .lnt-scope-strip-mode .lnt-scope-screen .panel-bd,
+  .lnt-scope-strip-mode .lnt-scope-wave,
+  .lnt-scope-strip-mode .lnt-scope-wave .panel-bd {
+    display: contents;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-viewport {
+    grid-area: 2 / 1;
+    height: auto;
+    min-height: 0;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-figure {
+    grid-area: 3 / 1;
+    min-height: 0;
+    background: var(--lnt-panel);
+    border-radius: var(--lnt-r-ctl);
+    overflow: hidden;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-figure .lnt-uplot-root,
+  .lnt-scope-strip-mode .lnt-scope-figure .lnt-uplot-host {
+    block-size: 100%;
+    min-height: 0;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-wave-status {
+    grid-area: 4 / 1;
+  }
+
+  /* Рельс показаний: измерения и поток — компактные панели справа.
+     Ряд измерений — короткие подписи (Vpp…D) — парами в 2 колонки;
+     ряд потока — длинные подписи («потеряно прибором»…) — одна пара
+     на строку: max-content-подписи двух пар не лезут в 300px рельс
+     (нулевые dd и горизонтальный перелив — axe scrollable-region). */
+  .lnt-scope-strip-mode .lnt-scope-measure {
+    grid-area: 2 / 2;
+    min-height: 0;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-readout {
+    grid-area: 3 / 2;
+    min-height: 0;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-measure .panel-bd,
+  .lnt-scope-strip-mode .lnt-scope-readout .panel-bd {
+    padding: 6px 10px;
+    gap: 4px;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-measure .readout-grid {
+    grid-template-columns: repeat(2, max-content minmax(0, 1fr));
+    gap: 2px 10px;
+    margin: 0;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-readout .readout-grid {
+    gap: 2px 10px;
+    margin: 0;
+  }
+
+  /* Панель триггера опустела (сегменты и уровень в полосе): в главной
+     области видна только ошибка уровня; панель свёрнута до ячейки рельса. */
+  .lnt-scope-strip-mode .lnt-scope-trigger {
+    display: none;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-trigger:has([role="alert"]) {
+    display: contents;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-trigger .panel-bd,
+  .lnt-scope-strip-mode .lnt-scope-trigger .lnt-scope-trig-grid {
+    display: contents;
+  }
+
+  .lnt-scope-strip-mode .lnt-scope-cursors {
+    display: none;
+  }
+}

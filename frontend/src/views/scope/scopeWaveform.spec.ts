@@ -58,7 +58,9 @@ test("Run draws both channels on uPlot with the selected V/div and probe", async
   await expect(page.locator(".lnt-scope-wave-status")).toBeHidden();
 
   mkdirSync(EVIDENCE_DIR, { recursive: true });
-  await page.locator(".lnt-scope-wave").screenshot({
+  // Задача 17b: панель развёртки — прозрачный layout-контейнер (display:
+  // contents, ячейки сетки — фигура и статус); снимок — сигнальное окно.
+  await page.locator(".lnt-scope-figure").screenshot({
     path: resolve(EVIDENCE_DIR, "scope-wave-running.png"),
   });
 });
@@ -78,7 +80,8 @@ test("inversion toggle and probe re-render the sweep; label scales", async ({ pa
   await expect(page.locator(".lnt-scope-vdiv-effective")).toHaveText("50 В/дел");
 
   mkdirSync(EVIDENCE_DIR, { recursive: true });
-  await page.locator(".lnt-scope-wave").screenshot({
+  // Задача 17b: снимок — фигура (панель .lnt-scope-wave — display: contents).
+  await page.locator(".lnt-scope-figure").screenshot({
     path: resolve(EVIDENCE_DIR, "scope-wave-controls.png"),
   });
 });

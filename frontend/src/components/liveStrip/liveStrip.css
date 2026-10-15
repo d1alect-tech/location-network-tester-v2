@@ -786,3 +786,30 @@
 .lnt-live-strip [data-ctl="span"] {
   flex-wrap: wrap;
 }
+
+/* ── Задача 17b: одна приборная страница — вид без прокрутки (AC1) ──────
+   Окно вида для живых вкладок — flex-колонка: воркспейс забирает свободную
+   высоту (flex-grow, min-height: 0), полоса — константа 138 px; контент
+   не порождает прокрутки (зона-карта 13 §9: «overflow = скролл = красный
+   AC1 задачи 17»; геометрия гейтится машиной задачи 17 на 3 вьюпортах).
+   Мобильный (≤767) контур не трогаем: документ владеет прокруткой (Todo 44). */
+
+.lnt-live-strip [data-readonly] {
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .view-container:has(> .lnt-scope-workspace),
+  .view-container:has(> .lnt-sa-workspace) {
+    display: flex;
+    flex-direction: column;
+    overflow-y: hidden;
+    padding: 4px var(--lnt-space-6);
+  }
+
+  .view-container:has(> .lnt-scope-workspace) > .lnt-scope-workspace,
+  .view-container:has(> .lnt-sa-workspace) > .lnt-sa-workspace {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
