@@ -69,6 +69,9 @@ export function createV6Extras(opts: V6ExtrasOpts): V6ExtrasHandle {
   function ensureView(): ChartHandle {
     if (view !== null) return view;
     view = createView({ container: waveHost, syncKey: WAVE_SYNC });
+    // Root — единственная точка монтирования: host живёт внутри него
+    // (uplotView), без этого график уходит в отцепленный root.
+    waveHost.append(view.root);
     return view;
   }
 

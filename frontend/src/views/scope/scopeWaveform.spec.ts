@@ -104,6 +104,42 @@ for (const width of [375, 1280]) {
   });
 }
 
+test("sizing root nests the uPlot host: no empty band above the chart", async ({ page }) => {
+  await openScope(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.locator("#lnt-scope-run").click();
+  await expect(page.locator(".lnt-scope-figure .lnt-uplot-host canvas").first()).toBeVisible();
+
+  // Геометрия фигуры: host — единственный размерный элемент; его верх
+  // совпадает с верхом фигуры, пустой полосы высоты графика над ним нет
+  // (дефект: root и host сиблинги, оба по 520 px — над графиком 520 px
+  // пустоты, воспроизведено верификатором r3-задачи-7).
+  const geometry = await page.evaluate(() => {
+    const figure = document.querySelector(".lnt-scope-figure");
+    const host = document.querySelector(".lnt-scope-figure .lnt-uplot-host");
+    if (figure === null || host === null) return null;
+    const f = figure.getBoundingClientRect();
+    const h = host.getBoundingClientRect();
+    return {
+      figureHeight: f.height,
+      hostHeight: h.height,
+      hostOffsetTop: h.top - f.top,
+    };
+  });
+  if (geometry === null) throw new Error(".lnt-scope-figure/.lnt-uplot-host не найдены");
+  expect(
+    Math.abs(geometry.figureHeight - geometry.hostHeight),
+    `figure ${geometry.figureHeight}px vs host ${geometry.hostHeight}px`,
+  ).toBeLessThanOrEqual(2);
+  expect(geometry.hostOffsetTop, `host top offset ${geometry.hostOffsetTop}px`).toBeLessThanOrEqual(
+    2,
+  );
+
+  // DOM: host живёт ВНУТРИ sizing-root (root — единственная точка
+  // монтирования в фигуру), а не сиблингом рядом с ним.
+  await expect(page.locator(".lnt-scope-figure .lnt-uplot-root .lnt-uplot-host")).toHaveCount(1);
+});
+
 test("axe reports no serious or critical violations on the live sweep", async ({ page }) => {
   await openScope(page);
   await page.locator("#lnt-scope-run").click();

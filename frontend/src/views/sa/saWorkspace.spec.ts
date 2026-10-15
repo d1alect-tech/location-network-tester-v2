@@ -256,6 +256,40 @@ for (const width of [375, 1280]) {
   });
 }
 
+test("sizing root nests the uPlot host: no empty band above the chart", async ({ page }) => {
+  await openSa(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.locator("#lnt-sa-run").click();
+  await expect(page.locator(".lnt-sa-figure .lnt-uplot-host canvas").first()).toBeVisible();
+
+  // Зеркало развёртки осциллографа: host — единственный размерный элемент
+  // фигуры SA, пустой полосы высоты графика над трассой нет.
+  const geometry = await page.evaluate(() => {
+    const figure = document.querySelector(".lnt-sa-figure");
+    const host = document.querySelector(".lnt-sa-figure .lnt-uplot-host");
+    if (figure === null || host === null) return null;
+    const f = figure.getBoundingClientRect();
+    const h = host.getBoundingClientRect();
+    return {
+      figureHeight: f.height,
+      hostHeight: h.height,
+      hostOffsetTop: h.top - f.top,
+    };
+  });
+  if (geometry === null) throw new Error(".lnt-sa-figure/.lnt-uplot-host не найдены");
+  expect(
+    Math.abs(geometry.figureHeight - geometry.hostHeight),
+    `figure ${geometry.figureHeight}px vs host ${geometry.hostHeight}px`,
+  ).toBeLessThanOrEqual(2);
+  expect(geometry.hostOffsetTop, `host top offset ${geometry.hostOffsetTop}px`).toBeLessThanOrEqual(
+    2,
+  );
+
+  // DOM: host живёт ВНУТРИ sizing-root (root — единственная точка
+  // монтирования в фигуру), а не сиблингом рядом с ним.
+  await expect(page.locator(".lnt-sa-figure .lnt-uplot-root .lnt-uplot-host")).toHaveCount(1);
+});
+
 test("axe reports no serious or critical violations on the sa skeleton", async ({ page }) => {
   await openSa(page);
   await injectAxe(page);

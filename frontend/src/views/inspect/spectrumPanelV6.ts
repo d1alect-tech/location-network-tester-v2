@@ -140,6 +140,9 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
     syncKey: SYNC_KEY,
     peaksPlugin: createPeaksPlugin({ peaks: () => peaksA, color: theme.accentA }),
   });
+  // Root — единственная точка монтирования: host живёт внутри него
+  // (uplotView), без этого график уходит в отцепленный root.
+  frame.append(chart.root);
 
   function setView(next: SpectrumView): void {
     switch (next) {

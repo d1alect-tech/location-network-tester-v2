@@ -1,5 +1,6 @@
-/** uPlot-реализация ChartHandle (todo 41): монтирование в контейнер,
- * выравнивание рядов, log-safe фильтрация, ResizeObserver, темы.
+/** uPlot-реализация ChartHandle (todo 41): монтирование в контейнер
+ * через единый sizing-root (root → host → uPlot), выравнивание рядов,
+ * log-safe фильтрация, ResizeObserver, темы.
  * Синхронизация курсора/диапазонов — общая sync-группа uplotOptions. */
 
 import uPlot from "uplot";
@@ -57,12 +58,20 @@ export function createUplotView(options: UplotViewOptions): ChartHandle {
   let lastRequest: ChartRenderRequest | null = null;
   let host: HTMLDivElement | null = null;
 
+  const root = document.createElement("div");
+  root.className = "lnt-uplot-root";
+
+  /** Host живёт ВНУТРИ root: root — единственная точка монтирования
+   * для потребителя (figure.append(root) / setContent(root)), а host —
+   * единственный размерный элемент внутри него. Раньше host был сиблингом
+   * root в options.container, и CSS назначал обоим block-size токена —
+   * над графиком вставала пустая полоса высотой графика. */
   function ensureHost(): HTMLDivElement {
     if (host?.isConnected === true) return host;
     host?.remove();
     host = document.createElement("div");
     host.className = "lnt-uplot-host";
-    options.container.append(host);
+    root.append(host);
     return host;
   }
 
@@ -131,9 +140,6 @@ export function createUplotView(options: UplotViewOptions): ChartHandle {
           if (box === undefined) return;
           draw(Math.floor(box.width), Math.floor(box.height));
         });
-
-  const root = document.createElement("div");
-  root.className = "lnt-uplot-root";
 
   return {
     root,
