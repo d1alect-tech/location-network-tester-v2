@@ -18,6 +18,12 @@ const RUNNING: LiveStatePayload = {
   trigger: null,
 };
 const IDLE: LiveStatePayload = { state: "idle", mode: "sim", busy_reason: null, trigger: null };
+const STOPPED: LiveStatePayload = {
+  state: "stopped",
+  mode: "sim",
+  busy_reason: null,
+  trigger: null,
+};
 
 function mountCluster(): {
   cluster: ReturnType<typeof mountLiveRunCluster>;
@@ -96,6 +102,24 @@ describe("mountLiveRunCluster", () => {
     expect(run.getAttribute("aria-checked")).toBe("false");
     // Кластер НЕ владеет доступностью кнопок — disabled остаётся за воркспейсом.
     expect(stop.disabled).toBe(true);
+  });
+
+  it("переход idle→running в ОТКРЫТОМ стриме красит пару до первого кадра (QA F1)", () => {
+    // Реальная последовательность сервера (routes_live): анонс idle на
+    // коннекте, затем событие состояния (heartbeat с running) в тот же
+    // открытый стрим ПРИ переходе, кадры после; стоп завершает стрим, а
+    // статус stopped приходит на переподключении. Кластер красится из
+    // каждого onState — без события перехода оставался бы idle.
+    const { cluster, run, stop, emit } = mountCluster();
+    emit(IDLE);
+    expect(cluster.root.getAttribute("data-run-state")).toBe("idle");
+    emit(RUNNING);
+    expect(run.getAttribute("aria-checked")).toBe("true");
+    expect(stop.getAttribute("aria-checked")).toBe("false");
+    expect(cluster.root.getAttribute("data-run-state")).toBe("running");
+    emit(STOPPED);
+    expect(run.getAttribute("aria-checked")).toBe("false");
+    expect(cluster.root.getAttribute("data-run-state")).toBe("idle");
   });
 
   it("бейдж «отложено к запуску» появляется при staged≠∅ и гаснет при 0", () => {

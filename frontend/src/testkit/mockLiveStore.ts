@@ -3,8 +3,18 @@
  * захвата — 409. Кадры синтетические (синус CH1/CH2); трасса SA — тон
  * 10 кГц по сетке запрошенной полосы, событие spectrum идёт за кадром при
  * настроенном контуре. frame_index растёт с каждым SSE-ответом — темп
- * каденции задаёт переподключение EventSource по
- * retry: 150 (детерминированно, без гонок), как у JobStore. */
+ * каденции задаёт переподключение EventSource по retry: 150
+ * (детерминированно, без гонок), как у JobStore.
+ *
+ * Heartbeat ЧЕСТНЫЙ (зеркало routes_live после фикса QA round4/F1): событие
+ * состояния уходит только при СМЕНЕ состояния (событие перехода, как у
+ * сервера) и повторяется окном из нескольких ответов — столько, чтобы
+ * КАЖДЫЙ открытый EventSource (вкладка держит несколько: воркспейс,
+ * кластер, статус) успел переподключиться с периодом retry: 150 и получить
+ * событие, как получил бы его каждый открытый подписчик реального сервера.
+ * Инъекция heartbeat с текущим состоянием в КАЖДЫЙ ответ (без связи с
+ * переходом) маскировала отсутствие события перехода у живого сервера
+ * (run-кластер оставался idle) — так мок больше не делает. */
 
 import type {
   LiveChannelSeries,
@@ -35,6 +45,10 @@ const FRAME_POINTS = 32;
 const SPECTRUM_POINTS = 64;
 /** Индекс сетки с тоном мока: пик всегда НА сетке — виден на графике. */
 const TONE_INDEX = 8;
+/** Ответов с heartbeat при смене состояния: событие перехода должно дойти
+ * до каждого открытого подписчика; при ~3 стримах с периодом retry: 150
+ * окно 12 ответов покрывает каждый минимум дважды. */
+const ANNOUNCE_WINDOW_RESPONSES = 12;
 
 function series(phase: number, amplitude: number): LiveChannelSeries {
   const time_s: number[] = [];
@@ -59,6 +73,10 @@ export class LiveStore {
   saConfig: LiveSaConfig | null = null;
   /** Действующий триггер сервиса (зеркало start/config): SINGLE в кадре. */
   runningTrigger: LiveTrigger | null = null;
+  /** Последний анонсированный статус: смена — событие перехода. */
+  private lastAnnouncedState: LiveInstrumentState | null = null;
+  /** Осталось ответов с heartbeat текущего перехода (окно вещания). */
+  private announceLeft = 0;
 
   statePayload(): LiveStatePayload {
     return {
@@ -130,12 +148,24 @@ export class LiveStore {
     };
   }
 
-  /** Тело SSE-потока: heartbeat статуса + кадры, пока идёт захват; кадр
-   * при настроенном SA-контуре несёт и трассу спектра. SINGLE — контракт InstrumentService: ровно один сработавший кадр,
-   * затем прибор освобождён (state=stopped); дальше только heartbeat. */
+  /** Тело SSE-потока: кадры, пока идёт захват; heartbeat — окном при СМЕНЕ
+   * состояния: событие перехода, как у routes_live, должно дойти до каждого
+   * открытого подписчика, а в мок-среде каждый EventSource живёт
+   * переподключениями с периодом retry: 150 — окно покрывает их все.
+   * Инъекция heartbeat в каждый ответ маскировала QA round4/F1. Кадр при
+   * настроенном SA-контуре несёт и трассу спектра. SINGLE — контракт
+   * InstrumentService: ровно один сработавший кадр, затем прибор освобождён
+   * (state=stopped); смена состояния анонсируется окном, как переход. */
   private framesBody(): string {
     let body = "retry: 150\n\n";
-    body += `event: heartbeat\ndata: ${JSON.stringify(this.statePayload())}\n\n`;
+    if (this.state !== this.lastAnnouncedState) {
+      this.lastAnnouncedState = this.state;
+      this.announceLeft = ANNOUNCE_WINDOW_RESPONSES;
+    }
+    if (this.announceLeft > 0) {
+      this.announceLeft -= 1;
+      body += `event: heartbeat\ndata: ${JSON.stringify(this.statePayload())}\n\n`;
+    }
     const single = this.state === "running" && this.runningTrigger?.mode === "single";
     const limit = single ? 1 : this.framesPerResponse;
     for (let i = 0; i < limit && this.state === "running"; i += 1) {

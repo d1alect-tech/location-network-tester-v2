@@ -148,10 +148,18 @@ async def live_frames(
     """Кадры и трассы SA событиями ``frame``/``spectrum``/``heartbeat``.
 
     Подписка до старта разрешена: пока захвата нет, подписчик получает
-    heartbeat и ждёт, а после ``POST /api/live/start`` тот же стрим отдаёт кадры.
+    heartbeat и ждёт, а после ``POST /api/live/start`` тот же стрим отдаёт
+    кадры. Переход idle→running при ОТКРЫТОЙ подписке сопровождается
+    событием состояния (heartbeat с текущим статусом) ДО кадров: run-кластер
+    полосы красит пару из onState и без события остаётся на idle до
+    перестройки вкладки (QA round4, задача 21, находка F1).
     """
+    announced_running = gate.service is not None and gate.service.is_running
     pacer = Pacer(gate=gate, min_interval_s=min_interval_s)
     yield heartbeat_event(gate)
+    # Анонс коннекта мог уйти до старта: переход idle→running, увиденный
+    # этим стримом, повторяется событием состояния тем же форматом
+    # (heartbeat) ДО кадров — потребитель onState не остаётся на idle.
     while True:
         service = gate.service
         if service is None or not service.is_running:
@@ -159,6 +167,9 @@ async def live_frames(
                 yield beat
             await asyncio.sleep(IDLE_POLL_INTERVAL_S)
             continue
+        if not announced_running:
+            announced_running = True
+            yield heartbeat_event(gate)
         # Очередь ограничена: наполняет её только наш ``poll`` (плюс один
         # финальный кадр из ``stop``), а вычитывает тот же генератор — роста
         # без потребителя здесь нет.

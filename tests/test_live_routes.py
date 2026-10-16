@@ -608,17 +608,65 @@ def test_stream_attaches_to_capture_started_after_subscribe(rig: Rig) -> None:
                 rig.gate.start(start_config())
                 rig.advance(2)
                 attached = True
-            if len(events) >= 3:
+            if len(events) >= 4:
                 break
         return events
 
     events = asyncio.run(scenario())
 
     assert attached
-    assert [event.event for event in events] == ["heartbeat", "frame", "frame"]
-    first: LiveFramePayload = events[1].data
+    # Переход взят тем же стримом: событие состояния (heartbeat с running) —
+    # сразу за анонсом коннекта, ДО первого кадра (контракт задачи 21 / F1).
+    assert [event.event for event in events] == ["heartbeat", "heartbeat", "frame", "frame"]
+    assert events[1].data.state is InstrumentState.RUNNING
+    first: LiveFramePayload = events[2].data
     assert first.frame_index == 0
     assert first.sample_rate_hz == RATE_HZ
+
+
+def test_state_event_reaches_open_subscriber_on_idle_to_running(rig: Rig) -> None:
+    """QA round4, задача 21, находка F1: переход idle→running при ОТКРЫТОЙ
+    подписке обязан нести событие состояния в тот же стрим.
+
+    Подписчик открывает стрим ДО старта (первый heartbeat — idle); внешний
+    клиент стартует захват (``POST /api/live/start`` = ``gate.start``);
+    heartbeat с ``running`` должен прийти в тот же открытый стрим ДО
+    первого кадра: run-кластер полосы красится из onState и без события
+    остаётся idle, пока вкладку не перестроят (дефект живого сервера; e2e-мок
+    маскировал его heartbeat-ом в каждом ответе ``/api/live/frames``).
+
+    ``TestClient`` отдаёт тело стрима только целиком (см. ``read_stream``),
+    поэтому переход проверяется на генераторе маршрута — тот же контракт,
+    что и в ``test_stream_attaches_to_capture_started_after_subscribe``.
+    """
+
+    async def scenario() -> list[ServerSentEvent]:
+        events: list[ServerSentEvent] = []
+        async for event in live_stream(rig.gate):
+            events.append(event)
+            if len(events) == 1:
+                # Подписка до старта: первый heartbeat — анонс idle.
+                assert event.event == "heartbeat"
+                assert event.data.state is InstrumentState.IDLE
+                # Внешний старт (как POST /api/live/start из другой вкладки).
+                rig.gate.start(start_config())
+                rig.advance(2)
+            if len(events) >= 4:
+                break
+        return events
+
+    events = asyncio.run(scenario())
+
+    assert [event.event for event in events] == ["heartbeat", "heartbeat", "frame", "frame"]
+    first, transition = events[0].data, events[1].data
+    assert first.state is InstrumentState.IDLE
+    # Событие перехода — heartbeat того же формата, что и анонс коннекта:
+    # клиент маршрутизует его в onState (liveRunCluster красит пару).
+    assert transition.state is InstrumentState.RUNNING
+    assert transition.mode is LiveMode.SIM
+    assert transition.busy_reason == LIVE_BUSY_MESSAGE_RU
+    frames = [event.data for event in events if event.event == "frame"]
+    assert frames[0].frame_index == 0
 
 
 def test_stop_terminates_the_stream_with_the_final_frame(rig: Rig) -> None:
