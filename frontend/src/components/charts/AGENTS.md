@@ -6,10 +6,10 @@ uPlot + echarts wrappers with min/max decimation, CSV strings, peaks/markers; di
 ## WHERE TO LOOK
 - `series.ts`: `psdToDb` = 10*log10(psd), `psdToAsd`, `decimateMinMax`, `seriesToCsv`, `filterFinitePairs`
 - `uplotView.ts` + `uplotOptions.ts`: uPlot mount, cursor emit, log-safe axes
-- `echarts.ts`: modular ECharts registration (Heatmap only) + `initSpectrogramChart`; live consumer is `views/inspect/spectrogramOrient.ts`
+- `echarts.ts`: modular ECharts registration (`echarts/core`+charts/components/renderers: Heatmap, Canvas, Grid/DataZoom, Tooltip, VisualMap — full barrel import forbidden in product code) + `initSpectrogramChart`; live consumer is `views/inspect/spectrogramOrient.ts`
 - `spectrogramModel.ts`: tile requests, `TILE_CELL_CAP`, race-safe tile loader, `sliceTile`
 - `spectrogramSetup.ts`: NPZ -> level (`levelFromNpz`), initial tile policy, small control factories
-- `spectrogramPalette.ts`: 9-step matrix palette (independent of the frozen `showcase-round2` copy)
+- `spectrogramPalette.ts`: 9-step matrix palette — live copy is byte-equal to the frozen `showcase-round2` source, pinned by `spectrogramPalette.test.ts`; edits need before/after spectrogram screenshots + test update. Palette consumers: `capture/spectrogramLivePaint.ts`, `views/inspect/spectrogramOrient.ts`
 - `viewModels.ts`: `spectrumToRequest`, `waveformToRequest`, `POINT_BUDGETS`
 - `annotations.ts`: `createPeaksPlugin`, band bounds, peaks summary
 - `theme.ts` + `charts.css`: token reads, no hardcoded colors

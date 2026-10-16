@@ -2,13 +2,19 @@
 
 ## OVERVIEW
 
-~112 tracked files. Full run is 1269 pytest + 574 vitest + ~193 playwright — route by change type instead.
+279 tracked files, 1813 pytest test functions (+ node:test in `tests/js/`, vitest/playwright under `frontend/`) — route by change type instead of running everything.
+Subdirs with own AGENTS.md: `characterization/`, `analysis_v2/`, `science/`.
 
 ## WHICH SUITE FOR WHICH CHANGE
 
 | You changed | Run |
 |---|---|
 | DSP / math (`psd/`, `spectrum`, `needles`, `uncertainty`) | `uv run pytest tests/science -q` + the matching `tests/test_<module>.py` |
+| F-suite family math (f01–f18) | `uv run pytest tests/characterization -q` — own AGENTS.md |
+| v2 run seam, branches, artifact bundle | `uv run pytest tests/analysis_v2 -q` — own AGENTS.md |
+| Experiments / protocol runner / statistics routes | `uv run pytest tests/experiments -q` (fixtures in `factories.py`) |
+| Catalog SQLite / migrations | `uv run pytest tests/catalog -q` |
+| Archive backup/restore, hostile paths | `uv run pytest tests/archive -q` |
 | A facade you are splitting into leaves | the file's `*_characterization.py` — green BEFORE and AFTER the move |
 | Manifest / session storage | `tests/test_manifest_characterization.py tests/test_v2_storage_contract.py -q` |
 | CH1 setup, input-reference | `tests/test_ch1_manifest_contract.py tests/test_ch1_transfer_contract.py -q` |
@@ -19,8 +25,8 @@
 
 ## LAYERS
 
-- **`*_characterization.py` (5)** — refactor pins, NOT TDD-red. Written before a split; any diff = code-motion regression. Pin exact Russian `InputError` strings, driver code tables, sqlite snapshots, and facade re-export **by identity** (`except runner.X` must catch `runner_errors.X`).
-- **`*_contract.py` (8)** — consumer-visible boundaries that must fail closed: schema rules, `store` facade re-export set, `DESIGN.md` ↔ `v2-tokens.css` ↔ `showcase.html` parity, static-JS DAG + chart a11y shells.
+- **`*_characterization.py` (6)** — refactor pins, NOT TDD-red. Written before a split; any diff = code-motion regression. Pin exact Russian `InputError` strings, driver code tables, sqlite snapshots, and facade re-export **by identity** (`except runner.X` must catch `runner_errors.X`). Five at root + `analysis_v2/test_run_characterization.py`.
+- **`*_contract.py` (11)** — consumer-visible boundaries that must fail closed: schema rules, `store` facade re-export set, `DESIGN.md` ↔ `v2-tokens.css` ↔ `showcase.html` parity, static-JS DAG + chart a11y shells. Nine at root + `characterization/test_f12_contract.py` + `experiments/test_statistics_route_contract.py`.
 - **Golden values** — `tests/fixtures/manifest_frozen/` (3 valid must round-trip byte-identical incl. key order + trailing newline; 2 invalid must raise `InputError`), 5 report SHA-256 in `tests/reporting/test_reporting.py`, needles `golden.json`, `tests/analysis/test_events.py` `golden_test` preset at zero false positives.
 - **`tests/science/`** — analytic truth corpus (`RATE_HZ 16384`, `COUNT 16384`, `SEED 20260811`, sha256 digest). Has its own AGENTS.md; read it before touching any golden.
 - **`tests/js/*.test.mjs`** — `node --test`, not pytest.
@@ -28,7 +34,7 @@
 ## CONVENTIONS
 
 - Config lives only in `pyproject.toml`: `testpaths=["tests"]`, `addopts="-ra --strict-markers"`. No `pytest.ini`.
-- `tests/**` ruff ignores: `S101 PLR2004 SLF001 D ARG S603 FBT` — asserts, magic numbers and private access are expected here.
+- `tests/**` ruff ignores: `S101 PLR2004 SLF001 D ARG S603 FBT N802 PLR0913 PLR0917` — asserts, magic numbers, private access, scientific-notation names and many-arg fixture factories are expected here.
 - Exactly ONE custom marker: `pristine`. Select `-m pristine` or exclude `-m "not pristine"`. Every other `@pytest.mark.*` is `parametrize`/`usefixtures`.
 - `conftest.py` isolates AppData and seeds `rng(6022)`; `no_hantek_driver` poisons `sys.modules["PyHT6022"]` to force the no-driver path.
 - Frontend split is by extension: `*.test.ts` = vitest (jsdom), `*.spec.ts` = playwright. `vitest.config.ts` excludes `*.spec.ts` explicitly — a spec named `.test.ts` silently runs in the wrong runner.

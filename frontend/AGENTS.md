@@ -6,19 +6,23 @@
 ## STRUCTURE
 - `src/main.ts`: bootstrap; no-store `index.html` + hashed-URL bootstrap contract.
 - `src/AppShell.ts`: hash routing, view switching, shell chrome.
-- `src/api/`: 24 typed clients, one per backend group; no fetch outside.
-- `src/views/`: route screens; inspect largest; keep view-local logic inside.
-- `src/components/charts/`: uPlot + echarts wrappers; token CSS only.
-- `src/state/`: `resource` + `routeState`; single source per concern.
-- Rollup inputs: `index.html` + 13 `showcase*.html` (a/b/c/d, redesign, round2, v1-v6, base).
-- `scripts/build-manifest.js`: emit asset manifest; `scripts/build-check.js`: byte-stable rebuild gate.
+- `src/api/`: `types-*`/`guards-*`/`client-*` triple per route group (12 client modules); no fetch outside.
+- `src/views/`: route screens (routing map in `views/AGENTS.md`); inspect largest, own file; keep view-local logic inside.
+- `src/capture/`: capture wizard, SSE job watch, live spectrogram (own file).
+- `src/components/`: DOM primitives + channelbar (own file); `charts/` own file too.
+- `src/testkit/`: e2e-only mock backend + goldens (own file); never imported by product.
+- `src/test-support/`: static analysis-v2 fixtures + NPZ builder; golden data, biome-ignored.
+- `src/state/`: `resource` + `routeState` + `themePreference`; single source per concern.
+- Rollup inputs: `index.html` + 13 `showcase*.html` (a/b/c/d, redesign, round2, v1-v6, base); the 5 `showcase-r3*.html` are dev-only, not inputs.
+- `scripts/`: `build-manifest.js` (asset manifest), `build-check.js` (byte-stable rebuild gate), `licenses-check.js` (pinned license whitelist).
+- `bench/`: chart perf harness as playwright tests; `DECISION.md` + `results.json` frozen, never overwritten.
 
 ## CONVENTIONS
 - Vite `base: /static/v2/`; `outDir: ../src/lnt/ui/static/v2`; `emptyOutDir: true`.
 - Dev: `vite :4101`; prod served from backend static, never standalone.
 - Biome only, no eslint; 2-space, 100-col; `tsc --noEmit` strict clean.
 - Hashed assets: `assets/[name].[hash].js`; `manifest: true`; no inline scripts.
-- Offline: vendored uPlot 1.6.32 + IBM Plex WOFF2; zero external requests.
+- Offline: runtime deps exactly uplot (lock 1.6.32) + echarts 5.6.0; IBM Plex WOFF2 vendored in `src/showcase-redesign/fonts/`; zero external requests.
 - Tests: `*.test.ts` vitest unit; `*.spec.ts` playwright (`installMockBackend` + `pumpAll`).
 - Charts: min/max decimation at server edge (spectra 5000, previews 4000); never mutate source data.
 - Compare deltas `B - A`; line-quality sessions: no A/B, open metrics singly.
@@ -32,3 +36,4 @@
 - A11y floor: 44px targets, 2px focus ring, honor `prefers-reduced-motion`.
 - No `innerHTML` for untrusted content; no `as any` / `@ts-ignore`.
 - No React/Tailwind/Plotly/Electron; no new deps without offline + license check.
+- `src/showcase-redesign/` is editable (unlike round2), but round2/round3 import its `data.ts`/`spectrum.ts`/`fonts.css` — renaming those breaks frozen code.

@@ -10,13 +10,15 @@ Science + data-plane + orchestration packages, flat modules + ~26 subpacks.
 |---|---|
 | Acquisition HW | `acquire.py`, `scope_io.py`, `capture_preflight.py`, `simulate.py`, `device_diagnostics.py` |
 | Signal science | `psd/`, `spectrum/`, `spectrogram/`, `features/`, `needles/`, `harmonics/`, `apd/`, `burst/`, `cm_dm/`, `notching/`, `power_quality/`, `line_quality*/`, `uncertainty/`, `statistics/`, `trends/` |
-| Data plane | `catalog/`, `archive/`, `session_store/`, `analysis_store/`, `manifest.py`, `manifest_*` |
-| Orchestration | `experiments/`, `research/`, `reporting/`, `runtime/`, `config/` |
-| Analysis tracts | `analysis.py` (facade), `analysis_v2/engine*.py` (active) |
-| Entry | `cli.py`, `launcher.py`, `ui/` |
+| F-suite f01–f18 | `characterization/` — 148 modules, own AGENTS.md |
+| Data plane | `catalog/` (own AGENTS.md), `archive/`, `session_store/`, `analysis_store/` (own AGENTS.md), `manifest.py`, `manifest_*` |
+| Orchestration | `experiments/`, `research/`, `reporting/`, `runtime/`, `config/`, `comparability/`, `profiles/`, `context/` |
+| Analysis tracts | `analysis.py` (facade), `analysis_v2/` (own AGENTS.md) |
+| Entry | `cli.py`, `launcher.py`, `ui/` (own AGENTS.md) |
 
 ## CONVENTIONS
 
+- Subpacks with own AGENTS.md: `analysis_v2/`, `ui/`, `characterization/`, `analysis_store/`, `catalog/` — read the closest one first.
 - `analysis.py` is legacy facade, active logic lives in `analysis_v2/engine*.py`.
 - New analysis branches go in `analysis_v2/`, never extend `analysis.py`.
 - `_private.py` / `_*.py` modules are internal to parent subpack, no cross imports.

@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-24 typed clients, one per backend route group; types-* declare shapes, guards-* narrow them, client-* fetch them.
+12 `client-*` modules over per-group `types-*`/`guards-*` triples: types declare shapes, guards narrow them, clients fetch them.
 
 ## WHERE TO LOOK
 
@@ -11,11 +11,12 @@
 - `client-analysis.ts`: analyze / reanalyze triggers, branch selection, result polling.
 - `types-plots.ts` + `guards-plots.ts`: `SpectrumPayload` / `InputReferredSpectrumPayload` shapes + narrowing.
 - `spectrumInputReferred`: input-referred excess PSD resolution; pairs with plot types/guards above.
-- `client-research.ts`: thin facade (45 LOC) over `client-research-*.ts` leaves; add new research calls to a leaf.
-- `client-device.ts`, `client-profiles.ts`, `client-statistics.ts`: device / profile / stats groups.
+- `client-research.ts`: thin facade (50 LOC) over `client-research-{experiments,hypotheses,runs,paths,guards}.ts` leaves; add new research calls to a leaf.
+- `client-device.ts`, `client-profiles.ts`, `client-statistics.ts`: device / profile / stats groups. `client-device` (`createDeviceApi`) and `client-jobs` (`PlotsApi`) are also imported directly by views; `client-analysis/profiles/research/statistics` compose only into `client.ts`.
 - `types-jobs.ts`, `types-analysis.ts`, `types-device.ts`, `types-research.ts`: per-group payloads.
 - `guards-jobs.ts`, `guards-analysis.ts`, `guards-device.ts`, `guards.ts`: per-group predicates.
-- `errors.ts`, `types.ts`: shared error kinds + common aliases.
+- `errors.ts`, `types.ts`: shared error kinds + common aliases (`CatalogSession` et al. — widest import surface).
+- `sessionMetrics.ts`: metric value access + `knownMetricUnits` (inspect/catalog views).
 - `*.test.ts`: contract examples per client/guard pair.
 
 ## CONVENTIONS
