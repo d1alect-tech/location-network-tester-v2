@@ -62,10 +62,8 @@ class TriggerConfig:
         if not math.isfinite(self.level_v):
             raise InputError(f"триггер: уровень {self.level_v} В должен быть конечным")
         if not -TRIGGER_LEVEL_LIMIT_V <= self.level_v <= TRIGGER_LEVEL_LIMIT_V:
-            raise InputError(
-                f"триггер: уровень {self.level_v} В вне диапазона "
-                f"−{TRIGGER_LEVEL_LIMIT_V:g}…+{TRIGGER_LEVEL_LIMIT_V:g} В",
-            )
+            limit = f"−{TRIGGER_LEVEL_LIMIT_V:g}…+{TRIGGER_LEVEL_LIMIT_V:g} В"
+            raise InputError(f"триггер: уровень {self.level_v} В вне диапазона {limit}")
         if not math.isfinite(self.auto_timeout_s) or self.auto_timeout_s <= 0.0:
             raise InputError(
                 f"триггер: auto_timeout_s {self.auto_timeout_s} с должен быть конечным и > 0",

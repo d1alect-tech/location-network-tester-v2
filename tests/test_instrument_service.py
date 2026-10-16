@@ -13,7 +13,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import MISSING, dataclass, field, fields
 from typing import TYPE_CHECKING, override
 
 import numpy as np
@@ -833,9 +833,14 @@ def test_trigger_config_rejects_levels_outside_the_input_window(level_v: float) 
 
 
 def test_trigger_config_requires_a_level() -> None:
-    # Отсутствующий уровень — не молчаливый ноль: поле обязательное.
-    with pytest.raises(TypeError):
-        TriggerConfig(slope=TriggerSlope.RISING)
+    # Отсутствующий уровень — не молчаливый ноль: поле обязательное
+    # (без дефолта — вызов без него даёт TypeError).
+    required = {
+        f.name
+        for f in fields(TriggerConfig)
+        if f.default is MISSING and f.default_factory is MISSING
+    }
+    assert "level_v" in required
 
 
 # ---------------------------------------------------------------------------

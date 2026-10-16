@@ -19,7 +19,7 @@ import threading
 import time
 from dataclasses import dataclass
 from itertools import pairwise
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, cast
 
 import pytest
 from fastapi import FastAPI
@@ -682,7 +682,8 @@ def test_config_requires_running_capture(rig: Rig) -> None:
 
 @pytest.mark.parametrize("level_v", [5.001, -5.001])
 def test_out_of_range_trigger_level_is_rejected_with_limits(rig: Rig, level_v: float) -> None:
-    start_body = {**START_BODY, "trigger": {**START_BODY["trigger"], "level_v": level_v}}
+    trigger_body = cast("dict[str, object]", START_BODY["trigger"])
+    start_body = {**START_BODY, "trigger": {**trigger_body, "level_v": level_v}}
     with TestClient(rig.app) as client:
         started = client.post("/api/live/start", headers=rig.headers, json=start_body)
         rejected_untouched = (rig.gate.is_active, rig.factory.calls)
@@ -732,7 +733,8 @@ def test_live_trigger_model_rejects_non_finite_levels(level_v: float) -> None:
 
 
 def test_null_trigger_level_is_unprocessable(rig: Rig) -> None:
-    body = {**START_BODY, "trigger": {**START_BODY["trigger"], "level_v": None}}
+    trigger_body = cast("dict[str, object]", START_BODY["trigger"])
+    body = {**START_BODY, "trigger": {**trigger_body, "level_v": None}}
     with TestClient(rig.app) as client:
         response = client.post("/api/live/start", headers=rig.headers, json=body)
 
