@@ -229,14 +229,19 @@ describe("таббар «Иконки-ярлыки» (todo 7 ui-refactor)", () =
     expect(reduced).toMatch(/animation:\s*none/);
   });
 
-  it("CSS: нажатие пункта даёт отклик scale, в reduced-motion он снят", () => {
+  it("CSS: нажатие пункта — scale-токен словаря, в reduced-motion press мгновенный", () => {
     // Given
     const css = readShellCss();
 
-    // Then: планка emil-design-eng — pressable элемент отвечает scale(0.97).
-    expect(ruleBody(css, ".hdr .tabbar .snav-item:active")).toContain("scale(0.97)");
+    // Then: планка emil-design-eng — pressable элемент отвечает
+    // scale(var(--lnt-press-scale)) (словарь r5-7/r5-11, не сырой литерал).
+    expect(ruleBody(css, ".hdr .tabbar .snav-item:active")).toContain(
+      "scale(var(--lnt-press-scale))",
+    );
     const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
-    expect(ruleBody(reduced, ".hdr .tabbar .snav-item:active")).toContain("transform: none");
+    // Политика reduced-motion (r5-7): press остаётся мгновенным состоянием,
+    // НЕ снимается transform: none — движение гасит список свойств, не правило.
+    expect(reduced).not.toMatch(/transform:\s*none/);
   });
 
   it("CSS: на <=767px ярлык скрыт, пункт держит тач-таргет 44px", () => {

@@ -57,7 +57,7 @@
   border: var(--lnt-border-width) solid transparent;
   border-radius: var(--lnt-r-ctl);
   transition: background-color var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
-    var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-motion-fast)
+    var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-t-press)
     var(--lnt-ease-out);
 }
 
@@ -78,20 +78,25 @@
   text-overflow: ellipsis;
 }
 
-.hdr .tabbar .snav-item:hover {
-  background: var(--lnt-elev);
-  color: var(--lnt-text);
-}
+/* Задача r5-11 (E7): hover-обратная связь таббара — только для устройств
+ * с настоящим hover и точным указателем (тач-тап не оставляет липкий
+ * hover-кроссфейд). */
+@media (hover: hover) and (pointer: fine) {
+  .hdr .tabbar .snav-item:hover {
+    background: var(--lnt-elev);
+    color: var(--lnt-text);
+  }
 
-.hdr .tabbar .snav-item:hover .ico {
-  color: var(--lnt-text-sec);
+  .hdr .tabbar .snav-item:hover .ico {
+    color: var(--lnt-text-sec);
+  }
 }
 
 .hdr .tabbar .snav-item:active {
   background: var(--lnt-canvas);
   color: var(--lnt-text);
-  /* Отклик на нажатие: планка emil-design-eng, 100–160ms ease-out. */
-  transform: scale(0.97);
+  /* Отклик на нажатие: токен словаря моушена (r5-7/r5-11), 160ms ease-out. */
+  transform: scale(var(--lnt-press-scale));
 }
 
 .hdr .tabbar .snav-item.is-active {
@@ -126,19 +131,18 @@
   }
 }
 
-/* prefers-reduced-motion: тон и подложка остаются, движение уходит. */
+/* prefers-reduced-motion: тон и подложка остаются, движение уходит —
+ * политика r5-7 (та же, что в style.css/liveStrip.css): цвет/opacity-переходы
+ * живут (список свойств без transform), press — мгновенное состояние,
+ * кейфрейм входа гасится. */
 @media (prefers-reduced-motion: reduce) {
   .hdr .tabbar .snav-item,
   .hdr .tabbar .snav-item .ico {
-    transition: none;
+    transition-property: background, border-color, color, opacity !important;
   }
 
   .hdr .tabbar .snav-item.is-entering {
     animation: none;
-  }
-
-  .hdr .tabbar .snav-item:active {
-    transform: none;
   }
 }
 
@@ -156,9 +160,12 @@
   transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
 }
 
-.snav-item:hover {
-  color: var(--lnt-text);
-  background: var(--lnt-elev);
+/* Задача r5-11 (E7): тот же гейт для пунктов навигации панелей. */
+@media (hover: hover) and (pointer: fine) {
+  .snav-item:hover {
+    color: var(--lnt-text);
+    background: var(--lnt-elev);
+  }
 }
 
 .snav-item.is-active {

@@ -15,6 +15,7 @@ const read = (rel: string): string => readFileSync(`${process.cwd()}/src/${rel}`
 const FILES: ReadonlyArray<[string, string]> = [
   ["liveStrip.css", "components/liveStrip/liveStrip.css"],
   ["style.css", "style.css"],
+  ["v6Shell.css", "shell/v6Shell.css"],
   ...readdirSync(`${process.cwd()}/src/views/scope`)
     .filter((name) => name.endsWith(".css"))
     .map((name) => [`scope/${name}`, `views/scope/${name}`] as [string, string]),
@@ -87,7 +88,8 @@ describe("motionTokens: словарь моушена живых вкладок 
   });
 
   it("ноль сырых 120ms/cubic-bezier( вне строк-определений токенов", () => {
-    for (const [name, text] of FILES) {
+    for (const [name, rel] of FILES) {
+      const text = read(rel);
       for (const line of stripComments(text).split("\n")) {
         if (!/120ms|cubic-bezier\(/.test(line)) continue;
         // Разрешение — только строка-объявление кастомного свойства (токен).
@@ -97,7 +99,8 @@ describe("motionTokens: словарь моушена живых вкладок 
   });
 
   it("каждое :active-правило с transform ссылается на var(--lnt-press-scale)", () => {
-    for (const [name, text] of FILES) {
+    for (const [name, rel] of FILES) {
+      const text = read(rel);
       for (const rule of styleRules(text)) {
         if (!rule.selector.includes(":active")) continue;
         // Не-press :active (cursor: grabbing у линии триггера) transform не несёт.
@@ -134,6 +137,7 @@ describe("motionTokens: словарь моушена живых вкладок 
     for (const [name, text] of [
       ["style.css", styleCss],
       ["liveStrip.css", stripCss],
+      ["v6Shell.css", read("shell/v6Shell.css")],
     ] as const) {
       const block = reducedMotionBlock(text);
       expect(block.length, `${name}: нет reduced-motion-блока`).toBeGreaterThan(0);
@@ -146,7 +150,8 @@ describe("motionTokens: словарь моушена живых вкладок 
   });
 
   it("длительности в живой поверхности не превышают 300 мс", () => {
-    for (const [name, text] of FILES) {
+    for (const [name, rel] of FILES) {
+      const text = read(rel);
       for (const match of stripComments(text).matchAll(/(\d+)ms/g)) {
         expect(Number(match[1]), `${name}: ${match[0]}`).toBeLessThanOrEqual(300);
       }
@@ -247,9 +252,69 @@ describe("motionTokens: планка emil r5-9 (E5 клавиатура, E7 hove
       ["scope.css", scopeCss],
       ["scopeWaveform.css", waveCss],
       ["sa.css", saCss],
+      ["style.css", read("style.css")],
+      ["v6Shell.css", read("shell/v6Shell.css")],
     ] as const) {
       const ungated = hoverGateViolations(text);
       expect(ungated, `${name}: :hover вне @media (hover: hover) and (pointer: fine)`).toEqual([]);
+    }
+  });
+});
+
+/** Задача r5-11: хром — словарь моушена доведён до таббара оболочки и app-css
+ * (press-токены вместо литералов, hover-гейт E7, политика reduced-motion),
+ * плюс net-removal полосы по частотной таблице emil: свойство transition без
+ * анимируемого события (меню мгновенно, hover — только border-color,
+ * :disabled — opacity) удаляется, а не комментируется. */
+
+describe("motionTokens: хром r5-11 (таббар, net-removal полосы)", () => {
+  const shellCss = read("shell/v6Shell.css");
+  const stripCssLocal = read("components/liveStrip/liveStrip.css");
+
+  it("r5-11: press таббара — токены словаря (scale, длительность), не литералы", () => {
+    const active = styleRules(shellCss).filter((rule) =>
+      rule.selector.includes(".hdr .tabbar .snav-item:active"),
+    );
+    expect(active.length, "нет :active-правила таббара").toBeGreaterThan(0);
+    for (const rule of active) {
+      expect(rule.decls).toContain("scale(var(--lnt-press-scale))");
+    }
+    const base = baseRules(shellCss, ".hdr .tabbar .snav-item");
+    expect(base.length, "нет базового правила таббара").toBeGreaterThan(0);
+    // Press-семейство — t-press 160ms ease-out (словарь r5-7), не motion-fast.
+    expect(
+      base.some((rule) =>
+        /transform\s+var\(--lnt-t-press\)\s+var\(--lnt-ease-out\)/.test(rule.decls),
+      ),
+    ).toBe(true);
+    expect(base.some((rule) => /transform\s+var\(--lnt-motion-fast\)/.test(rule.decls))).toBe(
+      false,
+    );
+  });
+
+  it("r5-11: токены press доходят до таббара — скоуп .hdr в списке style.css", () => {
+    const css = stripComments(read("style.css"));
+    expect(css).toMatch(/\.app-v6[^{}]*\.hdr[^{}]*\{[^}]*--lnt-t-press:/);
+  });
+
+  it("r5-11 net-removal: мёртвый background-транзишен снят с chip/step/.btn полосы", () => {
+    for (const needle of [".lnt-live-chip-btn", ".lnt-live-step-btn", ".lnt-live-strip .btn"]) {
+      const rules = baseRules(stripCssLocal, needle);
+      expect(rules.length, `нет базового правила ${needle}`).toBeGreaterThan(0);
+      for (const rule of rules) {
+        // Частотная таблица, вопрос 1 («должно ли это анимироваться?»):
+        // у семейства нет события, меняющего фон, — свойство удалено (r5-11).
+        expect(rule.decls, `${needle}: background в transition`).not.toMatch(
+          /transition[^;]*\bbackground\b/,
+        );
+        // Выжившие строки словаря: hover-цвет (border-color) и press-transform.
+        expect(rule.decls, `${needle}: border-color-транзишен`).toMatch(
+          /transition[^;]*border-color\s+var\(--lnt-t-fast\)\s+var\(--lnt-ease\)/,
+        );
+        expect(rule.decls, `${needle}: press-transform`).toMatch(
+          /transform\s+var\(--lnt-t-press\)\s+var\(--lnt-ease-out\)/,
+        );
+      }
     }
   });
 });

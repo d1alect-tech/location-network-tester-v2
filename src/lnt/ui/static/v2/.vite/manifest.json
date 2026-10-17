@@ -1,13 +1,9 @@
 {
-  "_chartshell.B96qGQ-W.css": {
-    "file": "assets/chartshell.B96qGQ-W.css",
-    "src": "_chartshell.B96qGQ-W.css"
-  },
-  "_chartshell.DV0L63CV.js": {
-    "file": "assets/chartshell.DV0L63CV.js",
+  "_chartshell.Bo3wC0qu.js": {
+    "file": "assets/chartshell.Bo3wC0qu.js",
     "name": "chartshell",
     "css": [
-      "assets/chartshell.B96qGQ-W.css"
+      "assets/chartshell.CwDUDHU5.css"
     ],
     "assets": [
       "assets/inter-cyrillic-wght-normal.DqGufNeO.woff2",
@@ -28,6 +24,10 @@
       "assets/IBMPlexMono-Regular.Du0PCiXT.woff2",
       "assets/IBMPlexMono-Medium.CiYsa3y2.woff2"
     ]
+  },
+  "_chartshell.CwDUDHU5.css": {
+    "file": "assets/chartshell.CwDUDHU5.css",
+    "src": "_chartshell.CwDUDHU5.css"
   },
   "_form.BUF79Nh4.js": {
     "file": "assets/form.BUF79Nh4.js",
@@ -107,16 +107,16 @@
     "src": "_variantV1.CCz54TsC.css"
   },
   "index.html": {
-    "file": "assets/main.C1zdd3uT.js",
+    "file": "assets/main.BsVPybfT.js",
     "name": "main",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.DV0L63CV.js",
+      "_chartshell.Bo3wC0qu.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
-      "assets/main.dymI1pA7.css"
+      "assets/main.DEe3wue4.css"
     ]
   },
   "showcase-a.html": {
@@ -272,12 +272,12 @@
     ]
   },
   "showcase.html": {
-    "file": "assets/showcase.DC5NeU0Y.js",
+    "file": "assets/showcase.DJAnYw6H.js",
     "name": "showcase",
     "src": "showcase.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.DV0L63CV.js"
+      "_chartshell.Bo3wC0qu.js"
     ]
   },
   "src/showcase-redesign/fonts/IBMPlexMono-Medium.woff2": {

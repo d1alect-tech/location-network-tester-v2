@@ -204,14 +204,18 @@ test("S5: 390px — ярлык уходит, глиф и тач-таргет 44p
   await noHorizontalOverflow(page);
 });
 
-test("S6: prefers-reduced-motion — входа и переходов тона нет", async ({ page }) => {
+test("S6: prefers-reduced-motion — вход гасится, тон живёт, движения нет", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   mockInspectApi(installMockBackend(page));
   await page.goto(`${BASE}#/catalog`);
   const active = page.locator("header.hdr .tabbar a.snav-item.is-active");
   await expect(active).toHaveCount(1);
   await expect(active).toHaveCSS("animation-name", "none");
-  await expect(active).toHaveCSS("transition-duration", "0s");
+  // Политика r5-7/r5-11 (emil: reduced = меньше/мягче, не ноль): цвет/opacity
+  // живут, transform выпадает из списка свойств, длительность конечная —
+  // старый пин «0s» (transition: none) репинен на машинные значения политики.
+  await expect(active).toHaveCSS("transition-property", "background, border-color, color, opacity");
+  await expect(active).not.toHaveCSS("transition-duration", "0s");
 });
 
 test("S7: worst-case длинный ярлык эллипсуется, хром не ломается", async ({ page }) => {

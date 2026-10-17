@@ -177,8 +177,12 @@
   font: 600 12px / 16px var(--lnt-mono);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
-    var(--lnt-ease), transform var(--lnt-t-press) var(--lnt-ease-out);
+  /* r5-11 net-removal (частотная таблица emil, вопрос «должно ли это
+     анимироваться?»): у чипа нет правила, меняющего фон — меню/действие
+     мгновенны, hover красит border-color, :disabled — opacity; фон меняться
+     нечем, transition-свойство удалено, не закомментировано. */
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-t-press)
+    var(--lnt-ease-out);
 }
 
 .lnt-live-strip .lnt-live-chip-btn:active {
@@ -271,8 +275,12 @@
   color: var(--lnt-text);
   font: 600 16px / 16px var(--lnt-mono);
   cursor: pointer;
-  transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
-    var(--lnt-ease), transform var(--lnt-t-press) var(--lnt-ease-out);
+  /* r5-11 net-removal (частотная таблица emil, вопрос «должно ли это
+     анимироваться?»): у степпера нет правила, меняющего фон — нажатие меняет
+     значение поля мгновенно, hover красит border-color, :disabled — opacity; фон меняться
+     нечем, transition-свойство удалено, не закомментировано. */
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-t-press)
+    var(--lnt-ease-out);
 }
 
 /* Задача r5-7: press-отклик степпера. */
@@ -478,8 +486,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
-    var(--lnt-ease), transform var(--lnt-t-press) var(--lnt-ease-out);
+  /* r5-11 net-removal (частотная таблица emil, вопрос «должно ли это
+     анимироваться?»): у кнопки «Живой» нет правила, меняющего фон — включение
+     мгновенно, hover красит border-color, :disabled — opacity; фон меняться
+     нечем, transition-свойство удалено, не закомментировано. */
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-t-press)
+    var(--lnt-ease-out);
 }
 
 .lnt-live-strip .btn:active {

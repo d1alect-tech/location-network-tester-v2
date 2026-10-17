@@ -7,7 +7,8 @@
 
 /* Задача r5-7 (планка emil-design-eng): словарь моушена — токены press.
  * Скоуп — корни поверхностей с нажимаемыми семействами (полоса liveStrip,
- * воркспейсы scope/SA, формы захвата/настроек) и .app-v6 (инспекция);
+ * воркспейсы scope/SA, формы захвата/настроек), .app-v6 (инспекция) и
+ * таббар оболочки .hdr (r5-11: press пунктов навигации — на токене);
  * НИКОГДА :root (конвенция репо). Значения запинены motionTokens.test.ts:
  * изменение токена — тем же коммитом со спекой. */
 .app-v6,
@@ -15,7 +16,8 @@
 .lnt-scope-workspace,
 .lnt-sa-workspace,
 .capture-view,
-.lnt-set-workspace {
+.lnt-set-workspace,
+.hdr {
   --lnt-t-press: 160ms;
   --lnt-press-scale: 0.97;
   --lnt-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -96,8 +98,12 @@ body {
   align-items: center;
 }
 
-.btn-recovery:hover {
-  opacity: 0.9;
+/* Задача r5-11 (E7): hover-обратная связь — только для устройств с настоящим
+ * hover и точным указателем: тач-тап не оставляет липкого hover-состояния. */
+@media (hover: hover) and (pointer: fine) {
+  .btn-recovery:hover {
+    opacity: 0.9;
+  }
 }
 
 .btn-recovery:focus-visible {
