@@ -7,6 +7,7 @@
  * Run → применилось, маркировка снята»; 409 запуска — баннер с переходом
  * на вкладку-конкурента «Осциллограф»; dispose закрывает подписки. */
 
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LntApiClient } from "../../api/client";
 import { createLiveApi } from "../../api/client-live";
@@ -368,5 +369,36 @@ describe("saStrip: полоса поверх воркспейса (задача 
     await flush();
     expect(log.stops).toBe(1);
     expect(window.location.hash).toBe("#/scope");
+  });
+});
+
+describe("saStrip: W2/W4 — r4-пропорции зоны и пустые состояния (задача r5-10)", () => {
+  const saCss = readFileSync(`${process.cwd()}/src/views/sa/sa.css`, "utf8");
+  const stripComments = (text: string): string => text.replace(/\/\*[\s\S]*?\*\//g, "");
+  const css = stripComments(saCss);
+
+  it("W2: приборная сетка SA сбрасывает потолок ширины — воркспейс заполняет окно вида", () => {
+    // Паттерн r5-9 scope.css: max-width: none ВНУТРИ @media (min-width: 768px)
+    // блока .lnt-sa-strip-mode — базовый потолок 980px остаётся для
+    // не-полосного/мобильного контура.
+    const at = css.indexOf("@media (min-width: 768px)");
+    expect(at, "нет десктопного блока").toBeGreaterThan(-1);
+    const block = css.slice(at);
+    const gridAt = block.indexOf(".lnt-sa-workspace.lnt-sa-strip-mode {");
+    expect(gridAt, "нет правила приборной сетки").toBeGreaterThan(-1);
+    const rule = block.slice(gridAt, block.indexOf("}", gridAt));
+    expect(rule).toContain("max-width: none");
+  });
+
+  it("W4: пустые состояния маркеров/пиков переносятся — эллипсис снят", () => {
+    // Инструкции оператора обязаны рендериться полностью: ни одного
+    // white-space: nowrap / text-overflow: ellipsis на .lnt-sa-table-empty.
+    for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selector = (match[1] ?? "").trim();
+      const decls = match[2] ?? "";
+      if (!selector.includes(".lnt-sa-table-empty")) continue;
+      expect(decls, `${selector}: nowrap запрещён`).not.toMatch(/white-space:\s*nowrap/);
+      expect(decls, `${selector}: эллипсис запрещён`).not.toMatch(/text-overflow:\s*ellipsis/);
+    }
   });
 });

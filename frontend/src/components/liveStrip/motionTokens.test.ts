@@ -209,6 +209,7 @@ describe("motionTokens: планка emil r5-9 (E5 клавиатура, E7 hove
   const stripCssLocal = read("components/liveStrip/liveStrip.css");
   const scopeCss = read("views/scope/scope.css");
   const waveCss = read("views/scope/scopeWaveform.css");
+  const saCss = read("views/sa/sa.css");
 
   it("E5: базовые правила флип-контролов (сегменты, run-клавиши) без color-транзишена", () => {
     for (const [name, text, needle] of [
@@ -240,11 +241,12 @@ describe("motionTokens: планка emil r5-9 (E5 клавиатура, E7 hove
     expect(trigHover.some((rule) => /transition[^;]*background/.test(rule.decls))).toBe(true);
   });
 
-  it("E7: каждое :hover-правило полосы и scope-воркспейса — внутри hover-гейта", () => {
+  it("E7: каждое :hover-правило полосы и воркспейсов обеих вкладок — внутри hover-гейта", () => {
     for (const [name, text] of [
       ["liveStrip.css", stripCssLocal],
       ["scope.css", scopeCss],
       ["scopeWaveform.css", waveCss],
+      ["sa.css", saCss],
     ] as const) {
       const ungated = hoverGateViolations(text);
       expect(ungated, `${name}: :hover вне @media (hover: hover) and (pointer: fine)`).toEqual([]);

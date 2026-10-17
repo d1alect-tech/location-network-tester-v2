@@ -106,10 +106,6 @@
     var(--lnt-ease-out);
 }
 
-.lnt-sa-workspace .btn:hover {
-  background: color-mix(in srgb, var(--lnt-accent) 85%, white);
-}
-
 .lnt-sa-workspace .btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -124,11 +120,6 @@
   background: var(--lnt-elev);
   color: var(--lnt-text);
   border: 1px solid var(--lnt-line-struct);
-}
-
-.lnt-sa-workspace .btn-secondary:hover {
-  background: color-mix(in srgb, var(--lnt-line-hot) 55%, var(--lnt-elev));
-  border-color: var(--lnt-line-hot);
 }
 
 .lnt-sa-workspace .form-actions {
@@ -252,10 +243,6 @@
     var(--lnt-ease-out);
 }
 
-.lnt-sa-workspace .ctl:hover {
-  border-color: var(--lnt-line-hot);
-}
-
 /* Задача r5-7: press-отклик селекторов конфигурации SA. */
 .lnt-sa-workspace .ctl:active {
   transform: scale(var(--lnt-press-scale));
@@ -265,6 +252,24 @@
   outline: 2px solid var(--lnt-accent);
   outline-offset: -1px;
   border-color: var(--lnt-line-hot);
+}
+
+/* ── Задача r5-10 E7: hover-обратная связь воркспейса SA — только для
+   устройств с настоящим hover и точным указателем (emil: тач-тап не
+   оставляет липкий hover-кроссфейд). Один блок на весь воркспейс SA. ── */
+@media (hover: hover) and (pointer: fine) {
+  .lnt-sa-workspace .btn:hover {
+    background: color-mix(in srgb, var(--lnt-accent) 85%, white);
+  }
+
+  .lnt-sa-workspace .btn-secondary:hover {
+    background: color-mix(in srgb, var(--lnt-line-hot) 55%, var(--lnt-elev));
+    border-color: var(--lnt-line-hot);
+  }
+
+  .lnt-sa-workspace .ctl:hover {
+    border-color: var(--lnt-line-hot);
+  }
 }
 
 .lnt-sa-workspace .lnt-sa-config-grid {
@@ -466,12 +471,15 @@
   display: none;
 }
 
-/* ── Задача 17b: вертикальное сжатие вкладки в одно окно (AC1) ─────────
-   Воркспейс — приборная сетка: фигура спектра — единственное сигнальное
-   окно главной колонки, строки 2-4 (fr-трек дышит по высоте окна вида);
-   правый рельс — leftover-строки BRIEF §1.4 (окно/детектор, единицы/лог)
-   + таблицы маркеров + показания потока. Панель волны раскрывается до
-   ячеек (display: contents): фигура и статус — прямые ячейки, высота
+/* ── Задача 17b: вертикальное сжатие вкладки в одно окно (AC1); r5-10 W2 —
+   r4-пропорции главной зоны. Воркспейс — приборная сетка НА ВСЮ ширину
+   окна вида (паттерн r5-9 scope.css: max-width: none, базовый потолок
+   980px остаётся для не-полосного/мобильного контура): фигура спектра —
+   СТЕКЛО главной зоны, заполняющее главную колонку (единственное
+   сигнальное окно, строки 2-4, fr-трек дышит по высоте окна вида);
+   правый рельс — leftover-строки BRIEF §1.4 (окно/детектор, единицы/
+   лог) + таблицы маркеров + показания потока. Панель волны раскрывается
+   до ячеек (display: contents): фигура и статус — прямые ячейки, высота
    фигуры — из трека, не из токена. Мобильный (≤767) не трогаем (Todo 44). */
 
 @media (min-width: 768px) {
@@ -480,6 +488,7 @@
     grid-template-columns: minmax(0, 1fr) 300px;
     grid-template-rows: auto auto auto minmax(0, 1fr) auto;
     gap: 4px 12px;
+    max-width: none;
   }
 
   .lnt-sa-strip-mode .lnt-sa-status {
@@ -561,11 +570,11 @@
     gap: 4px 10px;
   }
 
-  /* Пустые состояния маркеров — одна строка с эллипсисом (§3.4). */
+  /* Пустые состояния маркеров/пиков — инструкции оператора: текст
+     переносится и рендерится полностью (r5-10 W4; эллипсис §3.4 снят —
+     обрезанные строки владелец отверг дословно). */
   .lnt-sa-strip-mode .lnt-sa-markers .lnt-sa-table-empty {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   /* Показания потока — длинные подписи («свипов в складе»…): одна пара
