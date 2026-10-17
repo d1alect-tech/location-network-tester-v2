@@ -5,6 +5,22 @@
 @import "./components/primitives/primitives.css";
 @import "./capture/capture.css";
 
+/* Задача r5-7 (планка emil-design-eng): словарь моушена — токены press.
+ * Скоуп — корни поверхностей с нажимаемыми семействами (полоса liveStrip,
+ * воркспейсы scope/SA, формы захвата/настроек) и .app-v6 (инспекция);
+ * НИКОГДА :root (конвенция репо). Значения запинены motionTokens.test.ts:
+ * изменение токена — тем же коммитом со спекой. */
+.app-v6,
+.lnt-live-strip,
+.lnt-scope-workspace,
+.lnt-sa-workspace,
+.capture-view,
+.lnt-set-workspace {
+  --lnt-t-press: 160ms;
+  --lnt-press-scale: 0.97;
+  --lnt-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 /* Base styles */
 body {
   margin: 0;
@@ -107,10 +123,13 @@ body {
   color: var(--lnt-fg-secondary);
 }
 
-/* Reduced Motion */
+/* Reduced Motion — политика планки emil: reduced = меньше/мягче, НЕ ноль.
+ * Переходы цвета и прозрачности СОХРАНЯЮТСЯ (понимание состояния), движение
+ * гасится: transform выпадает из transition-property, press становится
+ * мгновенным состоянием. Кейфреймы — движение, остаются погашенными. */
 @media (prefers-reduced-motion: reduce) {
   * {
-    transition: none !important;
+    transition-property: background, border-color, color, opacity !important;
     animation: none !important;
   }
 }

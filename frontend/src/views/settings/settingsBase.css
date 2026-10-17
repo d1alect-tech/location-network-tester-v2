@@ -102,15 +102,17 @@
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  transition: background var(--lnt-t-fast) var(--lnt-ease);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-t-press)
+    var(--lnt-ease-out);
 }
 
 .lnt-set-workspace .btn:hover {
   background: var(--lnt-accent-press);
 }
 
+/* Задача r5-7: press-отклик на токене (ad-hoc background-press мигрирован). */
 .lnt-set-workspace .btn:active {
-  background: var(--lnt-accent-press);
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-set-workspace .btn-secondary {

@@ -102,7 +102,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--lnt-t-fast) var(--lnt-ease);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-t-press)
+    var(--lnt-ease-out);
 }
 
 .lnt-sa-workspace .btn:hover {
@@ -112,6 +113,11 @@
 .lnt-sa-workspace .btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+/* Задача r5-7: press-отклик (планка emil — тактильный отклик). */
+.lnt-sa-workspace .btn:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-sa-workspace .btn-secondary {
@@ -242,11 +248,17 @@
   background: var(--lnt-field, var(--lnt-chrome));
   color: var(--lnt-text);
   font: 400 14px / 20px var(--lnt-ui);
-  transition: border-color var(--lnt-t-fast) var(--lnt-ease);
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-t-press)
+    var(--lnt-ease-out);
 }
 
 .lnt-sa-workspace .ctl:hover {
   border-color: var(--lnt-line-hot);
+}
+
+/* Задача r5-7: press-отклик селекторов конфигурации SA. */
+.lnt-sa-workspace .ctl:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-sa-workspace .ctl:focus-visible {
@@ -291,6 +303,11 @@
   min-height: var(--lnt-control-height, 44px);
   cursor: pointer;
   flex: none;
+  transition: transform var(--lnt-t-press) var(--lnt-ease-out);
+}
+
+.lnt-sa-workspace .lnt-sa-check:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-sa-workspace .lnt-sa-check[for] {

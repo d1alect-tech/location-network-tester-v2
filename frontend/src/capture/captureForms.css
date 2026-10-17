@@ -12,15 +12,17 @@
   color: var(--lnt-canvas);
   font: 600 14px / 20px var(--lnt-ui);
   cursor: pointer;
-  transition: background var(--lnt-t-fast) var(--lnt-ease);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-t-press)
+    var(--lnt-ease-out);
 }
 
 .capture-view .btn:hover {
   background: var(--lnt-accent-press);
 }
 
+/* Задача r5-7: press-отклик на токене (ad-hoc background-press мигрирован). */
 .capture-view .btn:active {
-  background: var(--lnt-accent-press);
+  transform: scale(var(--lnt-press-scale));
 }
 
 .capture-view .btn:disabled {

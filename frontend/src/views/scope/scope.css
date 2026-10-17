@@ -103,7 +103,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--lnt-t-fast) var(--lnt-ease);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-t-press)
+    var(--lnt-ease-out);
 }
 
 .lnt-scope-workspace .btn:hover {
@@ -113,6 +114,11 @@
 .lnt-scope-workspace .btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+/* Задача r5-7: press-отклик (планка emil — тактильный отклик). */
+.lnt-scope-workspace .btn:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-scope-workspace .btn-secondary {
@@ -224,6 +230,16 @@
   display: none;
 }
 
+/* Задача r5-7: press-отклик тумблеров инверсии CH1/CH2 — строка
+ * кликабельна целиком (label). */
+.lnt-scope-workspace .lnt-scope-check {
+  transition: transform var(--lnt-t-press) var(--lnt-ease-out);
+}
+
+.lnt-scope-workspace .lnt-scope-check:active {
+  transform: scale(var(--lnt-press-scale));
+}
+
 /* ── Триггер-панель и частота дискретизации (Todo 9) ──────────────────── */
 
 .lnt-scope-workspace .lnt-scope-field-label {
@@ -256,7 +272,7 @@
   font: 600 13px / 16px var(--lnt-ui);
   cursor: pointer;
   transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
-    var(--lnt-ease);
+    var(--lnt-ease), transform var(--lnt-t-press) var(--lnt-ease-out);
 }
 
 .lnt-scope-workspace .lnt-scope-seg-btn:hover {
@@ -267,6 +283,10 @@
   background: color-mix(in srgb, var(--lnt-accent) 22%, var(--lnt-elev));
   border-color: var(--lnt-accent);
   color: var(--lnt-text);
+}
+
+.lnt-scope-workspace .lnt-scope-seg-btn:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 /* Поле уровня: те же контуры, что .ctl развёртки, но таргет 44px. */

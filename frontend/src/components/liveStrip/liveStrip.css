@@ -137,8 +137,8 @@
   font: 600 12px / 16px var(--lnt-mono);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
-    cubic-bezier(0.2, 0, 0, 1);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
+    var(--lnt-ease), transform var(--lnt-t-press) var(--lnt-ease-out);
 }
 
 .lnt-live-strip .lnt-live-seg-btn:hover {
@@ -150,6 +150,11 @@
   border-color: var(--lnt-accent);
   color: var(--lnt-text);
   font-weight: 700;
+}
+
+/* Задача r5-7: press-отклик сегментов (планка emil — тактильный отклик). */
+.lnt-live-strip .lnt-live-seg-btn:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 /* ── Чип + stateless listbox (дискрет >5): частота 150×44 ─────────────── */
@@ -175,12 +180,16 @@
   font: 600 12px / 16px var(--lnt-mono);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
-    cubic-bezier(0.2, 0, 0, 1);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
+    var(--lnt-ease), transform var(--lnt-t-press) var(--lnt-ease-out);
 }
 
 .lnt-live-strip .lnt-live-chip-btn:hover {
   border-color: var(--lnt-line-hot);
+}
+
+.lnt-live-strip .lnt-live-chip-btn:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-live-chip-caret {
@@ -231,6 +240,12 @@
   font-variant-numeric: tabular-nums;
   text-align: left;
   cursor: pointer;
+  transition: transform var(--lnt-t-press) var(--lnt-ease-out);
+}
+
+/* Задача r5-7: press-отклик опции listbox (семейство чипа). */
+.lnt-live-strip .lnt-live-opt:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-live-strip .lnt-live-opt:hover {
@@ -267,12 +282,17 @@
   color: var(--lnt-text);
   font: 600 16px / 16px var(--lnt-mono);
   cursor: pointer;
-  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
-    cubic-bezier(0.2, 0, 0, 1);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
+    var(--lnt-ease), transform var(--lnt-t-press) var(--lnt-ease-out);
 }
 
 .lnt-live-strip .lnt-live-step-btn:hover {
   border-color: var(--lnt-line-hot);
+}
+
+/* Задача r5-7: press-отклик степпера. */
+.lnt-live-strip .lnt-live-step-btn:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 /* Степпер (задача 15: поле 56 px — уровень ±5.0 влезает, строка ТРИГГ
@@ -319,12 +339,12 @@
   letter-spacing: 0.04em;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3);
   cursor: pointer;
-  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
-    cubic-bezier(0.2, 0, 0, 1);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
+    var(--lnt-ease), transform var(--lnt-t-press) var(--lnt-ease-out);
 }
 
 .lnt-live-strip .lnt-live-runctl > button:active {
-  transform: translateY(1px);
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-live-run-glyph {
@@ -421,10 +441,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Политика (та же, что в style.css): цвет/opacity остаются,
+   * движение гасится — transform выпадает из transition-property. */
   .lnt-live-strip *,
   .lnt-live-strip *::before,
   .lnt-live-strip *::after {
-    transition: none;
+    transition-property: background, border-color, color, opacity !important;
   }
 }
 
@@ -443,8 +465,8 @@
   font: 600 12px / 16px var(--lnt-mono);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
-    cubic-bezier(0.2, 0, 0, 1);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
+    var(--lnt-ease), transform var(--lnt-t-press) var(--lnt-ease-out);
 }
 
 .lnt-live-strip .lnt-scope-seg-btn:hover {
@@ -456,6 +478,10 @@
   border-color: var(--lnt-accent);
   color: var(--lnt-text);
   font-weight: 700;
+}
+
+.lnt-live-strip .lnt-scope-seg-btn:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 /* Кнопка «Живой» истории: компактный btn-secondary полосы. */
@@ -471,12 +497,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 120ms cubic-bezier(0.2, 0, 0, 1), border-color 120ms
-    cubic-bezier(0.2, 0, 0, 1);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
+    var(--lnt-ease), transform var(--lnt-t-press) var(--lnt-ease-out);
 }
 
 .lnt-live-strip .btn:hover {
   border-color: var(--lnt-line-hot);
+}
+
+.lnt-live-strip .btn:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-live-strip .btn:disabled {
@@ -610,6 +640,7 @@
   background: var(--lnt-panel);
   color: var(--lnt-text);
   font: 500 12px / 14px var(--lnt-ui);
+  transition: transform var(--lnt-t-press) var(--lnt-ease-out);
 }
 
 .lnt-live-strip .lnt-live-action-btn:hover:not(:disabled) {
@@ -617,7 +648,7 @@
 }
 
 .lnt-live-strip .lnt-live-action-btn:active {
-  transform: translateY(1px);
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-live-strip .lnt-live-action-btn:focus-visible {
@@ -689,10 +720,15 @@
   background: var(--lnt-panel);
   color: var(--lnt-text);
   font: 500 12px / 14px var(--lnt-ui);
+  transition: transform var(--lnt-t-press) var(--lnt-ease-out);
 }
 
 .lnt-live-strip .lnt-live-conflict-goto:hover:not(:disabled) {
   border-color: var(--lnt-line-hot);
+}
+
+.lnt-live-strip .lnt-live-conflict-goto:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-live-strip .lnt-live-conflict-goto:focus-visible {
@@ -757,6 +793,12 @@
   min-height: 44px;
   cursor: pointer;
   flex: none;
+  transition: transform var(--lnt-t-press) var(--lnt-ease-out);
+}
+
+/* Задача r5-7: press-отклик тумблера трассы (вся строка кликабельна). */
+.lnt-live-strip .lnt-sa-check:active {
+  transform: scale(var(--lnt-press-scale));
 }
 
 .lnt-live-strip .lnt-sa-toggle {
