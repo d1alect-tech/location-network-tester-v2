@@ -146,3 +146,40 @@ test("SINGLE mode: one frame, then the instrument stops", async ({ page }) => {
   // Остановленный прибор кадров не даёт: показание остаётся единственным.
   await expect(page.locator(".lnt-scope-frame-count")).toHaveText("1");
 });
+
+/** Задача r5-9 (E5): клавиатурный флип состояния мгновенен — после
+ * ArrowRight (сегменты В/дел) и spacebar (run-кластер) computed
+ * transition-property флип-кнопки НЕ содержит background/border-color:
+ * цвет-кроссфейд остаётся только обратной связи указателя (:hover). */
+test("keyboard state flip is instant: no background transition after keydown", async ({ page }) => {
+  await openScope(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  await page.locator('#lnt-scope-vdiv [data-value="5"]').focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('#lnt-scope-vdiv [data-value="1"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const segTransition = await page.evaluate(() => {
+    const node = document.querySelector('#lnt-scope-vdiv [data-value="1"]');
+    return node === null ? "MISSING" : getComputedStyle(node).transitionProperty;
+  });
+  expect(segTransition, `сегмент после ArrowRight: ${segTransition}`).not.toContain("background");
+  expect(segTransition).not.toContain("border-color");
+
+  // Spacebar вне интерактива: run-кластер стартует; клавиша без транзишена.
+  await page.evaluate(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  });
+  await page.keyboard.press(" ");
+  await expect(page.locator(".lnt-scope-state")).toHaveAttribute("data-live-state", "running");
+  const runTransition = await page.evaluate(() => {
+    const node = document.querySelector("#lnt-scope-run");
+    if (node === null) throw new Error("нет run-клавиши");
+    return getComputedStyle(node).transitionProperty;
+  });
+  expect(runTransition, `run-клавиша после spacebar: ${runTransition}`).not.toContain("background");
+  expect(runTransition).not.toContain("border-color");
+});

@@ -107,10 +107,6 @@
     var(--lnt-ease-out);
 }
 
-.lnt-scope-workspace .btn:hover {
-  background: color-mix(in srgb, var(--lnt-accent) 85%, white);
-}
-
 .lnt-scope-workspace .btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -125,11 +121,6 @@
   background: var(--lnt-elev);
   color: var(--lnt-text);
   border: 1px solid var(--lnt-line-struct);
-}
-
-.lnt-scope-workspace .btn-secondary:hover {
-  background: color-mix(in srgb, var(--lnt-line-hot) 55%, var(--lnt-elev));
-  border-color: var(--lnt-line-hot);
 }
 
 .lnt-scope-workspace .form-actions {
@@ -271,12 +262,10 @@
   color: var(--lnt-text-sec);
   font: 600 13px / 16px var(--lnt-ui);
   cursor: pointer;
-  transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
-    var(--lnt-ease), transform var(--lnt-t-press) var(--lnt-ease-out);
-}
-
-.lnt-scope-workspace .lnt-scope-seg-btn:hover {
-  border-color: var(--lnt-line-hot);
+  /* Задача r5-9 E5: флип aria-pressed (клавиатура/клик) мгновенен —
+     цвет-транзишен живёт только в :hover-правиле ниже (обратная связь
+     указателя); press-transform остаётся здесь. */
+  transition: transform var(--lnt-t-press) var(--lnt-ease-out);
 }
 
 .lnt-scope-workspace .lnt-scope-seg-btn[aria-pressed="true"] {
@@ -302,10 +291,6 @@
   transition: border-color var(--lnt-t-fast) var(--lnt-ease);
 }
 
-.lnt-scope-workspace .lnt-scope-ctl:hover {
-  border-color: var(--lnt-line-hot);
-}
-
 .lnt-scope-workspace .lnt-scope-ctl[aria-invalid="true"] {
   border-color: var(--lnt-err);
 }
@@ -322,6 +307,31 @@
 @media (max-width: 767px) {
   .lnt-scope-workspace .lnt-scope-trig-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ── Задача r5-9 E7: hover-обратная связь — только для устройств с
+   настоящим hover и точным указателем (emil: тач-тап не оставляет
+   липкий hover-кроссфейд). Один блок на весь воркспейс scope. ────────── */
+@media (hover: hover) and (pointer: fine) {
+  .lnt-scope-workspace .btn:hover {
+    background: color-mix(in srgb, var(--lnt-accent) 85%, white);
+  }
+
+  .lnt-scope-workspace .btn-secondary:hover {
+    background: color-mix(in srgb, var(--lnt-line-hot) 55%, var(--lnt-elev));
+    border-color: var(--lnt-line-hot);
+  }
+
+  /* E5: цвет-кроссфейд сегментов — здесь, не в базовом правиле. */
+  .lnt-scope-workspace .lnt-scope-seg-btn:hover {
+    border-color: var(--lnt-line-hot);
+    transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
+      var(--lnt-ease);
+  }
+
+  .lnt-scope-workspace .lnt-scope-ctl:hover {
+    border-color: var(--lnt-line-hot);
   }
 }
 
@@ -633,22 +643,23 @@
   outline-offset: -2px;
 }
 
-/* ── Задача 17b: вертикальное сжатие вкладки в одно окно (AC1) ─────────
-   Воркспейс — приборная сетка: главная колонка (экран + фигура развёртки,
-   fr-строки дышат по высоте окна вида) + правый рельс показаний
-   (измерения/поток, зона-карта 13 §9: «полоса +140 вычитается из stage;
-   leftover-строки ужимаются»). Панели сигнальных окон раскрываются до
-   сеточных ячеек (display: contents): экран и фигура — прямые ячейки,
-   высота — из трека, не из токена. Курсоры — скрытый leftover (слайдеры
-   с живыми слушателями остаются в DOM, drag пишет в них). Мобильный
-   (≤767) контур не трогаем: колонка и прокрутка документа (Todo 44). */
+/* ── Задача 17b: вертикальное сжатие вкладки в одно окно (AC1); r5-9 W1 —
+   r4-пропорции главного экрана. Воркспейс — приборная сетка НА ВСЮ ширину
+   окна вида (r4 v1: стейдж во всю ширину): главная колонка — СТЕКЛО
+   экрана, заполняющее колонку (r4 v1: 454 из 498 стейджа ≥ 400 px на
+   1280×720), + правый рельс показаний. Фигура развёртки (uPlot) — верхний
+   слот рельса; измерения/поток — под ней. Панели раскрываются до сеточных
+   ячеек (display: contents); курсоры — скрытый leftover (слайдеры с живыми
+   слушателями остаются в DOM, drag пишет в них). Мобильный (≤767) контур
+   не трогаем: колонка и прокрутка документа (Todo 44). */
 
 @media (min-width: 768px) {
   .lnt-scope-workspace.lnt-scope-strip-mode {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 300px;
-    grid-template-rows: auto minmax(0, 2fr) minmax(0, 3fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
     gap: 4px 12px;
+    max-width: none;
   }
 
   .lnt-scope-strip-mode .lnt-scope-status {
@@ -674,14 +685,17 @@
     display: contents;
   }
 
+  /* W1: стекло — прямая ячейка строк 2-4 (высота стейджа r4), фигура —
+     верхний слот рельса, под ней измерения и поток. */
   .lnt-scope-strip-mode .lnt-scope-viewport {
-    grid-area: 2 / 1;
+    grid-row: 2 / 5;
+    grid-column: 1;
     height: auto;
     min-height: 0;
   }
 
   .lnt-scope-strip-mode .lnt-scope-figure {
-    grid-area: 3 / 1;
+    grid-area: 2 / 2;
     min-height: 0;
     background: var(--lnt-panel);
     border-radius: var(--lnt-r-ctl);
@@ -695,7 +709,7 @@
   }
 
   .lnt-scope-strip-mode .lnt-scope-wave-status {
-    grid-area: 4 / 1;
+    grid-area: 5 / 1;
   }
 
   /* Рельс показаний: измерения и поток — компактные панели справа.
@@ -704,12 +718,12 @@
      на строку: max-content-подписи двух пар не лезут в 300px рельс
      (нулевые dd и горизонтальный перелив — axe scrollable-region). */
   .lnt-scope-strip-mode .lnt-scope-measure {
-    grid-area: 2 / 2;
+    grid-area: 3 / 2;
     min-height: 0;
   }
 
   .lnt-scope-strip-mode .lnt-scope-readout {
-    grid-area: 3 / 2;
+    grid-area: 4 / 2;
     min-height: 0;
   }
 

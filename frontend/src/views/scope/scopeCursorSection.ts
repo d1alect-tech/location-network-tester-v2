@@ -14,6 +14,7 @@ import type uPlot from "uplot";
 import type { LiveFramePayload } from "../../api/types-live";
 import { createLiveSeg } from "../../components/liveStrip/liveSeg";
 import { el } from "../../components/primitives/dom";
+import { cursorField } from "./scopeCursorFields";
 import {
   type CursorPositions,
   DEFAULT_T1,
@@ -29,6 +30,9 @@ import { VOLT_CURSOR_SPAN_V, clampFraction } from "./scopeCursors";
 export interface ScopeCursorView {
   /** Панель «Курсоры»: тумблер линий + ползунки + readout Δt/ΔV. */
   readonly root: HTMLElement;
+  /** Инлайн-ридаут «Δt … · ΔV …» (r4-грамматика): полоса liveStrip несёт
+   * одну строку без обрезки — клетки сетки не сжимаются (задача r5-9 W3). */
+  readonly inlineReadout: HTMLElement;
   /** Плагин линий курсоров для стека развёртки (шов createView). */
   readonly plugin: uPlot.Plugin;
   /** Кадр задаёт окно времени T-курсоров, пока график не сообщил своё. */
@@ -45,35 +49,6 @@ const viewsByRoot = new WeakMap<HTMLElement, ScopeCursorView>();
 
 export function findScopeCursorView(root: HTMLElement): ScopeCursorView | undefined {
   return viewsByRoot.get(root);
-}
-
-/** Поле курсора: подпись + ползунок; возвращает обёртку и input. */
-function cursorField(
-  id: string,
-  label: string,
-  min: number,
-  max: number,
-  value: number,
-  sliderClass: string,
-): { field: HTMLElement; input: HTMLInputElement } {
-  const input = el("input", {
-    className: `lnt-scope-cursor-slider ${sliderClass}`,
-    attrs: {
-      type: "range",
-      id,
-      min: String(min),
-      max: String(max),
-      step: "5",
-      value: String(value),
-      "aria-label": label,
-    },
-  });
-  const caption = el("label", { className: "lnt-scope-cursor-label", text: label });
-  caption.htmlFor = id;
-  return {
-    input,
-    field: el("div", { className: "lnt-scope-cursor-field" }, [caption, input]),
-  };
 }
 
 export function buildScopeCursorSection(): ScopeCursorView {
@@ -102,6 +77,11 @@ export function buildScopeCursorSection(): ScopeCursorView {
   const v1Value = el("dd", { className: "t-mono lnt-scope-cursor-v1", text: "—" });
   const v2Value = el("dd", { className: "t-mono lnt-scope-cursor-v2", text: "—" });
   const dvValue = el("dd", { className: "t-mono lnt-scope-cursor-dv", text: "—" });
+  const inlineReadout = el("span", {
+    className: "t-mono lnt-scope-cursor-inline",
+    text: "Δt — · ΔV —",
+    attrs: { "data-readonly": "" },
+  });
   const row = (label: string, value: HTMLElement): Node[] => [
     el("dt", { className: "readout-label", text: label }),
     value,
@@ -146,6 +126,7 @@ export function buildScopeCursorSection(): ScopeCursorView {
     v1Value.textContent = readout.v1;
     v2Value.textContent = readout.v2;
     dvValue.textContent = readout.dv;
+    inlineReadout.textContent = `Δt ${readout.dt} · ΔV ${readout.dv}`;
   }
 
   for (const [control, apply] of [
@@ -206,6 +187,7 @@ export function buildScopeCursorSection(): ScopeCursorView {
   updateCursorReadout();
 
   const view: ScopeCursorView = {
+    inlineReadout,
     root: el("section", { className: "panel lnt-scope-section lnt-scope-cursors" }, [
       el("div", { className: "panel-hd" }, [
         el("h3", { className: "panel-title", text: "Курсоры" }),
@@ -238,6 +220,7 @@ export function buildScopeCursorSection(): ScopeCursorView {
             .concat(row("V2", v2Value))
             .concat(row("ΔV", dvValue)),
         ),
+        inlineReadout,
         el("p", {
           className: "t-compact",
           text: "Курсоры T — доли окна кадра, V — номинальная шкала ±5 В.",

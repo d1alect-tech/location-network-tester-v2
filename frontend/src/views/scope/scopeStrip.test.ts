@@ -320,10 +320,14 @@ describe("scopeStrip: полоса поверх воркспейса (задач
     level.dispatchEvent(new Event("change", { bubbles: true }));
     expect(line?.getAttribute("aria-valuenow")).toBe("1");
 
-    // ИЗМЕР: тумблер курсоров + ридаут Δt/ΔV; кнопки действий с эхом.
+    // ИЗМЕР: тумблер курсоров + инлайн-ридаут Δt/ΔV (r4-грамматика, W3);
+    // шесть пар остались в панели воркспейса — скрытый leftover.
     const cursors = container.querySelector('[data-local="cursors"]');
     expect(cursors?.querySelectorAll("button")).toHaveLength(2);
-    expect(cursors?.querySelector(".readout-grid")).toBeInstanceOf(HTMLElement);
+    expect(cursors?.querySelector(".readout-grid")).toBeNull();
+    const inline = cursors?.querySelector(".lnt-scope-cursor-inline");
+    expect(inline?.textContent).toContain("ΔV");
+    expect(inline?.getAttribute("data-readonly")).toBe("");
     const autoset = container.querySelector('[data-action="autoset"] button');
     expect(autoset?.textContent).toBe("Автосет");
     const reset = container.querySelector('[data-action="reset"] button');
@@ -360,5 +364,27 @@ describe("scopeStrip: полоса поверх воркспейса (задач
     await flush();
     expect(log.stops).toBe(1);
     expect(window.location.hash).toBe("#/sa");
+  });
+});
+
+describe("scopeStrip: W3 — ридауты полосы без обрезки (задача r5-9)", () => {
+  it("грид измерений остаётся в рельсе воркспейса; полоса несёт только тумблер", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+
+    // Зона ИЗМЕР полосы: тумблер БЕЗ грида — 6-8px клетки исчезли.
+    const measureZone = container.querySelector('[data-local="measure"]');
+    expect(measureZone?.querySelector(".readout-grid")).toBeNull();
+    // Рельс воркспейса: грид измерений на месте — клетки не сжимаются полосой.
+    const rail = container.querySelector(".lnt-scope-measure");
+    expect(rail?.querySelectorAll(".readout-grid dd").length).toBe(7);
+    // Сетка курсоров тоже живёт в панели (скрытый leftover со слушателями).
+    const panel = container.querySelector(".lnt-scope-cursors");
+    expect(panel?.querySelectorAll(".readout-grid dd").length).toBe(6);
+    // Инлайн Δt·ΔV — единственный ридаут курсоров в полосе.
+    const inline = container.querySelector('[data-local="cursors"] .lnt-scope-cursor-inline');
+    expect(inline?.textContent).toContain("Δt");
+    expect(inline?.textContent).toContain("ΔV");
   });
 });

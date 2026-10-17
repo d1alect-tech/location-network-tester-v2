@@ -107,15 +107,15 @@ export function mountScopeStrip(
   });
   strip.groupHost("level").append(stepper.root);
 
-  // ИЗМЕР: тумблер курсоров + ридаут Δt/ΔV; история; измерения;
-  // послесвечение (действия автосета/сброса — ниже, задача 15).
+  // ИЗМЕР: тумблер курсоров; история; измерения; послесвечение (действия
+  // автосета/сброса — ниже, задача 15). Ридауты: сетки НЕ переезжают в полосу
+  // (задача r5-9 W3) — измерения остаются в рельсе воркспейса, курсорная сетка
+  // — скрытый leftover панели; полоса несёт инлайн-строку Δt·ΔV (r4-грамматика).
   move("#lnt-scope-cursors", "cursors");
-  move(".lnt-scope-cursors .readout-grid", "cursors");
   move("#lnt-scope-history", "history");
   move("#lnt-scope-live", "history");
   move(".lnt-scope-screen-note", "history");
   move("#lnt-scope-measure", "measure");
-  move(".lnt-scope-measure .readout-grid", "measure");
   move("#lnt-scope-persist", "persist");
 
   // Статус-зона: живые строки состояния + ошибки (absolute-оверлей).
@@ -154,6 +154,11 @@ export function mountScopeStrip(
   if (figure === null || cursorsRoot === null) {
     throw new Error("mountScopeStrip: нет фигуры/секции курсоров");
   }
+  const cursorView = findScopeCursorView(cursorsRoot);
+  if (cursorView === undefined) {
+    throw new Error("mountScopeStrip: нет хэндла секции курсоров");
+  }
+  strip.groupHost("cursors").append(cursorView.inlineReadout);
   const slider = (id: string): HTMLInputElement => {
     const node = workspace.querySelector<HTMLInputElement>(id);
     if (node === null) throw new Error(`mountScopeStrip: нет слайдера ${id}`);

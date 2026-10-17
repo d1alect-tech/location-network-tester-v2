@@ -35,10 +35,6 @@
   transition: border-color var(--lnt-t-fast) var(--lnt-ease);
 }
 
-.lnt-scope-workspace .ctl:hover {
-  border-color: var(--lnt-line-hot);
-}
-
 .lnt-scope-workspace .ctl:focus-visible {
   outline: 2px solid var(--lnt-accent);
   outline-offset: -1px;
@@ -131,5 +127,13 @@
 @media (max-width: 767px) {
   .lnt-scope-workspace .lnt-scope-controls {
     gap: 8px;
+  }
+}
+
+/* Задача r5-9 E7: hover-обратная связь — только для устройств с настоящим
+   hover и точным указателем (тач-тап не оставляет липкий кроссфейд). */
+@media (hover: hover) and (pointer: fine) {
+  .lnt-scope-workspace .ctl:hover {
+    border-color: var(--lnt-line-hot);
   }
 }

@@ -279,3 +279,26 @@ describe("scopeCursorSection: тумблер Выкл|Вкл и поиск хэ�
     expect(section.chart()).toBe(self);
   });
 });
+
+describe("scopeCursorSection: инлайн-ридаут Δt·ΔV (задача r5-9 W3, r4-грамматика)", () => {
+  it("инлайн-строка «Δt … · ΔV …» живёт в секции и обновляется вместе с сеткой", () => {
+    const section = buildScopeCursorSection();
+    document.body.append(section.root);
+
+    // До окна кадра Δt — «—», ΔV — номинальная шкала (та же истина, что в сетке).
+    expect(section.inlineReadout.textContent).toBe("Δt — · ΔV 2.000 В");
+    expect(section.root.contains(section.inlineReadout)).toBe(true);
+
+    // Окно из кадра (графика нет) честно попадает в Δt.
+    section.applyFrame(frame());
+    expect(section.inlineReadout.textContent).toBe("Δt 1.000 мс · ΔV 2.000 В");
+
+    // Слайдер двигает пару: инлайн и сетка говорят одно и то же.
+    setSlider(section.root, "lnt-scope-cursor-t1", "100");
+    expect(section.inlineReadout.textContent).toBe("Δt 1.300 мс · ΔV 2.000 В");
+    expect(section.root.querySelector(".lnt-scope-cursor-dt")?.textContent).toBe("1.300 мс");
+
+    setSlider(section.root, "lnt-scope-cursor-v2", "200");
+    expect(section.inlineReadout.textContent).toBe("Δt 1.300 мс · ΔV 3.000 В");
+  });
+});

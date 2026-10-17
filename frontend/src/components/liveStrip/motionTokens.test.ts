@@ -163,3 +163,91 @@ describe("motionTokens: словарь моушена живых вкладок 
     }
   });
 });
+
+/** Задача r5-9 (E5/E7): клавиатурный флип состояния мгновенен — цвет-транзишен
+ * живёт ТОЛЬКО в :hover-правиле (обратная связь указателя), базовое правило
+ * сегментов/run-клавиш несёт только press-transform. Hover-обратная связь
+ * всей полосы/воркспейса scope гейтится @media (hover:hover)+(pointer:fine). */
+
+/** :hover-правила вне гейта @media (hover: hover) and (pointer: fine). */
+function hoverGateViolations(text: string): string[] {
+  const src = stripComments(text);
+  const bad: string[] = [];
+  const stack: string[] = [];
+  let prelude = "";
+  for (const ch of src) {
+    if (ch === "{") {
+      stack.push(prelude.trim());
+      prelude = "";
+      continue;
+    }
+    if (ch === "}") {
+      const opened = stack.pop() ?? "";
+      if (!opened.startsWith("@") && opened.includes(":hover")) {
+        const gated = stack.some(
+          (p) => /@media[^{]*hover:\s*hover/.test(p) && /@media[^{]*pointer:\s*fine/.test(p),
+        );
+        if (!gated) bad.push(opened.replace(/\s+/g, " "));
+      }
+      prelude = "";
+      continue;
+    }
+    prelude += ch;
+  }
+  return bad;
+}
+
+/** Базовые правила (без псевдоклассов) по вхождению селектора. */
+const baseRules = (text: string, needle: string): StyleRule[] =>
+  styleRules(text).filter(
+    (rule) =>
+      rule.selector.includes(needle) &&
+      !/:[a-z-]/.test(rule.selector.replace(/::?(before|after)/g, "")),
+  );
+
+describe("motionTokens: планка emil r5-9 (E5 клавиатура, E7 hover-гейт)", () => {
+  const stripCssLocal = read("components/liveStrip/liveStrip.css");
+  const scopeCss = read("views/scope/scope.css");
+  const waveCss = read("views/scope/scopeWaveform.css");
+
+  it("E5: базовые правила флип-контролов (сегменты, run-клавиши) без color-транзишена", () => {
+    for (const [name, text, needle] of [
+      ["liveStrip.css", stripCssLocal, ".lnt-live-seg-btn"],
+      ["liveStrip.css", stripCssLocal, ".lnt-live-runctl > button"],
+      ["liveStrip.css", stripCssLocal, ".lnt-scope-seg-btn"],
+      ["scope.css", scopeCss, ".lnt-scope-seg-btn"],
+    ] as const) {
+      const rules = baseRules(text, needle);
+      expect(rules.length, `${name}: нет базового правила ${needle}`).toBeGreaterThan(0);
+      for (const rule of rules) {
+        expect(
+          /transition[^;]*background|transition[^;]*border-color/.test(rule.decls),
+          `${name}: ${rule.selector} — color-транзишен в базовом правиле`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("E5: color-транзишен сегментов живёт в :hover-правиле (указатель, не клавиатура)", () => {
+    const hover = styleRules(stripCssLocal).filter((rule) =>
+      rule.selector.includes(".lnt-live-seg-btn:hover"),
+    );
+    expect(hover.length, "нет :hover-правила сегментов").toBeGreaterThan(0);
+    expect(hover.some((rule) => /transition[^;]*background/.test(rule.decls))).toBe(true);
+    const trigHover = styleRules(stripCssLocal).filter((rule) =>
+      rule.selector.includes(".lnt-scope-seg-btn:hover"),
+    );
+    expect(trigHover.some((rule) => /transition[^;]*background/.test(rule.decls))).toBe(true);
+  });
+
+  it("E7: каждое :hover-правило полосы и scope-воркспейса — внутри hover-гейта", () => {
+    for (const [name, text] of [
+      ["liveStrip.css", stripCssLocal],
+      ["scope.css", scopeCss],
+      ["scopeWaveform.css", waveCss],
+    ] as const) {
+      const ungated = hoverGateViolations(text);
+      expect(ungated, `${name}: :hover вне @media (hover: hover) and (pointer: fine)`).toEqual([]);
+    }
+  });
+});
