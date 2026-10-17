@@ -91,7 +91,7 @@
     "src/captureV6.test.ts": "7052a438aa86a15d598d7bae860b628564abe49414d4c3aef85e2e8f63803009",
     "src/captureWizard.spec.ts": "374cdb435dd15f756f8f5bec2b39339473dd9a93ff95e6b9e12a5d523ea925f0",
     "src/captureWrittenSession.spec.ts": "1c9183c87e12c5e805fed08ccc6bbadb8334599e69a46590c85b9d48c7d5143e",
-    "src/catalog.spec.ts": "25db404ea61d6a136ebf9336eecd9beb0675a2dd0014b8247d81b241d47ead91",
+    "src/catalog.spec.ts": "17e9e6f98294dee70342214ab09b43c6334130ccce6efacb8ab22cea1ec79fb2",
     "src/channelbar.spec.ts": "40910eb9b20bebce337a0d7269b488c6c3dfb1d3fc88f6453acffe99c2bdf2fc",
     "src/charts.spec.ts": "9e3d56e2b0bf0ea6369d4d596cdb844fccb0ce1c68378fdbb413b16241d76d42",
     "src/components/AGENTS.md": "d643397c27bbe09f6a8b916b97f3600d883b5a8892c01f09511c7e48cd2db294",

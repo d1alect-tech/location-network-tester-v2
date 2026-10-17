@@ -360,7 +360,9 @@ test("save on context_invalid is refused with role=alert and no write", async ({
   expect(backend.getContext(corruptId)?.revision).toBe(before);
 });
 
-test("prefers-reduced-motion removes entrance animation and row transitions", async ({ page }) => {
+test("prefers-reduced-motion: entrance animation off, transitions colors-only", async ({
+  page,
+}) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await openCatalog(page);
   await page.locator(".lnt-cat-row").first().click();
@@ -368,14 +370,21 @@ test("prefers-reduced-motion removes entrance animation and row transitions", as
   const styles = await page.evaluate(() => {
     const body = document.querySelector(".insp-body");
     const row = document.querySelector(".lnt-cat-row");
+    const computed = row instanceof HTMLElement ? getComputedStyle(row) : null;
     return {
       animation: body === null ? "missing" : getComputedStyle(body).animationName,
-      rowTransition: row === null ? "missing" : getComputedStyle(row).transitionDuration,
+      rowProperties: computed === null ? "missing" : computed.transitionProperty,
+      rowDuration: computed === null ? "missing" : computed.transitionDuration,
     };
   });
+  // Политика задачи 7 (emil: reduced = меньше/мягче, не ноль): движение —
+  // кейфреймы входа и transform-переходы — гасится; цвет/прозрачность живут.
+  // Глобальное правило style.css держит список свойств без transform,
+  // длительность конечная (компонент смягчает переход строки до 1ms).
   expect(styles.animation).toBe("none");
-  // Глобальное правило style.css гасит движение целиком: transition: none.
-  expect(styles.rowTransition).toBe("0s");
+  expect(styles.rowProperties).toBe("background, border-color, color, opacity");
+  expect(styles.rowProperties).not.toContain("transform");
+  expect(styles.rowDuration).toBe("0.001s");
 });
 
 test("reduced-motion: component rules silence motion without the global override", async ({
