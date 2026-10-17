@@ -13,6 +13,10 @@ BLOCK-findings прерывают старт ДО взятия прибора, �
 внедряются: гейт не делает скрытого I/O и не импортирует ``ui/``. Подмены
 ``/api/device/state`` нет — во время live диагностика честно вернёт
 ``HANDLE_BUSY``, а владение живёт отдельным статусом ``is_active``.
+
+Пока прибор живой, reaper-поток гейта следит за возрастом последнего ``poll``:
+мёртвая вкладка (упал браузер, оборвался SSE) теряет прибор за ``REAP_AFTER_S``
+секунд, остановка идёт контрактом ``stop`` (финальный кадр, затем close_handle).
 """
 
 from __future__ import annotations
@@ -21,7 +25,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from threading import RLock
+from threading import Event, RLock, Thread, current_thread
 from typing import TYPE_CHECKING, Final, Protocol
 
 from lnt.capture_preflight import (
@@ -61,6 +65,12 @@ if TYPE_CHECKING:
     from lnt.scope_io import CancellationToken, ScopeProtocol
 
 LIVE_BUSY_MESSAGE_RU: Final = "устройство занято вкладкой"
+
+# Reaper: потребитель, не опрашивавший поток дольше REAP_AFTER_S (мёртвая
+# вкладка/браузер), теряет прибор за секунды; каденс проверки — REAP_POLL_S.
+REAP_AFTER_S: Final = 10.0
+REAP_AFTER_FLOOR_S: Final = 2.0
+REAP_POLL_S: Final = 1.0
 
 EnvironmentProbe = Callable[[], CaptureEnvironment]
 
@@ -141,9 +151,12 @@ class LiveCaptureGate:
         adc_calibration: AdcCalibration | None = None,
         cancellation_token: CancellationToken = NEVER_CANCELLED,
         poll_timeout_ms: int = MAX_POLL_TIMEOUT_MS,
+        reap_after_s: float = REAP_AFTER_S,
         mode: LiveMode = LiveMode.REAL,
     ) -> None:
         """Запоминает зависимости; прибор не открывает и preflight не запускает."""
+        if not (REAP_AFTER_FLOOR_S <= reap_after_s < float("inf")):
+            raise InputError(f"reap_after_s {reap_after_s} должен быть >= 2 с и конечным")
         self._scope_factory: Final = scope_factory
         self._environment_probe: Final = environment_probe
         self._session_root: Final = session_root
@@ -157,6 +170,9 @@ class LiveCaptureGate:
         self._lock: Final = RLock()
         self._service: InstrumentService | None = None
         self._mode: Final = mode
+        self._reap_after_s: Final = reap_after_s
+        self._reaper: Thread | None = None
+        self._reaper_stop: Event | None = None
         # Живой SA-контур: конфигурация и кольцо живут здесь, пересчёт на свип
         # гоняет SSE-контур панели (владелец потока), а не гейт.
         self._spectrum: Final = SaEngine()
@@ -177,6 +193,11 @@ class LiveCaptureGate:
         return self._service
 
     @property
+    def reaper_thread(self) -> Thread | None:
+        """Поток слежки за простоем потребителя (для тестов и диагностики)."""
+        return self._reaper
+
+    @property
     def is_active(self) -> bool:
         """Прибор во владении живой вкладки прямо сейчас (единственная правда)."""
         service = self._service
@@ -192,6 +213,8 @@ class LiveCaptureGate:
         прибора при старте (например ``DeviceNotFoundError``) пробрасывается
         типизированно, гейт остаётся неактивным.
         """
+        # Старый reaper глушим до блокировки: SINGLE-рестарт без stop не копит потоки.
+        self._stop_reaper()
         with self._lock:
             if self.is_active:
                 raise InputError("живой режим уже запущен: сначала stop")
@@ -218,10 +241,16 @@ class LiveCaptureGate:
             service.subscribe(self._spectrum.offer)
             service.start()
             self._service = service
+            stop_flag = Event()
+            self._reaper_stop = stop_flag
+            self._reaper = Thread(target=self._reap_loop, args=(stop_flag,), daemon=True)
+            self._reaper.start()
             return service
 
     def stop(self) -> None:
         """Освобождает прибор: ``stop -> финальный кадр -> close_handle``; идемпотентно."""
+        # reaper глушим до прибора: мёртвый потребитель — не повод потерять кадр.
+        self._stop_reaper()
         with self._lock:
             if self._service is not None:
                 self._service.stop()
@@ -230,6 +259,27 @@ class LiveCaptureGate:
         """Гейт job-захвата: ``DeviceBusyError``, пока прибор держит вкладка."""
         if self.is_active:
             raise DeviceBusyError
+
+    def _stop_reaper(self) -> None:
+        """Глушит и джойнит reaper с ограниченным окном; сам себя поток не ждёт."""
+        if self._reaper_stop is not None:
+            self._reaper_stop.set()
+        reaper = self._reaper
+        if reaper is not None and reaper is not current_thread():
+            reaper.join(timeout=2 * REAP_POLL_S)
+
+    def _reap_loop(self, stop_flag: Event) -> None:
+        """Контур reaper: раз в ``REAP_POLL_S`` проверяет простой потребителя."""
+        while not stop_flag.wait(REAP_POLL_S):
+            self._reap_check()
+
+    def _reap_check(self) -> None:
+        """Проверка: потребитель не опрашивал дольше порога — ``stop`` по контракту."""
+        service = self._service
+        if service is None or not service.is_running:
+            return
+        if self._clock() - service.last_poll_s > self._reap_after_s:
+            self.stop()
 
     def _blockers(self, config: LiveStartConfig) -> tuple[PreflightFinding, ...]:
         findings = run_capture_preflight(

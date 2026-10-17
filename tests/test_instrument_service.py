@@ -42,9 +42,12 @@ from lnt.scope_io import (
     NEVER_CANCELLED,
     RANGE_CODE_5V,
     CancellationToken,
+    RawCallback,
 )
 
 if TYPE_CHECKING:
+    import threading
+
     from numpy.typing import NDArray
 
     from lnt.scope_io import ScopeProtocol
@@ -336,6 +339,24 @@ class _FailingStart(FakeHantekScope):
         raise DeviceNotFoundError("имитация отказа старта захвата")
 
 
+class _DripScope(FakeHantekScope):
+    """Фейк, отдающий наружу колбэк ``read_async``: драйвер сыплет без poll."""
+
+    on_block: RawCallback | None = None
+
+    @override
+    def read_async(
+        self,
+        callback: RawCallback,
+        data_size: int,
+        outstanding_transfers: int,
+        *,
+        raw: bool,
+    ) -> threading.Event:
+        self.on_block = callback
+        return super().read_async(callback, data_size, outstanding_transfers, raw=raw)
+
+
 def test_start_failure_releases_the_handle_and_leaves_the_service_idle() -> None:
     scope = _FailingStart(clock=ManualClock(), sample_rate_hz=RATE_HZ)
     service = InstrumentService(
@@ -373,6 +394,61 @@ def test_poll_uses_the_driver_poll_window() -> None:
     assert rig.pump(1) == FRAMES_PER_BLOCK - 1
 
     assert rig.scope.poll_timeouts == [MAX_POLL_TIMEOUT_MS]
+
+
+# ---------------------------------------------------------------------------
+# очередь _pending: драйвер сыплет блоки, а poll никто не зовёт
+# ---------------------------------------------------------------------------
+
+
+def test_pending_overflow_drops_oldest_blocks_and_counts_drops() -> None:
+    # Мёртвый потребитель: колбэк read_async сыплет блоки между poll (как
+    # драйверный поток без опроса). Очередь держит кап 2 x max_buffered_blocks,
+    # старейшие режутся и считаются; выжившие видны в финальном кадре.
+    clock = ManualClock()
+    scope = _DripScope(profile=PROFILE, seed=SEED, sample_rate_hz=RATE_HZ, clock=clock)
+    frames: list[LiveFrame] = []
+    service = InstrumentService(
+        scope_factory=_Factory(scope=scope),
+        trigger=_sweep_trigger(),
+        sample_rate_hz=RATE_HZ,
+        clock=clock,
+        max_buffered_blocks=2,
+        discard_lead_samples=0,
+    )
+    service.subscribe(frames.append)
+    service.start()
+
+    callback = scope.on_block
+    assert callback is not None
+    for i in range(6):
+        callback(bytearray([i]), bytearray([i]))
+
+    assert service.dropped_blocks == 2
+
+    # Хозяин вернулся: выжившие 4 блока уходят в буфер потока (окно кадра
+    # ещё не собрано — 4 отсчёта против 4096), кадра при poll нет.
+    assert service.poll() == 0
+    assert frames == []
+
+    service.stop()
+    assert service.state is InstrumentState.STOPPED
+    assert scope.calls[-1] == "close_handle"
+
+    assert len(frames) == 1
+    expected = apply_adc_calibration(np.array([3, 4, 5], dtype=np.uint8), range_code=RANGE_CODE_5V)
+    assert np.array_equal(frames[0].ch1, expected)
+    assert np.array_equal(frames[0].ch2, expected)
+
+
+def test_poll_stamps_last_poll_s_for_the_reaper() -> None:
+    rig = _rig(discard_lead_samples=0)
+    rig.service.start()
+    assert rig.service.last_poll_s == 0.0
+
+    rig.pump(1)
+
+    assert rig.service.last_poll_s == rig.clock.now_s
 
 
 # ---------------------------------------------------------------------------

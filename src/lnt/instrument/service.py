@@ -106,6 +106,9 @@ class InstrumentService:
         self._lock: Final = RLock()
         self._sinks: list[FrameSink] = []
         self._pending: list[tuple[object, object]] = []
+        self._pending_cap: Final = 2 * max_buffered_blocks
+        self.dropped_blocks: int = 0
+        self.last_poll_s: float = 0.0
         self._scope: ScopeProtocol | None = None
         self._shutdown: _StopEvent | None = None
         self._trigger: TriggerConfig = trigger
@@ -188,6 +191,8 @@ class InstrumentService:
             self._stream.reset()
             self._pending.clear()
             self._last_emit_s = self._clock()
+            # Момент взятия ручки — стартовая точка reaper-гейта простоя.
+            self.last_poll_s = self._last_emit_s
             self._state = InstrumentState.RUNNING
 
     def poll(self) -> int:
@@ -198,6 +203,7 @@ class InstrumentService:
                 self._release(emit_final=False)
                 return 0
             scope.poll(self._poll_timeout_ms)
+            self.last_poll_s = self._clock()
             self._absorb_blocks()
             return self._emit_ready()
 
@@ -221,8 +227,11 @@ class InstrumentService:
         return scope
 
     def _on_block(self, ch1_raw: object, ch2_raw: object) -> None:
-        """Колбэк ``read_async``: блок ждёт следующего ``poll`` в очереди."""
+        """Колбэк ``read_async``: блок ждёт ``poll``; сверх капа режутся старейшие."""
         self._pending.append((ch1_raw, ch2_raw))
+        overflow = max(len(self._pending) - self._pending_cap, 0)
+        del self._pending[:overflow]
+        self.dropped_blocks += overflow
 
     def _absorb_blocks(self) -> None:
         pending, self._pending = self._pending, []

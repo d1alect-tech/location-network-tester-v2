@@ -1,8 +1,9 @@
 """LiveCaptureGate: preflight-гейт live-старта и владение прибором для job-захвата.
 
-Без железа, потоков и ``sleep``: прибор — ``FakeHantekScope``, время —
-``ManualClock`` (кадры ставятся одним присваиванием, как в
-``test_instrument_service``). Контракт 409 проверяется через реальный маршрут
+Без железа: прибор — ``FakeHantekScope``, время — ``ManualClock`` (кадры
+ставятся одним присваиванием, как в ``test_instrument_service``); reaper-тесты
+ждут смены состояния с ограниченным окном (``_wait_until``), реальный поток
+один — сам reaper. Контракт 409 проверяется через реальный маршрут
 ``POST /api/jobs`` и существующий ``map_domain_error`` (issue #26, резолюция
 п.2/п.6): live-старт всегда идёт через ``run_capture_preflight``, блокеры
 отклоняют старт ДО прикосновения к прибору, а job-захват при активной вкладке
@@ -12,6 +13,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, override
@@ -31,7 +33,9 @@ from lnt.errors import DeviceNotFoundError, InputError
 from lnt.instrument import (
     DeviceBusyError,
     FakeHantekScope,
+    InstrumentState,
     LiveCaptureGate,
+    LiveFrame,
     LivePreflightBlockedError,
     LiveStartConfig,
     ManualClock,
@@ -56,6 +60,8 @@ from lnt.ui.jobs import JobManager
 from lnt.ui.operations import LntBackend
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from lnt.scope_io import ScopeProtocol
     from lnt.types import SeriesPosition
     from lnt.ui.models import CaptureRequest
@@ -409,6 +415,130 @@ def test_single_trigger_self_stop_releases_ownership() -> None:
     assert rig.gate.is_active is False
     assert rig.scope.is_open is False
     rig.gate.require_device_free()
+
+
+# ---------------------------------------------------------------------------
+# reaper: мёртвый потребитель освобождает прибор за секунды
+# ---------------------------------------------------------------------------
+
+
+def _wait_until(predicate: Callable[[], bool], timeout_s: float) -> bool:
+    """Ждёт смены состояния с ограниченным окном; фиксированных таймингов нет."""
+    deadline = time.monotonic() + timeout_s
+    while not predicate():
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.01)
+    return True
+
+
+def test_reaper_releases_the_device_when_the_consumer_stops_polling() -> None:
+    rig = _rig()
+    service = rig.gate.start(_config())
+    assert service.last_poll_s == 0.0  # старт засеял момент взятия ручки
+
+    # Потребитель пропал: фейк-часы уходят за порог, ни одного poll.
+    rig.clock.advance(11.0)
+
+    assert _wait_until(lambda: not rig.gate.is_active, 5.0) is True
+    assert service.state is InstrumentState.STOPPED
+    assert service.is_running is False
+    assert rig.scope.is_open is False
+    assert rig.scope.calls[-1] == "close_handle"
+    assert rig.scope.calls.count("close_handle") == 1
+    reaper = rig.gate.reaper_thread
+    assert reaper is not None
+    reaper.join(timeout=5.0)
+    assert reaper.is_alive() is False
+
+
+def test_reaper_stop_honors_the_contract_final_frame_then_close_handle() -> None:
+    # Тот же контракт, что у явного stop: финальный кадр уходит подписчику при
+    # открытой ручке, затем stop_capture и close_handle. NORMAL без фронта —
+    # кадр копится в буфере и достаётся именно финальным сбросом.
+    rig = _rig()
+    frames: list[LiveFrame] = []
+    handle_open: list[bool] = []
+
+    def on_frame(frame: LiveFrame) -> None:
+        frames.append(frame)
+        handle_open.append(rig.scope.is_open)
+
+    service = rig.gate.start(_config(mode=TriggerMode.NORMAL))
+    service.subscribe(on_frame)
+    rig.advance(1)
+    assert service.poll() == 0
+    assert frames == []
+
+    rig.clock.advance(11.0)
+    assert _wait_until(lambda: not rig.gate.is_active, 5.0) is True
+
+    assert len(frames) == 1
+    assert handle_open == [True]
+    assert frames[0].triggered is False
+    assert frames[0].ch2.size == 4096
+    assert rig.scope.calls[-2:] == ["stop_capture", "close_handle"]
+    assert service.state is InstrumentState.STOPPED
+
+
+def test_regular_polling_keeps_the_reaper_idle() -> None:
+    rig = _rig()
+    service = rig.gate.start(_config())
+
+    # Живой потребитель: окно ~1.6 с реального времени покрывает тик reaper,
+    # фейк-часы шагом 0.3 с — возраст последнего poll далеко от порога.
+    deadline = time.monotonic() + 1.6
+    while time.monotonic() < deadline:
+        rig.clock.advance(0.3)
+        service.poll()
+        time.sleep(0.02)
+
+    assert rig.gate.is_active is True
+    assert service.is_running is True
+    assert rig.scope.is_open is True
+    assert rig.scope.calls.count("close_handle") == 0
+
+    rig.gate.stop()
+    assert rig.scope.calls.count("close_handle") == 1
+
+
+@pytest.mark.parametrize("reap_after_s", [1.0, 0.0, -1.0, float("nan"), float("inf")])
+def test_reap_after_s_outside_the_floor_is_rejected(reap_after_s: float) -> None:
+    clock = ManualClock()
+    scope = FakeHantekScope(profile=PROFILE, seed=SEED, sample_rate_hz=RATE_HZ, clock=clock)
+
+    with pytest.raises(InputError, match="reap_after_s"):
+        LiveCaptureGate(
+            scope_factory=_Factory(scope=scope),
+            environment_probe=_Environment().probe,
+            session_root=Path("sessions"),
+            clock=clock,
+            reap_after_s=reap_after_s,
+        )
+
+
+def test_restart_joins_the_previous_reaper_and_keeps_one_thread() -> None:
+    # SINGLE сам отпускает прибор; повторный старт глушит старый reaper,
+    # а не копит их: прибор один — поток слежки тоже один.
+    rig = _rig()
+    rig.gate.start(_config(mode=TriggerMode.SINGLE, level_v=TRIGGER_LEVEL_V))
+    first = rig.gate.reaper_thread
+    assert first is not None
+
+    rig.advance(4)
+    assert rig.gate.service is not None
+    assert rig.gate.service.poll() == 1
+    assert rig.gate.is_active is False
+
+    rig.gate.start(_config(mode=TriggerMode.SINGLE, level_v=TRIGGER_LEVEL_V))
+    second = rig.gate.reaper_thread
+    assert second is not None
+    assert second is not first
+    first.join(timeout=5.0)
+    assert first.is_alive() is False
+
+    rig.gate.stop()
+    assert rig.scope.calls.count("close_handle") == 2
 
 
 # ---------------------------------------------------------------------------
