@@ -1,16 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LntApiClient } from "../../api/client";
+import { ApiError } from "../../api/errors";
 import type { ContextResponse } from "../../api/types";
+import type { SessionDetailPayload } from "../../api/types-plots";
 import { createContextInspector } from "./contextInspector";
 
-function fakeClient(context?: ContextResponse): LntApiClient {
+function fakeClient(context?: ContextResponse, detail?: SessionDetailPayload | null): LntApiClient {
   return {
     context: vi.fn(async () => {
       if (!context) throw new Error("context fixture missing");
       return context;
     }),
-    updateContext: vi.fn(),
+    updateContext: vi.fn(async () => context),
     ensureReady: vi.fn(async () => undefined),
+    plots: { detail: vi.fn(async () => detail ?? null) },
   } as unknown as LntApiClient;
 }
 
@@ -24,6 +27,29 @@ function contextResponse(health: string, reasonCodes: string[] = []): ContextRes
     tags: [],
     notes: null,
   };
+}
+
+function detailWith(metrics: Record<string, unknown>): SessionDetailPayload {
+  return {
+    name: "session-1",
+    manifest: { duration_s: 12.4, line_frequency_hz: 50.0 },
+    analysis: { line_quality: metrics },
+    spectrum_available: false,
+    waveform_available: false,
+    ch2_available: false,
+  };
+}
+
+const META = { id: "session-1", createdUtc: "2026-08-05T18:06:23Z", sessionHealth: "ok" };
+
+async function mount(
+  context: ContextResponse,
+  detail?: SessionDetailPayload | null,
+): Promise<LntApiClient & { root: HTMLElement }> {
+  const client = fakeClient(context, detail);
+  const inspector = createContextInspector({ client });
+  await inspector.loadSession("session-1", META);
+  return Object.assign(client, { root: inspector.root });
 }
 
 describe("createContextInspector pristine state", () => {
@@ -46,26 +72,19 @@ describe("createContextInspector pristine state", () => {
 
 describe("createContextInspector context health", () => {
   it("shows a healthy context without a damage notice", async () => {
-    const inspector = createContextInspector({
-      client: fakeClient(contextResponse("context_valid")),
-    });
+    const mounted = await mount(contextResponse("context_valid"));
 
-    await inspector.loadSession("session-1");
-
-    expect(inspector.root.querySelector(".lnt-cat-session-summary")?.textContent).toContain(
-      "Состояние контекста: Исправен",
-    );
-    expect(inspector.root.querySelector(".lnt-cat-recovery")).toBeNull();
+    // Supersession: сводка варианта «Плотный список» показывает здоровье
+    // пилюлей «Контекст: …» вместо строки «Состояние контекста: …».
+    const pill = mounted.root.querySelector("[data-cat-context-health='context_valid']");
+    expect(pill?.textContent).toContain("Контекст: Исправен");
+    expect(mounted.root.querySelector(".lnt-cat-recovery")).toBeNull();
   });
 
   it("explains an absent context without calling the session unusable", async () => {
-    const inspector = createContextInspector({
-      client: fakeClient(contextResponse("context_absent")),
-    });
+    const mounted = await mount(contextResponse("context_absent"));
 
-    await inspector.loadSession("session-1");
-
-    const text = inspector.root.querySelector(".lnt-cat-recovery")?.textContent ?? "";
+    const text = mounted.root.querySelector(".lnt-cat-recovery")?.textContent ?? "";
     expect(text).toContain("Контекст сессии ещё не сохранён");
     expect(text).toContain("можно заполнить и сохранить");
     expect(text).not.toContain("Сессия повреждена");
@@ -73,13 +92,9 @@ describe("createContextInspector context health", () => {
   });
 
   it("limits an invalid-context notice to context metadata", async () => {
-    const inspector = createContextInspector({
-      client: fakeClient(contextResponse("context_invalid", ["context_cache_malformed"])),
-    });
+    const mounted = await mount(contextResponse("context_invalid", ["context_cache_malformed"]));
 
-    await inspector.loadSession("session-1");
-
-    const text = inspector.root.querySelector(".lnt-cat-recovery")?.textContent ?? "";
+    const text = mounted.root.querySelector(".lnt-cat-recovery")?.textContent ?? "";
     expect(text).toContain("Контекст сессии повреждён");
     expect(text).toContain("Проблема относится только к контексту");
     expect(text).toContain("Не удалось прочитать context.json");
@@ -87,16 +102,175 @@ describe("createContextInspector context health", () => {
   });
 
   it("keeps a torn-tail warning on an otherwise valid context", async () => {
-    const inspector = createContextInspector({
-      client: fakeClient(contextResponse("context_valid", ["context_events_torn_tail"])),
-    });
+    const mounted = await mount(contextResponse("context_valid", ["context_events_torn_tail"]));
 
-    await inspector.loadSession("session-1");
-
-    const text = inspector.root.querySelector(".lnt-cat-recovery")?.textContent ?? "";
+    const text = mounted.root.querySelector(".lnt-cat-recovery")?.textContent ?? "";
     expect(text).toContain("Контекст исправен");
     expect(text).toContain("Журнал изменений контекста оборван в конце");
     expect(text).toContain("загружена последняя целая версия контекста");
     expect(text).not.toContain("Сессия повреждена");
+  });
+});
+
+describe("createContextInspector сводка варианта «Плотный список»", () => {
+  it("readouts show duration and mains frequency from session detail", async () => {
+    const mounted = await mount(
+      contextResponse("context_valid"),
+      detailWith({ thd_ratio: 0.037, cycles_analyzed: 620, fundamental_hz: 50.02 }),
+    );
+
+    const summary = mounted.root.querySelector(".lnt-cat-session-summary");
+    expect(summary?.textContent).toContain("session-1");
+    expect(summary?.textContent).toContain("12,4 с");
+    expect(summary?.textContent).toContain("50,02 Гц");
+    expect(mounted.root.querySelector("[data-cat-revision]")?.textContent).toContain("ревизия 2");
+  });
+
+  it("missing metrics read «недоступно» with a reason, never zero", async () => {
+    const mounted = await mount(contextResponse("context_valid"), null);
+
+    const summary = mounted.root.querySelector(".lnt-cat-session-summary");
+    const unavailable = summary?.querySelectorAll(".is-unavailable") ?? [];
+    expect(unavailable.length).toBe(2);
+    for (const node of unavailable) {
+      expect(node.textContent).toBe("недоступно");
+      expect(node.getAttribute("title")).not.toBe("");
+    }
+    expect(summary?.textContent).not.toContain("0 с");
+  });
+
+  it("THD block compares to the limit factually and never says «норма»", async () => {
+    const mounted = await mount(
+      contextResponse("context_valid"),
+      detailWith({ thd_ratio: 0.089, cycles_analyzed: 930 }),
+    );
+
+    const block = mounted.root.querySelector(".insp-thd");
+    expect(block?.getAttribute("data-thd-compare")).toBe("above");
+    expect(block?.querySelector("[data-thd-badge]")?.textContent).toBe("выше предела 8 %");
+    expect(mounted.root.textContent).not.toMatch(/норм|годен/iu);
+  });
+
+  it("THD below the limit reads «ниже предела», without analysis — «нет данных»", async () => {
+    const below = await mount(
+      contextResponse("context_valid"),
+      detailWith({ thd_ratio: 0.037, cycles_analyzed: 620 }),
+    );
+    expect(below.root.querySelector("[data-thd-badge]")?.textContent).toBe("ниже предела 8 %");
+
+    const none = await mount(contextResponse("context_valid"), null);
+    const block = none.root.querySelector(".insp-thd");
+    expect(block?.getAttribute("data-thd-compare")).toBe("none");
+    expect(block?.querySelector(".thd-value")?.textContent).toBe("недоступно");
+  });
+
+  it("entrance animation class lands on the inspector body once per session", async () => {
+    const mounted = await mount(contextResponse("context_valid"));
+    expect(mounted.root.querySelector(".insp-body.insp-enter")).not.toBeNull();
+  });
+
+  it("empty tags render «Тегов нет» instead of an empty chip row", async () => {
+    const mounted = await mount(contextResponse("context_valid"));
+    expect(mounted.root.querySelector(".tag-empty")?.textContent).toBe("Тегов нет");
+  });
+});
+
+describe("createContextInspector провал загрузки контекста", () => {
+  it("показывает ошибку чтения, а не «сессия не выбрана»", async () => {
+    // Given: сессия выбрана, но GET context отклоняется
+    const inspector = createContextInspector({ client: fakeClient() });
+
+    // When
+    await inspector.loadSession("session-1", META);
+
+    // Then: тело называет провал чтения, а не отсутствие выбора
+    expect(inspector.root.querySelector(".insp-none")?.textContent).toBe(
+      "Не удалось загрузить контекст сессии.",
+    );
+    expect(inspector.root.textContent).not.toContain("Сессия не выбрана");
+
+    // Then: строка ошибки видна, сохранение закрыто
+    const alert = inspector.root.querySelector("[role='alert']");
+    expect(alert?.hasAttribute("hidden")).toBe(false);
+    expect(alert?.textContent).toContain("Выберите другую сессию или повторите.");
+    const save = inspector.root.querySelector<HTMLButtonElement>(".lnt-btn-primary");
+    expect(save?.disabled).toBe(true);
+  });
+});
+
+describe("createContextInspector конфликт чтения (409)", () => {
+  function conflict409(): ApiError {
+    return new ApiError("conflict", {
+      status: 409,
+      cause: "неоднозначный идентификатор сессии: 'syn-quiet-seed6022'",
+    });
+  }
+
+  function clientWith409(failTimes: number, thenContext: ContextResponse): LntApiClient {
+    let attempts = 0;
+    return {
+      context: vi.fn(async () => {
+        attempts += 1;
+        if (attempts <= failTimes) throw conflict409();
+        return thenContext;
+      }),
+      updateContext: vi.fn(async () => thenContext),
+      ensureReady: vi.fn(async () => undefined),
+      plots: { detail: vi.fn(async () => null) },
+    } as unknown as LntApiClient;
+  }
+
+  it("показывает баннер конфликта с деталью сервера и повтором", async () => {
+    // Given: GET context стабильно отвечает 409 (дубль идентификатора)
+    const inspector = createContextInspector({
+      client: clientWith409(2, contextResponse("context_valid")),
+    });
+
+    // When
+    await inspector.loadSession("session-1", META);
+
+    // Then: конфликт виден баннером, а не спрятан пустым состоянием
+    const banner = inspector.root.querySelector(".lnt-cat-conflict");
+    expect(banner?.hasAttribute("hidden")).toBe(false);
+    expect(banner?.textContent).toContain("Сервер отклонил чтение контекста: конфликт (409)");
+    expect(banner?.textContent).toContain("неоднозначный идентификатор сессии");
+    expect(banner?.querySelector("button")?.textContent).toBe("Повторить загрузку");
+
+    // Then: строка ошибки называет отказ чтения, а не конфликт ревизий
+    const alert = inspector.root.querySelector("[role='alert']");
+    expect(alert?.textContent).toContain("Сервер отклонил чтение контекста: конфликт (409)");
+    expect(alert?.textContent).not.toContain("Конфликт версий");
+  });
+
+  it("повтор загрузки прячет баннер, когда сервер отдаёт контекст", async () => {
+    const inspector = createContextInspector({
+      client: clientWith409(1, contextResponse("context_valid")),
+    });
+    await inspector.loadSession("session-1", META);
+    const banner = inspector.root.querySelector<HTMLElement>(".lnt-cat-conflict");
+    expect(banner?.hasAttribute("hidden")).toBe(false);
+
+    banner?.querySelector("button")?.click();
+    await vi.waitFor(() => expect(banner?.hasAttribute("hidden")).toBe(true));
+    expect(inspector.root.querySelector(".insp-body")).not.toBeNull();
+  });
+});
+
+describe("createContextInspector отказ сохранения на повреждённом контексте", () => {
+  it("refuses save with role=alert and never calls PUT", async () => {
+    const context = contextResponse("context_invalid", ["context_cache_malformed"]);
+    const client = fakeClient(context);
+    const inspector = createContextInspector({ client });
+    await inspector.loadSession("session-1", META);
+
+    const save = inspector.root.querySelector<HTMLButtonElement>(".lnt-btn-primary");
+    save?.click();
+    await Promise.resolve();
+
+    const alert = inspector.root.querySelector("[role='alert']");
+    expect(alert?.hasAttribute("hidden")).toBe(false);
+    expect(alert?.textContent).toContain("Сохранение отклонено: контекст повреждён");
+    expect(alert?.textContent).toContain("context_cache_malformed");
+    expect(client.updateContext).not.toHaveBeenCalled();
   });
 });

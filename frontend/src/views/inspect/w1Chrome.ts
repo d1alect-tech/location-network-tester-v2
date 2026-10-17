@@ -1,251 +1,262 @@
-/** W1 inspect chrome: one missing-artifact banner, THD verdict, four optional scalars. */
+/** Analysis-v2 хром (G7 «Disclosure-панели»): шапка секции + тело раскрытия.
+ * Шапка видна всегда: заголовок, вердикт THD-V, сессия базы, CTA пересчёта.
+ * B2: сессию задаёт ПАРА инспекции — своего select и своего вызова
+ * catalogSessions здесь нет, detail берётся из общего загрузчика пары. */
 
-import { LntApiClient } from "../../api/client";
-import { ApiError } from "../../api/errors";
+import type { LntApiClient } from "../../api/client";
+import { ApiError, isAbortError } from "../../api/errors";
 import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { createExtendedRun } from "./extendedRun";
-import { getArtifactJson } from "./panels/fetch";
+import type { DetailLoader } from "./pairDetail";
+import { REASON_NO_ARTIFACT, reasonFromError } from "./pairLoadOutcome";
 import { createPanelHost } from "./panels/host";
-import { thdVerdict } from "./thdVerdict";
-import type { ThdVerdict, ThdWindow } from "./thdVerdict";
-import { SCALAR, formatScalar, isPointer, needleOf, parseFailures } from "./w1Parse";
-import type { BranchFailure, Scalar } from "./w1Parse";
+import type { PanelAbsence } from "./panels/host";
+import { loadW1Session } from "./w1ChromeLoad";
+import type { W1JobWatchOptions } from "./w1JobProgress";
+import { createW1JobRail } from "./w1JobRail";
+import { renderAbsent, renderScalars, renderVerdict } from "./w1Render";
 import "./w1Chrome.css";
 
 export const MISSING_BANNER =
   "Расширенный анализ (ITIC, гармоники, APD…) для этой сессии не записан. Метрики и спектр v1 на месте.";
 export const CTA_LABEL = "Пересчитать анализ (v2)";
-export const LEGACY_VERDICT = "Analysis v1 legacy (no THD limit check)";
+export const NO_SESSION_SUMMARY = "сессия не выбрана";
+export const SCALAR_SLOTS = 4;
+export const SESSION_CAPTION = "Сессия инспекции · база";
+export const SESSION_HINT =
+  "Выбор в каталоге: клик по строке — сравнение; кнопки А/Б — точное назначение.";
+export const PANELS_TITLE = "Сворачиваемые панели";
+
+export type W1ChromeOptions = {
+  readonly client: LntApiClient;
+  /** Общий загрузчик detail пары: один fetch на смену пары (B2). */
+  readonly detail?: DetailLoader;
+  /** Тип сессии из каталога инспекции — единственного источника выбора. */
+  readonly sessionTypeOf?: (session: string) => string;
+  /** Состояние in-flight задачи анализа: парбар блокирует контролы (job-busy). */
+  readonly onJobBusy?: (busy: boolean) => void;
+  /** Успешная задача анализа: данные пары перезабираются хостом тем же
+   * конвейером, что и смена пары (literal setPair на неизменной паре —
+   * no-op по контракту задачи 5, поэтому отдельный канал). */
+  readonly onJobReload?: () => void;
+  /** Внедрение планировщиков SSE-ожидания: юнит-тесты без EventSource. */
+  readonly jobWatch?: W1JobWatchOptions;
+};
 
 export interface W1ChromeHandle {
+  /** Шапка секции: владелец DOM — хром, размещает её шелл analysis-v2. */
+  readonly bar: HTMLElement;
+  /** Тело раскрытия «Анализ сессии (метрики и панели)». */
   readonly root: HTMLElement;
+  setSession(session: string | null): void;
+  /** Сводка для свёрнутой шапки раскрытия: «панелей N · скаляров M/4». */
+  onSummary(listener: (text: string) => void): void;
+  /** Причина отсутствия анализа v2 (G1/Q3 = A): сиблинг счётчика сводки,
+   * null — анализа нет причина не нужна. Канал onSummary отвергнут вердиктом. */
+  onAbsenceReason(listener: (reason: string | null) => void): void;
   destroy(): void;
 }
 
-function assertNever(value: never): never {
-  throw new Error(`unhandled verdict ${String(value)}`);
+function summaryText(panelCount: number, scalarCount: number): string {
+  return `панелей ${String(panelCount)} · скаляров ${String(scalarCount)}/${String(SCALAR_SLOTS)}`;
 }
 
-function renderVerdict(host: HTMLElement, verdict: ThdVerdict): void {
-  clearElement(host);
-  switch (verdict.kind) {
-    case "pass":
-      host.append(
-        el("span", {
-          className: "lnt-w1-badge lnt-w1-badge-ok",
-          text: "THD-V pass",
-          attrs: { "data-thd-verdict": "pass" },
-        }),
-      );
-      return;
-    case "fail":
-      host.append(
-        el("span", {
-          className: "lnt-w1-badge lnt-w1-badge-fail",
-          text: "THD-V fail",
-          attrs: { "data-thd-verdict": "fail" },
-        }),
-      );
-      return;
-    case "legacy":
-      host.append(
-        el("span", {
-          className: "lnt-w1-badge lnt-w1-badge-legacy",
-          text: LEGACY_VERDICT,
-          attrs: { "data-thd-verdict": "legacy" },
-        }),
-      );
-      return;
-    case "hidden":
-      return;
-    default:
-      assertNever(verdict);
-  }
-}
-
-function renderScalars(host: HTMLElement, scalars: readonly Scalar[]): void {
-  clearElement(host);
-  for (const scalar of scalars) {
-    host.append(
-      el("div", { attrs: { "data-scalar": scalar.key } }, [
-        el("dt", { text: scalar.label }),
-        el("dd", { text: formatScalar(scalar.value) }),
-      ]),
-    );
-  }
-}
-
-function renderFailures(host: HTMLElement, failures: readonly BranchFailure[]): void {
-  clearElement(host);
-  for (const row of failures) {
-    host.append(el("li", { text: `ветка ${row.branch} не посчитана: ${row.message}` }));
-  }
-}
-
-export function createW1Chrome(options: { readonly client: LntApiClient }): W1ChromeHandle {
+export function createW1Chrome(options: W1ChromeOptions): W1ChromeHandle {
   const { client } = options;
+  const loadDetail: DetailLoader =
+    options.detail ?? ((name, detailOptions) => client.plots.detail(name, detailOptions));
+  const sessionTypeOf = options.sessionTypeOf ?? (() => "");
   let loadAbort = new AbortController();
+  let generation = 0;
+  let session: string | null = null;
+  let summary: ((text: string) => void) | null = null;
+  let absence: ((reason: string | null) => void) | null = null;
+  let absenceReason: string | null = null;
 
-  const sessionSelect = el("select", {
-    className: "lnt-select",
-    attrs: { "aria-label": "Сессия инспекции" },
+  const verdictHost = el("span", { className: "av2-verdict", attrs: { "data-role": "verdict" } });
+  const sessionId = el("span", {
+    className: "av2-session-id",
+    text: "—",
+    attrs: { "data-session-id": "", title: SESSION_HINT },
   });
-  sessionSelect.append(el("option", { text: "Выберите сессию", attrs: { value: "" } }));
+  const sessionBox = el(
+    "span",
+    { className: "av2-session", attrs: { "data-role": "session-display" } },
+    [el("span", { className: "av2-session-cap", text: SESSION_CAPTION }), sessionId],
+  );
   const cta = el("button", {
-    className: "lnt-btn lnt-btn-primary",
+    className: "lnt-btn lnt-btn-primary av2-cta",
     text: CTA_LABEL,
     attrs: { type: "button" },
   });
-  const banner = el("p", {
-    className: "lnt-w1-banner",
-    attrs: { role: "status" },
-  });
-  banner.hidden = true;
-  const verdictHost = el("div", { className: "lnt-w1-verdict" });
-  const scalarsHost = el("dl", { className: "lnt-w1-scalars" });
-  const jobBar = el("div", { className: "lnt-w1-job-bar" });
-  const failuresHost = el("ul", { className: "lnt-w1-failures" });
-  const jobRail = el("div", { className: "lnt-w1-job-rail" }, [jobBar, failuresHost]);
-  jobRail.hidden = true;
-  const panelsHost = el("div", { className: "lnt-w1-panels" });
-  const panels = createPanelHost({ client, root: panelsHost });
-  const extended = createExtendedRun({
-    client: { ...client.analysis, ensureReady: (options) => client.ensureReady(options) },
-  });
-  const sessionTypes = new Map<string, string>();
-
-  const root = el("section", { className: "lnt-w1-chrome", attrs: { "aria-label": "Анализ v2" } }, [
-    el("div", { className: "lnt-w1-toolbar" }, [sessionSelect, cta]),
-    banner,
+  cta.disabled = true;
+  const bar = el("div", { className: "panel-hd av2-hd" }, [
+    el("h2", { className: "panel-title", text: "Анализ v2" }),
     verdictHost,
-    scalarsHost,
-    extended.root,
-    panelsHost,
-    jobRail,
+    sessionBox,
+    cta,
   ]);
 
-  async function loadCatalog(): Promise<void> {
-    const page = await client.catalogSessions({ page_size: 200 });
-    sessionTypes.clear();
-    sessionSelect.replaceChildren(el("option", { text: "Выберите сессию", attrs: { value: "" } }));
-    for (const item of page.items) {
-      if (item.session_type !== null) sessionTypes.set(item.id, item.session_type);
-      sessionSelect.append(el("option", { text: item.id, attrs: { value: item.id } }));
-    }
+  const banner = el("p", { className: "lnt-w1-banner", attrs: { role: "status" } });
+  banner.hidden = true;
+  const scalarsHost = el("div", { className: "band-scalars av2-scalars" });
+  const scalarsBlock = el("section", { className: "av2-block" }, [
+    el("h3", { className: "av2-block-title", text: "Скаляры W1" }),
+    scalarsHost,
+  ]);
+  scalarsBlock.hidden = true;
+  const extended = createExtendedRun({
+    client: { ...client.analysis, ensureReady: (runOptions) => client.ensureReady(runOptions) },
+  });
+  const absentHost = el("ul", { className: "av2-absent", attrs: { "data-role": "absent-panels" } });
+  absentHost.hidden = true;
+  const panelsTitle = el("h3", {
+    className: "av2-block-title",
+    attrs: { "data-role": "panels-title" },
+    text: `${PANELS_TITLE} · 0`,
+  });
+  const panelsHost = el("div", { className: "lnt-w1-panels" });
+  const panels = createPanelHost({ client, root: panelsHost });
+  const panelsBlock = el("section", { className: "av2-block" }, [
+    panelsTitle,
+    absentHost,
+    panelsHost,
+  ]);
+  panelsBlock.hidden = true;
+  const jobRail = createW1JobRail();
+  const root = el("div", { className: "av2-body" }, [
+    banner,
+    scalarsBlock,
+    extended.root,
+    panelsBlock,
+    jobRail.root,
+  ]);
+
+  function publish(panelCount: number, scalarCount: number): void {
+    summary?.(session === null ? NO_SESSION_SUMMARY : summaryText(panelCount, scalarCount));
   }
 
-  async function loadSession(session: string): Promise<void> {
-    loadAbort.abort();
-    loadAbort = new AbortController();
-    const { signal } = loadAbort;
+  /** Провод словаря задач 3 на NO-POINTER пути: причина уходит в свёрнутую
+   * шапку (сиблинг счётчика), не трогая пиннутый текст сводки. */
+  function publishAbsence(reason: string | null): void {
+    absenceReason = reason;
+    absence?.(reason);
+  }
+
+  function paintSession(): void {
+    sessionId.textContent = session ?? "—";
+    sessionId.setAttribute("data-session-id", session ?? "");
+    cta.disabled = session === null;
+  }
+
+  function resetBody(): void {
     banner.hidden = true;
     banner.textContent = "";
     clearElement(verdictHost);
     clearElement(scalarsHost);
+    clearElement(absentHost);
     panels.clear();
-    extended.setSession(session === "" ? null : session);
-    if (session === "") return;
-    const encoded = encodeURIComponent(session);
-    const detail = await client.plots.detail(session, { signal });
-    const pointerRaw = await getArtifactJson(
-      client,
-      `/api/analysis/sessions/${encoded}/.lnt-default-analysis.json`,
-      signal,
-    );
-    const pointer = isPointer(pointerRaw) ? pointerRaw : null;
-    const needle = needleOf(detail.analysis);
-    const scalars: Scalar[] = [];
-    let windows: readonly ThdWindow[] | null = null;
-    let harmonicsFailed = false;
-    if (pointer === null) {
-      banner.hidden = false;
-      banner.textContent = MISSING_BANNER;
-    } else {
-      const bound = await panels.bind(
-        {
-          session,
-          artifactKey: pointer.artifact_key,
-          sessionType: sessionTypes.get(session) ?? "",
-          cycles: needle.cycles,
-          failures: [],
-        },
-        signal,
-      );
-      windows = bound.windows;
-      if (windows !== null) {
-        const mean = windows.reduce((sum, row) => sum + row.thd, 0) / windows.length;
-        scalars.push({ key: "thd-v", label: SCALAR.thd, value: mean });
-      }
-      if (bound.notch !== null) {
-        scalars.push({ key: "peak-notch-depth", label: SCALAR.notch, value: bound.notch });
-      }
-      if (bound.bursts !== null) {
-        scalars.push({ key: "burst-count", label: SCALAR.burst, value: bound.bursts });
-      }
-      harmonicsFailed = windows === null;
-    }
-    if (needle.sigma !== null) {
-      scalars.push({ key: "sigma-pk", label: SCALAR.sigma, value: needle.sigma });
-    }
-    renderVerdict(
-      verdictHost,
-      thdVerdict({
-        windows,
-        cyclesAnalyzed: needle.cycles,
-        harmonicsFailed: pointer !== null && harmonicsFailed,
-      }),
-    );
-    renderScalars(scalarsHost, scalars);
+    scalarsBlock.hidden = true;
+    panelsBlock.hidden = true;
+    absentHost.hidden = true;
+    panelsTitle.textContent = `${PANELS_TITLE} · 0`;
   }
 
+  function paintAbsent(rows: readonly PanelAbsence[]): void {
+    renderAbsent(absentHost, rows);
+    absentHost.hidden = rows.length === 0;
+  }
+
+  async function loadSession(current: string, gen: number): Promise<void> {
+    const state = await loadW1Session(
+      { client, detail: loadDetail, panels, sessionTypeOf },
+      current,
+      loadAbort.signal,
+    );
+    if (gen !== generation) return;
+    banner.hidden = state.hasPointer;
+    banner.textContent = state.hasPointer ? "" : MISSING_BANNER;
+    publishAbsence(state.hasPointer ? null : REASON_NO_ARTIFACT);
+    panelsBlock.hidden = !state.hasPointer;
+    panelsTitle.textContent = `${PANELS_TITLE} · ${String(state.panelCount)}`;
+    paintAbsent(state.absent);
+    renderVerdict(verdictHost, state.verdict);
+    renderScalars(scalarsHost, state.scalars);
+    scalarsBlock.hidden = state.scalars.length === 0;
+    publish(state.panelCount, state.scalars.length);
+  }
+
+  /** Задача 8 (D1e/R5): rerun честен — старт задачи, живой SSE-прогресс из
+   * реальных стадий (сфабрикованный scaleX-хардкод удалён), терминал с
+   * исходом; успех перезабирает данные пары (onJobReload), недоступность
+   * задачи — честный failed(reason) из словаря задач 3, контролы не виснут. */
   async function rerun(): Promise<void> {
-    const session = sessionSelect.value;
-    if (session === "") return;
-    await client.ensureReady();
-    jobRail.hidden = false;
-    jobBar.style.width = "50%";
-    const snap = await client.jobs.start({ kind: "analyze", session_name: session });
-    renderFailures(failuresHost, parseFailures(snap.result));
-    jobBar.style.width = snap.status === "succeeded" ? "100%" : "50%";
+    const current = session;
+    if (current === null) return;
+    options.onJobBusy?.(true);
+    try {
+      await client.ensureReady();
+      jobRail.show();
+      const started = await client.jobs.start({ kind: "analyze", session_name: current });
+      const final = await jobRail.awaitTerminal(
+        started,
+        () => client.jobs.get(started.job_id),
+        options.jobWatch,
+      );
+      if (final.status === "succeeded") options.onJobReload?.();
+    } catch (error) {
+      if (isAbortError(error)) return;
+      jobRail.paintFailure(reasonFromError(error));
+    } finally {
+      options.onJobBusy?.(false);
+    }
   }
 
-  sessionSelect.addEventListener("change", () => {
-    void loadSession(sessionSelect.value).catch((error: unknown) => {
-      if (error instanceof ApiError) {
-        announcePolite(error.message);
-        return;
-      }
-      throw error;
-    });
-  });
-  cta.addEventListener("click", () => {
-    void rerun().catch((error: unknown) => {
-      if (error instanceof ApiError) {
-        announcePolite(error.message);
-        return;
-      }
-      throw error;
-    });
-  });
-  void loadCatalog().catch((error: unknown) => {
+  function report(error: unknown): void {
+    if (isAbortError(error)) return;
     if (error instanceof ApiError) {
       announcePolite(error.message);
       return;
     }
     throw error;
+  }
+
+  cta.addEventListener("click", () => {
+    void rerun().catch(report);
   });
 
   return {
+    bar,
     root,
-    destroy: () => {
+    setSession(next) {
       loadAbort.abort();
+      loadAbort = new AbortController();
+      generation += 1;
+      session = next;
+      paintSession();
+      resetBody();
+      extended.setSession(next);
+      publish(0, 0);
+      publishAbsence(null);
+      if (next === null) return;
+      void loadSession(next, generation).catch(report);
+    },
+    onSummary(listener) {
+      summary = listener;
+      listener(session === null ? NO_SESSION_SUMMARY : summaryText(0, 0));
+    },
+    onAbsenceReason(listener) {
+      absence = listener;
+      listener(absenceReason);
+    },
+    destroy() {
+      generation += 1;
+      loadAbort.abort();
+      jobRail.close();
+      extended.destroy();
+      bar.remove();
+      root.remove();
     },
   };
-}
-
-export function mountInspectW1Chrome(host: HTMLElement): W1ChromeHandle {
-  const chrome = createW1Chrome({ client: new LntApiClient() });
-  host.append(chrome.root);
-  return chrome;
 }

@@ -21,6 +21,7 @@ const s2 = session("s2", "2026-08-29T14:30:00Z", "Beta");
 function fakeClient(items: CatalogSession[]) {
   return {
     catalogSessions: async () => ({ items }),
+    legacySessions: async () => ({ sessions: [] }),
   };
 }
 
@@ -40,21 +41,27 @@ describe("createCatalogColumn", () => {
     expect(column.root.querySelector('[data-session="s2"]')).not.toBeNull();
   });
 
-  it("calls onPick with the session id when a row is clicked", async () => {
+  it("calls onPick with the load key (dir-name for duplicates) when a row is clicked", async () => {
+    const dup: CatalogSession = {
+      ...s1,
+      id: "syn-quiet-seed6022",
+      health: "duplicate_id",
+      storage_path: "/root/sim-quiet-dup",
+    };
     const pair = createPairState();
     const onPick = vi.fn();
     const column = createCatalogColumn({
-      client: fakeClient([s1, s2]),
+      client: fakeClient([dup]),
       pair,
       onPick,
     });
     await column.reload();
 
-    const row = column.root.querySelector('[data-session="s1"]');
+    const row = column.root.querySelector('[data-rowkey="sim-quiet-dup"]');
     expect(row).toBeInstanceOf(HTMLTableRowElement);
     row?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-    expect(onPick).toHaveBeenCalledWith("s1");
+    expect(onPick).toHaveBeenCalledWith("sim-quiet-dup");
   });
 
   it.each(["Enter", " "])("calls onPick when a focused row receives %s", async (key) => {
@@ -182,7 +189,6 @@ describe("createCatalogColumn", () => {
     sortLabel?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     expect(column.root.querySelectorAll("[data-cat-group]")).toHaveLength(0);
-    const labelTh = sortLabel?.closest("th");
-    expect(labelTh?.getAttribute("aria-sort")).toBe("ascending");
+    expect(sortLabel?.getAttribute("aria-sort")).toBe("ascending");
   });
 });

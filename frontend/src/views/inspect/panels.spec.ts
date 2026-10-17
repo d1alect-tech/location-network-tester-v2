@@ -84,8 +84,12 @@ function mockArtifacts(
 async function openInspect(page: Page, id: string): Promise<void> {
   await page.goto(INSPECT);
   await expect(page.locator(".app-v6")).toBeVisible();
-  await page.locator(".v6-extras details[data-extra='w1'] summary").click();
-  await page.selectOption('select[aria-label="Сессия инспекции"]', id);
+  const section = page.locator(".v6-extras");
+  // B2 (todo 13): сессию задаёт пара инспекции — рейка каталога авто-подхватывает
+  // базу, секция показывает её пассивно; selectOption больше не контракт.
+  await expect(section.locator("[data-session-id]")).toHaveText(id);
+  await expect(section.locator("select")).toHaveCount(0);
+  await section.locator("details[data-extra='w1'] > summary").click();
 }
 
 async function expectNoErrorBand(page: Page): Promise<void> {

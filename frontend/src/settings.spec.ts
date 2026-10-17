@@ -151,13 +151,15 @@ test("bundle section launches panel backup and support-bundle jobs, CLI stays as
   await expect(bundle).toBeVisible();
 
   await backup.click();
-  await expect(backend.startedRequests.at(-1)).toMatchObject({ kind: "backup" });
+  // poll: запрос стартует после асинхронного ensureReady; снимок значения в
+  // момент вызова ловил гонку (flake в полном прогоне 2026-10-09).
+  await expect.poll(() => backend.startedRequests.at(-1)).toMatchObject({ kind: "backup" });
   await expect(guidance.locator("#lnt-set-bundle-status")).toContainText("Создание бэкапа");
   backend.pumpAll();
   await expect(guidance.locator("#lnt-set-bundle-status")).toContainText("Бэкап создан");
 
   await bundle.click();
-  await expect(backend.startedRequests.at(-1)).toMatchObject({ kind: "support_bundle" });
+  await expect.poll(() => backend.startedRequests.at(-1)).toMatchObject({ kind: "support_bundle" });
   backend.pumpAll();
   await expect(guidance.locator("#lnt-set-bundle-status")).toContainText(
     "Сборник поддержки собран",

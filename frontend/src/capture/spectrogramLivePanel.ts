@@ -48,7 +48,7 @@ export function createSpectrogramLivePanel(deps: {
   });
 
   const head = el("div", { className: "panel-hd" }, [
-    el("h2", { className: "panel-title", text: "Спектрограмма" }),
+    el("h3", { className: "panel-title", text: "Спектрограмма" }),
   ]);
   head.append(renderer.bar);
   const body = el("div", { className: "panel-bd", attrs: { "data-live-spectrogram": "" } }, [

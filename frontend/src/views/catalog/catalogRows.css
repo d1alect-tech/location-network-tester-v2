@@ -46,9 +46,11 @@
   width: 100%;
 }
 
-/* Пилюля «Повреждён манифест» — самый длинный текст состояния (~150px). */
+/* Пилюля «Дубль идентификатора» — самый длинный текст состояния (замер
+ * break-ui: 164.5px) + 8px паддинга ячейки: колонка держит пилюлю целиком,
+ * вторжения в МЕТКУ нет ни на десктопе, ни на 390px. */
 .lnt-cat-workspace .cat-v6 .tbl-cat tr > :first-child {
-  width: 158px;
+  width: 176px;
 }
 
 /* Самый длинный тип «Качество сети» (~104px, измерено в витрине). */
@@ -99,11 +101,11 @@
 }
 
 .lnt-cat-workspace .cat-role-a {
-  color: #9db4ff;
+  color: var(--lnt-role-a);
 }
 
 .lnt-cat-workspace .cat-role-b {
-  color: #f0a95c;
+  color: var(--lnt-role-b);
 }
 
 .lnt-cat-workspace .cat-empty {
@@ -230,12 +232,18 @@
   border: 0;
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease);
+  transition: background var(--lnt-t-fast) var(--lnt-ease), color var(--lnt-t-fast) var(--lnt-ease),
+    transform var(--lnt-motion-fast) var(--lnt-ease-out);
 }
 
 .lnt-cat-workspace .snav-item:hover {
   color: var(--lnt-text);
   background: var(--lnt-elev);
+}
+
+/* Отклик на нажатие таба: планка emil-design-eng, scale 0.97. */
+.lnt-cat-workspace .snav-item:active {
+  transform: scale(0.97);
 }
 
 .lnt-cat-workspace .snav-item.is-active {
@@ -255,4 +263,44 @@
 .lnt-cat-workspace .snav-item:focus-visible {
   outline: 2px solid var(--lnt-accent);
   outline-offset: -2px;
+}
+
+/* Reduced motion: движение убираем, цвет и прозрачность держим.
+ * Заголовки дней статичны всегда — анимации у них нет и не будет. */
+@media (prefers-reduced-motion: reduce) {
+  /* Селектор выбранной строки — той же специфичности (0,3,2), что и правило
+   * 150ms в catalogTable.css: rows импортирован позже, reduced-motion побеждает. */
+  .lnt-cat-workspace .tbl tbody tr,
+  .lnt-cat-workspace .tbl tbody tr.lnt-cat-row-selected,
+  .lnt-cat-workspace .btn,
+  .lnt-cat-workspace .btn-quiet,
+  .lnt-cat-workspace .ctl,
+  .lnt-cat-workspace .cat-sort,
+  .lnt-cat-workspace .snav-item {
+    transition-duration: 1ms;
+  }
+
+  /* Кнопки: press-правило .btn:active живёт в catalogForms.css, а catalog.css
+   * импортирует forms ПОСЛЕ rows — при равной специфичности (0,3,0) оно
+   * глушило этот override. :not(:disabled) поднимает его до (0,4,0);
+   * отключённая кнопка и так без трансформации (catalogForms.css).
+   * Пункт таббара объявлен выше в этом же файле — ему хватает (0,3,0). */
+  .lnt-cat-workspace .btn:active:not(:disabled),
+  .lnt-cat-workspace .btn-quiet:active:not(:disabled) {
+    transform: none;
+  }
+
+  .lnt-cat-workspace .snav-item:active {
+    transform: none;
+  }
+}
+
+/* Узкий вьюпорт (375px → колонка ~336px): фиксированные ширины колонок не
+ * сжимаем — таблица едет горизонтально внутри .tbl-wrap, страница не
+ * скроллится. Блок живёт ЗДЕСЬ, после ширин: catalog.css импортирует rows
+ * после core, и прежний override из catalogCore.css проигрывал каскад. */
+@media (max-width: 520px) {
+  .lnt-cat-workspace .cat-v6 .tbl-cat {
+    min-width: 480px;
+  }
 }

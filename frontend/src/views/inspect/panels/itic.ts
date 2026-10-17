@@ -75,6 +75,13 @@ export function parseItic(payload: unknown): IticView | null {
   };
 }
 
+/** Строка SEMI-F47: один источник для тела панели и для свёрнутой шапки. */
+export function iticBadge(view: IticView): string {
+  return view.semiF47Unavailable > 0 && view.eventCount > 0
+    ? `SEMI-F47 N/A (${String(view.semiF47Unavailable)})`
+    : `SEMI-F47 PASS ${String(view.semiF47Pass)} / FAIL ${String(view.semiF47Fail)}`;
+}
+
 function row(host: HTMLElement, label: string, value: string): void {
   host.append(el("div", {}, [el("dt", { text: label }), el("dd", { text: value })]));
 }
@@ -89,10 +96,6 @@ export function renderItic(body: HTMLElement, payload: unknown): void {
   row(dl, "min_rms", formatScalar(view.minRms));
   row(dl, "max_rms", formatScalar(view.maxRms));
   row(dl, "nominal_rms", formatScalar(view.nominalRms));
-  const badge =
-    view.semiF47Unavailable > 0 && view.eventCount > 0
-      ? `SEMI-F47 N/A (${view.semiF47Unavailable})`
-      : `SEMI-F47 PASS ${view.semiF47Pass} / FAIL ${view.semiF47Fail}`;
-  row(dl, "semi_f47", badge);
+  row(dl, "semi_f47", iticBadge(view));
   body.append(dl);
 }

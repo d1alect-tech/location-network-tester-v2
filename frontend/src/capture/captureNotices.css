@@ -139,6 +139,25 @@
   font-size: 13px;
 }
 
+/* Сессия открывается в инспекции: ссылка, а не голый текст. Цвет наследуется —
+ * контраст текста тот же, что у прежней строки; признак ссылки даёт подчёркивание
+ * акцентным токеном (не только цвет). Отступ даёт мишени ≥24px (строка 20px + 8px). */
+.capture-view .capture-written-link {
+  display: inline-block;
+  padding: 4px 0;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--lnt-accent);
+  overflow-wrap: anywhere;
+}
+
+.capture-view .capture-written-link:hover,
+.capture-view .capture-written-link:focus-visible {
+  color: var(--lnt-accent-press);
+  text-decoration-thickness: 2px;
+}
+
 .capture-view .lnt-mono {
   font-family: var(--lnt-mono);
 }

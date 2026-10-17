@@ -117,6 +117,38 @@
   border-right: 1px solid var(--lnt-line);
 }
 
+/* Мобильная ширина: колонки складываются в стек, каталог — ограниченной
+ * высоты сверху, иначе рейка 336px съедает весь вьюпорт 390px. */
+@media (max-width: 900px) {
+  /* Пара не теряет второй слот: слоты переносятся, а не обрезаются краем. */
+  .app-v6 .pairbar {
+    flex-wrap: wrap;
+    row-gap: var(--lnt-space-2);
+    padding-block: var(--lnt-space-2);
+  }
+
+  .app-v6 .pair-slot {
+    flex: 1 1 220px;
+  }
+
+  /* Ряд пары в сетке корня — auto: перенесённые слоты раздвигают строку,
+     а не рисуются поверх рабочей области. */
+  .app-v6 {
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+  }
+
+  .app-v6 .app-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .app-v6 .col-cat {
+    max-height: 40vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--lnt-line);
+  }
+}
+
 /* Рельс каталога прокручивается внутри своей колонки: <table> не создаёт
    scroll-контейнер (overflow к display:table не применяется), поэтому область
    прокрутки владеет панель. Без неё 30 строк рисуются наружу — ниже
@@ -128,12 +160,17 @@
   background: var(--lnt-chrome);
 }
 
+/* Нижний запас прокрутки равен высоте фиксированного футера (.statusbar, 32px):
+ * последняя интерактивная строка (CTA расширенного прогона в details w1)
+ * обязана уходить выше футера, иначе её центр ловит клик под статус-баром
+ * и полосой cmdbar (F3-F3, замер 1440x900). */
 .app-v6 .col-main {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  padding-bottom: var(--lnt-space-8);
 }
 
 /* Дочерние блоки не сжимаются: при нехватке высоты колонка скроллится,
@@ -177,49 +214,47 @@
   min-height: 0;
 }
 
-/* Нижний ярус анализа: показания базы слева, пики с дельтой во всю оставшуюся ширину. */
+/* Лента анализа (G6 «Два ряда»): ряд 1 — плитки скаляров, ряд 2 — пики с
+ * дельтой к базе и Δ-полоса сбоку. Плотность просторнее: строки 32px. */
 .app-v6 .analysis-band {
-  display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  --lnt-table-row-min: 32px;
+  display: flex;
+  flex-direction: column;
   flex: none;
   min-height: 0;
 }
 
-.app-v6 .analysis-band > * + * {
-  border-left: 1px solid var(--lnt-line);
-}
-
-.app-v6 .readout .panel-bd {
-  padding: 8px 12px;
-}
-
-.app-v6 .readout-grid {
+.app-v6 .band-scalars {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 12px;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: var(--lnt-space-3) var(--lnt-space-4);
+  padding: var(--lnt-space-4) var(--lnt-space-5);
 }
 
-.app-v6 .readout-cell {
+.app-v6 .band-cell {
   display: flex;
   flex-direction: column;
+  gap: var(--lnt-space-1);
   min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--lnt-chrome);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
 }
 
-.app-v6 .readout-cell.is-wide {
-  grid-column: 1 / -1;
-}
-
-.app-v6 .readout-label {
+.app-v6 .band-cell dt {
   font: 700 10px / 14px var(--lnt-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--lnt-text-dim);
+  color: var(--lnt-text-sec);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.app-v6 .readout-value {
+.app-v6 .band-cell dd {
+  margin: 0;
   font: 600 20px / 24px var(--lnt-mono);
   font-variant-numeric: tabular-nums lining-nums;
   color: var(--lnt-text);
@@ -228,9 +263,111 @@
   text-overflow: ellipsis;
 }
 
-.app-v6 .readout-value .t-unit {
+.app-v6 .band-cell dd.is-long {
+  font-size: 16px;
+  line-height: 20px;
+}
+
+.app-v6 .band-cell.is-wide {
+  grid-column: span 2;
+}
+
+.app-v6 .band-cell .t-unit {
   font: 400 12px / 16px var(--lnt-ui);
   color: var(--lnt-text-sec);
+}
+
+.app-v6 .band-tier2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  border-block-start: 1px solid var(--lnt-line);
+}
+
+.app-v6 .band-tier2 > * + * {
+  border-inline-start: 1px solid var(--lnt-line);
+}
+
+.app-v6 .band-peaks {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-v6 .band-tier2 .panel-hd {
+  min-height: var(--lnt-touch-target-min);
+}
+
+.app-v6 .band-note {
+  margin-inline-start: auto;
+  font: 400 11px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+}
+
+.app-v6 .band-peaks .tbl-wrap {
+  overflow: auto;
+  min-width: 0;
+}
+
+.app-v6 .band-rail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-v6 .band-rail .delta-strip {
+  border-top: 0;
+  background: transparent;
+}
+
+.app-v6 .band-rail .delta-strip-toggle {
+  min-height: var(--lnt-touch-target-min);
+}
+
+.app-v6 .band-rail .delta-strip-bd {
+  height: 88px;
+  padding: var(--lnt-space-3);
+  background: var(--lnt-chrome);
+}
+
+.app-v6 .band-rail-note {
+  margin: 0;
+  padding: var(--lnt-space-2) var(--lnt-space-3);
+  border-block-start: 1px solid var(--lnt-line);
+  color: var(--lnt-text-sec);
+  font: 400 11px / 16px var(--lnt-ui);
+}
+
+@media (max-width: 900px) {
+  .app-v6 .band-tier2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-v6 .band-tier2 > * + * {
+    border-inline-start: 0;
+    border-block-start: 1px solid var(--lnt-line);
+  }
+}
+
+@media (max-width: 720px) {
+  .app-v6 .band-scalars {
+    gap: var(--lnt-space-2);
+    padding: var(--lnt-space-3);
+  }
+
+  .app-v6 .band-cell dd {
+    font-size: 18px;
+    line-height: 22px;
+  }
+
+  .app-v6 .band-cell dd.is-long {
+    font-size: 15px;
+    line-height: 20px;
+  }
+
+  .app-v6 .band-cell.is-wide {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Строки пиков — плотность R3-A через общий var. */
@@ -408,11 +545,14 @@
   flex: none;
 }
 
+/* Строка поиска рельса — сетка [поле 1fr][кнопка auto]: поле и кнопка стоят
+   на одной линии, ряд читается тулбаром, а не наездом на шапку таблицы. */
 .app-v6 .cat-tools {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: var(--lnt-space-2);
+  padding: var(--lnt-space-1) var(--lnt-space-2);
   background: rgb(0 0 0 / 0.18);
   border-bottom: 1px solid var(--lnt-line);
 }
@@ -423,14 +563,15 @@
   color: var(--lnt-text-dim);
 }
 
-/* Поле живёт в хроме панели, а не выглядит веб-формой: без рамки и фона. */
+/* Поле живёт в хроме панели, а не выглядит веб-формой: без рамки и фона.
+   Высота — контрольный контракт 44px, как у кнопки сброса рядом: строка
+   поиска держит один ритм целей (craft sweep todo 14). */
 .app-v6 .cat-search {
   flex: 1;
   min-width: 0;
-  /* §2.3: инпут 32px. */
-  height: 32px;
+  height: var(--lnt-control-height);
   padding: 0 4px;
-  font: 400 12px / 32px var(--lnt-ui);
+  font: 400 12px / 20px var(--lnt-ui);
   color: var(--lnt-text);
   background: none;
   border: 0;
@@ -442,10 +583,6 @@
 }
 
 /* Заголовок колонки — настоящая кнопка: сортировка доступна и с клавиатуры (§6). */
-.app-v6 .cat-th {
-  padding: 0;
-}
-
 /* Шапка таблицы — плотность R3-A. */
 .app-v6 .cat-sort {
   display: flex;
@@ -464,20 +601,6 @@
 }
 
 .app-v6 .cat-sort:hover {
-  color: var(--lnt-text);
-}
-
-/* Направление читается глифом, а не только подсветкой колонки (§6). */
-.app-v6 .cat-th[aria-sort="ascending"] .cat-sort-mark::after {
-  content: "▲";
-}
-
-.app-v6 .cat-th[aria-sort="descending"] .cat-sort-mark::after {
-  content: "▼";
-}
-
-.app-v6 .cat-th[aria-sort="ascending"] .cat-sort,
-.app-v6 .cat-th[aria-sort="descending"] .cat-sort {
   color: var(--lnt-text);
 }
 
@@ -508,9 +631,12 @@
   color: var(--lnt-text-dim);
 }
 
+/* Строка 13: высота ряда — контент (двухстрочная .cat-row), паддинги в
+   .cat-row (catalogRowMarkup.css); фиксированные 26px и колоночные ширины
+   4-колоночной таблицы убраны. */
 .app-v6 .cat-v6 .tbl-cat tbody td {
-  height: var(--lnt-table-row-min);
-  padding: 0 8px;
+  padding: 0;
+  vertical-align: top;
 }
 
 .app-v6 .cat-v6 .tbl-cat {
@@ -518,39 +644,8 @@
   width: 100%;
 }
 
-.app-v6 .cat-v6 .tbl-cat tr > :first-child {
-  width: 22px;
-  padding-right: 0;
-}
-
-.app-v6 .cat-v6 .tbl-cat tr > :nth-child(3) {
-  width: 104px;
-}
-
-.app-v6 .cat-v6 .tbl-cat tr > :nth-child(4) {
-  width: 50px;
-}
-
-.app-v6 .cat-v6 .tbl-cat.is-flat tr > :nth-child(4) {
-  width: 90px;
-}
-
 .app-v6 .cat-group > th {
   width: auto;
-}
-
-.app-v6 .cat-label-cell {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.app-v6 .cat-label-cell .cell-ellipsis {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .app-v6 .cat-role {
@@ -571,10 +666,6 @@
 
 .app-v6 .cat-role-b {
   color: #f0a95c;
-}
-
-.app-v6 .cat-role-noise {
-  color: var(--lnt-text-dim);
 }
 
 .app-v6 .cat-empty {
@@ -609,15 +700,12 @@
   display: none;
 }
 
-.app-v6 [data-showcase="spectrum"]:not(.is-gram) .gram-bar {
-  display: none;
-}
-
 /* §2.3: фокус-рамка видима у каждого органа. */
 .app-v6 .cat-search:focus-visible,
 .app-v6 .cat-sort:focus-visible,
 .app-v6 .tbl-cat tbody tr[data-session]:focus-visible,
 .app-v6 .gram-mode:focus-visible,
+.app-v6 .gram-detector:focus-visible,
 .app-v6 .view-toggle-btn:focus-visible,
 .app-v6 [data-cat-clear]:focus-visible,
 .app-v6 [data-pair-swap]:focus-visible {
@@ -667,8 +755,7 @@
 }
 
 .app-v6 .gram-mode,
-.app-v6 .view-toggle-btn,
-.app-v6 [data-cat-clear] {
+.app-v6 .view-toggle-btn {
   min-height: 28px;
 }
 
@@ -687,9 +774,42 @@
 
 .app-v6 .gram-scale {
   font: 400 11px / 16px var(--lnt-mono);
-  color: var(--lnt-text-dim);
+  color: var(--lnt-text-sec);
   flex: none;
   white-space: nowrap;
+}
+
+/* Базовая тихая кнопка инспекции: токены, контраст 4.5+, цель 44px. */
+.app-v6 .btn-quiet,
+.app-v6 .gram-mode,
+.app-v6 .gram-detector,
+.app-v6 .view-toggle-btn,
+.app-v6 [data-cat-clear] {
+  min-height: var(--lnt-control-height);
+  padding: 0 var(--lnt-space-3);
+  border: var(--lnt-border-width) solid var(--lnt-border-subtle);
+  border-radius: var(--lnt-radius-control);
+  background: var(--lnt-field);
+  color: var(--lnt-text-sec);
+  font: 500 13px / 18px var(--lnt-ui);
+  cursor: pointer;
+}
+
+.app-v6 .btn-quiet:hover:not(:disabled),
+.app-v6 .gram-mode:hover:not(:disabled),
+.app-v6 .gram-detector:hover:not(:disabled),
+.app-v6 .view-toggle-btn:hover:not(:disabled),
+.app-v6 [data-cat-clear]:hover:not(:disabled) {
+  color: var(--lnt-text);
+  border-color: var(--lnt-line-struct);
+}
+
+.app-v6 .btn-quiet:disabled,
+.app-v6 .gram-mode:disabled,
+.app-v6 .gram-detector:disabled,
+.app-v6 .view-toggle-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .app-v6 .gram-canvas-wrap {
@@ -739,45 +859,349 @@
   border-color: var(--lnt-line-struct);
 }
 
-/* ── Сворачиваемые панели под лентой анализа ─────────────────────────── */
+/* ── Единая шапка спектр+грам (G5): группы с подписями ──────────────────
+ * Одна секция, одна шапка: Вид / Спектр / Спектрограмма. Кластер грама не
+ * исчезает в режиме спектра — состояние читается всегда, приглушённо. */
 
-.app-v6 .v6-extras summary {
+.app-v6 .signal-hd {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  min-height: 44px;
+  flex-wrap: wrap;
+}
+
+.app-v6 .signal-cluster {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 12px;
+  min-width: 0;
+  border-right: 1px solid var(--lnt-line);
+}
+
+.app-v6 .signal-cluster[data-signal-cluster="spectrum"] {
+  flex: 1 1 auto;
+}
+
+.app-v6 .signal-cluster[data-signal-cluster="gram"] {
+  border-right: 0;
+}
+
+.app-v6 .signal-cluster-cap {
+  font: 700 10px / 14px var(--lnt-ui);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+}
+
+/* Активная группа читается ярче подписью, не прозрачностью: органы грама
+   остаются кликабельными и контрастными в любом виде. */
+.app-v6 .signal-cluster[data-active] .signal-cluster-cap {
+  color: var(--lnt-text);
+}
+
+.app-v6 .signal-cluster-bd {
   display: flex;
   align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.app-v6 .signal-hd .view-toggle {
+  margin-left: 0;
+}
+
+/* Селекторы кластера «Спектр»: компактные контролы с подписью-капсом,
+ * как в эталоне G5 — шапка не превращается в слепую свалку слотов. */
+.app-v6 .spectrum-selectors,
+.app-v6 .spectrum-units {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.app-v6 .spectrum-selectors label,
+.app-v6 .spectrum-units label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 700 10px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+}
+
+.app-v6 .spectrum-selectors select,
+.app-v6 .spectrum-units select {
   height: 32px;
-  padding: 0 12px;
+  max-width: 120px;
+  padding: 0 8px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  color: var(--lnt-text);
+  font: 400 13px / 18px var(--lnt-ui);
+}
+
+.app-v6 .selectors-meta {
+  font: 400 11px / 16px var(--lnt-mono);
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Приглушение снято: непрозрачность роняла контраст органов (axe
+   color-contrast). Состояние группы несёт подпись, а не прозрачность. */
+
+/* Вход содержимого секции на смене пары: 200ms ease-out, transform/opacity. */
+@keyframes lnt-signal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.app-v6 .signal-bd.is-enter {
+  animation: lnt-signal-enter var(--lnt-t-enter) var(--lnt-ease-out) both;
+}
+
+/* Частые зоны содержимого: ноль движения. */
+.app-v6 .frame,
+.app-v6 .gram,
+.app-v6 .view-toggle,
+.app-v6 .plane-toggle,
+.app-v6 .delta-strip,
+.app-v6 .spectrum-markers {
+  transition: none;
+}
+
+/* НАХОДКА F4: hidden проигрывал авторским display (статус-строка 44px и
+   фантомная рамка жили всегда). Атрибут сильнее авторских правил. */
+.app-v6 [hidden] {
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  .app-v6 .signal-cluster {
+    flex: 1 1 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--lnt-line);
+    padding-block: 6px;
+  }
+
+  .app-v6 .signal-cluster[data-signal-cluster="gram"] {
+    border-bottom: 0;
+  }
+}
+
+/* ── Секция analysis-v2 (G7 «Disclosure-панели», todo 13) ──────────────────
+ * Одна рамка панели (primitives/panel.css) + шапка, которая читается без
+ * раскрытия: заголовок, вердикт THD-V, сессия базы, CTA пересчёта. Ниже —
+ * два раскрытия: осциллограмма CH1 и анализ сессии. Раскрытие/сворачивание —
+ * частое действие, поэтому ноль анимации тела; движение остаётся только у
+ * шеврона (120ms) и у входа содержимого на смене пары (200ms ease-out). */
+
+.app-v6 .analysis-v2 {
+  flex: none;
+  min-width: 0;
+}
+
+.app-v6 .av2-hd {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lnt-space-3);
+  min-height: var(--lnt-touch-target-min);
+  padding: var(--lnt-space-2) var(--lnt-space-4);
+}
+
+.app-v6 .av2-hd .panel-title {
+  flex: none;
+}
+
+.app-v6 .av2-verdict {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Пассивное отображение базы пары: источник выбора — рейка каталога (B2). */
+.app-v6 .av2-session {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lnt-space-2);
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.app-v6 .av2-session-cap {
+  flex: none;
+  font: 700 10px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  white-space: nowrap;
+}
+
+.app-v6 .av2-session-id {
+  min-width: 0;
+  max-inline-size: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 12px / 18px var(--lnt-mono);
+  color: var(--lnt-text);
+}
+
+.app-v6 .av2-cta {
+  flex: none;
+}
+
+.app-v6 .av2-disclosure {
+  min-width: 0;
+  border-top: 1px solid var(--lnt-line);
+}
+
+.app-v6 .av2-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--lnt-space-2);
+  /* Пол тач-цели: 44px вместо прежних 32px. */
+  min-height: var(--lnt-control-height);
+  padding: var(--lnt-space-2) var(--lnt-space-4);
   cursor: pointer;
+  list-style: none;
   font: 600 12px / 16px var(--lnt-ui);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--lnt-text-sec);
-  list-style: none;
 }
 
-.app-v6 .v6-extras summary::-webkit-details-marker {
+.app-v6 .av2-disclosure > summary::-webkit-details-marker {
   display: none;
 }
 
 /* Шеврон раскрытия: без него заголовок выглядит мёртвой подписью. */
-.app-v6 .v6-extras summary::before {
+.app-v6 .av2-disclosure > summary::before {
   content: "▸";
   flex: none;
-  margin-right: 8px;
   color: var(--lnt-text-dim);
   transition: transform var(--lnt-t-fast) var(--lnt-ease);
 }
 
-.app-v6 .v6-extras details[open] > summary::before {
+.app-v6 .av2-disclosure[open] > summary::before {
   transform: rotate(90deg);
 }
 
-.app-v6 .v6-extras summary:hover {
+.app-v6 .av2-disclosure > summary:hover {
   color: var(--lnt-text);
+  background: rgb(255 255 255 / 0.03);
 }
 
-.app-v6 .v6-extras summary:focus-visible {
+.app-v6 .av2-disclosure > summary:focus-visible {
   outline: 2px solid var(--lnt-accent);
   outline-offset: -2px;
+}
+
+.app-v6 .av2-sum-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Сводка в свёрнутой шапке: сколько панелей и скаляров реально есть. */
+.app-v6 .av2-sum-value {
+  flex: none;
+  margin-inline-start: auto;
+  font: 400 12px / 18px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--lnt-text-dim);
+  white-space: nowrap;
+}
+
+.app-v6 .av2-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-4);
+  min-width: 0;
+  padding: var(--lnt-space-4);
+  border-top: 1px solid var(--lnt-line);
+}
+
+.app-v6 .av2-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-2);
+  min-width: 0;
+}
+
+.app-v6 .av2-block-title {
+  margin: 0;
+  font: 700 10px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-dim);
+}
+
+/* Скаляры W1 — та же сетка плиток, что у ленты анализа, без её внешних полей. */
+.app-v6 .av2-scalars {
+  padding: 0;
+}
+
+/* Честное отсутствие: панель не смонтирована — причина названа чипом. */
+.app-v6 .av2-absent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lnt-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-v6 .av2-chip {
+  max-inline-size: 100%;
+  padding: 2px var(--lnt-space-2);
+  background: var(--lnt-chrome);
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-radius-status);
+  color: var(--lnt-text-sec);
+  font: 400 12px / 18px var(--lnt-ui);
+  overflow-wrap: anywhere;
+}
+
+.app-v6 .av2-chip.is-failed {
+  background-color: var(--lnt-status-error-bg);
+  border-color: var(--lnt-status-error);
+  color: var(--lnt-status-error);
+}
+
+.app-v6 .av2-chip.is-withheld {
+  background-color: var(--lnt-status-warn-bg);
+  border-color: var(--lnt-status-warn);
+  color: var(--lnt-fg-primary);
+}
+
+/* Решённый блок карточек живёт в том же ритме тела, без своего внешнего поля. */
+.app-v6 .analysis-v2 .lnt-w1-extended {
+  margin-top: 0;
+}
+
+/* Вход содержимого на смене пары: тот же ритм, что у секции спектр+грам. */
+.app-v6 .av2-body.is-enter {
+  animation: lnt-signal-enter var(--lnt-t-enter) var(--lnt-ease-out) both;
 }
 
 .app-v6 .gram .lnt-spec-chart {
@@ -814,8 +1238,41 @@
   outline-offset: -2px;
 }
 
+@media (max-width: 720px) {
+  .app-v6 .av2-hd {
+    padding: var(--lnt-space-2) var(--lnt-space-3);
+  }
+
+  .app-v6 .av2-session {
+    flex: 1 1 100%;
+    margin-inline-start: 0;
+  }
+
+  .app-v6 .av2-cta {
+    flex: 1 1 100%;
+  }
+
+  .app-v6 .av2-disclosure > summary {
+    padding: var(--lnt-space-2) var(--lnt-space-3);
+  }
+
+  .app-v6 .av2-body {
+    gap: var(--lnt-space-3);
+    padding: var(--lnt-space-3);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-v6 .panel.is-loading .frame {
     opacity: 1;
+  }
+
+  .app-v6 .signal-bd.is-enter,
+  .app-v6 .av2-body.is-enter {
+    animation: none;
+  }
+
+  .app-v6 .av2-disclosure > summary::before {
+    transition: none;
   }
 }

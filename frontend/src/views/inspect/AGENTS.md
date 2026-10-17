@@ -11,14 +11,15 @@ Largest view: spectrum / spectrogram / v2 panels + pairbar + analysis band.
 - `v6Chrome.ts` — tabbar + commandbar shell.
 - `w1Chrome.ts` / `w1Parse.ts` — w1 chrome variant + parse helpers.
 - `spectrumPanelV6.ts` — spectrum panel render + axes + peak markers.
-- `spectrogramLive*.ts` — live gram: ring 48x256, rAF draw, poll `spectrum|waveform` ~1500ms.
-- `spectrogramOrient.ts` / `gramAlign.ts` / `gramPair.ts` — orientation, alignment, pairing.
+- Live gram lives in `src/capture/spectrogramLive*.ts` (ring 48×256, −120 dB floor, 1.5 s poll) — moved out of this view; here only `spectrogramOrient.ts` / `gramAlign.ts` / `gramPair.ts` handle gram orientation, alignment, pairing.
 - `pairbarV6.ts` / `pairState.ts` — pairbar slots + A/B state.
 - `analysisBand.ts` — analysis band row under charts.
 - `panels/fetch.ts` — fetch layer; never-fake-0 rule lives here.
 - `panels/` — per-panel fetch + render split.
 - `catalogColumn*.ts` — catalog column model + render.
-- `peaksDelta.ts` / `thdVerdict.ts` — delta + verdict chips.
+- `spectrumSelectors.ts` — marker RBW/window options; shared with `capture/channelbarCapture.ts`.
+- `sessionAlias.ts` — session alias + storage dir names; reused by `src/testkit/`.
+- `peaksDelta.ts` — delta chips; `thdVerdict.ts` — THD limits, single source (`THD_MIN_CYCLES`/`THD_V_LIMIT` imported by `views/catalog/contextThd.ts`).
 - `v6.css` / `w1Chrome.css` — view-scoped styles only.
 - `*.spec.ts` — playwright; `*.test.ts` — vitest; `*.mount.test.ts` — mount harness.
 
@@ -32,7 +33,7 @@ Largest view: spectrum / spectrogram / v2 panels + pairbar + analysis band.
 - Compare deltas always B - A.
 - Units toggle (C3 DONE): display-only дБВ/дБмкВ/дБм(50 Ом) in markers table
   (`spectrumUnits`), stored CSV stays V²/Hz, default дБВ/Hz; deltas unit-invariant.
-- Live poll: single in-flight request; drop, never queue.
+- Live poll: single in-flight request; drop, never queue (`spectrumPanelRequest.ts` generation counter + AbortController; the live-gram poller in `src/capture/` follows the same rule).
 
 ## ANTI-PATTERNS
 

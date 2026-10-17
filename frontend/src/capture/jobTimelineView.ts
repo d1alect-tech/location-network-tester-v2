@@ -2,9 +2,11 @@
  * сессии, отмена с подтверждением на безопасной границе, повтор,
  * подсказка восстановления после прерывания. */
 
+import type { JobSnapshot } from "../api/types-jobs";
 import { openDialog } from "../components/primitives/dialog";
 import { el } from "../components/primitives/dom";
 import { announcePolite, createJobProgress } from "../components/primitives/status";
+import { serializeLocation } from "../state/routeState";
 import {
   STAGE_LABELS_RU,
   STATUS_LABELS_RU,
@@ -27,6 +29,29 @@ export interface TimelineViewDeps {
 export interface TimelineViewHandle {
   root: HTMLElement;
   update(state: TimelineState): void;
+}
+
+/** Записанная сессия открывается в инспекции: #/inspect?a=<id> — зеркало
+ * captureDeepLink (обратный переход capture -> inspect). Без идентификатора
+ * остаётся текст: ссылаться не на что, а выдуманного id в URL быть не должно. */
+function writtenSessionNode(name: string, linked: boolean): Text | HTMLElement {
+  const id = name.trim();
+  if (!linked || id === "") return document.createTextNode(name);
+  return el("a", {
+    className: "capture-written-link",
+    text: name,
+    attrs: { href: serializeLocation({ route: "inspect", params: { a: id } }) },
+  });
+}
+
+/** Сколько записанных сессий уже прошли анализ. Рабочий пишет сессию позиции i
+ * и сразу анализирует её (job_worker._execute_series): артефакты готовы, когда
+ * задача ушла к позиции i+1, а вся серия — на succeeded. До этого ссылка вела бы
+ * в инспект с «н/д», который не обновится сам (f3 F-2). */
+function analyzedSessionCount(snapshot: JobSnapshot): number {
+  if (snapshot.status === "succeeded") return snapshot.written_sessions.length;
+  const position = snapshot.series_index ?? 1;
+  return Math.min(snapshot.written_sessions.length, Math.max(0, position - 1));
 }
 
 export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandle {
@@ -195,13 +220,16 @@ export function createJobTimelineView(deps: TimelineViewDeps): TimelineViewHandl
       // Записанные сессии серии.
       while (writtenWrap.firstChild) writtenWrap.removeChild(writtenWrap.firstChild);
       if (snapshot.written_sessions.length > 0) {
+        const analyzed = analyzedSessionCount(snapshot);
         writtenWrap.append(
           el("p", { className: "lnt-hint", text: "Записанные сессии:" }),
           el(
             "ul",
             { className: "capture-written-list" },
-            snapshot.written_sessions.map((name) =>
-              el("li", { className: "capture-written-item lnt-mono cell-wrap", text: name }),
+            snapshot.written_sessions.map((name, index) =>
+              el("li", { className: "capture-written-item lnt-mono cell-wrap" }, [
+                writtenSessionNode(name, index < analyzed),
+              ]),
             ),
           ),
         );

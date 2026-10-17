@@ -1,0 +1,92 @@
+/* Inspect V6 — M1 (план inspect-v1-selection-ux, todo 5): видимые кнопки
+   назначения «А»/«Б» на строках каталога + эхо-статус строки (кромка/тинт).
+   Цвета ролей — переменные --lnt-role-a/--lnt-role-b на .app-v6 (значения
+   как у чипов .cat-role-a/b из v6.css; single-owner волны 6 — этот файл).
+   Стиль повторяет одобренный владельцем прототип V1
+   (frontend/prototypes/inspect-flow.html), адаптированный под плотность R3-A:
+   кнопки в строку, а не столбиком (строка 26px, --lnt-table-row-min). */
+
+.app-v6 {
+  --lnt-role-a: #9db4ff;
+  --lnt-role-b: #f0a95c;
+}
+
+.app-v6 .cat-assign {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: var(--lnt-table-row-min);
+  padding: 0;
+  font: 700 11px / 14px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  background: transparent;
+  border: var(--lnt-border-width) solid transparent;
+  border-radius: var(--lnt-r-ctl);
+  cursor: pointer;
+}
+
+/* 2px focus-ring; смещение внутрь — кнопка 16px, внешний offset срезался бы
+   соседями. */
+.app-v6 .cat-assign:focus {
+  outline: var(--lnt-focus-width) solid var(--lnt-accent-a);
+  outline-offset: calc(-1 * var(--lnt-focus-offset));
+}
+
+/* Нажатая кнопка = чип роли: тот же глиф и цвет (aria-pressed из
+   assignButtons). Заливка — цвет роли, как в прототипе V1. */
+.app-v6 .cat-assign[data-assign="a"]:hover,
+.app-v6 .cat-assign[aria-pressed="true"][data-assign="a"] {
+  background: color-mix(in srgb, var(--lnt-role-a) 18%, transparent);
+  color: var(--lnt-role-a);
+}
+
+.app-v6 .cat-assign[data-assign="b"]:hover,
+.app-v6 .cat-assign[aria-pressed="true"][data-assign="b"] {
+  background: color-mix(in srgb, var(--lnt-role-b) 18%, transparent);
+  color: var(--lnt-role-b);
+}
+
+/* Эхо-статус строки без hover: слабый тинт цвета роли + кромка 2px слева.
+   Кромка на td (не tr): таблица .tbl-cat под глобальным .tbl идёт с
+   border-collapse, тень на tr под collapse не красится. */
+.app-v6 .cat-v6 .tbl-cat tr[data-in-pair="a"] {
+  background: color-mix(in srgb, var(--lnt-role-a) 10%, transparent);
+}
+
+.app-v6 .cat-v6 .tbl-cat tr[data-in-pair="a"] > :first-child {
+  box-shadow: inset 2px 0 0 var(--lnt-role-a);
+}
+
+.app-v6 .cat-v6 .tbl-cat tr[data-in-pair="b"] {
+  background: color-mix(in srgb, var(--lnt-role-b) 10%, transparent);
+}
+
+.app-v6 .cat-v6 .tbl-cat tr[data-in-pair="b"] > :first-child {
+  box-shadow: inset 2px 0 0 var(--lnt-role-b);
+}
+
+/* Слот-клик pairbar → пульс кнопок назначаемого слота: только opacity,
+   200ms (--lnt-t-enter), ease-out; transient-атрибут [data-pulse] ставит
+   focusRail, снимает документ-листенёр по animationend. */
+.app-v6 .cat-assign[data-pulse] {
+  animation: lnt-cat-pulse var(--lnt-t-enter) var(--lnt-ease-out);
+}
+
+@keyframes lnt-cat-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-v6 .cat-assign[data-pulse] {
+    animation: none;
+  }
+}

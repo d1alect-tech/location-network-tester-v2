@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { isCatalogPage } from "../../api/guards";
 import type { CatalogSession } from "../../api/types";
 import { createPairbar } from "./pairbarV6";
 
@@ -30,9 +31,57 @@ describe("createPairbar", () => {
 
   it("clicking the swap control calls onSwap once", () => {
     const onSwap = vi.fn();
-    const { root } = createPairbar({ onSwap });
-    root.querySelector<HTMLButtonElement>("[data-pair-swap]")?.click();
+    const bar = createPairbar({ onSwap });
+    bar.setPair(session("стенд-А", "id-a"), session("стенд-Б", "id-b"));
+    bar.root.querySelector<HTMLButtonElement>("[data-pair-swap]")?.click();
     expect(onSwap).toHaveBeenCalledTimes(1);
+  });
+
+  it("swap disabled iff B пуст: мёртвый контрол закрыт", () => {
+    const onSwap = vi.fn();
+    const bar = createPairbar({ onSwap });
+    const swap = () => bar.root.querySelector<HTMLButtonElement>("[data-pair-swap]");
+    expect(swap()?.disabled).toBe(true);
+    swap()?.click();
+    expect(onSwap).not.toHaveBeenCalled();
+    bar.setPair(session("стенд-А", "id-a"), null);
+    expect(swap()?.disabled).toBe(true);
+    bar.setPair(session("стенд-А", "id-a"), session("стенд-Б", "id-b"));
+    expect(swap()?.disabled).toBe(false);
+  });
+
+  it("onSlotTap: клик слота зовёт onSlotTap без режима арма; setArmed — прямой API", () => {
+    const onSlotTap = vi.fn();
+    const bar = createPairbar({ onSwap: () => {}, onSlotTap });
+    bar.root.querySelector<HTMLElement>('[data-pair="a"]')?.click();
+    expect(onSlotTap).toHaveBeenCalledTimes(1);
+    expect(onSlotTap).toHaveBeenCalledWith("a");
+    bar.root.querySelector<HTMLElement>('[data-pair="b"]')?.click();
+    expect(onSlotTap).toHaveBeenCalledTimes(2);
+    expect(onSlotTap).toHaveBeenLastCalledWith("b");
+    // M1: клик слота не входит в режим — пара не армится, подсветки нет.
+    expect(bar.root.querySelector('[data-pair="a"]')?.getAttribute("aria-pressed")).toBe("false");
+    expect(bar.root.querySelector('[data-pair="a"]')?.classList.contains("pair-armed")).toBe(false);
+    // setArmed (dormant API) напрямую подсвечивает и жмёт aria-pressed.
+    bar.setArmed("a");
+    expect(bar.root.querySelector('[data-pair="a"]')?.getAttribute("aria-pressed")).toBe("true");
+    expect(bar.root.querySelector('[data-pair="a"]')?.classList.contains("pair-armed")).toBe(true);
+    expect(bar.root.querySelector('[data-pair="b"]')?.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("setBusy блокирует слоты и swap, снятие возвращает swap по B", () => {
+    const bar = createPairbar({ onSwap: () => {} });
+    bar.setPair(session("стенд-А", "id-a"), session("стенд-Б", "id-b"));
+    bar.setBusy(true);
+    expect(bar.root.querySelector<HTMLButtonElement>('[data-pair="a"]')?.disabled).toBe(true);
+    expect(bar.root.querySelector<HTMLButtonElement>("[data-pair-swap]")?.disabled).toBe(true);
+    bar.setBusy(false);
+    expect(bar.root.querySelector<HTMLButtonElement>('[data-pair="a"]')?.disabled).toBe(false);
+    expect(bar.root.querySelector<HTMLButtonElement>("[data-pair-swap]")?.disabled).toBe(false);
+    bar.setPair(session("стенд-А", "id-a"), null);
+    bar.setBusy(true);
+    bar.setBusy(false);
+    expect(bar.root.querySelector<HTMLButtonElement>("[data-pair-swap]")?.disabled).toBe(true);
   });
 
   it("U3/U4: бейджи всегда на месте", () => {
@@ -48,6 +97,39 @@ describe("createPairbar", () => {
     expect(bar.root.querySelector('[data-pair-delta="max"]')?.textContent).toBe("Δmax +10,0 дБ");
     bar.setDelta(null);
     expect(bar.root.querySelector('[data-pair-delta="mean"]')?.textContent).toBe("Δср —");
+  });
+
+  it("F-5: провод каталога без created_utc не роняет слот (exclude_none)", () => {
+    // Бэкенд отдаёт response_model_exclude_none: null-поля отсутствуют, guard
+    // isCatalogSession пропускает объект без created_utc (f3 F-5, pageerror).
+    const page: unknown = {
+      items: [{ id: "f3-longid", health: "corrupt_manifest" }],
+      next_cursor: null,
+    };
+    expect(isCatalogPage(page)).toBe(true);
+    const bar = createPairbar({ onSwap: () => {} });
+    let slotName: string | null | undefined;
+    let slotMeta: string | null | undefined;
+    if (isCatalogPage(page)) {
+      const wire = page.items[0] ?? null;
+      expect(() => bar.setPair(wire, null)).not.toThrow();
+      slotName = bar.root.querySelector('[data-pair="a"] .pair-name')?.textContent;
+      slotMeta = bar.root.querySelector('[data-pair="a"] .pair-meta')?.textContent;
+    }
+    expect(slotName).toBe("f3-longid");
+    expect(slotMeta).toBe("— · —");
+  });
+
+  it("F-5: created_utc undefined и нестроковый дают прочерк, а не TypeError", () => {
+    const base = session("стенд-А", "id-a");
+    const missing = { ...base, created_utc: undefined } as unknown as CatalogSession;
+    const nonString = { ...base, created_utc: 42 } as unknown as CatalogSession;
+    for (const broken of [missing, nonString]) {
+      const bar = createPairbar({ onSwap: () => {} });
+      expect(() => bar.setPair(broken, null)).not.toThrow();
+      expect(bar.root.querySelector('[data-pair="a"] .pair-name')?.textContent).toBe("стенд-А");
+      expect(bar.root.querySelector('[data-pair="a"] .pair-meta')?.textContent).toBe("capture · —");
+    }
   });
 
   it("setPair(null, null) shows em dash names and does not throw", () => {

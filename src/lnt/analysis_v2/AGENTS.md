@@ -6,11 +6,18 @@ v2 analysis orchestrator + recipe dispatch, branch fan-out.
 ## WHERE TO LOOK
 - `engine.py` — orchestration entry, run lifecycle, artifact assembly
 - `engine_branches.py` — per-branch fan-out, branch inputs/outputs
-- `default_recipe.py` — default recipe construction, baseline params
-- `recipes.py` — recipe registry, named recipe definitions
+- `engine_spectrogram.py` — spectrogram branch adapter
+- `characterization_slices.py` + 8 `_*.py` leaves (bicoherence/coherence/conditional/cross_channel/envelope/extended/kurtosis/memory) — per-family slice fan-out for f01–f18
+- `orchestrator.py` — integrity-checked orchestration of immutable optional branches (artifact store publish)
+- `run_characterization.py` — dedicated characterization seam parallel to the SessionKind dispatch
+- `jobs.py` — `AnalysisJobStore`, durable progress snapshots for job API runs
+- `projection.py` — atomic projection of the default artifact into legacy files (`metrics.json`, `spectrum.csv`, …)
+- `types.py` — `BranchContext` / `BranchOutput` / `BranchFailure` / `SessionKind`
+- `default_recipe.py` — default recipe construction, baseline params (incl. `BUILTIN_MEASUREMENT_RECIPE`)
+- `recipes.py` — recipe registry, named recipe definitions (`RecipeCatalog`)
 - `artifact_inputs.py` — artifact input gathering, scope-plane prep
 - `../analysis_store/settings.py` — `WelchSettings`, `SpectrogramSettings`
-- `../analysis_store/recipe.py` — recipe validation, schema gate
+- `../analysis_store/recipe.py` — recipe validation, schema gate (`recipe_parse.py` dispatches schema 1 → v1, 2 → `CharacterizationRecipe`)
 
 ## CONVENTIONS
 - recipe first: validate via `analysis_store/recipe.py` before dispatch

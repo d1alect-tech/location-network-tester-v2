@@ -1,23 +1,26 @@
 # charts/ — wrappers for waveform / spectrum / spectrogram
 
 ## OVERVIEW
-uPlot + echarts wrappers with min/max decimation, CSV export, peaks/markers; display layer only, sessions stay raw.
+uPlot + echarts wrappers with min/max decimation, CSV strings, peaks/markers; display layer only, sessions stay raw.
 
 ## WHERE TO LOOK
 - `series.ts`: `psdToDb` = 10*log10(psd), `psdToAsd`, `decimateMinMax`, `seriesToCsv`, `filterFinitePairs`
 - `uplotView.ts` + `uplotOptions.ts`: uPlot mount, cursor emit, log-safe axes
-- `echarts.ts` + `spectrogramView.ts`: echarts spectrogram shell, `baseOption`, markers A/B
-- `spectrogramView.ts` (127 LOC): thin shell over `spectrogramViewOption` (options) + `spectrogramTiles` (cell pool) + `spectrogramMarkers` (DOM markers); ledger is empty repo-wide
-- `spectrogramPanel.ts` -> `spectrogramLoader/WindowForm/Summary-CSV`; `workbench.ts` -> `workbenchControls/inputReferencePanel`: both split under 250, off the ledger
-- `spectrogramModel.ts`: tile requests, `TILE_CELL_CAP`, loader, slice
-- `spectrogramSetup.ts` + `spectrogramSummary.ts`: tile init, window summary, matrix CSV
+- `echarts.ts`: modular ECharts registration (`echarts/core`+charts/components/renderers: Heatmap, Canvas, Grid/DataZoom, Tooltip, VisualMap — full barrel import forbidden in product code) + `initSpectrogramChart`; live consumer is `views/inspect/spectrogramOrient.ts`
+- `spectrogramModel.ts`: tile requests, `TILE_CELL_CAP`, race-safe tile loader, `sliceTile`
+- `spectrogramSetup.ts`: NPZ -> level (`levelFromNpz`), initial tile policy, small control factories
+- `spectrogramPalette.ts`: 9-step matrix palette — live copy is byte-equal to the frozen `showcase-round2` source, pinned by `spectrogramPalette.test.ts`; edits need before/after spectrogram screenshots + test update. Palette consumers: `capture/spectrogramLivePaint.ts`, `views/inspect/spectrogramOrient.ts`
 - `viewModels.ts`: `spectrumToRequest`, `waveformToRequest`, `POINT_BUDGETS`
 - `annotations.ts`: `createPeaksPlugin`, band bounds, peaks summary
-- `csvDownload.ts`: `downloadCsv` entry point
 - `theme.ts` + `charts.css`: token reads, no hardcoded colors
 - `types.ts`: `ChartHandle`, `ChartRenderRequest`, `MARKER_A/B`
-- `register.ts`: `mountInspectWorkbench`, `mountInspectSpectrogram`
-- `npz.ts`, `tileError.ts`, `readout.ts`, `eventList.ts`: artifact parse, errors, cursor readout
+- `npz.ts`, `tileError.ts`: artifact parse, typed tile errors
+
+Live spectrogram path: `views/inspect/gramPair.ts` + `spectrogramOrient.ts` over
+`spectrogramModel`/`spectrogramSetup`/`spectrogramPalette`/`echarts`. The old
+`register`/`workbench`/`spectrogramPanel` cluster (unreachable from `main.ts`)
+was deleted with its tests and the `bench/spectrogram-bench` harness; do not
+re-add a second spectrogram shell here.
 
 ## CONVENTIONS
 - Shells read CSS tokens via `theme.ts`; figures carry names, siblings carry statuses.
@@ -34,4 +37,4 @@ uPlot + echarts wrappers with min/max decimation, CSV export, peaks/markers; dis
 - Keep every module under 250 pure LOC; `tests/test_module_size.py` enforces it with no exceptions left.
 - No color literals in TS; route through tokens.
 - No raw PSD on log axis; convert via `psdToDb` / `psdToAsd` first.
-- No sync CSV stringify on full tiles; use sliced summary helpers.
+- No module that `main.ts` cannot reach: dead shells get deleted, not kept "for the bench".

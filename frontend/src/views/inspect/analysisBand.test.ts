@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SessionDetailPayload } from "../../api/types-plots";
 import { type Meter, type PeakRow, createAnalysisBand, metersFromDetail } from "./analysisBand";
+import { REASON_NO_ARTIFACT, branchNotComputedReason } from "./pairLoadOutcome";
+
+const REASON_BRANCH = branchNotComputedReason("");
 
 const METER_LABELS = [
   "Частота сети",
@@ -145,7 +148,7 @@ describe("createAnalysisBand", () => {
     },
   ];
 
-  it("renders readout cells and peak rows on update", () => {
+  it("renders two rows: scalar tiles then peaks plus delta rail", () => {
     // Given
     const band = createAnalysisBand();
 
@@ -154,16 +157,16 @@ describe("createAnalysisBand", () => {
 
     // Then
     expect(band.root.classList.contains("analysis-band")).toBe(true);
-    const readout = band.root.querySelector(".panel.readout");
-    expect(readout).not.toBeNull();
-    expect(readout?.querySelector(".panel-hd")?.textContent).toContain("Показания базы");
-    const cells = band.root.querySelectorAll(".readout-grid .readout-cell");
+    expect(band.root.getAttribute("data-band-variant")).toBe("two-rows");
+    expect(band.root.querySelector(".panel-hd")?.textContent).toContain("Показания базы");
+    const cells = band.root.querySelectorAll(".band-scalars .band-cell");
     expect(cells).toHaveLength(7);
-    expect(cells[0]?.querySelector(".readout-label")?.textContent).toBe("Частота сети");
-    expect(cells[0]?.querySelector(".readout-value")?.textContent).toContain("50.0000007");
+    expect(cells[0]?.querySelector("dt")?.textContent).toBe("Частота сети");
+    expect(cells[0]?.querySelector("dd")?.textContent).toContain("50.0000007");
     expect(cells[0]?.querySelector(".t-unit")?.textContent).toBe("Гц");
-    const wide = band.root.querySelector(".readout-cell.is-wide");
-    expect(wide?.querySelector(".readout-label")?.textContent).toBe("Полоса");
+    const wide = band.root.querySelector(".band-cell.is-wide");
+    expect(wide?.querySelector("dt")?.textContent).toBe("Полоса");
+    expect(wide?.querySelector("dd")?.classList.contains("is-long")).toBe(true);
     const peaksHd = band.root.querySelectorAll(".panel-hd");
     expect(peaksHd[1]?.textContent).toContain("Пики спектра · дельта к базе");
     const table = band.root.querySelector("table.tbl.tbl-compare");
@@ -173,6 +176,9 @@ describe("createAnalysisBand", () => {
     const firstCells = rows?.[0]?.querySelectorAll("td");
     expect(firstCells?.[0]?.classList.contains("num")).toBe(true);
     expect(firstCells?.[1]?.textContent).toBe("-48.57");
+    // Δ-полоса живёт во втором ряду ленты, рядом с пиками.
+    expect(band.root.querySelector(".band-tier2 .band-rail [data-delta-canvas]")).not.toBeNull();
+    expect(band.root.querySelector(".band-rail-note")?.textContent).toContain("±8 дБ");
   });
 
   it("renders data-delta -10.00 and glyph ▼ when deltaDb is -10", () => {
@@ -217,5 +223,147 @@ describe("createAnalysisBand", () => {
     expect(delta?.classList.contains("is-flat")).toBe(true);
     expect(delta?.hasAttribute("data-delta")).toBe(false);
     expect(delta?.textContent).toBe("—");
+  });
+});
+
+describe("metersFromDetail: причины «н/д» из честных флагов detail (задача 9)", () => {
+  it("analysis:null → все значения «н/д» с причиной «нет артефакта»", () => {
+    // Given
+    const detail = sessionDetail(null);
+
+    // When
+    const meters = metersFromDetail(detail);
+
+    // Then
+    expect(meters).toHaveLength(7);
+    for (const meter of meters) {
+      expect(meter.value).toBe("н/д");
+      expect(meter.reason).toBe(REASON_NO_ARTIFACT);
+    }
+  });
+
+  it("metrics есть, spectrum.csv нет: полоса/разрешение «н/д» с причиной «нет артефакта»", () => {
+    // Given — зеркало corpus-строки cap-20260805-212516: analysis без веток
+    // needle/spectrum (фикстура числа не выдумывает), spectrum_available false.
+    const detail: SessionDetailPayload = {
+      name: "cap-20260805-212516",
+      manifest: {},
+      analysis: { session_id: "cap-20260805-212518-4e246d77", schema_version: 1 },
+      spectrum_available: false,
+      waveform_available: true,
+      ch2_available: false,
+    };
+
+    // When
+    const meters = metersFromDetail(detail);
+
+    // Then
+    expect(meterByLabel(meters, "Полоса")?.value).toBe("н/д");
+    expect(meterByLabel(meters, "Полоса")?.reason).toBe(REASON_NO_ARTIFACT);
+    expect(meterByLabel(meters, "Разрешение")?.value).toBe("н/д");
+    expect(meterByLabel(meters, "Разрешение")?.reason).toBe(REASON_NO_ARTIFACT);
+  });
+
+  it("spectrum_available true, ветки спектра нет: «ветка не посчитана»", () => {
+    // Given — metrics с иглой, но без ветки spectrum; spectrum.csv при этом есть.
+    const detail: SessionDetailPayload = {
+      name: "ses-spectrum-csv",
+      manifest: {},
+      analysis: { needle: { ...FULL_ANALYSIS.needle } },
+      spectrum_available: true,
+      waveform_available: true,
+      ch2_available: false,
+    };
+
+    // When
+    const meters = metersFromDetail(detail);
+
+    // Then
+    expect(meterByLabel(meters, "Полоса")?.value).toBe("н/д");
+    expect(meterByLabel(meters, "Полоса")?.reason).toBe(REASON_BRANCH);
+    expect(meterByLabel(meters, "Разрешение")?.reason).toBe(REASON_BRANCH);
+    // Игла посчитана — причина не появляется.
+    expect(meterByLabel(meters, "μ иглы")?.reason).toBeUndefined();
+  });
+
+  it("analysis без ветки needle: иглы «н/д» с причиной «ветка не посчитана»", () => {
+    // Given
+    const detail: SessionDetailPayload = {
+      name: "qa-line-quality",
+      manifest: {},
+      analysis: { session_id: "qa-line-quality", schema_version: 1 },
+      spectrum_available: false,
+      waveform_available: true,
+      ch2_available: false,
+    };
+
+    // When
+    const meters = metersFromDetail(detail);
+
+    // Then
+    for (const label of ["Частота сети", "μ иглы", "σ/μ", "P_async/P_sync", "Циклов"]) {
+      expect(meterByLabel(meters, label)?.value).toBe("н/д");
+      expect(meterByLabel(meters, label)?.reason).toBe(REASON_BRANCH);
+    }
+  });
+
+  it("null-поле существующей ветки: причина не выдумывается", () => {
+    // Given — 1-канальная сессия: σ/μ и async null, ветка needle посчитана.
+    const detail = sessionDetail({ ...CHANNEL1_ANALYSIS });
+
+    // When
+    const meters = metersFromDetail(detail);
+
+    // Then
+    expect(meterByLabel(meters, "σ/μ")?.value).toBe("н/д");
+    expect(meterByLabel(meters, "σ/μ")?.reason).toBeUndefined();
+    expect(meterByLabel(meters, "P_async/P_sync")?.reason).toBeUndefined();
+    expect(meterByLabel(meters, "Полоса")?.reason).toBeUndefined();
+  });
+
+  it("полный анализ: значений причины нет — пин значений не тронут", () => {
+    // Given
+    const detail = sessionDetail({ ...FULL_ANALYSIS });
+
+    // When
+    const meters = metersFromDetail(detail);
+
+    // Then
+    expect(meters).toHaveLength(7);
+    for (const meter of meters) expect(meter.reason).toBeUndefined();
+  });
+});
+
+describe("createAnalysisBand: причина «н/д» — ВИДИМЫЙ соседний узел (задача 9, F-1)", () => {
+  it("«н/д»-плитка: span.band-cell-reason ПОСЛЕ dd; текст dd байт-в-байт не тронут", () => {
+    // Given
+    const band = createAnalysisBand();
+
+    // When
+    band.update({
+      meters: [
+        { label: "Полоса", value: "н/д", unit: "Гц", reason: REASON_NO_ARTIFACT },
+        { label: "Циклов", value: "н/д", reason: REASON_BRANCH },
+        { label: "μ иглы", value: "1.2905", unit: "В" },
+      ],
+      peaks: [],
+    });
+
+    // Then
+    const cells = band.root.querySelectorAll(".band-scalars .band-cell");
+    expect(cells).toHaveLength(3);
+    const first = cells[0];
+    const bandDd = first?.querySelector("dd");
+    expect(bandDd?.textContent).toBe("н/дГц");
+    // Соседний узел: span сразу после dd, видимый текст причины + data-role.
+    const reason = first?.querySelector("dd + span.band-cell-reason");
+    expect(reason?.getAttribute("data-role")).toBe("band-reason");
+    expect(reason?.textContent).toBe(REASON_NO_ARTIFACT);
+    expect(reason?.getAttribute("title")).toBe(REASON_NO_ARTIFACT);
+    expect(cells[1]?.querySelector("dd + span.band-cell-reason")?.textContent).toBe(REASON_BRANCH);
+    // Причины нет — узла нет; title на dd — бонусный дубликат словаря.
+    expect(cells[2]?.querySelector("span.band-cell-reason")).toBeNull();
+    expect(bandDd?.getAttribute("title")).toBe(REASON_NO_ARTIFACT);
+    expect(cells[2]?.querySelector("dd")?.getAttribute("title")).toBeNull();
   });
 });

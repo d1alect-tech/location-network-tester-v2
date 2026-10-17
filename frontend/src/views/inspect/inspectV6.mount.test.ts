@@ -45,8 +45,12 @@ const WAVE: WaveformPayload = {
 };
 
 function fakeClient() {
+  // Mount-мир: обе сессии проанализированы (legacy analyzed=true по dir-ключу
+  // с запасным id) — иначе boot по JOIN честно выберет null-пару.
+  const analyzed = (name: string) => ({ name, status: "valid", error: null, analyzed: true });
   return {
     catalogSessions: async () => ({ items: [SESSION_A, SESSION_B], next_cursor: null }),
+    legacySessions: async () => ({ sessions: [analyzed("sess-a"), analyzed("sess-b")] }),
     plots: {
       spectrum: async () => SPECTRUM,
       detail: async () => DETAIL,
@@ -144,8 +148,13 @@ describe("mountInspectV6", () => {
   });
 
   it.each(["resolve", "reject"] as const)(
-    "ignores a stale first-pair analysis %s after the auto-picked pair completes",
+    "drops a stale pair refresh %s once the newer pair completes",
     async (outcome) => {
+      // Given: boot грузит пару по двум вызовам detail; первый висячий.
+      // stale: ручной pick во время загрузки делает поколение 1 устаревшим.
+      // Свежий hash: предыдущие тест файла оставляют ?a=… в общем jsdom-окне,
+      // RouteStore конструируется по нему — deep-link boot сломал бы расклад гонки.
+      window.location.hash = "";
       let settle!: (detail: SessionDetailPayload) => void;
       let fail!: (error: Error) => void;
       const staleDetail = new Promise<SessionDetailPayload>((resolve, reject) => {
@@ -163,8 +172,10 @@ describe("mountInspectV6", () => {
           ...fakeClient().plots,
           detail: vi.fn(async () => {
             detailCall += 1;
-            if (detailCall === 2) return staleDetail;
-            return detailCall >= 4 ? currentDetail : DETAIL;
+            // B2: один fetch на пару — первый вызов это первая пара, и её
+            // поздний ответ обязан быть проигнорирован.
+            if (detailCall === 1) return staleDetail;
+            return currentDetail;
           }),
         },
       };
@@ -177,6 +188,17 @@ describe("mountInspectV6", () => {
       });
       cleanups.push(cleanup);
 
+      // When: пользователь жмёт «А» второй строки, пока грузится первая
+      // пара — поколение 1 (a=sess-a, b=sess-b) устаревает, побеждает
+      // поколение 2 (a=sess-b, b=null): A переставлен на вторую строку,
+      // detail дергается дважды, выигрывает второй ответ.
+      const rows = container.querySelectorAll("tr[data-session]");
+      const secondRow = rows[1];
+      if (!(secondRow instanceof HTMLElement)) throw new Error("no second row");
+      const assignA = secondRow.querySelector('[data-assign="a"]');
+      if (!(assignA instanceof HTMLElement)) throw new Error("no assign button a");
+      assignA.click();
+
       await vi.waitFor(() => {
         expect(container.querySelector('[data-chbar="segments"]')?.textContent).toBe("222");
       });
@@ -185,10 +207,126 @@ describe("mountInspectV6", () => {
       await flush();
 
       expect(container.querySelector('[data-chbar="segments"]')?.textContent).toBe("222");
-      expect(container.querySelector('[data-pair="b"] .pair-name')?.textContent).toBe("Beta");
+      expect(container.querySelector('[data-pair="a"] .pair-name')?.textContent).toBe("Beta");
       expect(container.querySelector<HTMLElement>("[data-inspect-error]")?.hidden).toBe(true);
     },
   );
+
+  it("fetches the base detail once per atomic boot pair: spectrum, band and analysis-v2 share it", async () => {
+    // Given: каталог из двух проанализированных — boot делает ОДИН setPair.
+    const bandDetail: SessionDetailPayload = {
+      ...DETAIL,
+      analysis: { needle: { cycles_analyzed: 130 } },
+    };
+    const detail = vi.fn(async () => bandDetail);
+    const client = {
+      ...fakeClient(),
+      plots: { ...fakeClient().plots, detail },
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    // When
+    const cleanup = await mountInspectV6(container, {
+      client,
+      routes: new RouteStore(),
+      createView: fakeCreateView(),
+    });
+    cleanups.push(cleanup);
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-chbar="segments"]')?.textContent).toBe("130");
+    });
+    await flush();
+
+    // Then: один detail на атомарный setPair, а не по одному на потребителя.
+    expect(detail).toHaveBeenCalledTimes(1);
+  });
+
+  it("F-1: deep-link по имени каталога наполняет слот пары метой каталога", async () => {
+    // Given: каталог несёт manifest id; имя каталога видно только в storage_path
+    // (include_paths). Шов захвата и ручные ссылки несут имя каталога (f3 F-1).
+    const row: CatalogSession = {
+      ...SESSION_A,
+      id: "syn-quiet-seed777",
+      label: "стенд-А",
+      storage_path: "/root/dirname-differs",
+    };
+    const client = {
+      ...fakeClient(),
+      catalogSessions: async () => ({ items: [row], next_cursor: null }),
+    };
+    window.location.hash = "#/inspect?a=dirname-differs";
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    // When
+    const cleanup = await mountInspectV6(container, {
+      client,
+      routes: new RouteStore(),
+      createView: fakeCreateView(),
+    });
+    cleanups.push(cleanup);
+    cleanups.push(() => {
+      window.location.hash = "";
+    });
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-pair="a"] .pair-name')?.textContent).toBe("стенд-А");
+    });
+
+    // Then: мета слота та же, что дал бы переход по manifest id.
+    expect(container.querySelector('[data-pair="a"] .pair-meta')?.textContent).toContain(
+      "2026-08-28",
+    );
+  });
+
+  it("F-8: dir-name строки duplicate_id не канонизируется в неоднозначный id", async () => {
+    // Given: две строки каталога с одним manifest id (health duplicate_id).
+    // Запрос по id даёт 409 «идентификатор сессии неоднозначен», по имени
+    // каталога — 200 (D1). Шов захвата несёт имя каталога.
+    const dupRow = (dir: string, label: string): CatalogSession => ({
+      ...SESSION_A,
+      id: "syn-quiet-seed6022",
+      health: "duplicate_id",
+      label,
+      storage_path: `/root/${dir}`,
+    });
+    const rows = [dupRow("sim-quiet-a", "дубль-А"), dupRow("sim-quiet-b", "дубль-Б")];
+    const detailKeys: string[] = [];
+    const client = {
+      ...fakeClient(),
+      catalogSessions: async () => ({ items: rows, next_cursor: null }),
+      plots: {
+        ...fakeClient().plots,
+        detail: async (name: string) => {
+          detailKeys.push(name);
+          if (name === "syn-quiet-seed6022") throw new ApiError("conflict", { status: 409 });
+          return { ...DETAIL, name };
+        },
+      },
+    };
+    window.location.hash = "#/inspect?a=sim-quiet-a";
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    // When
+    const cleanup = await mountInspectV6(container, {
+      client,
+      routes: new RouteStore(),
+      createView: fakeCreateView(),
+    });
+    cleanups.push(cleanup);
+    cleanups.push(() => {
+      window.location.hash = "";
+    });
+
+    // Then: слот пары наполнен метой своей строки, а не прочерком.
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-pair="a"] .pair-name')?.textContent).toBe("дубль-А");
+    });
+    expect(detailKeys.length).toBeGreaterThan(0);
+    expect(detailKeys.every((key) => key === "sim-quiet-a")).toBe(true);
+    expect(container.querySelector<HTMLElement>("[data-inspect-error]")?.hidden).toBe(true);
+  });
 
   it("removes the v6 root when cleanup runs", async () => {
     // Given
@@ -207,5 +345,67 @@ describe("mountInspectV6", () => {
 
     // Then
     expect(container.querySelector(".app-v6")).toBeNull();
+  });
+
+  /** Задача 3 (D2/C5): ошибка pair-load уходит в ленту через существующий
+   * сеттер showError; reason = canned-префикс + серверный detail. */
+  function failingClient(error: unknown) {
+    return {
+      ...fakeClient(),
+      plots: {
+        ...fakeClient().plots,
+        detail: async (): Promise<SessionDetailPayload> => {
+          throw error;
+        },
+      },
+    };
+  }
+
+  it("задача 3: 409 с detail на pair-load — detail виден в ленте после canned-префикса", async () => {
+    // Given: detail базы отвечает 409 с серверным detail (дубль идентификатора).
+    const detailText = "идентификатор сессии неоднозначен: 'syn-quiet-seed6022'";
+    const conflict = new ApiError("conflict", { status: 409, detail: detailText });
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    // When
+    const cleanup = await mountInspectV6(container, {
+      client: failingClient(conflict),
+      routes: new RouteStore(),
+      createView: fakeCreateView(),
+    });
+    cleanups.push(cleanup);
+
+    // Then: лента видна, текст = canned-префикс + пробел + detail (точный порядок).
+    await vi.waitFor(() => {
+      expect(container.querySelector<HTMLElement>("[data-inspect-error]")?.hidden).toBe(false);
+    });
+    const band = container.querySelector<HTMLElement>("[data-inspect-error]");
+    expect(band?.textContent).toBe(`${conflict.message} ${detailText}`);
+    expect(band?.textContent).not.toContain("undefined");
+  });
+
+  it("задача 3: 500 без detail — честный failed из словаря, без «undefined» и без краша", async () => {
+    // Given: сервер вернул 500 с пустым телом — detail нет.
+    const serverError = new ApiError("http", { status: 500 });
+    const container = document.createElement("div");
+    document.body.append(container);
+
+    // When
+    const cleanup = await mountInspectV6(container, {
+      client: failingClient(serverError),
+      routes: new RouteStore(),
+      createView: fakeCreateView(),
+    });
+    cleanups.push(cleanup);
+
+    // Then: только canned-префикс; вид смонтирован и жив.
+    await vi.waitFor(() => {
+      expect(container.querySelector<HTMLElement>("[data-inspect-error]")?.hidden).toBe(false);
+    });
+    const band = container.querySelector<HTMLElement>("[data-inspect-error]");
+    expect(band?.textContent).toBe(serverError.message);
+    expect(band?.textContent).not.toContain("undefined");
+    expect(container.querySelector(".app-v6")).toBeInstanceOf(HTMLElement);
   });
 });

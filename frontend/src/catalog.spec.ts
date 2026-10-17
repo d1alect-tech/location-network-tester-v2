@@ -8,15 +8,18 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Page, expect, test } from "@playwright/test";
-import { generateSessions } from "./testkit/catalogFixture";
+import { generateSessions, worstCaseSessions } from "./testkit/catalogFixture";
 import { type MockLntBackend, installMockBackend } from "./testkit/mockBackend";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+/* Артефакты — внутри .omo текущего checkout (frontend/src → ../../ — корень),
+ * .omo в .gitignore. Глубина ../../../ уводила файлы НАД репозиторием. */
 const EVIDENCE_DIR = resolve(
   __dirname,
-  "../../../.omo/start-work/evidence/task-39-lnt-complete-redesign",
+  "../../.omo/start-work/evidence/task-39-lnt-complete-redesign",
 );
+const TASK5_EVIDENCE_DIR = resolve(__dirname, "../../.omo/evidence/ui-refactor/task-5");
 const BASE = "http://127.0.0.1:4101/static/v2/";
 const FIXTURE_SIZE = 10_000;
 
@@ -49,6 +52,12 @@ test.beforeEach(async ({ page }) => {
 async function openCatalog(page: Page): Promise<void> {
   await page.goto(`${BASE}#/catalog`);
   await expect(page.locator(".lnt-cat-workspace")).toBeVisible();
+}
+
+/** Ждём конец анимации входа инспектора: computed opacity доходит до 1
+ * (ключевые кадры стартуют с 0). Поллинг expect-ом, без ожиданий по таймеру. */
+async function settleEntrance(page: Page): Promise<void> {
+  await expect(page.locator(".insp-body")).toHaveCSS("opacity", "1");
 }
 
 function firstFixtureId(): string {
@@ -237,6 +246,273 @@ test("corrupt sessions stay visible with reason-coded badges and recovery explan
   await expect(recovery).toBeVisible();
   await expect(recovery).toContainText("Контекст сессии повреждён");
   await expect(recovery).toContainText("Не удалось прочитать context.json");
+});
+
+test("dense table groups sessions by day with row counters", async ({ page }) => {
+  await openCatalog(page);
+  const group = page.locator("tr.cat-group").first();
+  await expect(group).toBeVisible();
+  await expect(group.locator("[data-cat-count]")).toHaveText(/^\d+$/u);
+  // Строка плотной таблицы: пилюля + метка + тип + время, выбор с data-selected.
+  const row = page.locator(".lnt-cat-row").first();
+  await row.click();
+  await expect(row).toHaveAttribute("data-selected", "");
+  await expect(row.locator(".lnt-status-pill")).toBeVisible();
+});
+
+test("worst-case health pills stay inside their column (desktop and 390px)", async ({ page }) => {
+  // break-ui: самые длинные пилюли health + короткие метки в тех же строках.
+  backend.seedCatalog([
+    {
+      id: "w-dup",
+      health: "duplicate_id",
+      created_utc: "2026-08-05T10:00:00Z",
+      source: "disk",
+      session_type: "line_quality",
+      profile: null,
+      label: "Jo",
+    },
+    {
+      id: "w-corrupt",
+      health: "corrupt_manifest",
+      created_utc: "2026-08-05T11:00:00Z",
+      source: "disk",
+      session_type: "line_quality",
+      profile: null,
+      label: "стенд-Б",
+    },
+  ]);
+  await openCatalog(page);
+  await expect(page.locator("tr.lnt-cat-row")).toHaveCount(2);
+
+  /** Пересечение пилюли с границей своей ячейки и с колонкой МЕТКА, в px. */
+  const overflow = (): Promise<number[]> =>
+    page.evaluate(() =>
+      [...document.querySelectorAll("tr.lnt-cat-row")].map((tr) => {
+        const pill = tr.querySelector(".lnt-status-pill")?.getBoundingClientRect();
+        const cells = tr.querySelectorAll("td");
+        const state = cells[0]?.getBoundingClientRect();
+        const label = cells[1]?.getBoundingClientRect();
+        if (!pill || !state || !label) return -1;
+        return Math.max(0, pill.right - state.right, pill.right - label.left);
+      }),
+    );
+
+  for (const value of await overflow()) expect(value, "пилюля в своей колонке").toBe(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator("tr.lnt-cat-row")).toHaveCount(2);
+  for (const value of await overflow()) expect(value, "пилюля в своей колонке на 390px").toBe(0);
+  const doc = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+  }));
+  expect(doc.scroll, "страница не скроллится горизонтально").toBeLessThanOrEqual(doc.client);
+});
+
+test("row click keeps roving focus on the row instead of body", async ({ page }) => {
+  await openCatalog(page);
+  const row = page.locator(".lnt-cat-row").first();
+  const sessionId = await row.getAttribute("data-session-id");
+  await row.click();
+  const activeId = await page.evaluate(
+    () => document.activeElement?.getAttribute("data-session-id") ?? null,
+  );
+  expect(activeId).toBe(sessionId);
+});
+
+test("inspector readouts and THD stay factual, no verdict words", async ({ page }) => {
+  const sessionId = firstFixtureId();
+  backend.seedSessionDetail(sessionId, {
+    name: sessionId,
+    manifest: { duration_s: 18.6, line_frequency_hz: 50.0 },
+    analysis: {
+      line_quality: { thd_ratio: 0.089, cycles_analyzed: 930, fundamental_hz: 50.11 },
+    },
+    spectrum_available: false,
+    waveform_available: false,
+    ch2_available: false,
+  });
+  await openCatalog(page);
+  await page.locator(`.lnt-cat-row[data-session-id="${sessionId}"]`).click();
+  const inspector = page.locator(".lnt-cat-inspector");
+  const summary = inspector.locator(".lnt-cat-session-summary");
+  await expect(summary).toContainText("18,6 с");
+  await expect(summary).toContainText("50,11 Гц");
+  await expect(inspector.locator(".insp-thd")).toHaveAttribute("data-thd-compare", "above");
+  await expect(inspector.locator("[data-thd-badge]")).toHaveText("выше предела 8 %");
+  const text = await inspector.textContent();
+  expect(text).not.toMatch(/норм|годен/iu);
+});
+
+test("save on context_invalid is refused with role=alert and no write", async ({ page }) => {
+  const corruptId = firstFixtureWithHealth("context_invalid");
+  await openCatalog(page);
+  await page.getByLabel("Состояние (health)").selectOption("context_invalid");
+  await page.locator(`.lnt-cat-row[data-session-id="${corruptId}"]`).click();
+  const before = backend.getContext(corruptId)?.revision;
+
+  await page.locator(".lnt-cat-inspector .lnt-btn-primary").click();
+  const alert = page.locator(".lnt-cat-inspector [role='alert']");
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText("Сохранение отклонено: контекст повреждён");
+  await expect(alert).toContainText("context_cache_malformed");
+  expect(backend.getContext(corruptId)?.revision).toBe(before);
+});
+
+test("prefers-reduced-motion removes entrance animation and row transitions", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openCatalog(page);
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".insp-body")).toBeAttached();
+  const styles = await page.evaluate(() => {
+    const body = document.querySelector(".insp-body");
+    const row = document.querySelector(".lnt-cat-row");
+    return {
+      animation: body === null ? "missing" : getComputedStyle(body).animationName,
+      rowTransition: row === null ? "missing" : getComputedStyle(row).transitionDuration,
+    };
+  });
+  expect(styles.animation).toBe("none");
+  // Глобальное правило style.css гасит движение целиком: transition: none.
+  expect(styles.rowTransition).toBe("0s");
+});
+
+test("reduced-motion: component rules silence motion without the global override", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openCatalog(page);
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".insp-body")).toBeAttached();
+
+  // Изоляция компонентных правил: глобальный override style.css
+  // (* { transition/animation: none !important }) вырезается из CSSOM, и
+  // замеренные значения остаются только от правил компонентов
+  // (catalogRows.css, catalogInspector.css).
+  const removed = await page.evaluate(() => {
+    let count = 0;
+    for (const sheet of [...document.styleSheets]) {
+      const groups = sheet.cssRules;
+      for (let index = groups.length - 1; index >= 0; index -= 1) {
+        const group = groups[index];
+        if (!(group instanceof CSSMediaRule)) continue;
+        if (!group.conditionText.includes("prefers-reduced-motion")) continue;
+        const inner = group.cssRules;
+        for (let innerIndex = inner.length - 1; innerIndex >= 0; innerIndex -= 1) {
+          const rule = inner[innerIndex];
+          if (rule instanceof CSSStyleRule && rule.selectorText === "*") {
+            group.deleteRule(innerIndex);
+            count += 1;
+          }
+        }
+      }
+    }
+    return count;
+  });
+  expect(removed, "глобальное правило найдено и вырезано").toBeGreaterThan(0);
+
+  const styles = await page.evaluate(() => {
+    const body = document.querySelector(".insp-body");
+    const row = document.querySelector(".lnt-cat-row");
+    return {
+      animation: body === null ? "missing" : getComputedStyle(body).animationName,
+      rowTransition: row === null ? "missing" : getComputedStyle(row).transitionDuration,
+    };
+  });
+  // Компонентные правила держат reduced-motion сами: вход инспектора погашен,
+  // переход строки сжат до 1ms (0.001s), а не до нуля глобальным override.
+  expect(styles.animation).toBe("none");
+  expect(styles.rowTransition).toBe("0.001s");
+
+  // Кнопки: press-scale гаснет и без глобального override. Для этого override
+  // в catalogRows.css поднят до (0,4,0) через :not(:disabled) — press-правило
+  // .btn:active из catalogForms.css импортируется позже и при равном весе (0,3,0)
+  // override глушило (MINOR-1). Замер в нажатом состоянии, мышь не отпускаем.
+  const saveButton = page.locator(".lnt-cat-inspector .lnt-btn-primary");
+  await saveButton.hover();
+  await page.mouse.down();
+  try {
+    await expect(saveButton).toHaveCSS("transform", "none");
+  } finally {
+    await page.mouse.up();
+  }
+});
+
+/** Контроль к предыдущему тесту: без reduced-motion press-scale на кнопке есть.
+ * Без него «transform: none» проходил бы и на мертвом override. */
+test("press scale 0.97 applies to catalog buttons without reduced motion", async ({ page }) => {
+  await openCatalog(page);
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".insp-body")).toBeAttached();
+  const saveButton = page.locator(".lnt-cat-inspector .lnt-btn-primary");
+  await saveButton.hover();
+  await page.mouse.down();
+  try {
+    await expect(saveButton).toHaveCSS("transform", "matrix(0.97, 0, 0, 0.97, 0, 0)");
+  } finally {
+    await page.mouse.up();
+  }
+});
+
+/** ADV-1: override выбранной строки обязан реально применяться. Замер
+ * computed-значений в браузере: выбранная строка — 150ms токеном
+ * --lnt-ease-out, невыбранная — 100ms токеном --lnt-ease (shorthand). */
+test("selected row transition is 150ms ease-out token, plain row stays 100ms ease", async ({
+  page,
+}) => {
+  const sessionId = firstFixtureId();
+  await openCatalog(page);
+  await page.locator(`.lnt-cat-row[data-session-id="${sessionId}"]`).click();
+  const selected = page.locator(`.lnt-cat-row-selected[data-session-id="${sessionId}"]`);
+  await expect(selected).toHaveCSS("transition-property", "background-color");
+  await expect(selected).toHaveCSS("transition-duration", "0.15s");
+  await expect(selected).toHaveCSS("transition-timing-function", "cubic-bezier(0.23, 1, 0.32, 1)");
+  const plain = page.locator(".lnt-cat-row:not(.lnt-cat-row-selected)").first();
+  await expect(plain).toHaveCSS("transition-duration", "0.1s");
+  await expect(plain).toHaveCSS("transition-timing-function", "cubic-bezier(0.2, 0, 0, 1)");
+});
+
+test("worst-case catalog states captured through the real component", async ({ page }) => {
+  const [longSession, invalidSession, missingSession, plainSession] = worstCaseSessions();
+  if (!longSession || !invalidSession || !missingSession || !plainSession)
+    throw new Error("worst-case fixture пуста");
+  mkdirSync(TASK5_EVIDENCE_DIR, { recursive: true });
+  await openCatalog(page);
+
+  // Ноль строк в выдаче: пустое состояние таблицы (мок отдаёт research-сессии
+  // при пустом каталоге, поэтому ноль показан фильтром без совпадений).
+  await page.getByLabel("Метка").fill("нет-такой-сессии-вовсе");
+  await expect(page.locator(".lnt-cat-empty")).toBeVisible();
+  await page.screenshot({ path: resolve(TASK5_EVIDENCE_DIR, "worst-0-sessions.png") });
+  await page.getByLabel("Метка").fill("");
+
+  backend.seedCatalog([plainSession]);
+  await page.reload();
+  await expect(page.locator(".lnt-cat-row")).toHaveCount(1);
+  await page.screenshot({ path: resolve(TASK5_EVIDENCE_DIR, "worst-1-session.png") });
+
+  backend.seedCatalog([longSession]);
+  await page.reload();
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".lnt-cat-session-summary")).toContainText(longSession.id.slice(0, 16));
+  await settleEntrance(page);
+  await page.screenshot({ path: resolve(TASK5_EVIDENCE_DIR, "worst-long-id.png") });
+
+  backend.seedCatalog([invalidSession]);
+  await page.reload();
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".lnt-cat-recovery")).toBeVisible();
+  await settleEntrance(page);
+  await page.screenshot({ path: resolve(TASK5_EVIDENCE_DIR, "worst-invalid-context.png") });
+
+  backend.seedCatalog([missingSession]);
+  await page.reload();
+  await page.locator(".lnt-cat-row").first().click();
+  await expect(page.locator(".lnt-cat-session-summary")).toContainText(missingSession.id);
+  await expect(page.locator(".lnt-cat-session-summary")).toContainText("недоступно");
+  await settleEntrance(page);
+  await page.screenshot({ path: resolve(TASK5_EVIDENCE_DIR, "worst-empty-fields.png") });
 });
 
 test("keyboard-only journey reaches list, opens detail and saves an edit", async ({ page }) => {

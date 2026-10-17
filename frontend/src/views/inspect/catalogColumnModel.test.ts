@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogSession } from "../../api/types";
+import { loadKey } from "./bootPick";
 import { buildCatalogRows, roleOf } from "./catalogColumnModel";
 
 const sampleSessions: readonly CatalogSession[] = [
@@ -64,11 +65,11 @@ describe("catalogColumnModel", () => {
         },
         {
           kind: "session",
-          session: sampleSessions[0],
+          session: sampleSessions[1],
         },
         {
           kind: "session",
-          session: sampleSessions[1],
+          session: sampleSessions[0],
         },
       ]);
     });
@@ -204,18 +205,86 @@ describe("catalogColumnModel", () => {
     });
   });
 
+  describe("buildCatalogRows - unknown-day placement (R3)", () => {
+    const dated = (id: string, created: string): CatalogSession => ({
+      id,
+      health: "ok",
+      created_utc: created,
+      source: "disk",
+      session_type: "capture",
+      profile: null,
+      label: null,
+    });
+    const undated: CatalogSession = {
+      id: "no-date",
+      health: "partial",
+      created_utc: null,
+      source: null,
+      session_type: null,
+      profile: null,
+      label: null,
+    };
+
+    it("date/desc: unknown-группа ПОСЛЕДНЯЯ (зеркало API)", () => {
+      const rows = buildCatalogRows({
+        sessions: [undated, dated("new", "2026-08-29T10:00:00Z")],
+        sort: "date",
+        dir: "desc",
+        query: "",
+      });
+      const groups = rows.filter((row) => row.kind === "group");
+      expect(groups.map((row) => (row.kind === "group" ? row.day : ""))).toEqual([
+        "2026-08-29",
+        "unknown",
+      ]);
+    });
+
+    it("внутри дня — именованный keyset-порядок, не порядок вставки", () => {
+      const rows = buildCatalogRows({
+        sessions: [dated("b-id", "2026-08-29T09:00:00Z"), dated("a-id", "2026-08-29T11:00:00Z")],
+        sort: "date",
+        dir: "desc",
+        query: "",
+      });
+      const ids = rows
+        .filter((row) => row.kind === "session")
+        .map((row) => (row.kind === "session" ? row.session.id : ""));
+      expect(ids).toEqual(["a-id", "b-id"]);
+    });
+  });
+
   describe("roleOf", () => {
+    const ses = (id: string): CatalogSession => ({
+      id,
+      health: "ok",
+      created_utc: null,
+      source: null,
+      session_type: null,
+      profile: null,
+      label: null,
+    });
+
     it("returns 'a' when sessionId matches pair.a", () => {
-      expect(roleOf("ses-1", { a: "ses-1", b: "ses-2" })).toBe("a");
+      expect(roleOf(ses("ses-1"), loadKey, { a: "ses-1", b: "ses-2" })).toBe("a");
+    });
+
+    it("matches the duplicate row by dir-name load key", () => {
+      const dup: CatalogSession = {
+        ...ses("syn-quiet-seed6022"),
+        health: "duplicate_id",
+        storage_path: "/root/sim-quiet-20261005-151028",
+      };
+      expect(roleOf(dup, loadKey, { a: "sim-quiet-20261005-151028", b: null })).toBe("a");
+      expect(roleOf(dup, loadKey, { a: null, b: null })).toBeNull();
     });
 
     it("returns 'b' when sessionId matches pair.b", () => {
-      expect(roleOf("ses-2", { a: "ses-1", b: "ses-2" })).toBe("b");
+      expect(roleOf(ses("ses-2"), loadKey, { a: "ses-1", b: "ses-2" })).toBe("b");
     });
 
     it("returns null when sessionId does not match pair", () => {
-      expect(roleOf("ses-3", { a: "ses-1", b: "ses-2" })).toBeNull();
-      expect(roleOf("ses-1", { a: null, b: null })).toBeNull();
+      expect(roleOf(ses("ses-3"), loadKey, { a: "ses-1", b: "ses-2" })).toBeNull();
+      expect(roleOf(ses("ses-1"), loadKey, { a: null, b: null })).toBeNull();
     });
   });
 });

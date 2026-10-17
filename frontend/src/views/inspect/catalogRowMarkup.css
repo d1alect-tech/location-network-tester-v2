@@ -1,0 +1,83 @@
+/* Строка 13 (план ui-refactor-3, F3-remedy): двухстрочный ряд рейла —
+   вариант V1 «Мета под меткой». Инвариант владельца: НИЧЕГО не обрезается
+   и элементы не наезжают — метка flex:1 + min-width:0 +
+   overflow-wrap:anywhere (полный перенос, без ellipsis/nowrap/clamp),
+   мета-строка flex-wrap (переносится, никогда не клиппится), зона А/Б и
+   чип роли flex:none. v6.css при этом только уменьшается (мёртвые правила
+   4-колоночной таблицы удалены там). */
+
+.app-v6 .cat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 8px 5px;
+  min-width: 0;
+}
+
+.app-v6 .cat-line1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.app-v6 .cat-assign-wrap {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+
+.app-v6 .cat-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 600 13px / 17px var(--lnt-ui);
+  color: var(--lnt-text);
+  overflow-wrap: anywhere;
+}
+
+.app-v6 .cat-meta {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 6px;
+  row-gap: 1px;
+  min-width: 0;
+  font: 400 11px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+}
+
+.app-v6 .cat-meta-type {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app-v6 .cat-meta-time {
+  font-family: var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.app-v6 .cat-meta .lnt-status-pill {
+  flex: none;
+  font: 500 11px / 16px var(--lnt-ui);
+  padding: 0 6px;
+}
+
+/* Тулбар сортировки: thead убран (строка 13), кнопки .cat-sort живут в
+   .cat-tools второй строкой; атрибуты data-cat-sort — CONTRACT кликов. */
+.app-v6 .cat-v6 .cat-tools .cat-sort {
+  width: auto;
+  padding: 0 8px 0 0;
+  line-height: 24px;
+}
+
+.app-v6 .cat-v6 .cat-tools .cat-sortbar {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.app-v6 .cat-sort[aria-sort="ascending"],
+.app-v6 .cat-sort[aria-sort="descending"] {
+  color: var(--lnt-text);
+}

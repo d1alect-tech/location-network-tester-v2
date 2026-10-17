@@ -7,13 +7,16 @@
  * на .col-cat (см. catalog.css). */
 
 import type { LntApiClient } from "../../api/client";
+import type { CatalogSession } from "../../api/types";
 import { el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import type { RouteStore } from "../../state/routeState";
 import { type CatalogFilterPanelHandle, createCatalogFilterPanel } from "./catalogFilterPanel";
 import { type CatalogListHandle, createCatalogListView } from "./catalogListView";
+import { filtersFromParams, hasActiveFilters } from "./catalogModel";
 import { CatalogStore } from "./catalogStore";
 import { type ContextInspectorHandle, createContextInspector } from "./contextInspector";
+import type { SessionMeta } from "./contextSummary";
 import { type ProfileManagerHandle, createProfileManager } from "./profileManager";
 import { createProfilePreview } from "./profilePreview";
 import "./catalog.css";
@@ -33,7 +36,14 @@ const FILTER_KEYS = [
 
 export const EMPTY_MESSAGE =
   "По запросу ничего не найдено. Измените параметры фильтрации или нажмите «Сбросить».";
+/** Пустой каталог БЕЗ фильтров: сбрасывать нечего — своя формулировка. */
+export const NO_FILTERS_EMPTY_MESSAGE = "Каталог пуст — нет сохранённых сессий.";
 export const LOADING_MESSAGE = "Загрузка списка сессий…";
+
+/** Текст пустой выдачи: с активными фильтрами — фильтровый, без них — свой. */
+export function emptyCatalogMessage(params: Record<string, string>): string {
+  return hasActiveFilters(filtersFromParams(params)) ? EMPTY_MESSAGE : NO_FILTERS_EMPTY_MESSAGE;
+}
 
 export interface CatalogWorkspaceOptions {
   client: LntApiClient;
@@ -152,7 +162,11 @@ export function mountCatalogWorkspace(
   // тулбар фильтров монтируется в слот панели списка.
   list.toolsSlot.append(filterPanel.root);
   const leftPane = el("div", { className: "col-cat" }, [list.root]);
-  const root = el("div", { className: "lnt-cat-workspace app-body" }, [leftPane, rightPane]);
+  const root = el(
+    "div",
+    { className: "lnt-cat-workspace app-body", attrs: { "data-density": "default" } },
+    [leftPane, rightPane],
+  );
   container.append(root);
 
   async function activate(sessionId: string): Promise<void> {
@@ -174,7 +188,15 @@ export function mountCatalogWorkspace(
     await store.applyQuery(catalogQueryFromParams(routes.get().params));
   }
 
+  let latestItems: CatalogSession[] = [];
+  function metaFor(sessionId: string): SessionMeta | undefined {
+    const session = latestItems.find((item) => item.id === sessionId);
+    if (!session) return undefined;
+    return { id: session.id, createdUtc: session.created_utc, sessionHealth: session.health };
+  }
+
   const unsubscribeStore = store.subscribe((state) => {
+    latestItems = state.items;
     if (state.status === "loading" && state.items.length === 0) {
       list.setNotice("loading", LOADING_MESSAGE);
       return;
@@ -184,7 +206,7 @@ export function mountCatalogWorkspace(
       return;
     }
     if (state.items.length === 0) {
-      list.setNotice("empty", EMPTY_MESSAGE);
+      list.setNotice("empty", emptyCatalogMessage(routes.get().params));
       return;
     }
     list.clearNotice();
@@ -205,7 +227,7 @@ export function mountCatalogWorkspace(
     inFlightSessionId = sessionId;
     list.setSelected(sessionId);
     void inspector
-      .loadSession(sessionId)
+      .loadSession(sessionId, metaFor(sessionId))
       .then(() => {
         loadedSessionId = sessionId;
         announcePolite(`Сессия ${sessionId} открыта`);

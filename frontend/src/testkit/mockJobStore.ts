@@ -68,9 +68,14 @@ export function buildJobScript(
   const kind = String(body.kind) as JobSnapshot["kind"];
   const repeat = Number(body.repeat ?? 1);
   const total = repeat > 1 ? repeat : null;
-  const runStage = kind === "capture" ? "capturing" : "simulating";
+  // analyze: стадия анализа и результат с именем анализируемой сессии —
+  // зеркало job_worker.py:112 (WorkerUpdate(stage=ANALYZING), result.sessions).
+  const isAnalyze = kind === "analyze";
+  const runStage = isAnalyze ? "analyzing" : kind === "capture" ? "capturing" : "simulating";
   const prefix = kind === "capture" ? "cap" : "sim";
-  const firstSession = `${prefix}-${String(sessionNumber).padStart(3, "0")}`;
+  const firstSession = isAnalyze
+    ? String(body.session_name ?? "")
+    : `${prefix}-${String(sessionNumber).padStart(3, "0")}`;
   const sessions: string[] = [firstSession];
   let version = 1;
   const at = (overrides: Partial<JobSnapshot>): JobSnapshot => {

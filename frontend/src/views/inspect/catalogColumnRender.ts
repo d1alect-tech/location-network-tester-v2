@@ -1,9 +1,18 @@
+/** Ряды рейла каталога инспекции. Строка 13 (план ui-refactor-3, F3-remedy):
+ * строка сессии — ОДНА colspan-ячейка с контуром .cat-row (линия метки +
+ * мета-строка под ней, вариант V1 «Мета под меткой»); инвариант владельца —
+ * ничего не обрезается и не наезжает (полный перенос метки, мета
+ * flex-wrap). Билдеры разметки — в catalogRowMarkup.ts. Атрибуты строк
+ * (data-session/data-rowkey/data-in-pair) — замороженный CONTRACT. */
+
 import type { CatalogSession } from "../../api/types";
 import { el } from "../../components/primitives/dom";
+import { loadKey } from "./bootPick";
+import { assignButtons } from "./catalogAssign";
 import { type CatalogRow, roleOf } from "./catalogColumnModel";
-import type { PairStateValue } from "./pairState";
-
-const DAY_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" });
+import { formatDay, labelSpan, metaLine, roleChip } from "./catalogRowMarkup";
+import "./catalogRowMarkup.css";
+import type { PairSlot, PairStateValue } from "./pairState";
 
 function assertNever(value: never): never {
   throw new Error(`unhandled catalog row ${String(value)}`);
@@ -13,37 +22,6 @@ function dayKey(createdUtc: string | null): string {
   if (!createdUtc) return "unknown";
   const matched = createdUtc.match(/^(\d{4}-\d{2}-\d{2})/);
   return matched?.[1] ?? "unknown";
-}
-
-function formatDay(day: string): string {
-  const parsed = new Date(`${day}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? day : DAY_FORMAT.format(parsed);
-}
-
-function formatTime(createdUtc: string | null): string {
-  if (!createdUtc) return "—";
-  const match = /T(\d{2}):(\d{2})/.exec(createdUtc);
-  if (!match) return "—";
-  return `${match[1]}:${match[2]}`;
-}
-
-function roleLetter(role: "a" | "b"): string {
-  switch (role) {
-    case "a":
-      return "А";
-    case "b":
-      return "Б";
-    default:
-      return assertNever(role);
-  }
-}
-
-function roleChip(role: "a" | "b"): HTMLElement {
-  return el("span", {
-    className: `cat-role cat-role-${role}`,
-    text: roleLetter(role),
-    attrs: { "data-cat-role": role },
-  });
 }
 
 function renderGroup(day: string, count: number): HTMLTableRowElement {
@@ -74,7 +52,10 @@ function renderEmpty(): HTMLTableRowElement {
 export interface CatalogRowRenderCtx {
   readonly grouped: boolean;
   readonly pair: PairStateValue;
-  readonly onPick: (sessionId: string) => void;
+  readonly analyzedOf: (session: CatalogSession) => boolean | undefined;
+  readonly invalidOf: (session: CatalogSession) => string | undefined;
+  readonly onPick: (loadKey: string) => void;
+  readonly onAssign: (slot: PairSlot, loadKey: string) => void;
   readonly onFocus: (sessionId: string) => void;
 }
 
@@ -105,42 +86,48 @@ function moveFocus(event: KeyboardEvent, row: HTMLElement): boolean {
 
 function renderSession(session: CatalogSession, ctx: CatalogRowRenderCtx): HTMLTableRowElement {
   const day = dayKey(session.created_utc);
-  const role = roleOf(session.id, ctx.pair);
-  const roleCell = el("td");
-  const labelCell = el("td", { className: "cat-label-cell" });
-  if (role !== null) {
-    labelCell.append(roleChip(role));
-  }
-  // V6: полное имя — в title, обрезанное эллипсисом читается по наведению.
-  const fullLabel = session.label ?? session.id;
-  labelCell.append(
-    el("span", {
-      className: "cell-ellipsis",
-      text: fullLabel,
-      attrs: { "data-cat-label": "", title: fullLabel },
-    }),
+  const role = roleOf(session, loadKey, ctx.pair);
+  const key = loadKey(session);
+  const assign = assignButtons(
+    { id: session.id, name: session.label, loadKey: key, health: session.health },
+    role,
   );
-  const dateText = ctx.grouped ? formatTime(session.created_utc) : day === "unknown" ? "—" : day;
+  assign.onAssign = ctx.onAssign;
+  const line1 = el("div", { className: "cat-line1" }, [assign.el]);
+  if (role !== null) {
+    line1.append(roleChip(role));
+  }
+  line1.append(labelSpan(session));
+  const cell = el("td", { attrs: { colspan: "4" } }, [
+    el("div", { className: "cat-row" }, [
+      line1,
+      metaLine(session, ctx.analyzedOf(session), ctx.invalidOf(session), ctx.grouped),
+    ]),
+  ]);
   const row = el(
     "tr",
-    { attrs: { "data-session": session.id, "data-cat-date": day, tabindex: "-1" } },
-    [
-      roleCell,
-      labelCell,
-      el("td", { text: session.session_type ?? "—" }),
-      el("td", { text: dateText }),
-    ],
+    {
+      attrs: {
+        "data-session": session.id,
+        "data-rowkey": key !== session.id ? key : session.id,
+        "data-cat-date": day,
+        tabindex: "-1",
+        ...(role !== null ? { "data-in-pair": role } : {}),
+      },
+    },
+    [cell],
   );
   row.addEventListener("focus", () => focusRow(row, ctx));
   row.addEventListener("click", () => {
     row.focus();
-    ctx.onPick(session.id);
+    ctx.onPick(key);
   });
   row.addEventListener("keydown", (event) => {
+    assign.handleKeydown(event);
     if (moveFocus(event, row)) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    ctx.onPick(session.id);
+    ctx.onPick(key);
   });
   return row;
 }

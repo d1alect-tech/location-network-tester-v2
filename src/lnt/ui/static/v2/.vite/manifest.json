@@ -1,13 +1,9 @@
 {
-  "_chartshell.Brtr_Od0.css": {
-    "file": "assets/chartshell.Brtr_Od0.css",
-    "src": "_chartshell.Brtr_Od0.css"
-  },
-  "_chartshell.TVDE6ucs.js": {
-    "file": "assets/chartshell.TVDE6ucs.js",
+  "_chartshell.CCnsUC8Z.js": {
+    "file": "assets/chartshell.CCnsUC8Z.js",
     "name": "chartshell",
     "css": [
-      "assets/chartshell.Brtr_Od0.css"
+      "assets/chartshell.DNqXnWYa.css"
     ],
     "assets": [
       "assets/inter-cyrillic-wght-normal.DqGufNeO.woff2",
@@ -28,6 +24,10 @@
       "assets/IBMPlexMono-Regular.Du0PCiXT.woff2",
       "assets/IBMPlexMono-Medium.CiYsa3y2.woff2"
     ]
+  },
+  "_chartshell.DNqXnWYa.css": {
+    "file": "assets/chartshell.DNqXnWYa.css",
+    "src": "_chartshell.DNqXnWYa.css"
   },
   "_form.BUF79Nh4.js": {
     "file": "assets/form.BUF79Nh4.js",
@@ -57,10 +57,6 @@
     "imports": [
       "_spectrum.DkMTgLBy.js"
     ]
-  },
-  "_spectrogramPalette.CfMVLFb-.js": {
-    "file": "assets/spectrogramPalette.CfMVLFb-.js",
-    "name": "spectrogramPalette"
   },
   "_spectrum.CXwmWaak.css": {
     "file": "assets/spectrum.CXwmWaak.css",
@@ -111,17 +107,16 @@
     "src": "_variantV1.CCz54TsC.css"
   },
   "index.html": {
-    "file": "assets/main.S1e1Vqe7.js",
+    "file": "assets/main.COwOT5pz.js",
     "name": "main",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.TVDE6ucs.js",
-      "_spectrogramPalette.CfMVLFb-.js",
+      "_chartshell.CCnsUC8Z.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
-      "assets/main.DNxkdZjY.css"
+      "assets/main.qdJmSlou.css"
     ]
   },
   "showcase-a.html": {
@@ -262,7 +257,7 @@
     ]
   },
   "showcase-v6.html": {
-    "file": "assets/showcaseRound2V6.Dq1HCFi6.js",
+    "file": "assets/showcaseRound2V6.Wkt8oHmA.js",
     "name": "showcaseRound2V6",
     "src": "showcase-v6.html",
     "isEntry": true,
@@ -270,7 +265,6 @@
       "_spectrum.DkMTgLBy.js",
       "_metrics.Bj-MDfpM.js",
       "_peakMarkers.Bl5IZsKb.js",
-      "_spectrogramPalette.CfMVLFb-.js",
       "_uPlot.min.I5bB1VQk.js"
     ],
     "css": [
@@ -278,12 +272,12 @@
     ]
   },
   "showcase.html": {
-    "file": "assets/showcase.CwLgcD6T.js",
+    "file": "assets/showcase.BlkdYhTV.js",
     "name": "showcase",
     "src": "showcase.html",
     "isEntry": true,
     "imports": [
-      "_chartshell.TVDE6ucs.js"
+      "_chartshell.CCnsUC8Z.js"
     ]
   },
   "src/showcase-redesign/fonts/IBMPlexMono-Medium.woff2": {

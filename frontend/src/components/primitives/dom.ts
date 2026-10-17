@@ -26,6 +26,18 @@ export function clearElement(node: Element): void {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
 
+/** SVG-элемент через createElementNS: атрибуты точечно, без innerHTML. */
+export function svgEl(
+  tag: string,
+  attrs: Record<string, string> = {},
+  children: Node[] = [],
+): SVGElement {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, value);
+  for (const child of children) node.append(child);
+  return node;
+}
+
 let counter = 0;
 
 /** Стабильные уникальные id для aria-связок. */

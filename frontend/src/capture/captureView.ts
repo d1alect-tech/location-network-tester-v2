@@ -1,28 +1,29 @@
-/** Представление раздела «Захват»: mode-first форма, предпросмотр профиля,
- * диагностика устройства с preflight, хронология задачи через SSE.
- * Мутации идут через доменный клиент (nonce); занятость блокирует запуск
- * осознанно с объявлением причины. */
+/** Представление раздела «Захват»: пошаговый визард (вариант-победитель G4)
+ * — шаг 1 режим и источник, шаг 2 параметры с эхом и превью, шаг 3 запуск,
+ * устройство, live-грам и журнал задачи. Мутации идут через доменный клиент
+ * (nonce); занятость блокирует запуск осознанно с объявлением причины.
+ * Поток запуска, восстановление задачи и машина шагов вынесены в
+ * captureStartFlow/captureRecovery/captureSteps (сплит под потолок 250
+ * чистых LOC); e2e-пины сохранены дуал-классами и прежними селекторами. */
 
 import type { LntApiClient } from "../api/client";
 import { createDeviceApi } from "../api/client-device";
-import type { JobRequest, JobSnapshot } from "../api/types-jobs";
+import type { JobSnapshot } from "../api/types-jobs";
 import { el } from "../components/primitives/dom";
 import { announcePolite } from "../components/primitives/status";
 import { createCaptureAlert } from "./captureAlerts";
 import type { CaptureAlertHandle } from "./captureAlerts";
 import { applyCapturePrefill } from "./captureDeepLink";
 import type { CapturePrefill } from "./captureDeepLink";
+import { createCaptureRecovery } from "./captureRecovery";
+import { createCaptureStartFlow } from "./captureStartFlow";
+import type { CaptureFlowState, CaptureStartFlowHandle } from "./captureStartFlow";
+import { createCaptureSteps } from "./captureSteps";
+import type { CaptureStepsHandle } from "./captureSteps";
 import { mountCaptureChannelbar } from "./channelbarCapture";
 import { createDevicePanel } from "./devicePanel";
 import type { DevicePanelHandle } from "./devicePanel";
-import {
-  applySnapshot,
-  busyReasonRu,
-  initialTimeline,
-  isActive,
-  needsRecoveryPrompt,
-} from "./jobTimeline";
-import type { TimelineState } from "./jobTimeline";
+import { applySnapshot, initialTimeline } from "./jobTimeline";
 import { createJobTimelineView } from "./jobTimelineView";
 import type { TimelineViewHandle } from "./jobTimelineView";
 import { createModeForm } from "./modeForm";
@@ -31,8 +32,6 @@ import { buildJobRequest, validateCaptureForm } from "./modes";
 import { renderProfilePreview } from "./profilePreview";
 import { createSpectrogramLivePanel } from "./spectrogramLivePanel";
 import type { LivePanelHandle } from "./spectrogramLivePanel";
-import { watchJobEvents } from "./sse";
-import type { WatchHandle } from "./sse";
 
 export interface CaptureViewHandle {
   root: HTMLElement;
@@ -55,16 +54,27 @@ export function createCaptureView(
   const form: ModeFormHandle = createModeForm();
   if (opts.initial !== undefined) applyCapturePrefill(form.root, opts.initial);
   const devicePanel: DevicePanelHandle = createDevicePanel();
-  const timeline: TimelineViewHandle = createJobTimelineView({
-    onCancel: (jobId) => void cancelJob(jobId),
-    onRetry: () => void startJob(lastRequest),
-  });
+  const state: CaptureFlowState = {
+    stream: null,
+    timelineState: initialTimeline,
+    lastRequest: null,
+    disposed: false,
+    bootstrapPromise: null,
+  };
 
-  let stream: WatchHandle | null = null;
-  let timelineState: TimelineState = initialTimeline;
-  let lastRequest: JobRequest | null = null;
-  let disposed = false;
-  let bootstrapPromise: Promise<void> | null = null;
+  // Цикл сборки: хронология зовёт поток запуска, а поток запуска пишет в
+  // хронологию. Ячейка заполняется один раз ниже, до любого действия
+  // оператора; обращение до заполнения — явная ошибка, а не молчаливый no-op.
+  const startFlowSlot: { current: CaptureStartFlowHandle | null } = { current: null };
+  const startFlowOf = (): CaptureStartFlowHandle => {
+    const flow = startFlowSlot.current;
+    if (flow === null) throw new Error("поток запуска захвата не собран");
+    return flow;
+  };
+  const timeline: TimelineViewHandle = createJobTimelineView({
+    onCancel: (jobId) => void startFlowOf().cancelJob(jobId),
+    onRetry: () => void startFlowOf().startJob(state.lastRequest),
+  });
 
   const alert: CaptureAlertHandle = createCaptureAlert();
   const liveGram: LivePanelHandle = createSpectrogramLivePanel({ plots: client.plots });
@@ -79,6 +89,10 @@ export function createCaptureView(
     text: "Проверить устройство",
     attrs: { type: "button" },
   }) as HTMLButtonElement;
+  const startRow = el("div", { className: "capture-start-row form-actions" }, [
+    startButton,
+    deviceRefreshButton,
+  ]);
 
   const refreshPreview = (): void => {
     alert.hide();
@@ -86,193 +100,134 @@ export function createCaptureView(
   };
 
   const applySnapshotToTimeline = (snapshot: JobSnapshot): void => {
-    timelineState = applySnapshot(timelineState, snapshot);
-    timeline.update(timelineState);
+    state.timelineState = applySnapshot(state.timelineState, snapshot);
+    timeline.update(state.timelineState);
     liveGram.onSnapshot(snapshot);
   };
 
-  function attachStream(snapshot: JobSnapshot): void {
-    stream?.close();
-    stream = watchJobEvents(
-      snapshot.job_id,
-      {
-        onSnapshot: applySnapshotToTimeline,
-        onConnection: (kind) => {
-          timelineState = { ...timelineState, connection: kind };
-          timeline.update(timelineState);
-        },
-      },
-      { pollSnapshot: () => client.jobs.get(snapshot.job_id) },
-    );
-  }
+  const recovery = createCaptureRecovery({
+    client,
+    state,
+    timeline,
+    liveGram,
+    applySnapshotToTimeline,
+    ensureBootstrap: () => startFlowOf().ensureBootstrap(),
+  });
+  startFlowSlot.current = createCaptureStartFlow({
+    client,
+    device,
+    devicePanel,
+    alert,
+    form,
+    startButton,
+    state,
+    applySnapshotToTimeline,
+    attachStream: recovery.attachStream,
+  });
 
-  async function ensureBootstrap(): Promise<boolean> {
-    bootstrapPromise ??= client
-      .bootstrap()
-      .then(() => undefined)
-      .catch(() => undefined);
-    await bootstrapPromise;
-    return client.currentNonce !== null;
-  }
-
-  async function checkDeviceAndPreflight(request: JobRequest): Promise<boolean> {
-    try {
-      const state = await device.state();
-      devicePanel.renderState(state);
-      // Preflight выполняется всегда: блокировки должны быть reason-coded
-      // даже когда устройство уже не готово (диагностика + отчёт вместе).
-      const report = await device.preflight(request as Parameters<typeof device.preflight>[0]);
-      devicePanel.renderPreflight(report);
-      if (state.state !== "ready") {
-        alert.show(
-          "Запуск невозможен: устройство не готово. Выполните указанное диагностикой действие.",
-          "warn",
-        );
-        return false;
-      }
-      if (!report.ready) {
-        alert.show(
-          "Запуск невозможен: preflight нашёл блокирующие замечания — см. панель устройства.",
-          "warn",
-        );
-        return false;
-      }
+  // Валидация шага 2 — существующий per-mode гейт validateCaptureForm:
+  // ошибки рисуются на полях, причина объявляется, фокус — на первом ошибочном.
+  const validateStep2 = (): boolean => {
+    const { valid, errors } = validateCaptureForm(form.values());
+    if (valid !== null) {
+      form.clearErrors();
       return true;
-    } catch (error) {
-      alert.showApiError(error, disposed);
-      return false;
     }
-  }
+    form.setErrors(errors);
+    announcePolite("Форма содержит ошибки: исправьте выделенные поля.");
+    form.focusFirstInvalid();
+    return false;
+  };
 
-  async function startJob(request: JobRequest | null): Promise<void> {
-    if (disposed) return;
-    alert.hide();
-    if (!(await ensureBootstrap())) {
-      alert.show("Нет связи с сервером: панель не инициализирована. Повторите попытку.");
-      return;
-    }
-    if (isActive(timelineState)) {
-      // Осознанная блокировка с объявленной причиной — никогда не молчаливая.
-      alert.show(busyReasonRu(timelineState) ?? "Задача ещё выполняется.", "warn");
-      return;
-    }
-    if (request === null) {
-      // U3: повтор без сохранённого запроса (например, восстановление
-      // после перезапуска сервера): молчаливый возврат заменён видимой причиной.
-      alert.show(
-        "Нет сохранённого запроса для повтора. Запустите новую запись через форму.",
-        "warn",
-      );
-      return;
-    }
-
-    const source = form.getSource();
-    if (source === "device" && !(await checkDeviceAndPreflight(request))) return;
-
-    startButton.disabled = true;
-    try {
-      const snapshot = await client.jobs.start(request);
-      lastRequest = request;
-      timelineState = initialTimeline;
-      applySnapshotToTimeline(snapshot);
-      attachStream(snapshot);
-    } catch (error) {
-      alert.showApiError(error, disposed);
-    } finally {
-      startButton.disabled = false;
-    }
-  }
-
-  async function cancelJob(jobId: string): Promise<void> {
-    alert.hide();
-    try {
-      const snapshot = await client.jobs.cancel(jobId);
-      applySnapshotToTimeline(snapshot);
-    } catch (error) {
-      alert.showApiError(error, disposed);
-    }
-  }
-
-  async function recoverActiveJobOnMount(): Promise<void> {
-    if (!(await ensureBootstrap())) return;
-    try {
-      const page = await client.jobs.list(1, 0);
-      const latest = page.items[0];
-      // Live-панель в idle показывает последнюю завершённую сессию post-hoc.
-      if (latest !== undefined) liveGram.onSnapshot(latest);
-      if (
-        latest === undefined ||
-        (!needsRecoveryPrompt({ ...initialTimeline, latest }) && latest.status === "succeeded")
-      ) {
-        return;
-      }
-      timelineState = applySnapshot(initialTimeline, latest);
-      timeline.update(timelineState);
-      const status = latest.status;
-      if (status === "queued" || status === "running" || status === "cancelling") {
-        attachStream(latest);
-      }
-    } catch {
-      // Восстановление необязательно: без истории стартовая валидна.
-    }
-  }
+  // Визард (G4): рельс и панели шагов; шаг 3 забирает стартовую строку,
+  // устройство, live-грам и хронологию (журнал и записанные сессии живут там).
+  const steps: CaptureStepsHandle = createCaptureSteps({
+    form: form.root,
+    sections: form.sections,
+    launch: [alert.line, startRow, devicePanel.root, liveGram.root, timeline.root],
+    validateStep2,
+    onStep: () => steps.renderEcho(form.getMode(), form.getSource()),
+  });
 
   startButton.addEventListener("click", () => {
-    const { valid, errors } = validateCaptureForm(form.values());
+    const { valid } = validateCaptureForm(form.values());
     if (valid === null) {
-      form.setErrors(errors);
-      announcePolite("Форма содержит ошибки: исправьте выделенные поля.");
+      // Поля с ошибками живут на шаге 2: возвращаем туда и объявляем причину.
+      steps.show(2);
+      validateStep2();
       return;
     }
     form.clearErrors();
-    void startJob(buildJobRequest(form.getMode(), valid, form.getSource()));
+    void startFlowOf().startJob(buildJobRequest(form.getMode(), valid, form.getSource()));
   });
   deviceRefreshButton.addEventListener("click", () => {
-    void ensureBootstrap().then(async () => {
-      try {
-        devicePanel.renderState(await device.state());
-      } catch (error) {
-        alert.showApiError(error, disposed);
-      }
-    });
+    void startFlowOf()
+      .ensureBootstrap()
+      .then(async () => {
+        try {
+          devicePanel.renderState(await device.state());
+        } catch (error) {
+          alert.showApiError(error, state.disposed);
+        }
+      });
   });
-  form.onChange(refreshPreview);
+  form.onChange(() => {
+    refreshPreview();
+    steps.renderEcho(form.getMode(), form.getSource());
+  });
   const channelbar = mountCaptureChannelbar(form);
 
   const previewContainer = el("aside", {
     className: "capture-preview panel",
     attrs: { "aria-label": "Профиль записи" },
   });
-  const root = el("section", { className: "capture-view t-page" }, [
-    el("h2", { className: "view-title t-page", text: "Захват" }),
-    channelbar.root,
-    el("div", { className: "capture-layout" }, [
-      el("div", { className: "capture-form-column" }, [
-        form.root,
-        alert.line,
-        el("div", { className: "capture-start-row form-actions" }, [
-          startButton,
-          deviceRefreshButton,
-        ]),
-      ]),
-      el("div", { className: "capture-side-column" }, [
-        previewContainer,
-        devicePanel.root,
-        liveGram.root,
-      ]),
-    ]),
-    timeline.root,
+  // Боковая колонка визарда — только превью профиля (устройство и live-грам
+  // переехали на шаг 3); превью живо на всех шагах и обновляется на каждое
+  // изменение формы.
+  const stepMain = el("div", { className: "capture-form-column capture-step-main is-entering" }, [
+    form.root,
+    steps.panel3,
   ]);
+  // Вход играет один раз на монтировании: переход между шагами — частое
+  // действие и остаётся без анимации (моушен-правило волны).
+  stepMain.addEventListener("animationend", (event) => {
+    if (event.target === stepMain) stepMain.classList.remove("is-entering");
+  });
+  const root = el(
+    "section",
+    { className: "capture-view t-page", attrs: { "data-density": "default" } },
+    [
+      el("h2", { className: "view-title t-page", text: "Захват" }),
+      el("p", {
+        className: "capture-wizard-sub lnt-hint",
+        text: "Три шага: режим → параметры → запуск. Журнал задачи — на шаге 3.",
+      }),
+      channelbar.root,
+      el("div", { className: "capture-layout capture-wizard" }, [
+        steps.rail,
+        stepMain,
+        el("div", { className: "capture-side-column" }, [previewContainer]),
+      ]),
+    ],
+  );
 
   refreshPreview();
-  void recoverActiveJobOnMount();
+  steps.renderEcho(form.getMode(), form.getSource());
+  // Deep-link билет из инспекции: если режим/источник уже решены — открываем
+  // шаг 2 (пустой префилл — обычный вход с шага 1; captureParamsToPrefill
+  // возвращает {} и для маршрута без параметров).
+  if (opts.initial !== undefined && Object.keys(opts.initial).length > 0) steps.show(2);
+  void recovery.recoverActiveJobOnMount().then((recovered) => {
+    // Активная/прерванная задача: журнал и управление ею живут на шаге 3.
+    if (recovered) steps.show(3);
+  });
 
   return {
     root,
     dispose: () => {
-      disposed = true;
-      stream?.close();
-      stream = null;
+      state.disposed = true;
+      state.stream?.close();
+      state.stream = null;
       liveGram.dispose();
     },
   };

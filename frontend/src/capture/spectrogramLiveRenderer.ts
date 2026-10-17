@@ -1,10 +1,12 @@
 /** Live-renderer спектрограммы захвата: адаптация frozen spectrogramV6.
  * Вместо attach(plot) — setFreqDomain(minHz, maxHz); данные — из LiveGramStore
  * через pushSpectrumColumn(freqHz, psdDb); кадры — из spectrogramLivePaint.
- * Палитра, токены, селекторы и readout-формат витрины сохранены. */
+ * Палитра, токены, селекторы и readout-формат витрины сохранены: палитра —
+ * копия значений showcase-round2/spectrogramPalette.ts в components/charts
+ * (todo 5), остальное — из showcase-round2/tokens.css. */
 
+import { clamp01 } from "../components/charts/spectrogramPalette";
 import { el } from "../components/primitives/dom";
-import { clamp01 } from "../showcase-round2/spectrogramPalette";
 import { gramScaleText, paintGramFrame } from "./spectrogramLivePaint";
 import { FREQ_BINS, type LiveGramMode, LiveGramStore } from "./spectrogramLiveStore";
 

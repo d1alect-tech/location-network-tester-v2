@@ -113,7 +113,10 @@ export function mountSettingsWorkspace(
 
   const root = el(
     "div",
-    { className: "lnt-set-workspace", attrs: { role: "region", "aria-label": "Настройки" } },
+    {
+      className: "lnt-set-workspace",
+      attrs: { role: "region", "aria-label": "Настройки", "data-density": "default" },
+    },
     [
       el("h2", { className: "placeholder-title t-page", text: "Настройки" }),
       rootSection.section,

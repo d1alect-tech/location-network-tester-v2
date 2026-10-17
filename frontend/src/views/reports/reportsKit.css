@@ -1,7 +1,13 @@
 /* V6 kit-подмножество отчётов (showcase-round2/kit.css §5.2/§2.3, только чтение):
  * панели, meter/readout-сетки, баннеры, кнопки, поля, t-типографика и .md-блок.
- * Область видимости — рабочая область отчётов; токены prod с фолбэками kit.
- * T11: выделено из reports.css. */
+ * Область видимости — рабочая область отчётов. T11: выделено из reports.css.
+ * Todo 2 (ui-refactor-2): рамка (.panel/.panel-hd/.panel-title/.panel-bd) —
+ * канон из components/primitives/panel.css; легаси --lnt-bg-panel заменён
+ * V6-токеном --lnt-panel (документированное видимое изменение: в светлой теме
+ * превью получает ту же тёмную шкалу R3-A, что остальные разделы; в тёмной
+ * теме значения совпадают). Внутри превью легаси-цвета/шрифты заменены
+ * V6-эквивалентами (в тёмной теме идентичны); баннеры и .lnt-rep-workspace
+ * сохраняют легаси-токены — отдельная тема волны 2. */
 
 .lnt-rep-preview {
   display: flex;
@@ -11,13 +17,10 @@
   overflow: hidden;
 }
 
+/* Рамка — каноническая (primitives/panel.css); здесь остаётся только стык
+ * стека — hairline между панелями превью (V6-токен вместо легаси-фолбэка). */
 .lnt-rep-preview .panel {
-  background: var(--lnt-bg-panel, var(--lnt-panel, #323232));
-  border: 0;
-  border-bottom: 1px solid var(--lnt-border-subtle, var(--lnt-line, #3f3f3f));
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+  border-bottom: 1px solid var(--lnt-line);
 }
 
 .lnt-rep-preview .panel-bd:focus-visible {
@@ -29,32 +32,16 @@
   border-bottom: 0;
 }
 
-.lnt-rep-preview .panel-hd {
-  min-height: 30px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  background: rgb(0 0 0 / 0.18);
-  border-bottom: 1px solid var(--lnt-border-subtle, var(--lnt-line, #3f3f3f));
-}
-
+/* Шапка и тело — канон; видовое отличие только одно: нулевой margin
+ * заголовка (h2.panel-title). */
 .lnt-rep-preview .panel-title {
-  font: 700 11px / 14px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--lnt-fg-secondary, var(--lnt-text-sec, #d1d1d1));
   margin: 0;
-}
-
-.lnt-rep-preview .panel-bd {
-  padding: 12px;
 }
 
 .lnt-rep-preview .panel-ft {
   padding: 8px 12px;
-  border-top: 1px solid var(--lnt-border-subtle, var(--lnt-line, #3f3f3f));
-  color: var(--lnt-fg-secondary, var(--lnt-text-sec, #d1d1d1));
+  border-top: 1px solid var(--lnt-line);
+  color: var(--lnt-text-sec);
 }
 
 .lnt-rep-preview .meter-grid {
@@ -71,17 +58,17 @@
 }
 
 .lnt-rep-preview .meter-label {
-  font: 400 12px / 16px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
-  color: var(--lnt-fg-secondary, var(--lnt-text-sec, #d1d1d1));
+  font: 400 12px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .lnt-rep-preview .meter-value {
-  font: 600 12px / 16px var(--lnt-font-mono, var(--lnt-mono, monospace));
+  font: 600 12px / 16px var(--lnt-mono);
   font-variant-numeric: tabular-nums lining-nums;
-  color: var(--lnt-fg-primary, var(--lnt-text, #ebebeb));
+  color: var(--lnt-text);
 }
 
 .lnt-rep-preview .readout-grid {
@@ -97,27 +84,34 @@
 }
 
 .lnt-rep-preview .readout-label {
-  font: 700 11px / 14px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
+  font: 700 11px / 14px var(--lnt-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--lnt-fg-secondary, var(--lnt-text-dim, #909090));
+  color: var(--lnt-text-sec);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .lnt-rep-preview .readout-value {
-  font: 600 16px / 20px var(--lnt-font-mono, var(--lnt-mono, monospace));
+  font: 600 16px / 20px var(--lnt-mono);
   font-variant-numeric: tabular-nums lining-nums;
-  color: var(--lnt-fg-primary, var(--lnt-text, #ebebeb));
+  color: var(--lnt-text);
 }
 
 .lnt-rep-preview .t-mono {
-  font: 400 12px / 16px var(--lnt-font-mono, var(--lnt-mono, monospace));
+  font: 400 12px / 16px var(--lnt-mono);
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-.lnt-rep-preview .t-compact,
+.lnt-rep-preview .t-compact {
+  font: 400 12px / 16px var(--lnt-ui);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--lnt-text-sec);
+  margin: 0;
+}
+
+/* Рабочая область — вне превью: легаси-словарь сохранён (отдельная тема). */
 .lnt-rep-workspace .t-compact {
   font: 400 12px / 16px var(--lnt-font-sans, var(--lnt-ui, system-ui, sans-serif));
   font-variant-numeric: tabular-nums lining-nums;
@@ -128,10 +122,10 @@
 .lnt-rep-preview .md {
   margin: 0;
   padding: 8px;
-  border: 1px solid var(--lnt-border-subtle, var(--lnt-line, #3f3f3f));
+  border: 1px solid var(--lnt-line);
   border-radius: var(--lnt-radius-control, var(--lnt-r-ctl, 4px));
-  background: var(--lnt-bg-canvas, var(--lnt-canvas, #1d1d1d));
-  color: var(--lnt-fg-primary, var(--lnt-text, #ebebeb));
+  background: var(--lnt-canvas);
+  color: var(--lnt-text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 320px;

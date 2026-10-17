@@ -1,20 +1,26 @@
 /** Расширенный прогон characterization-v1: одна кнопка + скачивание + сводка.
  * Без графиков и управления каталогом рецептов: recipe_id захардкожен через
- * список рецептов по имени characterization-v1. */
+ * список рецептов по имени characterization-v1. Сводка рисуется карточками
+ * (`familyCards.ts`), скачивание с видимой строкой ошибки и повтором живёт в
+ * `extendedDownloads.ts`. */
 
 import type { AnalysisRunSnapshot } from "../../api/types-analysis";
 import { clearElement, el } from "../../components/primitives/dom";
+import { asReasonCodes, readFamilyDetail } from "./characterizationFamily";
+import type { FamilySummary } from "./characterizationFamily";
+import { BUNDLE_FILES, createExtendedDownloads } from "./extendedDownloads";
+import type { BundleFileName } from "./extendedDownloads";
+import { renderFamilyCards } from "./familyCards";
+import "./extendedRun.css";
+
+/** Типы полей семейства живут в characterizationFamily.ts; здесь — только реэкспорт. */
+export type * from "./characterizationFamily";
+export { BUNDLE_FILES };
+export type { BundleFileName };
 
 export const EXTENDED_RUN_BUTTON = "Запустить расширенный анализ";
 export const EXTENDED_RUN_TITLE = "Расширенный анализ (characterization-v1)";
 export const EXTENDED_RECIPE_NAME = "characterization-v1";
-export const BUNDLE_FILES = [
-  "characterization.json",
-  "characterization-arrays.npz",
-  "characterization-tables.json",
-] as const;
-
-export type BundleFileName = (typeof BUNDLE_FILES)[number];
 
 export type ExtendedRunClient = {
   /** Idempotent nonce bootstrap: расширенный прогон мутирует, нужен launch-nonce. */
@@ -40,12 +46,7 @@ export type ExtendedRunClient = {
 
 export type CharacterizationSummary = {
   readonly f1Hz: number | null;
-  readonly families: readonly {
-    readonly id: string;
-    readonly status: string;
-    /** Коды причин из reason_codes без перевода; null — бандл их не несёт. */
-    readonly reasonCodes: readonly string[] | null;
-  }[];
+  readonly families: readonly FamilySummary[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -56,22 +57,10 @@ function asFinite(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** reason_codes приходит списком строк; отсутствие поля — честный null. */
-function asReasonCodes(value: unknown): readonly string[] | null {
-  if (!Array.isArray(value)) return null;
-  const items: readonly unknown[] = value;
-  const codes: string[] = [];
-  for (const code of items) {
-    if (typeof code !== "string") return null;
-    codes.push(code);
-  }
-  return codes;
-}
-
-/** Разбирает characterization.json: f1 из сводки F01 + статусы семейств. */
+/** Разбирает characterization.json: f1 из сводки F01 + статусы и поля семейств. */
 export function parseCharacterizationSummary(payload: unknown): CharacterizationSummary | null {
   if (!isRecord(payload) || !Array.isArray(payload.families)) return null;
-  const families: { id: string; status: string; reasonCodes: readonly string[] | null }[] = [];
+  const families: FamilySummary[] = [];
   for (const item of payload.families) {
     if (!isRecord(item) || typeof item.family_id !== "string" || typeof item.status !== "string") {
       return null;
@@ -80,6 +69,7 @@ export function parseCharacterizationSummary(payload: unknown): Characterization
       id: item.family_id,
       status: item.status,
       reasonCodes: asReasonCodes(item.reason_codes),
+      ...readFamilyDetail(item),
     });
   }
   if (families.length !== 18) return null;
@@ -95,10 +85,6 @@ export function parseCharacterizationSummary(payload: unknown): Characterization
 
 function decodeJson(buffer: ArrayBuffer): unknown {
   return JSON.parse(new TextDecoder().decode(new Uint8Array(buffer)) as string) as unknown;
-}
-
-function formatF1(value: number | null): string {
-  return value === null ? "н/д" : `${value.toFixed(2)} Гц`;
 }
 
 export type ExtendedRunHandle = {
@@ -124,72 +110,39 @@ export function createExtendedRun(options: {
     text: EXTENDED_RUN_BUTTON,
     attrs: { type: "button" },
   });
-  const downloads = el("div", { className: "lnt-w1-extended-downloads" });
+  const downloads = createExtendedDownloads({
+    fetchBytes: (current, key, filename, fetchOptions) =>
+      client.artifactBytes(current, key, filename, fetchOptions),
+    session: () => session,
+    signal: () => runAbort.signal,
+  });
   const summaryHost = el("div", { className: "lnt-w1-extended-summary" });
+  summaryHost.hidden = true;
   const root = el(
     "section",
     {
       className: "lnt-w1-extended",
       attrs: { "aria-label": EXTENDED_RUN_TITLE },
     },
-    [el("div", { className: "lnt-w1-toolbar" }, [button]), status, downloads, summaryHost],
+    [el("div", { className: "lnt-w1-toolbar" }, [button]), status, downloads.root, summaryHost],
   );
+
+  /** Пустые контейнеры не должны оставлять дыры в ритме секции: скрыты,
+   * пока в них нет ни кнопки скачивания, ни карточек. */
+  function paintDownloadsVisibility(): void {
+    downloads.root.hidden = downloads.root.querySelector("button") === null;
+  }
+
+  paintDownloadsVisibility();
 
   function setStatus(text: string): void {
     status.textContent = text;
   }
 
-  function saveBlob(name: string, buffer: ArrayBuffer): void {
-    const url = URL.createObjectURL(new Blob([buffer]));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = name;
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function renderDownloads(artifactKey: string): void {
-    clearElement(downloads);
-    for (const name of BUNDLE_FILES) {
-      const link = el("button", {
-        className: "lnt-btn",
-        text: `Скачать ${name}`,
-        attrs: { type: "button", "data-bundle-file": name },
-      });
-      link.addEventListener("click", () => {
-        void (async () => {
-          if (session === null) return;
-          try {
-            const bytes = await client.artifactBytes(session, artifactKey, name, {
-              signal: runAbort.signal,
-            });
-            saveBlob(`${artifactKey}-${name}`, bytes);
-          } catch (error) {
-            if (error instanceof DOMException && error.name === "AbortError") return;
-            setStatus(error instanceof Error ? error.message : "Неизвестная ошибка");
-          }
-        })();
-      });
-      downloads.append(link);
-    }
-  }
-
   function renderSummary(summary: CharacterizationSummary): void {
     clearElement(summaryHost);
-    const title = el("h3", { text: "Сводка расширенного анализа" });
-    const f1 = el("p", {
-      className: "lnt-w1-panel-note",
-      text: `Частота сети F01: ${formatF1(summary.f1Hz)}`,
-    });
-    const list = el("ul", { className: "lnt-w1-failures" });
-    for (const family of summary.families) {
-      const codes = family.reasonCodes ?? [];
-      const reason = codes.length > 0 ? ` — Причина: ${codes.join(", ")}` : "";
-      list.append(el("li", { text: `${family.id}: ${family.status}${reason}` }));
-    }
-    summaryHost.append(title, f1, list);
+    summaryHost.hidden = false;
+    summaryHost.append(renderFamilyCards(summary, { session }));
   }
 
   async function pollDone(jobId: string, signal: AbortSignal): Promise<AnalysisRunSnapshot> {
@@ -229,7 +182,8 @@ export function createExtendedRun(options: {
         return;
       }
       setStatus(`Готово. Ключ артефакта: ${done.artifact_key}.`);
-      renderDownloads(done.artifact_key);
+      downloads.render(done.artifact_key);
+      paintDownloadsVisibility();
       const raw = await client.artifactBytes(current, done.artifact_key, BUNDLE_FILES[0], {
         signal,
       });
@@ -258,8 +212,10 @@ export function createExtendedRun(options: {
       session = next;
       runAbort.abort();
       runAbort = new AbortController();
-      clearElement(downloads);
+      downloads.clear();
+      paintDownloadsVisibility();
       clearElement(summaryHost);
+      summaryHost.hidden = true;
       button.disabled = next === null;
       setStatus(next === null ? "Выберите сессию." : "Готов к запуску.");
     },

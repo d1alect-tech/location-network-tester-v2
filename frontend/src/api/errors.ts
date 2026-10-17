@@ -23,16 +23,31 @@ export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status?: number;
   readonly code?: string;
+  /** Серверный detail ответа (409/422/…): виден оператору после canned-префикса
+   * (задача 3, D2). Пустая строка нормализуется в undefined — detail без текста
+   * не существует. */
+  readonly detail?: string;
 
   constructor(
     kind: ApiErrorKind,
-    options: { status?: number; code?: string; cause?: unknown; message?: string } = {},
+    options: {
+      status?: number;
+      code?: string;
+      cause?: unknown;
+      message?: string;
+      detail?: string;
+    } = {},
   ) {
     super(options.message ?? RU_MESSAGES[kind], { cause: options.cause });
     this.name = "ApiError";
     this.kind = kind;
     this.status = options.status;
     this.code = options.code;
+    // Строковый cause — исторический канал серверного detail (parseApiError и
+    // ручные конструкторы): detail выводится из него, если не задан явно.
+    this.detail =
+      options.detail ??
+      (typeof options.cause === "string" && options.cause !== "" ? options.cause : undefined);
   }
 }
 

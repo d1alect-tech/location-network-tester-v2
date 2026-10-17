@@ -19,7 +19,12 @@
 import type { CatalogSession } from "../../api/types";
 import { clearElement, el } from "../../components/primitives/dom";
 import type { RowNav } from "./catalogListNav";
-import { handleRowKeys as handleNavKeys, syncRowTabindex } from "./catalogListNav";
+import {
+  handleRowKeys as handleNavKeys,
+  rememberRowFocus,
+  restoreRowFocus,
+  syncRowTabindex,
+} from "./catalogListNav";
 import {
   dayKey,
   orderSessions,
@@ -129,10 +134,8 @@ export function createCatalogListView(options: CatalogListOptions): CatalogListH
     ]),
   ]);
 
-  function roleOf(sessionId: string): "a" | "b" | null {
-    return roleOfSession(items, selectedId, sessionId);
-  }
-
+  const roleOf = (sessionId: string): "a" | "b" | null =>
+    roleOfSession(items, selectedId, sessionId);
   function render(): void {
     for (const [key, cell] of heads) {
       cell.setAttribute("aria-sort", sort === key ? dir : "none");
@@ -143,6 +146,7 @@ export function createCatalogListView(options: CatalogListOptions): CatalogListH
     // Без групп в колонке полная дата — ширины под «14:30» ей мало.
     table.classList.toggle("is-flat", sort !== "date");
 
+    const focusedId = rememberRowFocus(tbody);
     clearElement(tbody);
     const ordered = orderSessions(items, sort, dir);
     const ctx = {
@@ -176,14 +180,15 @@ export function createCatalogListView(options: CatalogListOptions): CatalogListH
         tbody.append(renderRow(session, position, { ...ctx, activeIndex }));
       });
     }
+    restoreRowFocus(tbody, focusedId, activeIndex);
     syncFound();
   }
 
-  function syncFound(): void {
-    found.textContent = hasMore ? `${items.length}+` : String(items.length);
-    found.title = hasMore
-      ? `Загружено ${items.length}, есть ещё — нажмите «Показать ещё»`
-      : `Загружено сессий: ${items.length}`;
+  function syncFound(count: number = items.length, more: boolean = hasMore): void {
+    found.textContent = more ? `${count}+` : String(count);
+    found.title = more
+      ? `Загружено ${count}, есть ещё — нажмите «Показать ещё»`
+      : `Загружено сессий: ${count}`;
   }
 
   function activate(index: number): void {
@@ -233,7 +238,9 @@ export function createCatalogListView(options: CatalogListOptions): CatalogListH
         moreButton.hidden = true;
         clearElement(tbody);
         tbody.append(renderEmpty(message));
-        syncFound();
+        // Видимая выдача — ноль строк: счётчик следует ей, а не прежней
+        // странице (ранее над пустым состоянием висело устаревшее «200+»).
+        syncFound(0, false);
         return;
       }
       table.hidden = true;

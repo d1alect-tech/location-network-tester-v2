@@ -8,6 +8,8 @@ import { type MockLntBackend, installMockBackend } from "../../testkit/mockBacke
 
 /** E2E W1 inspect chrome inside V6 extras: measurement artifacts vs v1-only banner.
  * #/inspect mounts .app-v6; W1 lives in collapsed details[data-extra=w1].
+ * B2 (todo 13): сессию задаёт ПАРА инспекции — секция analysis-v2 показывает
+ * базу пары пассивно, своего select «Сессия инспекции» у неё больше нет.
  * API подменяется page.route как в spectrogram.spec.ts. */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -68,8 +70,12 @@ function mockSessionDetail(backend: MockLntBackend, id: string, metricsRel: stri
 async function openW1Chrome(page: Page, id: string): Promise<void> {
   await page.goto(INSPECT);
   await expect(page.locator(".app-v6")).toBeVisible();
-  await page.locator(".v6-extras details[data-extra='w1'] summary").click();
-  await page.selectOption('select[aria-label="Сессия инспекции"]', id);
+  const section = page.locator(".v6-extras");
+  // B2: базу пары уже выбрала рейка каталога (авто-подхват первого элемента);
+  // select как второй источник выбора удалён — осталось пассивное отображение.
+  await expect(section.locator("[data-session-id]")).toHaveText(id);
+  await expect(section.locator("select")).toHaveCount(0);
+  await section.locator("details[data-extra='w1'] > summary").click();
 }
 
 async function expectNoErrorBand(page: Page): Promise<void> {
@@ -114,6 +120,34 @@ test("measurement fixtures: THD verdict and four scalars, no banner, no eight pa
   await expectNoErrorBand(page);
 });
 
+/* ---------- B2: единый выбор сессии и один detail на пару ---------- */
+
+test("B2: detail базы — один запрос на пару, каталог — boot и рейка", async ({ page }) => {
+  // Given: одна сессия в каталоге → одна пара (база t1-measurement, б нет);
+  // указатель анализа на месте, артефакты не засеяны (404).
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t1-measurement");
+  mockSessionDetail(backend, "t1-measurement", "measurement/metrics.json");
+  backend.seedAnalysisPointer("t1-measurement", { artifact_key: ARTIFACT_KEY });
+  const detailRequests: string[] = [];
+  const catalogRequests: string[] = [];
+  page.on("request", (request) => {
+    const urlPath = new URL(request.url()).pathname.replace(/^\/static\/v2/, "");
+    if (/^\/api\/sessions\/[^/]+$/.test(urlPath)) detailRequests.push(urlPath);
+    if (urlPath.startsWith("/api/catalog/sessions")) catalogRequests.push(urlPath);
+  });
+
+  // When: страница загружена, analysis-v2 раскрыт и дочитал артефакты.
+  await openW1Chrome(page, "t1-measurement");
+  await expect(page.locator(".v6-extras [data-absent-panel]")).toHaveCount(6);
+
+  // Then: спектр, лента и analysis-v2 делят один detail базы; второй вызов
+  // catalogSessions принадлежит рейке, у секции своего запроса нет.
+  expect(detailRequests).toEqual(["/api/sessions/t1-measurement"]);
+  expect(catalogRequests).toHaveLength(2);
+  await expectNoErrorBand(page);
+});
+
 test("v1-only: exact Russian banner and CTA, no fake 0 scalars", async ({ page }) => {
   // Given: v1 metrics/spectrum only — no pointer, no Batch 2–6 artifacts.
   const backend = installMockBackend(page);
@@ -133,5 +167,441 @@ test("v1-only: exact Russian banner and CTA, no fake 0 scalars", async ({ page }
   await expect(chrome.getByText("Burst Count", { exact: true })).toHaveCount(0);
   await expect(chrome.locator('[data-scalar="burst-count"]')).toHaveCount(0);
   await expect(chrome.locator(".lnt-w1-panel")).toHaveCount(0);
+  await expectNoErrorBand(page);
+});
+
+/* ---------- Расширенный прогон: карточки 18 семейств (вариант «Карточки») ---------- */
+
+const CHAR_SESSION = "cap-20260805-180623-very-long-suffix";
+const CHAR_ARTIFACT = "art-char-8f21c4d2";
+/* Кнопка прогона: строка дублируется локально, как BANNER/CTA выше —
+ * импорт extendedRun.ts тянет CSS, который транспилятор спеков не парсит. */
+const EXTENDED_RUN_BUTTON = "Запустить расширенный анализ";
+
+function charFamily(
+  id: string,
+  status: string,
+  codes: readonly string[],
+  stored: number,
+  missing: number,
+  lowHz: number,
+  highHz: number,
+  windowS: number,
+  qcPassed: boolean,
+): unknown {
+  return {
+    family_id: id,
+    status,
+    reason_codes: [...codes],
+    comparison_summary: [],
+    support: {
+      stored_count: stored,
+      missing_count: missing,
+      selection_rule: "declared_band_full_record",
+    },
+    band: { low_hz: lowHz, high_hz: highHz },
+    window: {
+      kind: "hann",
+      duration_s: windowS,
+      sample_count: stored + missing,
+      overlap_fraction: 0.5,
+    },
+    qc: { passed: qcPassed, reason_codes: [...codes] },
+  };
+}
+
+/** Реалистичная выдача characterization-v1: 1 доступно, 4 частично, 13 недоступно. */
+function charPayload(): unknown {
+  const families = [
+    charFamily("f01_phase_cycle", "available", [], 4096, 0, 45, 2000, 0.2, true),
+    charFamily(
+      "f02_amplitude_time_shape",
+      "partial",
+      ["baseline_unavailable"],
+      312,
+      88,
+      45,
+      2000,
+      0.04,
+      false,
+    ),
+    charFamily(
+      "f03_interharmonic_tracking",
+      "partial",
+      ["artifact_limit"],
+      1840,
+      256,
+      3000,
+      200000,
+      0.2,
+      false,
+    ),
+    charFamily(
+      "f04_multicycle_periodicity",
+      "unavailable",
+      ["carrier_unavailable"],
+      0,
+      20480,
+      45,
+      2000,
+      1,
+      false,
+    ),
+    charFamily(
+      "f05_phase_conditioned_statistics",
+      "unavailable",
+      ["phase_reference_unavailable"],
+      0,
+      4096,
+      45,
+      2000,
+      0.2,
+      false,
+    ),
+    charFamily(
+      "f06_modulation_trajectories",
+      "partial",
+      ["band_above_nyquist"],
+      7420,
+      2820,
+      30,
+      500,
+      0.5,
+      false,
+    ),
+    charFamily(
+      "f07_comb_sideband_cepstrum",
+      "unavailable",
+      ["artifact_limit"],
+      0,
+      2048,
+      45,
+      8000,
+      0.1,
+      false,
+    ),
+    charFamily(
+      "f08_transient_morphology",
+      "partial",
+      ["too_few_samples"],
+      96,
+      41,
+      45,
+      2000,
+      0.04,
+      false,
+    ),
+    charFamily(
+      "f09_event_ordering",
+      "unavailable",
+      ["insufficient_support"],
+      0,
+      4096,
+      45,
+      2000,
+      0.2,
+      false,
+    ),
+    charFamily(
+      "f10_threshold_episode_surface",
+      "unavailable",
+      ["phase_reference_unavailable"],
+      0,
+      4096,
+      45,
+      2000,
+      0.2,
+      false,
+    ),
+    charFamily(
+      "f11_conditional_distributions",
+      "unavailable",
+      ["insufficient_support"],
+      0,
+      4096,
+      45,
+      2000,
+      0.2,
+      false,
+    ),
+    charFamily(
+      "f12_spectral_kurtosis",
+      "unavailable",
+      ["artifact_limit", "insufficient_frames"],
+      0,
+      20480,
+      500,
+      40000,
+      0.1,
+      false,
+    ),
+    charFamily(
+      "f13_band_envelope_coactivity",
+      "unavailable",
+      ["channel_missing"],
+      0,
+      10240,
+      30,
+      500,
+      0.5,
+      false,
+    ),
+    charFamily(
+      "f14_cross_channel_event_association",
+      "unavailable",
+      ["channel_missing"],
+      0,
+      4096,
+      45,
+      2000,
+      0.2,
+      false,
+    ),
+    charFamily(
+      "f15_interpretable_modes",
+      "unavailable",
+      ["insufficient_support"],
+      0,
+      4096,
+      45,
+      8000,
+      0.2,
+      false,
+    ),
+    charFamily(
+      "f16_multiscale_memory",
+      "unavailable",
+      ["phase_reference_unavailable"],
+      0,
+      20480,
+      45,
+      2000,
+      1,
+      false,
+    ),
+    charFamily(
+      "f17_cyclic_spectral_coherence",
+      "unavailable",
+      ["cyclic_frequency_off_grid"],
+      0,
+      20480,
+      500,
+      40000,
+      0.1,
+      false,
+    ),
+    charFamily(
+      "f18_bicoherence_triads",
+      "unavailable",
+      ["artifact_limit"],
+      0,
+      4096,
+      45,
+      8000,
+      0.2,
+      false,
+    ),
+  ];
+  const first = families[0] as Record<string, unknown>;
+  first.comparison_summary = [{ name: "f1_hz", value: 50.01, unit: "Hz" }];
+  return { schema_version: 2, families };
+}
+
+function charRunSnapshot(status: string, artifactKey: string | null): unknown {
+  return {
+    job_id: "job-char-1",
+    kind: "analysis",
+    status,
+    stage: "",
+    completed: 1,
+    total: 1,
+    artifact_key: artifactKey,
+    error: null,
+  };
+}
+
+/** Рецепты и задачи прогона: мок-бэкенд их не знает, перехват после installMockBackend. */
+async function mockCharacterizationRoutes(page: Page): Promise<void> {
+  await page.route(/\/api\/analysis\/(recipes|runs)/, async (route) => {
+    const path = new URL(route.request().url()).pathname.replace(/^\/static\/v2/, "");
+    const method = route.request().method();
+    const json = (body: unknown): Promise<void> =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+    if (path === "/api/analysis/recipes" && method === "GET") {
+      await json({
+        items: [
+          {
+            recipe_id: "rec-characterization-v1",
+            name: "characterization-v1",
+            sha256: "c".repeat(64),
+            recipe: { kind: "characterization" },
+          },
+        ],
+      });
+      return;
+    }
+    if (path === "/api/analysis/runs" && method === "POST") {
+      await json(charRunSnapshot("running", null));
+      return;
+    }
+    if (path.startsWith("/api/analysis/runs/") && method === "GET") {
+      await json(charRunSnapshot("succeeded", CHAR_ARTIFACT));
+      return;
+    }
+    await route.fallback();
+  });
+}
+
+test("extended run: card grid groups 18 families by status with RU reasons", async ({ page }) => {
+  // Given: characterization-v1 в каталоге рецептов и бандл с длинным id сессии.
+  const backend = installMockBackend(page);
+  mockCatalog(backend, CHAR_SESSION);
+  mockSessionDetail(backend, CHAR_SESSION, "measurement/metrics.json");
+  backend.seedArtifact(
+    CHAR_SESSION,
+    CHAR_ARTIFACT,
+    "characterization.json",
+    JSON.stringify(charPayload()),
+  );
+  await mockCharacterizationRoutes(page);
+
+  // When
+  await openW1Chrome(page, CHAR_SESSION);
+  const extended = page.locator(".lnt-w1-extended");
+  await extended.getByRole("button", { name: EXTENDED_RUN_BUTTON }).click();
+
+  // Then: группы по статусу со счётчиками, RU-фраза и сырой код на карточке.
+  await expect(extended.locator('[data-family-group="available"] [data-family-id]')).toHaveCount(1);
+  await expect(extended.locator('[data-family-group="partial"] [data-family-id]')).toHaveCount(4);
+  await expect(extended.locator('[data-family-group="unavailable"] [data-family-id]')).toHaveCount(
+    13,
+  );
+  await expect(extended.locator('[data-group-count="unavailable"]')).toHaveText("13 из 18");
+  const f17 = extended.locator('[data-family-id="f17_cyclic_spectral_coherence"]');
+  await expect(f17).toContainText("циклическая частота вне сетки");
+  await expect(f17).toContainText("cyclic_frequency_off_grid");
+  await expect(extended.locator(".lnt-xr-note")).toContainText(CHAR_SESSION);
+  await expectNoErrorBand(page);
+});
+
+/* F3-F3: последняя интерактивная строка колонки обязана уходить выше
+ * фиксированного футера — иначе центр CTA ловит клик под статус-баром. */
+test("extended-run CTA clears the fixed statusbar at the end of the scroll", async ({ page }) => {
+  // Given: 1440x900, w1-детали раскрыты, сессия выбрана.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t1-cta-clear");
+  mockSessionDetail(backend, "t1-cta-clear", "v1-only/metrics.json");
+
+  // When: прокрутка главной колонки до конца.
+  await openW1Chrome(page, "t1-cta-clear");
+  const geometry = await page.evaluate((label) => {
+    const button = [...document.querySelectorAll("button")].find((n) => n.textContent === label);
+    const colMain = document.querySelector(".app-v6 .col-main");
+    if (button === undefined || colMain === null) return null;
+    colMain.scrollTop = colMain.scrollHeight;
+    const col = colMain.getBoundingClientRect();
+    const box = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return {
+      clearance: Math.round(col.bottom - box.bottom),
+      hitInside: button.contains(hit),
+    };
+  }, EXTENDED_RUN_BUTTON);
+
+  // Then: запас не меньше высоты футера .statusbar (32px), клик попадает в кнопку.
+  expect(geometry).not.toBeNull();
+  expect(geometry?.clearance).toBeGreaterThanOrEqual(32);
+  expect(geometry?.hitInside).toBe(true);
+});
+
+/* ---------- Задача 8: post-job reload + честный SSE-прогресс ---------- */
+
+test("T8-1: rerun по CTA — прогресс по реальным SSE-стадиям, пара перезабирается без перевыбора", async ({
+  page,
+}) => {
+  // Given: v1-сессия без v2-указателя: баннер на месте, панелей нет;
+  // счётчик detail-запросов фиксирует единственный boot-фетч пары.
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t8-rerun");
+  mockSessionDetail(backend, "t8-rerun", "v1-only/metrics.json");
+  const detailRequests: string[] = [];
+  page.on("request", (request) => {
+    const urlPath = new URL(request.url()).pathname.replace(/^\/static\/v2/, "");
+    if (urlPath === "/api/sessions/t8-rerun") detailRequests.push(urlPath);
+  });
+  await openW1Chrome(page, "t8-rerun");
+  const chrome = page.locator(".lnt-w1-chrome");
+  await expect(chrome.locator(".lnt-w1-banner")).toBeVisible();
+  const bootDetailRequests = detailRequests.length;
+
+  // When: CTA запускает задачу анализа; первая SSE-доставка честно показывает
+  // стадию анализа — серийных данных нет, доля не выдумывается (indeterminate).
+  await page.getByRole("button", { name: CTA }).click();
+  const rail = chrome.locator(".lnt-w1-job-rail");
+  await expect(rail).toBeVisible();
+  await expect(rail.locator(".lnt-progress-text")).toHaveText("Стадия: анализ");
+  await expect(rail.locator(".lnt-progress-bar")).toHaveAttribute("aria-busy", "true");
+  // «задача завершилась и записала v2-артефакты»: сиды обновлены ДО доставки
+  // терминального снимка — перезагрузка обязана подхватить их сама.
+  backend.seedAnalysisPointer("t8-rerun", { artifact_key: ARTIFACT_KEY });
+  mockSessionDetail(backend, "t8-rerun", "measurement/metrics.json");
+  backend.seedArtifact(
+    "t8-rerun",
+    ARTIFACT_KEY,
+    "harmonics.json",
+    readFixture("measurement/harmonics.json"),
+  );
+  backend.pumpAll();
+
+  // Then: терминальное состояние прогресса (полный бар, без aria-busy) и
+  // данные пары перезабраны БЕЗ ручного перевыбора: detail запрошен снова,
+  // v2-панели и скаляры появились, баннер ушёл, сводка пересчитана.
+  await expect(rail.locator(".lnt-progress-text")).toHaveText("Готово");
+  await expect(rail.locator(".lnt-progress-bar")).toHaveAttribute("aria-valuenow", "1");
+  await expect(rail.locator(".lnt-progress-bar")).not.toHaveAttribute("aria-busy");
+  expect(detailRequests).toHaveLength(bootDetailRequests + 1);
+  await expect(chrome.locator('[data-panel="harmonics"]')).toHaveCount(1);
+  await expect(chrome.locator("[data-scalar]")).toHaveCount(2);
+  await expect(chrome.locator(".lnt-w1-banner")).toBeHidden();
+  await expect(chrome.locator("[data-role=w1-sum-value]")).toContainText("панелей 1");
+  await expectNoErrorBand(page);
+});
+
+test("T8-2: обрыв SSE mid-job — честный failed(reason) из словаря, контролы разблокированы", async ({
+  page,
+}) => {
+  // Given: v1-сессия; задача анализа запущена и прошла в стадию анализа,
+  // job-busy держит контролы пары заблокированными.
+  const backend = installMockBackend(page);
+  mockCatalog(backend, "t8-break");
+  mockSessionDetail(backend, "t8-break", "v1-only/metrics.json");
+  await openW1Chrome(page, "t8-break");
+  const chrome = page.locator(".lnt-w1-chrome");
+  await expect(chrome.locator(".lnt-w1-banner")).toBeVisible();
+  await page.getByRole("button", { name: CTA }).click();
+  const rail = chrome.locator(".lnt-w1-job-rail");
+  await expect(rail.locator(".lnt-progress-text")).toHaveText("Стадия: анализ");
+  await expect(page.locator(".pair-slot[data-pair='a']")).toBeDisabled();
+
+  // When: сервер «гаснет» mid-job — SSE-поток рвётся, опрос задачи отдаёт 500.
+  await page.route(/\/api\/jobs\/[^/]+\/events$/, async (route) => {
+    await route.abort();
+  });
+  await page.route(/\/api\/jobs\/[^/]+$/, async (route) => {
+    await route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "задача недоступна" }),
+    });
+  });
+
+  // Then: подряд неудачные опросы прерывают ожидание — причина честная, из
+  // словаря задачи 3 (canned-префикс + серверный detail), busy снят, слоты живы.
+  await expect(rail.locator(".lnt-w1-job-status")).toContainText("Сервер вернул ошибку.", {
+    timeout: 20000,
+  });
+  await expect(rail.locator(".lnt-w1-job-status")).toContainText("задача недоступна");
+  await expect(page.locator(".pair-slot[data-pair='a']")).not.toBeDisabled();
   await expectNoErrorBand(page);
 });

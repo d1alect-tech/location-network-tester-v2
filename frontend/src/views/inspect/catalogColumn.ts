@@ -1,25 +1,27 @@
-import type { CatalogQuery, CatalogSession } from "../../api/types";
+import type { CatalogSession } from "../../api/types";
 import { clearElement, el } from "../../components/primitives/dom";
 import { type CatalogSort, type SortDir, buildCatalogRows } from "./catalogColumnModel";
 import { renderCatalogRow } from "./catalogColumnRender";
-import type { PairStateHandle } from "./pairState";
+import type { JoinedCatalogClient } from "./catalogJoinedSource";
+import { joinKey, loadJoinedCatalog } from "./catalogJoinedSource";
+import type { PairSlot, PairStateHandle } from "./pairState";
 
-export interface CatalogColumnClient {
-  catalogSessions(
-    query?: CatalogQuery,
-    options?: unknown,
-  ): Promise<{ readonly items: readonly CatalogSession[] }>;
-}
+export type CatalogColumnClient = JoinedCatalogClient;
 
 export interface CatalogColumnOptions {
   readonly client: CatalogColumnClient;
   readonly pair: PairStateHandle;
-  readonly onPick: (sessionId: string) => void;
+  readonly onPick: (loadKey: string) => void;
+  /** M1 (todo 4): точное назначение слота кнопкой «А»/«Б» строки;
+   * провод к pair.assignSlot появляется в todo 5 (inspectV6). */
+  readonly onAssign?: (slot: PairSlot, loadKey: string) => void;
 }
 
 export interface CatalogColumnHandle {
   readonly root: HTMLElement;
   reload(): Promise<void>;
+  /** Слот-клик pairbar (todo 5): фокус возвращается на первый ряд рейла. */
+  focusRail(slot: PairSlot): void;
 }
 
 function assertNever(value: never): never {
@@ -35,6 +37,8 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
   let dir: SortDir = "desc";
   let query = "";
   let sessions: readonly CatalogSession[] = [];
+  let analyzedByDir: ReadonlyMap<string, boolean> = new Map();
+  let invalidByDir: ReadonlyMap<string, string> = new Map();
   let activeSession: string | null = null;
 
   const found = el("span", { className: "cat-found", attrs: { "data-cat-found": "" } });
@@ -44,6 +48,7 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
       type: "search",
       "data-cat-search": "",
       "aria-label": "Поиск по метке",
+      placeholder: "Поиск по метке",
     },
   });
   const clear = el("button", {
@@ -54,46 +59,35 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
   const labelBtn = el("button", {
     className: "cat-sort",
     text: "Метка",
-    attrs: { type: "button", "data-cat-sort": "label" },
+    attrs: { type: "button", "data-cat-sort": "label", "aria-sort": "none" },
   });
   const dateBtn = el("button", {
     className: "cat-sort",
     text: "Дата",
-    attrs: { type: "button", "data-cat-sort": "date" },
+    attrs: { type: "button", "data-cat-sort": "date", "aria-sort": "none" },
   });
-  const labelTh = el("th", { attrs: { scope: "col" } }, [labelBtn]);
-  const dateTh = el("th", { attrs: { scope: "col" } }, [dateBtn]);
+  const sortbar = el("div", { className: "cat-sortbar" }, [labelBtn, dateBtn]);
   const tbody = el("tbody");
-  const table = el("table", { className: "tbl tbl-cat" }, [
-    el("thead", {}, [
-      el("tr", {}, [
-        el("th", { attrs: { scope: "col" } }),
-        labelTh,
-        el("th", { attrs: { scope: "col" }, text: "Тип" }),
-        dateTh,
-      ]),
-    ]),
-    tbody,
-  ]);
+  const table = el("table", { className: "tbl tbl-cat" }, [tbody]);
 
   const root = el("section", { className: "panel cat-v6" }, [
     el("div", { className: "panel-hd" }, [
       el("h2", { className: "panel-title", text: "Каталог" }),
       found,
     ]),
-    el("div", { className: "cat-tools" }, [search, clear]),
+    el("div", { className: "cat-tools" }, [search, clear, sortbar]),
     table,
   ]);
 
   function syncAriaSort(): void {
     switch (sort) {
       case "label":
-        labelTh.setAttribute("aria-sort", ariaSortValue(dir));
-        dateTh.setAttribute("aria-sort", "none");
+        labelBtn.setAttribute("aria-sort", ariaSortValue(dir));
+        dateBtn.setAttribute("aria-sort", "none");
         return;
       case "date":
-        dateTh.setAttribute("aria-sort", ariaSortValue(dir));
-        labelTh.setAttribute("aria-sort", "none");
+        dateBtn.setAttribute("aria-sort", ariaSortValue(dir));
+        labelBtn.setAttribute("aria-sort", "none");
         return;
       default:
         assertNever(sort);
@@ -112,9 +106,27 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
         renderCatalogRow(row, {
           grouped: sort === "date",
           pair,
-          onPick: (id) => {
-            opts.onPick(id);
-            tbody.querySelector<HTMLElement>(`tr[data-session="${CSS.escape(id)}"]`)?.focus();
+          analyzedOf: (session) => analyzedByDir.get(joinKey(session)),
+          invalidOf: (session) => invalidByDir.get(joinKey(session)),
+          onPick: (key) => {
+            opts.onPick(key);
+            const escaped = CSS.escape(key);
+            tbody
+              .querySelector<HTMLElement>(
+                `tr[data-rowkey="${escaped}"], tr[data-session="${escaped}"]`,
+              )
+              ?.focus();
+          },
+          onAssign: (slot, key) => {
+            opts.onAssign?.(slot, key);
+            // Фокус re-grab — паттерн onPick-замыкания: пара меняется,
+            // render пересобирает tbody, фокус возвращается на ту же строку.
+            const escaped = CSS.escape(key);
+            tbody
+              .querySelector<HTMLElement>(
+                `tr[data-rowkey="${escaped}"], tr[data-session="${escaped}"]`,
+              )
+              ?.focus();
           },
           onFocus: (id) => {
             activeSession = id;
@@ -122,12 +134,14 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
         }),
       );
     }
-    const renderedSessions = [...tbody.querySelectorAll<HTMLElement>("tr[data-session]")];
-    const active = renderedSessions.find((row) => row.dataset.session === activeSession);
+    const renderedSessions = [...tbody.querySelectorAll<HTMLElement>("tr[data-rowkey]")];
+    const active = renderedSessions.find(
+      (row) => row.dataset.rowkey === activeSession || row.dataset.session === activeSession,
+    );
     const tabStop = active ?? renderedSessions[0];
     if (tabStop !== undefined) {
       tabStop.tabIndex = 0;
-      activeSession = tabStop.dataset.session ?? null;
+      activeSession = tabStop.dataset.rowkey ?? tabStop.dataset.session ?? null;
     }
     found.textContent = String(visible);
   }
@@ -168,11 +182,39 @@ export function createCatalogColumn(opts: CatalogColumnOptions): CatalogColumnHa
     render();
   });
 
+  // M1 (todo 5): transient-пульс кнопок назначения. animationend всплывает
+  // до document; листенёр снимает [data-pulse] у любой кнопки. Под
+  // prefers-reduced-motion токен вовсе не ставится (focusRail), поэтому
+  // «зависший» атрибут с animation:none невозможен.
+  document.addEventListener("animationend", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.hasAttribute("data-pulse")) {
+      target.removeAttribute("data-pulse");
+    }
+  });
+
+  function focusRail(slot: PairSlot): void {
+    // M1: слот-клик pairbar НЕ мутирует пару; фокус — на первый ряд рейла
+    // + пульс кнопок назначаемого слота (токен-ассерты, не тайминг).
+    const rows = [...tbody.querySelectorAll<HTMLElement>("tr[data-rowkey]")];
+    const first = rows[0];
+    if (first === undefined) return;
+    for (const item of rows) item.tabIndex = item === first ? 0 : -1;
+    first.focus();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    for (const button of tbody.querySelectorAll<HTMLElement>(`[data-assign="${slot}"]`)) {
+      button.setAttribute("data-pulse", "");
+    }
+  }
+
   return {
     root,
+    focusRail,
     async reload(): Promise<void> {
-      const page = await opts.client.catalogSessions({ page_size: 200 });
-      sessions = page.items;
+      const page = await loadJoinedCatalog(opts.client);
+      sessions = page.sessions;
+      analyzedByDir = page.analyzedByDir;
+      invalidByDir = page.invalidByDir;
       render();
     },
   };

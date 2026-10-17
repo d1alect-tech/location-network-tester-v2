@@ -1,0 +1,26 @@
+/* Причина «н/д» плиток ленты анализа (задача 9, F-1): видимый соседний узел
+ * span.band-cell-reason ПОСЛЕ dd. Скоуп .app-v6 (не :root), только токены;
+ * прецедент паттерна — w1SumReason.css (задача 7). Мелкий вторичный текст
+ * как .band-note/t-unit; усечение эллипсисом, сетка и число плиток не
+ * меняются: узел добавляется внутри dl.band-cell. */
+
+.app-v6 .band-cell .band-cell-reason {
+  font: 400 11px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Задача 10 (D3): причина отсутствия Δ у таблицы пиков — тот же видимый
+ * соседний узел, но в шапке таблицы (.band-peaks), НЕ внутри td.delta:
+ * пиннутое значение ячейки «—» байт-в-байт не меняется. Токены те же. */
+.app-v6 .band-peaks .band-cell-reason {
+  font: 400 11px / 16px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

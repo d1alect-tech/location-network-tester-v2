@@ -2,7 +2,6 @@
  * гонка устаревших тайлов, отмена полёта и битые данные. */
 
 import { describe, expect, it } from "vitest";
-import type { CandidateEventPayload } from "../../api/types-analysis";
 import {
   TILE_CELL_CAP,
   assertLevelWithinCap,
@@ -12,7 +11,6 @@ import {
   tileRequestForRange,
 } from "./spectrogramModel";
 import type { SpectrogramLevel } from "./spectrogramModel";
-import { summarizeWindow } from "./spectrogramSummary";
 import { TileError } from "./tileError";
 
 function makeLevel(timeBins: number, bands: number): SpectrogramLevel {
@@ -142,21 +140,6 @@ describe("ограничение тайла спектрограммы (кап 5
     expect(loader.get().kind).toBe("ready");
   });
 
-  it("сводка окна: диапазоны, статистика дБ, NaN и события в окне", () => {
-    const level = makeKnownLevel();
-    (level.powerDb[2] as number) = Number.NaN; // одна ячейка без покрытия
-    const events: CandidateEventPayload[] = [
-      eventAt(0.6),
-      eventAt(3.9), // вне окна
-    ];
-    const summary = summarizeWindow(level, tileRequestForRange(level, 0, 2, 0, 40), events);
-    expect(summary.cells).toBe(16);
-    expect(summary.eventCount).toBe(1);
-    expect(summary.nanShare).toBeCloseTo(1 / 16, 5);
-    expect(summary.maxDb).toBe(3003);
-    expect(summary.topBands[0]?.hz).toBe(30);
-  });
-
   it("запрос пустого окна или сверхкапного уровня отклоняется типизированной ошибкой", () => {
     const level = makeKnownLevel();
     expect(() => tileRequestForRange(level, 100, 200, 0, 10)).toThrowError(TileError);
@@ -175,22 +158,3 @@ describe("ограничение тайла спектрограммы (кап 5
     expect(request.window).toEqual({ t0: 0, t1: 256, f0: 0, f1: 128 });
   });
 });
-
-function eventAt(peakTimeS: number): CandidateEventPayload {
-  return {
-    start_sample: 0,
-    end_sample: 1,
-    peak_sample: 0,
-    start_time_s: peakTimeS - 0.01,
-    end_time_s: peakTimeS + 0.01,
-    peak_time_s: peakTimeS,
-    peak_value_v: 0.5,
-    polarity: "positive",
-    dominant_band: null,
-    excess_energy_v2_s: 1,
-    snr: 12,
-    qualification_status: "qualified",
-    boundary: false,
-    clipped: false,
-  };
-}

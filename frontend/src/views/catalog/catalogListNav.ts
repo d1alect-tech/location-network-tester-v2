@@ -20,6 +20,32 @@ export function syncRowTabindex(body: HTMLElement, activeIndex: number): void {
   }
 }
 
+/** Идентификатор строки под фокусом внутри выдачи, иначе null.
+ * Пересборка tbody снимает фокус на <body> — токен нужен для возврата. */
+export function rememberRowFocus(body: HTMLElement): string | null {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || !body.contains(active)) return null;
+  return active.getAttribute("data-session-id");
+}
+
+/** Возвращает фокус строке после пересборки; селектор без CSS.escape —
+ * сравнение атрибутов в цикле не боится кавычек в идентификаторе.
+ * Строка ушла фильтром — фокус на активную строку выдачи, не на <body>. */
+export function restoreRowFocus(
+  body: HTMLElement,
+  sessionId: string | null,
+  fallbackIndex = 0,
+): void {
+  if (sessionId === null) return;
+  for (const row of body.querySelectorAll<HTMLElement>(".lnt-cat-row")) {
+    if (row.getAttribute("data-session-id") === sessionId) {
+      row.focus();
+      return;
+    }
+  }
+  body.querySelector<HTMLElement>(`[data-pos="${String(fallbackIndex)}"]`)?.focus();
+}
+
 export function ensureRowVisible(table: HTMLElement, body: HTMLElement, index: number): void {
   const wrap = table.closest(".tbl-wrap");
   const row = body.querySelector(`[data-pos="${index}"]`);

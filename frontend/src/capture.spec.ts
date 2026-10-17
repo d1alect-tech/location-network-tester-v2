@@ -1,12 +1,16 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
 import type { JobSnapshot } from "./api/types-jobs";
 import { installMockBackend } from "./testkit/mockBackend";
 
 /** E2E рабочего процесса захвата (Todo 40): симулятор безопасен для
  * автоматизации; реальные пути устройства показывают диагностику, но запись
- * с сетью 230 В никогда не автоматизируется. */
+ * с сетью 230 В никогда не автоматизируется.
+ *
+ * С G4 (ui-refactor-2) раздел — визард: шаг 1 режим и источник, шаг 2
+ * параметры, шаг 3 запуск и журнал. Проза-пины сохранены дословно; в потоки
+ * добавлена навигация «Далее» (документация изменений — evidence task-7). */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,6 +20,19 @@ const EVIDENCE_DIR = resolve(
   "../../../.omo/start-work/evidence/task-40-lnt-complete-redesign",
 );
 const BASE = "http://127.0.0.1:4101/static/v2/";
+
+/** Шаг 2 «Параметры»: форма по умолчанию валидна, гейт проходит. */
+async function gotoStep2(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Далее: параметры" }).click();
+  await expect(page.locator('.capture-step[data-capture-step="2"]')).toBeVisible();
+}
+
+/** Шаг 3 «Запуск и прогресс»: старт, устройство, live-грам и журнал. */
+async function gotoStep3(page: Page): Promise<void> {
+  await gotoStep2(page);
+  await page.getByRole("button", { name: "Далее: запуск" }).click();
+  await expect(page.locator('.capture-step[data-capture-step="3"]')).toBeVisible();
+}
 
 function interruptedJobFixture(): JobSnapshot {
   return {
@@ -42,16 +59,21 @@ test.describe("capture workflow", () => {
     const modeCards = page.locator('.capture-mode-group input[name="capture-mode"]');
     await expect(modeCards).toHaveCount(4);
 
-    // Превью по умолчанию: RC-режим, два канала, база видима.
+    // Превью по умолчанию: боковая колонка визарда видима на каждом шаге.
     await expect(page.locator(".capture-preview-list")).toContainText("RC-развязка");
-    await expect(page.locator(".capture-channels-value")).toHaveText("Каналы: 2 (CH1 + CH2)");
     await expect(page.locator(".capture-preview-list")).toContainText("Базовая сессия");
 
-    // Скриншот артефакта ручной проверки: экран настройки режима.
+    // Скриншот артефакта ручной проверки: экран настройки режима (шаг 1).
     await page.screenshot({ path: resolve(EVIDENCE_DIR, "manual-mode-setup.png"), fullPage: true });
 
+    // Строка каналов живёт в параметрах (шаг 2): дефолт — два канала RC-режима.
+    await gotoStep2(page);
+    await expect(page.locator(".capture-channels-value")).toHaveText("Каналы: 2 (CH1 + CH2)");
+
     // Переключение в line-quality: каналы фиксируются, строка базы исчезает из превью.
+    await page.getByRole("button", { name: "Назад: режим" }).click();
     await page.locator('label[for="capture-mode-line_quality"]').click();
+    await gotoStep2(page);
     await expect(page.locator(".capture-channels-value")).toHaveText("Каналы: 1 (только CH1)");
     await expect(page.locator(".capture-preview-list")).toContainText(
       "Трансформаторный пробник 230:6, множитель 10x",
@@ -65,6 +87,14 @@ test.describe("capture workflow", () => {
     const backend = installMockBackend(page);
     await page.goto(`${BASE}#/capture`);
     await expect(page.locator(".view-title")).toHaveText("Захват");
+
+    // Клавиатурный путь через визард: фокус на «Далее» и активация Enter'ом.
+    await page.getByRole("button", { name: "Далее: параметры" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator('.capture-step[data-capture-step="2"]')).toBeVisible();
+    await page.getByRole("button", { name: "Далее: запуск" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator('.capture-step[data-capture-step="3"]')).toBeVisible();
 
     // Клавиатурный запуск: фокус на кнопку старта и активация Enter'ом.
     const startButton = page.getByRole("button", { name: "Запустить запись" });
@@ -105,6 +135,7 @@ test.describe("capture workflow", () => {
     await page.goto(`${BASE}#/capture`);
     await page.locator('label[for="capture-mode-rc_measurement"]').click();
 
+    await gotoStep3(page);
     const startButton = page.getByRole("button", { name: "Запустить запись" });
     await startButton.click();
     const timeline = page.locator(".capture-timeline");
@@ -117,8 +148,10 @@ test.describe("capture workflow", () => {
     const backend = installMockBackend(page);
     await page.goto(`${BASE}#/capture`);
     await page.locator('label[for="capture-mode-line_quality"]').click();
+    await gotoStep2(page);
     await expect(page.locator(".capture-channels-value")).toHaveText("Каналы: 1 (только CH1)");
 
+    await page.getByRole("button", { name: "Далее: запуск" }).click();
     const startButton = page.getByRole("button", { name: "Запустить запись" });
     await startButton.click();
     const timeline = page.locator(".capture-timeline");
@@ -134,11 +167,13 @@ test.describe("capture workflow", () => {
     const backend = installMockBackend(page);
     await page.goto(`${BASE}#/capture`);
     await page.locator('label[for="capture-mode-self_noise"]').click();
+    await gotoStep2(page);
 
     // Базовая сессия неприменима в самошуме — поле скрыто целиком.
     const baselineInput = page.locator('input[name="baseline_session"]');
     await expect(baselineInput).toBeHidden();
 
+    await page.getByRole("button", { name: "Далее: запуск" }).click();
     const startButton = page.getByRole("button", { name: "Запустить запись" });
     await startButton.click();
     backend.pumpAll();
@@ -149,10 +184,12 @@ test.describe("capture workflow", () => {
     const backend = installMockBackend(page);
     await page.goto(`${BASE}#/capture`);
 
-    // Серия из трёх повторов за раскрытием «Серия и протокол».
+    // Серия из трёх повторов за раскрытием «Серия и протокол» (шаг 2).
+    await gotoStep2(page);
     await page.getByRole("button", { name: "Серия и протокол" }).click();
     await page.locator('input[name="repeat"]').fill("3");
 
+    await page.getByRole("button", { name: "Далее: запуск" }).click();
     const startButton = page.getByRole("button", { name: "Запустить запись" });
     await startButton.click();
     const timeline = page.locator(".capture-timeline");
@@ -187,8 +224,9 @@ test.describe("capture workflow", () => {
     const backend = installMockBackend(page, { deviceState: "driver_missing" });
     await page.goto(`${BASE}#/capture`);
 
-    // Переключаем источник на осциллограф: только этот путь требует железо.
+    // Переключаем источник на осциллограф (шаг 1): только этот путь требует железо.
     await page.locator('label[for="capture-source-device"]').click();
+    await gotoStep3(page);
 
     await page.getByRole("button", { name: "Проверить устройство" }).click();
     const panel = page.locator(".capture-device-panel");
@@ -208,6 +246,9 @@ test.describe("capture workflow", () => {
     installMockBackend(page, { existingJob: interruptedJobFixture() });
     await page.goto(`${BASE}#/capture`);
 
+    // Активная/прерванная задача: визард сразу открывает шаг 3 (журнал).
+    await expect(page.locator('.capture-step[data-capture-step="3"]')).toBeVisible();
+
     const recovery = page.locator(".capture-recovery-banner");
     await expect(recovery).toBeVisible();
     await expect(recovery).toContainText("Задача была прервана из-за перезапуска сервера");
@@ -218,6 +259,7 @@ test.describe("capture workflow", () => {
   test("timeline shows onboarding when no job exists yet (queue A1)", async ({ page }) => {
     installMockBackend(page);
     await page.goto(`${BASE}#/capture`);
+    await gotoStep3(page);
 
     const timeline = page.locator(".capture-timeline");
     await expect(timeline).toBeVisible();
@@ -237,6 +279,11 @@ test.describe("capture workflow", () => {
     // за правую границу вьюпорта (общая навигация оболочки — зона T38).
     const clipped = await measureWorstOverflow(page);
     expect(clipped).toBeLessThanOrEqual(0);
+
+    // Старт живёт на шаге 3: проходим визард и проверяем кнопку в вьюпорте.
+    await gotoStep3(page);
+    const clippedStep3 = await measureWorstOverflow(page);
+    expect(clippedStep3).toBeLessThanOrEqual(0);
     const startButton = page.getByRole("button", { name: "Запустить запись" });
     await startButton.scrollIntoViewIfNeeded();
     await expect(startButton).toBeInViewport();

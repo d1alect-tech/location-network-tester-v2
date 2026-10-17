@@ -14,6 +14,9 @@ OVERVIEW: Analytic truth corpus + verifier, engine-derived truth forbidden.
 - `test_corpus.py`: digest check, byte-stable corpus identity.
 - `test_corpus.py`: RMS check, analytic value vs tight tolerance.
 - `test_corpus.py`: ABA pattern, A/B branches share one truth.
+- `test_engines.py`: engine-level analytic checks (events, features, line_quality_v2, Welch settings).
+- `test_marker_interpolation.py`: parabolic readout-marker interpolation — vertex, ±0.5-bin tone, A²/2 power, exact harmonics.
+- `test_rbw_windows.py`: RBW selector + Welch windows + ENBW — tone power window-independence, ENBW Hann = 1.5 bins, sidelobe ordering.
 - `test_truth_verifier.py`: mutation rejection, perturbed value fails.
 - `test_truth_verifier.py`: rationale gate, empty rationale fails.
 - `test_truth_verifier.py`: boundary probe, just-outside-tolerance fails.

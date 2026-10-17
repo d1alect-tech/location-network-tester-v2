@@ -14,8 +14,10 @@ import type { UplotViewOptions } from "../../components/charts/uplotView";
 import { peaksFromDetail } from "../../components/charts/viewModels";
 import type { SeriesStyle } from "../../components/charts/viewModels";
 import { el } from "../../components/primitives/dom";
-import { createDeltaStrip } from "./deltaStrip";
+import { reasonFromError } from "./pairLoadOutcome";
 import { createSpectrumExtras } from "./spectrumExtras";
+import { overlayRequest } from "./spectrumHoldOverlay";
+import { createSpectrumPanelChrome } from "./spectrumPanelChrome";
 import { EMPTY_SPECTRUM, detailForPeaks } from "./spectrumPanelData";
 import { createSpectrumPanelRequests } from "./spectrumPanelRequest";
 import { createPlaneControl } from "./spectrumPlaneControl";
@@ -41,15 +43,29 @@ export type SpectrumPanelClient = {
   };
 };
 
+/** B3: слоты спектрограммы создаёт секция, панель лишь размещает их у себя. */
+export type SpectrumPanelSlots = {
+  readonly gramBar: HTMLElement;
+  readonly gramHost: HTMLElement;
+};
+
+/** Состав шапки: секция собирает из частей свою композицию (G5). */
+export type SpectrumHeaderParts = {
+  readonly viewToggle: HTMLElement;
+  readonly planeToggle: HTMLElement;
+  readonly rbw: HTMLElement;
+  readonly selectors: HTMLElement;
+};
+
 export type SpectrumPanelOptions = {
   readonly client: SpectrumPanelClient;
   readonly createView?: (options: UplotViewOptions) => ChartHandle;
+  readonly slots?: SpectrumPanelSlots;
+  readonly composeHeader?: (parts: SpectrumHeaderParts) => HTMLElement;
 };
 
 export type SpectrumPanelHandle = {
   readonly root: HTMLElement;
-  readonly gramHost: HTMLElement;
-  readonly gramBar: HTMLElement;
   load(a: string, b: string | null): Promise<void>;
   /** U2/U3: последние пейлоады пары (null — пара не загружена). */
   payloads(): { readonly a: SpectrumPayload | null; readonly b: SpectrumPayload | null };
@@ -58,8 +74,19 @@ export type SpectrumPanelHandle = {
   plane(): SpectrumPlane;
   setPlane(plane: SpectrumPlane): void;
   onViewChange(cb: (view: SpectrumView) => void): void;
+  onPayloads(cb: SpectrumPayloadsListener): void;
   destroy(): void;
 };
+
+/** Задача 10 (D3): пейлоады ОТОБРАЖАЕМОЙ плоскости после оседания загрузки —
+ * Δ-потребители (пики таблицы, Δ-полоса, Δср пары) считаются из той же
+ * плоскости, что график; reason — словарь задачи 3, не null только при
+ * отказе загрузки (пейлоады при этом null/устаревшие). */
+export type SpectrumPayloadsListener = (
+  a: SpectrumPayload | null,
+  b: SpectrumPayload | null,
+  reason: string | null,
+) => void;
 
 const DASH_B: readonly [number, number] = [6, 4];
 const SYNC_KEY = "lnt-inspect-spectrum-v6";
@@ -67,8 +94,6 @@ const SYNC_KEY = "lnt-inspect-spectrum-v6";
 function assertNever(value: never): never {
   throw new Error(`unhandled spectrum view ${String(value)}`);
 }
-
-import { overlayRequest } from "./spectrumHoldOverlay";
 
 export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHandle {
   const theme = readChartTheme();
@@ -78,58 +103,34 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
   let viewChange: ((view: SpectrumView) => void) | undefined;
 
   const title = el("h2", { className: "panel-title", text: "Спектр мощности · Гц" });
-  const spectrumBtn = el("button", {
-    className: "btn-quiet view-toggle-btn",
-    text: "Спектр",
-    attrs: { type: "button", "data-spectrum-view": "spectrum", "aria-pressed": "true" },
-  });
-  const gramBtn = el("button", {
-    className: "btn-quiet view-toggle-btn",
-    text: "Спектрограмма",
-    attrs: { type: "button", "data-spectrum-view": "gram", "aria-pressed": "false" },
-  });
-  const viewToggle = el(
-    "div",
-    { className: "view-toggle", attrs: { role: "group", "aria-label": "Вид сигнального окна" } },
-    [spectrumBtn, gramBtn],
-  );
+  const { viewToggle, spectrumBtn, gramBtn, status, statusText, retryButton, frame } =
+    createSpectrumPanelChrome();
   let reloadPlane: () => void = () => undefined;
   let lastPayload: SpectrumPayload | null = null;
   let lastPayloadB: SpectrumPayload | null = null;
-  const deltaStrip = createDeltaStrip();
+  let payloadsChange: SpectrumPayloadsListener | undefined;
   const planeControl = createPlaneControl(() => reloadPlane());
   const extras = createSpectrumExtras();
-  const gramBar = el("div", { className: "gram-bar" });
-  const header = el("div", { className: "panel-hd" }, [
-    title,
+  const gramBar = opts.slots?.gramBar ?? el("div", { className: "gram-bar" });
+  const gramHost = opts.slots?.gramHost ?? el("div", { className: "gram" });
+  const headerParts: SpectrumHeaderParts = {
     viewToggle,
-    planeControl.toggle,
-    planeControl.rbw,
-    extras.selects,
-    gramBar,
-  ]);
-  const frame = el("div", { className: "frame" });
-  const gramHost = el("div", { className: "gram" });
-  const statusText = el("span", {});
-  const retryButton = el("button", {
-    className: "lnt-btn btn-quiet",
-    text: "Пересчитать спектр",
-    attrs: { type: "button" },
-  }) as HTMLButtonElement;
+    planeToggle: planeControl.toggle,
+    rbw: planeControl.rbw,
+    selectors: extras.selects,
+  };
+  const header =
+    opts.composeHeader?.(headerParts) ??
+    el("div", { className: "panel-hd" }, [
+      title,
+      viewToggle,
+      planeControl.toggle,
+      planeControl.rbw,
+      extras.selects,
+      gramBar,
+    ]);
   retryButton.addEventListener("click", () => reloadPlane());
-  const status = el(
-    "div",
-    { className: "spectrum-status", attrs: { role: "status", "data-spectrum-status": "" } },
-    [statusText, retryButton],
-  );
-  status.hidden = true;
-  const body = el("div", { className: "panel-bd" }, [
-    status,
-    frame,
-    deltaStrip.root,
-    gramHost,
-    extras.markers,
-  ]);
+  const body = el("div", { className: "panel-bd" }, [status, frame, gramHost, extras.markers]);
   const root = el("section", { className: "panel", attrs: { "data-showcase": "spectrum" } }, [
     header,
     body,
@@ -177,13 +178,13 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
       frame.hidden = true;
       planeControl.paintRbw(null);
       extras.paint({ payloadA: EMPTY_SPECTRUM, payloadB: null, analysis: {} });
-      deltaStrip.paint(null, null);
     }
     status.hidden = false;
     retryButton.hidden = true;
     statusText.textContent = "Загрузка спектра…";
     root.classList.add("is-loading");
     root.classList.remove("is-stale");
+    let loadReason: string | null = null;
     try {
       let [payloads, detail] = await Promise.all([
         requests.fetchPair(a, b, request),
@@ -199,10 +200,10 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
       const { a: payloadA, b: payloadB } = payloads;
       planeControl.paintRbw(payloadA);
       extras.paint({ payloadA, payloadB, analysis: detail.analysis });
-      peaksA = peaksFromDetail(detailForPeaks(a, detail));
+      // Задача 9: пики — только из РЕАЛЬНОГО detail-конверта (без фабрикации).
+      peaksA = peaksFromDetail(detailForPeaks(detail));
       lastPayload = payloadA;
       lastPayloadB = payloadB;
-      deltaStrip.paint(payloadA, payloadB);
       const suffix = planeControl.plane() === "input-referred" ? " · вход" : "";
       const styleA: SeriesStyle = { color: theme.accentA, label: `${a}${suffix}` };
       const styleB: SeriesStyle = {
@@ -227,8 +228,14 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
         ? `Данные устарели: ${reason}. Показан последний спектр.`
         : `Не удалось загрузить спектр: ${reason}.`;
       if (rendered) root.classList.add("is-stale");
+      // Задача 10: причина отсутствия пейлоадов — словарь задачи 3
+      // (canned-префикс + серверный detail), не сырой Error.message.
+      loadReason = reasonFromError(error);
     } finally {
-      if (request.isCurrent()) root.classList.remove("is-loading");
+      if (request.isCurrent()) {
+        root.classList.remove("is-loading");
+        payloadsChange?.(lastPayload, lastPayloadB, loadReason);
+      }
     }
   }
 
@@ -244,8 +251,6 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
 
   return {
     root,
-    gramHost,
-    gramBar,
     load,
     payloads: () => ({ a: lastPayload, b: lastPayloadB }),
     setView,
@@ -254,6 +259,9 @@ export function createSpectrumPanel(opts: SpectrumPanelOptions): SpectrumPanelHa
     view: () => current,
     onViewChange(cb) {
       viewChange = cb;
+    },
+    onPayloads(cb) {
+      payloadsChange = cb;
     },
     destroy() {
       requests.dispose();

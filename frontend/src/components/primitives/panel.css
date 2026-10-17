@@ -1,0 +1,118 @@
+/* primitives/panel.css — КАНОНИЧЕСКАЯ рамка панелей и формы (todo 2,
+ * ui-refactor-2). Единственный источник глобальных правил .panel/.panel-hd/
+ * .panel-title/.panel-bd/.field/.field-label/.ctl/.form-grid/.form-actions;
+ * перенесён без изменений из views/experiments/experimentsCore.css — правила
+ * глобальны и красят все разделы (включая inspect). Импорт — один раз в
+ * AppShell.ts, до CSS видов.
+ *
+ * Видовые плотность и геометрия (скругления захвата, flex:none шапки каталога,
+ * ритм тела настроек, стык стека отчётов, 26px строки inspect) живут в scoped
+ * CSS видов и выигрывают специфичностью, не порядком.
+ *
+ * Токены — только V6 (v2-tokens.css): --lnt-panel/--lnt-line/--lnt-line-struct/
+ * --lnt-line-hot, --lnt-text/--lnt-text-sec, --lnt-chrome, --lnt-accent,
+ * --lnt-r-ctl, --lnt-ui. */
+
+/* ── V6-панели (kit.css §5.2: фон панели, hairline-стыки) ─────────────────── */
+
+.panel {
+  background: var(--lnt-panel);
+  border: 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-hd {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgb(0 0 0 / 0.18);
+  border-bottom: 1px solid var(--lnt-line);
+}
+
+.panel-title {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+}
+
+.panel-bd {
+  padding: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.panel-bd.is-bare {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ── V6-формы (kit.css §2.3: контрол 32px, рамка, фон ступенью темнее) ─────── */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field-label {
+  font: 400 12px / 16px var(--lnt-ui);
+  font-weight: 600;
+  color: var(--lnt-text-sec);
+}
+
+.ctl {
+  height: 32px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  color: var(--lnt-text);
+  font: 400 14px / 20px var(--lnt-ui);
+}
+
+.ctl:hover {
+  border-color: var(--lnt-line-hot);
+}
+
+.ctl:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -1px;
+  border-color: var(--lnt-line-hot);
+}
+
+select.ctl {
+  appearance: none;
+  padding-inline-end: 26px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
+}
+
+.form-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Плотность: решается один раз на каркасе (todo 5, ui-refactor-2). ───────
+ * Вид объявляет плотность атрибутом data-density="dense"|"default" на своём
+ * корне (inspect: dense; capture/catalog/settings: default). Дефолт 44px
+ * приходит из токенов v2-tokens.css (--lnt-table-row-min и т.д.; декларации
+ * не редактировать — пин tests/test_design_contract.py:55-59). Dense-значения —
+ * scoped-переопределения вида (inspect: .app-v6 { --lnt-table-row-min: 26px },
+ * v6.css:21-23). panel.css плотность НЕ задаёт — только документирует
+ * механизм: один атрибут на корне вида, одно место, где решено. */

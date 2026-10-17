@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { ApiError } from "../../api/errors";
 import type { CatalogSession } from "../../api/types";
 import { buildSpectrogramNpz } from "../../test-support/spectrogramNpz";
 import { type MockLntBackend, installMockBackend } from "../../testkit/mockBackend";
@@ -209,6 +210,54 @@ test("V6-P3: каталог — группы, сортировка, поиск, 
   await expect(cat.locator("[data-cat-empty]")).toBeVisible();
 });
 
+test("V6-P3b: единая шапка спектр+грам — три кластера, органы грама в своём", async ({ page }) => {
+  mockApi(installMockBackend(page));
+  await page.goto(BASE);
+  await expect(page.locator(".app-v6")).toBeVisible();
+  const panel = page.locator('.col-main [data-showcase="spectrum"]');
+  const header = panel.locator(".panel-hd.signal-hd");
+  await expect(header.locator("[data-signal-cluster]")).toHaveCount(3);
+  await expect(
+    header.locator('[data-signal-cluster="gram"] [data-gram-bar] [data-spectrogram-mode]'),
+  ).toHaveCount(3);
+  await expect(
+    header.locator('[data-signal-cluster="gram"] [data-gram-bar] [data-spectrogram-mode]').first(),
+  ).toBeVisible();
+  const gramCluster = header.locator('[data-signal-cluster="gram"]');
+  const spectrumCluster = header.locator('[data-signal-cluster="spectrum"]');
+  await expect(spectrumCluster).toHaveAttribute("data-active", "");
+  await expect(gramCluster).not.toHaveAttribute("data-active", "");
+  await panel.locator('[data-spectrum-view="gram"]').click();
+  await expect(gramCluster).toHaveAttribute("data-active", "");
+  await expect(spectrumCluster).not.toHaveAttribute("data-active", "");
+  await panel.locator('[data-spectrum-view="spectrum"]').click();
+  await expect(spectrumCluster).toHaveAttribute("data-active", "");
+});
+
+test("V6-P3c: быстрые смены пары не оставляют оракулов: один чарт на секцию", async ({ page }) => {
+  mockApi(installMockBackend(page));
+  await page.goto(BASE);
+  await expect(page.locator(".app-v6")).toBeVisible();
+  const rows = page.locator(".tbl-cat tbody tr[data-session]");
+  for (let i = 0; i < 6; i += 1) {
+    await rows.nth(i % 2).click();
+  }
+  const panel = page.locator('.col-main [data-showcase="spectrum"]');
+  await expect(panel.locator(".uplot")).toHaveCount(1);
+  const painted = await panel
+    .locator(".uplot canvas")
+    .first()
+    .evaluate((node) => {
+      const canvas = node as HTMLCanvasElement;
+      const ctx = canvas.getContext("2d");
+      if (ctx === null) return false;
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 3; i < data.length; i += 4) if (data[i] !== 0) return true;
+      return false;
+    });
+  expect(painted).toBe(true);
+});
+
 test("V6-P4: дельта пика из трасс, глиф направления", async ({ page }) => {
   mockApi(installMockBackend(page));
   await page.goto(BASE);
@@ -237,6 +286,7 @@ test("V6-P5: полный захват и возврат через таббар
 test("V6-P6: сворачиваемые панели осциллограммы и анализа", async ({ page }) => {
   mockApi(installMockBackend(page));
   await page.goto(BASE);
+  const section = page.locator(".v6-extras");
   const wave = page.locator(".v6-extras details[data-extra='waveform']");
   const w1 = page.locator(".v6-extras details[data-extra='w1']");
   await expect(wave).toBeVisible();
@@ -244,22 +294,25 @@ test("V6-P6: сворачиваемые панели осциллограммы 
   // Закрыты по умолчанию.
   expect(await wave.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false);
   expect(await w1.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false);
+  // G7: CTA пересчёта живёт в шапке секции и доступен без раскрытия.
+  await expect(section.locator(".av2-hd .lnt-btn-primary")).toBeVisible();
   // Открытие осциллограммы грузит CH1.
-  await wave.locator("summary").click();
+  await wave.locator("> summary").click();
   await expect(wave.locator(".uplot")).toBeVisible({ timeout: 10_000 });
-  // W1-хром содержит CTA пересчёта.
-  await w1.locator("summary").click();
-  await expect(w1).toContainText("Пересчитать анализ (v2)");
+  // Тело анализа: блок панелей и честные чипы отсутствия (артефакты не засеяны).
+  await w1.locator("> summary").click();
+  await expect(w1.locator("[data-role=panels-title]")).toBeVisible();
+  await expect(w1.locator("[data-absent-panel]")).toHaveCount(6);
 });
 
 test("V6-P7: показания базы, н/д для одноканальной сессии", async ({ page }) => {
   mockApi(installMockBackend(page), { ch2: false });
   await page.goto(BASE);
-  const readout = page.locator(".analysis-band .readout-value");
+  const readout = page.locator(".analysis-band .band-cell dd");
   await expect(readout).toHaveCount(7);
   // P_async/P_sync отсутствует в один канал → «н/д», не 0.
   await expect(
-    page.locator(".analysis-band .readout-cell").filter({ hasText: "P_async" }),
+    page.locator(".analysis-band .band-cell").filter({ hasText: "P_async" }),
   ).toContainText("н/д");
 });
 
@@ -287,4 +340,127 @@ test("V6-P9: пустой каталог — заглушка и прочерк�
   await expect(page.locator(".col-cat [data-cat-empty]")).toBeVisible();
   await expect(page.locator(".pairbar [data-pair='a']")).toContainText("—");
   await expect(page.locator(".pairbar [data-pair='b']")).toContainText("—");
+});
+
+test("V6-P10: 409 с серверным detail на pair-load — причина видна после canned-префикса", async ({
+  page,
+}) => {
+  // Given: mock-бэкенд засеян, но detail/spectrum базы отвечают 409 с detail.
+  const backend = installMockBackend(page);
+  mockApi(backend);
+  const detailText = "идентификатор сессии неоднозначен: 'syn-quiet-seed6022'";
+  await page.route("**/api/sessions/capture-001*", (route) =>
+    route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: detailText }),
+    }),
+  );
+
+  // When
+  await page.goto(BASE);
+
+  // Then: лента ошибки видна; reason = canned-префикс + пробел + серверный detail.
+  const band = page.locator("[data-inspect-error]");
+  await expect(band).toBeVisible({ timeout: 15_000 });
+  await expect(band).toContainText(detailText);
+  expect(await band.textContent()).toBe(`${new ApiError("conflict").message} ${detailText}`);
+});
+
+test("V6-P11: 500 без detail на pair-load — честный failed из словаря, без «undefined»", async ({
+  page,
+}) => {
+  // Given: сервер базы отвечает 500 с пустым JSON-телом — detail нет.
+  const backend = installMockBackend(page);
+  mockApi(backend);
+  await page.route("**/api/sessions/capture-001*", (route) =>
+    route.fulfill({ status: 500, contentType: "application/json", body: "{}" }),
+  );
+
+  // When
+  await page.goto(BASE);
+
+  // Then: только canned-префикс http-ошибки, без «undefined», вид не упал.
+  const band = page.locator("[data-inspect-error]");
+  await expect(band).toBeVisible({ timeout: 15_000 });
+  const text = (await band.textContent()) ?? "";
+  expect(text).toBe(new ApiError("http", { status: 500 }).message);
+  expect(text).not.toContain("undefined");
+  await expect(page.locator(".app-v6")).toBeVisible();
+});
+
+test("V6-P12 (M1): клик ряда пишет в B, «А» ряда в B переносит его в A, слот-клик — фокус, KeyA/KeyB", async ({
+  page,
+}) => {
+  const THREE = [
+    ...CATALOG.items,
+    {
+      id: "capture-003",
+      health: "ok",
+      created_utc: "2026-07-30T08:00:00Z",
+      source: "capture",
+      session_type: "capture",
+      profile: "quiet",
+      label: "стенд-В",
+      storage_path: null,
+    },
+  ] as CatalogSession[];
+  const backend = installMockBackend(page);
+  backend.seedCatalog(THREE);
+  backend.seedSessionDetail("capture-001", detail("capture-001", true));
+  backend.seedSessionDetail("capture-002", detail("capture-002", true));
+  backend.seedSessionDetail("capture-003", detail("capture-003", true));
+  backend.seedSpectrum("capture-001", SPECTRUM_A);
+  backend.seedSpectrum("capture-002", SPECTRUM_B);
+  backend.seedSpectrum("capture-003", SPECTRUM_A);
+  backend.seedWaveform("capture-001", WAVEFORM);
+  await page.goto(BASE);
+  const slotA = page.locator(".pairbar [data-pair='a']");
+  const slotB = page.locator(".pairbar [data-pair='b']");
+  await expect(slotA).toContainText("стенд-А");
+  await expect(slotB).toContainText("стенд-Б");
+
+  // Клик тела незапаренного ряда → B (сравнить с базой), A не тронут.
+  const row3 = page.locator('.tbl-cat tbody tr[data-session="capture-003"]');
+  await row3.click();
+  await expect(slotA).toContainText("стенд-А");
+  await expect(slotB).toContainText("стенд-В");
+
+  // Кнопка «А» ряда в B → move: ряд в A, B освобождён.
+  await row3.locator('[data-assign="a"]').click();
+  await expect(slotA).toContainText("стенд-В");
+  await expect(slotB).toContainText("—");
+
+  // Слот-клик: фокус первого ряда рейла, пара не меняется, арм не включается.
+  await slotA.click();
+  await expect(page.locator(".tbl-cat tbody tr[data-session]").first()).toBeFocused();
+  await expect(slotA).toContainText("стенд-В");
+  await expect(slotB).toContainText("—");
+  await expect(slotA).toHaveAttribute("aria-pressed", "false");
+
+  // KeyA/KeyB на сфокусированном ряду (event.code — физические клавиши).
+  await page.locator('.tbl-cat tbody tr[data-session="capture-001"]').focus();
+  await page.keyboard.press("KeyA");
+  await expect(slotA).toContainText("стенд-А");
+  await expect(slotB).toContainText("—");
+  await page.locator('.tbl-cat tbody tr[data-session="capture-002"]').focus();
+  await page.keyboard.press("KeyB");
+  await expect(slotA).toContainText("стенд-А");
+  await expect(slotB).toContainText("стенд-Б");
+});
+
+test("V6-P13: swap disabled при пустом B — мёртвый контрол закрыт", async ({ page }) => {
+  const ONE = [CATALOG.items[0]] as CatalogSession[];
+  const backend = installMockBackend(page);
+  backend.seedCatalog(ONE);
+  backend.seedSessionDetail("capture-001", detail("capture-001", true));
+  backend.seedSpectrum("capture-001", SPECTRUM_A);
+  backend.seedWaveform("capture-001", WAVEFORM);
+  await page.goto(BASE);
+  const slotA = page.locator(".pairbar [data-pair='a']");
+  const slotB = page.locator(".pairbar [data-pair='b']");
+  const swap = page.locator(".pairbar [data-pair-swap]");
+  await expect(slotA).toContainText("стенд-А");
+  await expect(slotB).toContainText("—");
+  await expect(swap).toBeDisabled();
 });

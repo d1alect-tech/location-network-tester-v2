@@ -136,7 +136,7 @@ $mustHave = @(
     @{ id = "MH-5"; text = "versioned bounded PSD/STFT/events/features/uncertainty"; probes = @("src/lnt/psd", "src/lnt/spectrogram", "src/lnt/events", "src/lnt/features", "src/lnt/uncertainty", "tests/science") },
     @{ id = "MH-6"; text = "experiment protocols A/B/A repeats cohorts"; probes = @("src/lnt/comparability", "src/lnt/statistics", "tests/experiments") },
     @{ id = "MH-7"; text = "Russian-first offline workbench with a11y"; probes = @("frontend/src/AppShell.ts", "frontend/src/capture.spec.ts", "frontend/playwright.config.ts", "tests/test_design_contract.py") },
-    @{ id = "MH-8"; text = "exactly two local chart libraries, no runtime Node"; probes = @("frontend/src/components/charts/workbench.ts", "frontend/src/components/charts/spectrogramView.ts", "src/lnt/ui/static/vendor/uPlot.esm.js") },
+    @{ id = "MH-8"; text = "exactly two local chart libraries, no runtime Node"; probes = @("frontend/src/components/charts/uplotView.ts", "frontend/src/components/charts/echarts.ts", "src/lnt/ui/static/vendor/uPlot.esm.js") },
     @{ id = "MH-9"; text = "versioned exports, checksum backup/restore, PyInstaller package"; probes = @("src/lnt/archive/cli.py", "packaging/build.ps1", "packaging/lnt.spec") },
     @{ id = "MH-10"; text = "every routed defect closed or environment-blocked"; probes = @("docs/defect-ledger.md", "scripts/audit-plan-evidence.ps1", "scripts/audit-scope.ps1") }
 )
