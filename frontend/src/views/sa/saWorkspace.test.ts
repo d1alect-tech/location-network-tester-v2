@@ -325,6 +325,39 @@ describe("saWorkspace skeleton (Todo 14)", () => {
     expect(FakeLiveEventSource.instances[0]?.closed).toBe(true);
     expect(log.stops).toBe(0);
   });
+
+  it("unmount при живом захвате глушит SA-контур: fire-and-forget sa:null, без стопа", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: [] };
+    mountStub(log, { state: { ...RUNNING } });
+    await flush();
+    expect(log.configs).toHaveLength(1); // join-конфиг захвата
+
+    // When: размонтирование вкладки при running — захват остаётся чужим.
+    for (const cleanup of cleanups) cleanup();
+    cleanups.length = 0;
+    await flush();
+
+    // Then: SA-контур выключен отдельным конфигом — триггер зеркалом
+    // состояния сервиса, sa: null; сам захват НЕ остановлен; dispose
+    // не ждал сети (POST долетел микрозадачей после синхронного return).
+    expect(log.stops).toBe(0);
+    expect(log.configs).toHaveLength(2);
+    expect(log.configs[1]?.body).toEqual({ ...TRIGGER, sa: null });
+    expect(log.configs[1]?.nonce).toBe("test-nonce");
+  });
+
+  it("unmount без захвата не отправляет конфиг", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: [] };
+    mountStub(log, { state: { ...IDLE } });
+    await flush();
+
+    for (const cleanup of cleanups) cleanup();
+    cleanups.length = 0;
+    await flush();
+
+    expect(log.configs).toHaveLength(0);
+    expect(log.stops).toBe(0);
+  });
 });
 
 describe("sa markers and peak search (Todo 15)", () => {

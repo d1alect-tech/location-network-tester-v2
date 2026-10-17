@@ -244,7 +244,14 @@ export function mountSaWorkspace(container: HTMLElement, options: SaWorkspaceOpt
   });
 
   return () => {
-    // Только подписка: авто-stop — решение AppShell по группе маршрутов.
+    // Подписка закрывается всегда; авто-stop — решение AppShell по группе
+    // маршрутов. Но при живом захвате SA-контур гасим сразу: сервер не
+    // должен считать Welch для ушедшего потребителя. Fire-and-forget —
+    // dispose не ждёт сети и не трогает DOM после размонтирования.
+    if (lastState?.state === "running") {
+      const trigger = lastState.trigger ?? DEFAULT_LIVE_START_REQUEST.trigger;
+      void live.updateConfig({ ...trigger, sa: null }).catch(() => {});
+    }
     stream.close();
     spectrum.destroy();
   };
