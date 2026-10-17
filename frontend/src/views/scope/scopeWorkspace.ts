@@ -106,6 +106,10 @@ export function mountScopeWorkspace(
 
   let busy = false;
   let lastState: LiveStatePayload | null = null;
+  /** Порядок ответов /api/live/config не гарантирован: применяет только
+   * ответ последнего ушедшего запроса (r4-final f1) — устаревший не
+   * откатывает панель до следующего SSE-события. */
+  let configSeq = 0;
   /** Порог фронта для измерений: уровень триггера, пока его источник CH1. */
   let triggerLevelV: number | null = null;
   /** SINGLE: подтверждение остановки уже отправлено (защита от повторов). */
@@ -211,9 +215,13 @@ export function mountScopeWorkspace(
   /** Триггер на ходу (POST /api/live/config): захват не перезапускается. */
   async function configTrigger(trigger: LiveTrigger): Promise<void> {
     clearElement(status.errorHost);
+    const seq = ++configSeq;
     try {
-      applyState(await live.updateTrigger(trigger));
+      const state = await live.updateTrigger(trigger);
+      if (seq !== configSeq) return;
+      applyState(state);
     } catch (error) {
+      if (seq !== configSeq) return;
       showError(`Не удалось применить триггер: ${messageOf(error)}.`);
     }
   }

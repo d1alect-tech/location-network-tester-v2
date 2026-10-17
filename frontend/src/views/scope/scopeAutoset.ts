@@ -54,7 +54,13 @@ function computeTargets(
   const m = measureSeries(frame.ch1, null);
   if (m.vppV === null) return targets;
   const peak = Math.max(Math.abs(m.vmaxV ?? 0), Math.abs(m.vminV ?? 0));
-  let pick = VDIV_STEPS[0];
+  // Фолбэк «сигнал слишком велик» (r4-final f2): самый широкий диапазон
+  // (наибольший halfSpanVolts), а не первый элемент списка — порядок
+  // VDIV_STEPS не решает честность автосета.
+  const widest = VDIV_STEPS.reduce((w, v) =>
+    halfSpanVolts(v, probe) > halfSpanVolts(w, probe) ? v : w,
+  );
+  let pick = widest;
   for (const v of VDIV_STEPS) {
     if (peak <= 0.8 * halfSpanVolts(v, probe)) pick = v;
   }

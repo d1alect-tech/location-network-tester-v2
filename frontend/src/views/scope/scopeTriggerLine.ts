@@ -6,8 +6,10 @@
  * дублирования); пока поле в фокусе, drag его не затирает (контракт
  * зоны-карты). Клавиатура на линии = степпер: ←/→/↓/↑ ±0,1,
  * PgUp/PgDn ±1, Home/End ∓/±5. Поле → линия и линия → поле синхронны;
- * при running истина сервиса перерисовывает линию (стрелка — за кадром);
- * dispose снимает всё. */
+ * при running истина сервиса перерисовывает линию (стрелка — за кадром,
+ * в активном drag — нет); drag-POST коалесцирован: change не чаще раза
+ * в 100 мс и финалом по settle (r4-final f1); dispose снимает всё,
+ * финализируя отложенный шаг. */
 
 import type { LiveWatchHandle, LiveWatchHandlers } from "../../api/types-live";
 import { el } from "../../components/primitives/dom";
@@ -28,6 +30,9 @@ export interface ScopeTriggerLineHandle {
   dispose(): void;
 }
 
+/** Каденс drag-эмитов: не чаще раза в 100 мс, финал — по settle. */
+const DRAG_EMIT_MS = 100;
+
 function clampLevel(value: number, limit: number): number {
   return Math.max(-limit, Math.min(limit, value));
 }
@@ -36,6 +41,9 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
   const { viewport, field } = options;
   let level = clampLevel(Number(field.value) || 0, VOLTS_SPAN / 2);
   let dragging = false;
+  /** Drag-коалесценция (r4-final f1): не-NULL — финал ждёт эмита. */
+  let dragPending: number | null = null;
+  let dragEmitTimer: ReturnType<typeof setTimeout> | null = null;
 
   const line = el("div", {
     className: "lnt-scope-trig-line",
@@ -74,6 +82,41 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
     field.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
+  /** Эмит коалесцированного change: значение перезаписывается в поле —
+   * heartbeat мог откатить текст между шагом и эмитом, финал обязан уйти
+   * точным. */
+  function emitDragChange(): void {
+    if (dragPending === null) return;
+    field.value = String(dragPending);
+    dragPending = null;
+    field.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  /** Drag-запись: поле и линия живые каждый шаг, change — коалесцирован
+   * (первый шаг открывает окно 100 мс, финал — по settle). */
+  function writeFieldDragged(value: number): void {
+    if (document.activeElement === field) return;
+    level = value;
+    field.value = String(value);
+    dragPending = value;
+    repaint();
+    if (dragEmitTimer === null) {
+      dragEmitTimer = setTimeout(() => {
+        dragEmitTimer = null;
+        emitDragChange();
+      }, DRAG_EMIT_MS);
+    }
+  }
+
+  /** Settle (pointerup/pointercancel/dispose): финал уходит немедленно. */
+  function flushDragChange(): void {
+    if (dragEmitTimer !== null) {
+      clearTimeout(dragEmitTimer);
+      dragEmitTimer = null;
+    }
+    emitDragChange();
+  }
+
   function onFieldInput(): void {
     const value = Number(field.value);
     if (field.value.trim() === "" || !Number.isFinite(value)) return;
@@ -99,7 +142,7 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
     const rect = viewport.getBoundingClientRect();
     if (rect.height <= 0) return;
     const volts = (0.5 - (event.clientY - rect.top) / rect.height) * VOLTS_SPAN;
-    writeField(clampLevel(Math.round(volts * 100) / 100, VOLTS_SPAN / 2));
+    writeFieldDragged(clampLevel(Math.round(volts * 100) / 100, VOLTS_SPAN / 2));
   }
 
   function onPointerEnd(event: PointerEvent): void {
@@ -112,6 +155,8 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
         // Захвата не было — нечего отпускать.
       }
     }
+    // Settle: финальный уровень уходит немедленно, без окна таймера.
+    flushDragChange();
   }
 
   /** Клавиатура линии — эквивалент степпера уровня (v1.html). */
@@ -143,6 +188,8 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
 
   const stream = options.live?.watchFrames({
     onState: (state) => {
+      // Активный drag владеет линией: SSE-истина вернётся по settle.
+      if (dragging) return;
       // Истина сервиса — только при running; в покое поле есть истина.
       if (state.state === "running" && state.trigger !== null) {
         level = clampLevel(state.trigger.level_v, VOLTS_SPAN / 2);
@@ -163,6 +210,8 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
 
   return {
     dispose: () => {
+      // Финал активного drag не теряется при демонтаже полосы.
+      flushDragChange();
       observer?.disconnect();
       stream?.close();
       line.removeEventListener("pointerdown", onPointerDown);

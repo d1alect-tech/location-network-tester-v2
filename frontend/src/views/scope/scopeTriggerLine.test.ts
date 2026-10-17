@@ -102,17 +102,19 @@ describe("scopeTriggerLine: drag линии триггера", () => {
     expectTransform(line, 78);
   });
 
-  it("drag вниз на 50 px пишет поле −2,5 В нативным change; наверх — +2,5 В", () => {
+  it("drag вниз на 50 px: поле −2,5 В живо сразу; наверх — +2,5 В change финалом", () => {
     const { field, line } = mountLine();
     const changes: string[] = [];
     field.addEventListener("change", () => changes.push(field.value));
     pointer(line, "pointerdown", 200, 100);
     pointer(line, "pointermove", 200, 150);
+    // Поле пишет каждый шаг; change коалесцирован (r4-final f1).
     expect(field.value).toBe("-2.5");
-    expect(changes).toEqual(["-2.5"]);
+    expect(changes).toEqual([]);
     pointer(line, "pointermove", 200, 50);
     expect(field.value).toBe("2.5");
     pointer(line, "pointerup", 200, 50);
+    expect(changes).toEqual(["2.5"]);
   });
 
   it("drag зажимается границами ±5 В (выход за экран)", () => {
@@ -186,5 +188,104 @@ describe("scopeTriggerLine: drag линии триггера", () => {
     field.value = "3";
     field.dispatchEvent(new Event("change", { bubbles: true }));
     expectTransform(line, 78);
+  });
+});
+
+/** r4-final f1: drag линии коалесцирует change — POST /api/live/config уходит
+ * финалом/каденцией ≥100 мс, а не каждым шагом 0,01 В; settle (pointerup,
+ * pointercancel, dispose) финализирует немедленно; клавиатура остаётся
+ * немедленной; SSE-истина не дёргает линию в активном drag. */
+describe("scopeTriggerLine: коалесценция change при drag (r4-final f1)", () => {
+  it("drag на 20 шагов: поле живое сразу, change один — финальное значение", () => {
+    const { field, line } = mountLine();
+    const changes: string[] = [];
+    field.addEventListener("change", () => changes.push(field.value));
+    pointer(line, "pointerdown", 200, 100);
+    for (let i = 1; i <= 20; i += 1) pointer(line, "pointermove", 200, 100 - 2 * i);
+    // Значение видно в поле сразу, но change (и уводящий его POST) ещё не было.
+    expect(field.value).toBe("2");
+    expect(changes).toEqual([]);
+    pointer(line, "pointerup", 200, 60);
+    expect(changes).toEqual(["2"]);
+  });
+
+  it("20 шагов в окне 100 мс: не больше одного change на окно", () => {
+    vi.useFakeTimers();
+    try {
+      const { field, line } = mountLine();
+      const changes: string[] = [];
+      field.addEventListener("change", () => changes.push(field.value));
+      pointer(line, "pointerdown", 200, 100);
+      for (let i = 1; i <= 20; i += 1) pointer(line, "pointermove", 200, 100 - 2 * i);
+      expect(changes).toEqual([]);
+      vi.advanceTimersByTime(100);
+      expect(changes).toEqual(["2"]);
+      pointer(line, "pointerup", 200, 60);
+      expect(changes).toEqual(["2"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("пауза ≥100 мс в drag даёт промежуточный change, settle не дублирует", () => {
+    vi.useFakeTimers();
+    try {
+      const { field, line } = mountLine();
+      const changes: string[] = [];
+      field.addEventListener("change", () => changes.push(field.value));
+      pointer(line, "pointerdown", 200, 100);
+      pointer(line, "pointermove", 200, 95);
+      vi.advanceTimersByTime(100);
+      expect(changes).toEqual(["0.25"]);
+      pointer(line, "pointermove", 200, 85);
+      vi.advanceTimersByTime(100);
+      expect(changes).toEqual(["0.25", "0.75"]);
+      pointer(line, "pointerup", 200, 85);
+      expect(changes).toEqual(["0.25", "0.75"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("pointercancel финализирует финал так же, как pointerup", () => {
+    const { field, line } = mountLine();
+    const changes: string[] = [];
+    field.addEventListener("change", () => changes.push(field.value));
+    pointer(line, "pointerdown", 200, 100);
+    for (let i = 1; i <= 10; i += 1) pointer(line, "pointermove", 200, 100 - 2 * i);
+    pointer(line, "pointercancel", 200, 80);
+    expect(changes).toEqual(["1"]);
+  });
+
+  it("клавиатура линии остаётся немедленной, без таймеров", () => {
+    const { field, line } = mountLine();
+    const changes: string[] = [];
+    field.addEventListener("change", () => changes.push(field.value));
+    line.focus();
+    key(line, "End");
+    expect(changes).toEqual(["5"]);
+  });
+
+  it("SSE-состояние не дёргает линию в активном drag; после settle владеет", () => {
+    const { live, line } = mountLine();
+    pointer(line, "pointerdown", 200, 100);
+    pointer(line, "pointermove", 200, 90);
+    expectTransform(line, 68);
+    live.emitState(RUNNING);
+    expectTransform(line, 68);
+    pointer(line, "pointerup", 200, 90);
+    live.emitState(RUNNING);
+    expectTransform(line, 48);
+  });
+
+  it("dispose в середине drag финализирует значение, не теряя его", () => {
+    const { field, line, dispose } = mountLine();
+    const changes: string[] = [];
+    field.addEventListener("change", () => changes.push(field.value));
+    pointer(line, "pointerdown", 200, 100);
+    pointer(line, "pointermove", 200, 80);
+    pointer(line, "pointermove", 200, 60);
+    dispose();
+    expect(changes).toEqual(["2"]);
   });
 });
