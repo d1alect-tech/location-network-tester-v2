@@ -28,6 +28,7 @@ import { mountSaSpectrum } from "./saSpectrum";
 import type { SaSpectrumOptions } from "./saSpectrum";
 import { buildSaTraceControls } from "./saTraceControls";
 import { SaTraceStore } from "./saTraceStore";
+import { type SaWorkspaceHandle, saHostsFromViews } from "./saWorkspaceHosts";
 import "./sa.css";
 export interface SaWorkspaceOptions {
   client: LntApiClient;
@@ -41,7 +42,10 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function mountSaWorkspace(container: HTMLElement, options: SaWorkspaceOptions): () => void {
+export function mountSaWorkspace(
+  container: HTMLElement,
+  options: SaWorkspaceOptions,
+): SaWorkspaceHandle {
   const live = options.live ?? sharedLiveApi();
   const device = createDeviceApi(options.client);
   const store = new SaTraceStore();
@@ -82,23 +86,31 @@ export function mountSaWorkspace(container: HTMLElement, options: SaWorkspaceOpt
   const status = buildSaStatusSection();
   const readout = buildSaReadoutSection();
 
-  container.append(
-    el(
-      "div",
-      {
-        className: "lnt-sa-workspace",
-        attrs: { role: "region", "aria-label": "Спектроанализатор" },
-      },
-      [
-        el("h2", { className: "placeholder-title t-page", text: "Спектроанализатор" }),
-        status.root,
-        selectors.root,
-        spectrum.root,
-        markerPanel.root,
-        readout.root,
-      ],
-    ),
+  const workspaceRoot = el(
+    "div",
+    {
+      className: "lnt-sa-workspace",
+      attrs: { role: "region", "aria-label": "Спектроанализатор" },
+    },
+    [
+      el("h2", { className: "placeholder-title t-page", text: "Спектроанализатор" }),
+      status.root,
+      selectors.root,
+      spectrum.root,
+      markerPanel.root,
+      readout.root,
+    ],
   );
+  container.append(workspaceRoot);
+  // Хосты полосы (задача 12): узлы SA отдаются типизированным хэндлом —
+  // полоса не ищет их селекторами по DOM воркспейса.
+  const hosts = saHostsFromViews({
+    root: workspaceRoot,
+    status,
+    selectors,
+    traces: traceControls,
+    markers: markerPanel,
+  });
 
   let busy = false;
   let lastState: LiveStatePayload | null = null;
@@ -243,16 +255,19 @@ export function mountSaWorkspace(container: HTMLElement, options: SaWorkspaceOpt
     showError(`Не удалось получить статус живого режима: ${messageOf(error)}.`);
   });
 
-  return () => {
-    // Подписка закрывается всегда; авто-stop — решение AppShell по группе
-    // маршрутов. Но при живом захвате SA-контур гасим сразу: сервер не
-    // должен считать Welch для ушедшего потребителя. Fire-and-forget —
-    // dispose не ждёт сети и не трогает DOM после размонтирования.
-    if (lastState?.state === "running") {
-      const trigger = lastState.trigger ?? DEFAULT_LIVE_START_REQUEST.trigger;
-      void live.updateConfig({ ...trigger, sa: null }).catch(() => {});
-    }
-    stream.close();
-    spectrum.destroy();
+  return {
+    hosts,
+    dispose: () => {
+      // Подписка закрывается всегда; авто-stop — решение AppShell по группе
+      // маршрутов. Но при живом захвате SA-контур гасим сразу: сервер не
+      // должен считать Welch для ушедшего потребителя. Fire-and-forget —
+      // dispose не ждёт сети и не трогает DOM после размонтирования.
+      if (lastState?.state === "running") {
+        const trigger = lastState.trigger ?? DEFAULT_LIVE_START_REQUEST.trigger;
+        void live.updateConfig({ ...trigger, sa: null }).catch(() => {});
+      }
+      stream.close();
+      spectrum.destroy();
+    },
   };
 }

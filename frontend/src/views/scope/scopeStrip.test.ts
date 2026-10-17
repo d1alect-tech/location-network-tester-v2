@@ -161,10 +161,12 @@ function mountTab(
   // старта уходит сигналом liveConflict, а не правкой воркспейса.
   const conflict = createLiveConflictSignal();
   const liveApi = signalLiveConflicts(createLiveApi(new LntApiClient(fetchImpl)), conflict);
-  cleanups.push(
-    mountScopeWorkspace(container, { client: new LntApiClient(fetchImpl), live: liveApi }),
-  );
-  cleanups.push(mountScopeStrip(container, { live: liveApi, conflictSignal: conflict }));
+  const workspace = mountScopeWorkspace(container, {
+    client: new LntApiClient(fetchImpl),
+    live: liveApi,
+  });
+  cleanups.push(() => workspace.dispose());
+  cleanups.push(mountScopeStrip(container, { live: liveApi, conflictSignal: conflict, workspace }));
   return { container, conflict };
 }
 
@@ -386,5 +388,137 @@ describe("scopeStrip: W3 — ридауты полосы без обрезки (
     const inline = container.querySelector('[data-local="cursors"] .lnt-scope-cursor-inline');
     expect(inline?.textContent).toContain("Δt");
     expect(inline?.textContent).toContain("ΔV");
+  });
+});
+
+describe("scopeStrip: задача 12 — характеризация хостов (узел → зона, бит-в-бит)", () => {
+  /** Зона полосы, в которую упал узел после mount; null — остался в воркспейсе. */
+  const zoneOf = (root: ParentNode, selector: string): string | null => {
+    const node = root.querySelector(selector);
+    if (node === null) throw new Error(`характеризация: нет узла ${selector}`);
+    return node.closest<HTMLElement>("[data-zone]")?.dataset.zone ?? null;
+  };
+  const inStatusZone = (root: ParentNode, selector: string): boolean => {
+    const node = root.querySelector(selector);
+    if (node === null) throw new Error(`характеризация: нет узла ${selector}`);
+    return node.closest("[data-band-status]") !== null;
+  };
+  const inWorkspace = (root: ParentNode, selector: string): boolean => {
+    const node = root.querySelector(selector);
+    if (node === null) throw new Error(`характеризация: нет узла ${selector}`);
+    return node.closest(".lnt-scope-workspace") !== null;
+  };
+
+  it("линия 1: ЗАПУСК/ВЕРТ/ГОРИЗ/ТРИГГ — каждый манифестный хост в своей зоне", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+
+    // ЗАПУСК: живые кнопки в run-кластере зоны ЗАПУСК.
+    expect(zoneOf(container, "#lnt-scope-run")).toBe("run");
+    expect(zoneOf(container, "#lnt-scope-stop")).toBe("run");
+    expect(container.querySelector("#lnt-scope-run")?.closest(".lnt-live-runctl")).not.toBeNull();
+    // ВЕРТ: сегменты В/дел/пробника + эффективные В/дел (zone-echo, ридонли).
+    expect(zoneOf(container, "#lnt-scope-vdiv")).toBe("vert");
+    expect(zoneOf(container, "#lnt-scope-probe")).toBe("vert");
+    expect(zoneOf(container, ".lnt-scope-vdiv-effective")).toBe("vert");
+    expect(
+      container.querySelector(".lnt-scope-vdiv-effective")?.classList.contains("lnt-live-echo"),
+    ).toBe(true);
+    expect(
+      container.querySelector(".lnt-scope-vdiv-effective")?.getAttribute("data-readonly"),
+    ).toBe("");
+    // ГОРИЗ: чип частоты.
+    expect(zoneOf(container, ".lnt-scope-rate-field")).toBe("horiz");
+    // ТРИГГ, линия 1: сегменты режима/источника/фронта едут ЦЕЛИКОМ.
+    expect(zoneOf(container, "button[data-trigger-mode]")).toBe("trig");
+    expect(zoneOf(container, "button[data-trigger-source]")).toBe("trig");
+    expect(zoneOf(container, "button[data-trigger-slope]")).toBe("trig");
+    expect(
+      container.querySelector("button[data-trigger-mode]")?.closest(".lnt-scope-seg"),
+    ).not.toBeNull();
+  });
+
+  it("линия 2: уровень-степпер в ТРИГГ; ИЗМЕР несёт тумблеры/историю/действия", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+
+    expect(zoneOf(container, "#lnt-scope-level")).toBe("trig");
+    expect(
+      container.querySelector("#lnt-scope-level")?.closest(".lnt-live-stepper"),
+    ).not.toBeNull();
+    expect(zoneOf(container, "[data-trig-state]")).toBe("trig");
+    expect(zoneOf(container, "#lnt-scope-cursors")).toBe("measure");
+    expect(zoneOf(container, ".lnt-scope-cursor-inline")).toBe("measure");
+    expect(zoneOf(container, "#lnt-scope-history")).toBe("measure");
+    expect(zoneOf(container, "#lnt-scope-live")).toBe("measure");
+    expect(zoneOf(container, ".lnt-scope-screen-note")).toBe("measure");
+    expect(zoneOf(container, "#lnt-scope-measure")).toBe("measure");
+    expect(zoneOf(container, "#lnt-scope-persist")).toBe("measure");
+    expect(zoneOf(container, '[data-action="autoset"] button')).toBe("measure");
+    expect(zoneOf(container, '[data-action="reset"] button')).toBe("measure");
+  });
+
+  it("статус-зона: строки состояния/ошибки/staged/эхо — в [data-band-status]", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+
+    for (const selector of [
+      ".lnt-scope-state",
+      ".lnt-scope-sim-badge",
+      ".lnt-scope-busy",
+      ".lnt-scope-error-host",
+      "[data-staged-line]",
+      '[data-echo="autoset"]',
+      '[data-echo="reset"]',
+    ]) {
+      expect(inStatusZone(container, selector), selector).toBe(true);
+    }
+  });
+
+  it("воркспейс-остатки: экран/фигура/секции НЕ переезжают в полосу", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+
+    // Экран: вьюпорт и фигура остаются в воркспейсе (overlay-хосты, НЕ зона).
+    expect(zoneOf(container, ".lnt-scope-viewport")).toBeNull();
+    expect(inWorkspace(container, ".lnt-scope-viewport")).toBe(true);
+    expect(zoneOf(container, ".lnt-scope-figure")).toBeNull();
+    // Линия триггера — DOM-оверлей на экране, не в полосе.
+    expect(zoneOf(container, "[data-trigger-line]")).toBeNull();
+    expect(
+      container.querySelector("[data-trigger-line]")?.closest(".lnt-scope-viewport"),
+    ).not.toBeNull();
+    // Секция курсоров (класс) — скрытый leftover: слайдеры и сетка остаются.
+    expect(zoneOf(container, ".lnt-scope-cursors")).toBeNull();
+    for (const id of [
+      "#lnt-scope-cursor-t1",
+      "#lnt-scope-cursor-t2",
+      "#lnt-scope-cursor-v1",
+      "#lnt-scope-cursor-v2",
+    ]) {
+      expect(zoneOf(container, id), id).toBeNull();
+      expect(container.querySelector(id)?.closest(".lnt-scope-cursors")).not.toBeNull();
+    }
+    // Рельс измерений (класс, не тумблер #lnt-scope-measure) — в воркспейсе.
+    expect(zoneOf(container, ".lnt-scope-measure")).toBeNull();
+    expect(inWorkspace(container, ".lnt-scope-measure")).toBe(true);
+  });
+
+  it("dispose: полоса снята, режим полосы снят; воркспейс жив до своего dispose", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+    const workspace = container.querySelector(".lnt-scope-workspace");
+
+    for (const cleanup of cleanups) cleanup();
+    cleanups.length = 0;
+
+    expect(container.querySelector(".lnt-live-strip")).toBeNull();
+    expect(workspace?.classList.contains("lnt-scope-strip-mode")).toBe(false);
+    expect(container.contains(workspace)).toBe(true);
   });
 });

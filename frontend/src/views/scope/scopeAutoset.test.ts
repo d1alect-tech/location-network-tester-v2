@@ -156,10 +156,12 @@ function mountTab(log: LiveLog, live: { state: LiveStatePayload }): HTMLElement 
   document.body.append(container);
   const fetchImpl = liveStubFetch(log, live);
   const liveApi = createLiveApi(new LntApiClient(fetchImpl));
-  cleanups.push(
-    mountScopeWorkspace(container, { client: new LntApiClient(fetchImpl), live: liveApi }),
-  );
-  cleanups.push(mountScopeStrip(container, { live: liveApi }));
+  const workspace = mountScopeWorkspace(container, {
+    client: new LntApiClient(fetchImpl),
+    live: liveApi,
+  });
+  cleanups.push(() => workspace.dispose());
+  cleanups.push(mountScopeStrip(container, { live: liveApi, workspace }));
   return container;
 }
 

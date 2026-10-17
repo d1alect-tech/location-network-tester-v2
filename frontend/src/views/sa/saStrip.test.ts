@@ -164,10 +164,12 @@ function mountTab(
   // старта уходит сигналом liveConflict, а не правкой воркспейса.
   const conflict = createLiveConflictSignal();
   const liveApi = signalLiveConflicts(createLiveApi(new LntApiClient(fetchImpl)), conflict);
-  cleanups.push(
-    mountSaWorkspace(container, { client: new LntApiClient(fetchImpl), live: liveApi }),
-  );
-  cleanups.push(mountSaStrip(container, { live: liveApi, conflictSignal: conflict }));
+  const workspace = mountSaWorkspace(container, {
+    client: new LntApiClient(fetchImpl),
+    live: liveApi,
+  });
+  cleanups.push(() => workspace.dispose());
+  cleanups.push(mountSaStrip(container, { live: liveApi, conflictSignal: conflict, workspace }));
   return { container, conflict };
 }
 
@@ -400,5 +402,110 @@ describe("saStrip: W2/W4 — r4-пропорции зоны и пустые со
       expect(decls, `${selector}: nowrap запрещён`).not.toMatch(/white-space:\s*nowrap/);
       expect(decls, `${selector}: эллипсис запрещён`).not.toMatch(/text-overflow:\s*ellipsis/);
     }
+  });
+});
+
+describe("saStrip: задача 12 — характеризация хостов (узел → зона, бит-в-бит)", () => {
+  /** Зона полосы, в которую упал узел после mount; null — остался в воркспейсе. */
+  const zoneOf = (root: ParentNode, selector: string): string | null => {
+    const node = root.querySelector(selector);
+    if (node === null) throw new Error(`характеризация: нет узла ${selector}`);
+    return node.closest<HTMLElement>("[data-zone]")?.dataset.zone ?? null;
+  };
+  const inStatusZone = (root: ParentNode, selector: string): boolean => {
+    const node = root.querySelector(selector);
+    if (node === null) throw new Error(`характеризация: нет узла ${selector}`);
+    return node.closest("[data-band-status]") !== null;
+  };
+  const inWorkspace = (root: ParentNode, selector: string): boolean => {
+    const node = root.querySelector(selector);
+    if (node === null) throw new Error(`характеризация: нет узла ${selector}`);
+    return node.closest(".lnt-sa-workspace") !== null;
+  };
+
+  it("линия 1: ПОЛОСА/RBW/ЗАПУСК — хосты в зонах; опустевшие обёртки погашены", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: [] };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+    const workspace = container.querySelector(".lnt-sa-workspace");
+
+    // ЗАПУСК: живые кнопки в едином run-кластере.
+    expect(zoneOf(container, "#lnt-sa-run")).toBe("run");
+    expect(zoneOf(container, "#lnt-sa-stop")).toBe("run");
+    expect(container.querySelector("#lnt-sa-run")?.closest(".lnt-live-runctl")).not.toBeNull();
+    // ПОЛОСА: оба поля в степперах; подписи «Начало»/«Конец» в группе ПОЛОСА.
+    expect(zoneOf(container, "[data-sa-band-low]")).toBe("span");
+    expect(zoneOf(container, "[data-sa-band-high]")).toBe("span");
+    expect(
+      container.querySelector("[data-sa-band-low]")?.closest(".lnt-live-stepper"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-sa-band-high]")?.closest(".lnt-live-stepper"),
+    ).not.toBeNull();
+    const labels = [...container.querySelectorAll('[data-ctl="span"] .lnt-live-ctl-label')].map(
+      (node) => node.textContent,
+    );
+    expect(labels).toEqual(["Начало", "Конец"]);
+    // RBW: сегменты (контракт [data-sa-rbw], 5 кнопок) в зоне RBW.
+    expect(zoneOf(container, "[data-sa-rbw]")).toBe("rbw");
+    expect(container.querySelectorAll("[data-sa-rbw] button")).toHaveLength(5);
+    // Опустевшие обёртки leftover гасятся классом: 3 поля + инструментальный ряд.
+    expect(workspace?.querySelectorAll(".lnt-sa-field.lnt-live-emptied")).toHaveLength(3);
+    expect(workspace?.querySelectorAll(".lnt-sa-marker-tools.lnt-live-emptied")).toHaveLength(1);
+  });
+
+  it("линия 2: ТРАССЫ/МАРКЕРЫ/ПИКИ — хосты в своих зонах", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: [] };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+
+    expect(zoneOf(container, ".lnt-sa-trace-toggles")).toBe("traces");
+    expect(zoneOf(container, "#lnt-sa-clear")).toBe("traces");
+    expect(zoneOf(container, "#lnt-sa-markers-clear")).toBe("markers");
+    expect(zoneOf(container, "#lnt-sa-peak-search")).toBe("peaks");
+  });
+
+  it("статус-зона: строки состояния/ошибки/staged — в [data-band-status]", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: [] };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+
+    for (const selector of [
+      ".lnt-sa-state",
+      ".lnt-sa-sim-badge",
+      ".lnt-sa-busy",
+      ".lnt-sa-error-host",
+      "[data-staged-line]",
+    ]) {
+      expect(inStatusZone(container, selector), selector).toBe(true);
+    }
+  });
+
+  it("воркспейс-остатки: окно/детектор/график/таблицы НЕ переезжают", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: [] };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+
+    expect(zoneOf(container, "[data-sa-window]")).toBeNull();
+    expect(zoneOf(container, "[data-sa-detector]")).toBeNull();
+    expect(zoneOf(container, ".lnt-sa-figure")).toBeNull();
+    expect(zoneOf(container, "[data-sa-markers]")).toBeNull();
+    expect(zoneOf(container, "[data-sa-peaks]")).toBeNull();
+    expect(inWorkspace(container, "[data-sa-window]")).toBe(true);
+    expect(inWorkspace(container, ".lnt-sa-figure")).toBe(true);
+  });
+
+  it("dispose: полоса снята, режим полосы снят; воркспейс жив до своего dispose", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: [] };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+    const workspace = container.querySelector(".lnt-sa-workspace");
+
+    for (const cleanup of cleanups) cleanup();
+    cleanups.length = 0;
+
+    expect(container.querySelector(".lnt-live-strip")).toBeNull();
+    expect(workspace?.classList.contains("lnt-sa-strip-mode")).toBe(false);
+    expect(container.contains(workspace)).toBe(true);
   });
 });

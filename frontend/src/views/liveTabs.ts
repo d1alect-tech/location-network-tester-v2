@@ -20,21 +20,21 @@ import { mountScopeWorkspace } from "./scope/scopeWorkspace";
 export function mountScopeTab(container: HTMLElement, client: LntApiClient): () => void {
   const conflictSignal = createLiveConflictSignal();
   const live = signalLiveConflicts(sharedLiveApi(), conflictSignal);
-  const disposeWorkspace = mountScopeWorkspace(container, { client, live });
-  const disposeStrip = mountScopeStrip(container, { live, conflictSignal });
+  const workspace = mountScopeWorkspace(container, { client, live });
+  const disposeStrip = mountScopeStrip(container, { live, conflictSignal, workspace });
   return () => {
     disposeStrip();
-    disposeWorkspace();
+    workspace.dispose();
   };
 }
 
 export function mountSaTab(container: HTMLElement, client: LntApiClient): () => void {
   const conflictSignal = createLiveConflictSignal();
   const live = signalLiveConflicts(sharedLiveApi(), conflictSignal);
-  const disposeWorkspace = mountSaWorkspace(container, { client, live });
-  const disposeStrip = mountSaStrip(container, { live, conflictSignal });
+  const workspace = mountSaWorkspace(container, { client, live });
+  const disposeStrip = mountSaStrip(container, { live, conflictSignal, workspace });
   return () => {
     disposeStrip();
-    disposeWorkspace();
+    workspace.dispose();
   };
 }

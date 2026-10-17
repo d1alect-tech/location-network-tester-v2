@@ -33,6 +33,7 @@ import {
 import { buildScopeTriggerSection } from "./scopeTrigger";
 import { mountScopeWaveform } from "./scopeWaveform";
 import type { ScopeWaveformOptions } from "./scopeWaveform";
+import { type ScopeWorkspaceHandle, scopeHostsFromViews } from "./scopeWorkspaceHosts";
 import "./scope.css";
 
 export interface ScopeWorkspaceOptions {
@@ -50,7 +51,7 @@ function messageOf(error: unknown): string {
 export function mountScopeWorkspace(
   container: HTMLElement,
   options: ScopeWorkspaceOptions,
-): () => void {
+): ScopeWorkspaceHandle {
   const live = options.live ?? sharedLiveApi();
   const device = createDeviceApi(options.client);
   // Триггер-панель (Todo 9) держит стейджинг до старта; на ходу изменения
@@ -87,22 +88,34 @@ export function mountScopeWorkspace(
     controls: controls.root,
   });
 
-  container.append(
-    el(
-      "div",
-      { className: "lnt-scope-workspace", attrs: { role: "region", "aria-label": "Осциллограф" } },
-      [
-        el("h2", { className: "placeholder-title t-page", text: "Осциллограф" }),
-        status.root,
-        triggerPanel.root,
-        screen.root,
-        waveform.root,
-        cursors.root,
-        measure.root,
-        readout.root,
-      ],
-    ),
+  const workspaceRoot = el(
+    "div",
+    { className: "lnt-scope-workspace", attrs: { role: "region", "aria-label": "Осциллограф" } },
+    [
+      el("h2", { className: "placeholder-title t-page", text: "Осциллограф" }),
+      status.root,
+      triggerPanel.root,
+      screen.root,
+      waveform.root,
+      cursors.root,
+      measure.root,
+      readout.root,
+    ],
   );
+  container.append(workspaceRoot);
+  // Хосты полосы (задача 12): узлы контролов отдаются типизированным
+  // хэндлом — полоса не ищет их селекторами по DOM воркспейса.
+  const hosts = scopeHostsFromViews({
+    root: workspaceRoot,
+    status,
+    controls,
+    rateField,
+    trigger: triggerPanel,
+    screen,
+    measure,
+    cursors,
+    figure: waveform.figure,
+  });
 
   let busy = false;
   let lastState: LiveStatePayload | null = null;
@@ -260,10 +273,13 @@ export function mountScopeWorkspace(
     showError(`Не удалось получить статус живого режима: ${messageOf(error)}.`);
   });
 
-  return () => {
-    // Только подписка: авто-stop — решение AppShell по группе маршрутов.
-    stream.close();
-    screen.dispose();
-    waveform.destroy();
+  return {
+    hosts,
+    dispose: () => {
+      // Только подписка: авто-stop — решение AppShell по группе маршрутов.
+      stream.close();
+      screen.dispose();
+      waveform.destroy();
+    },
   };
 }

@@ -172,13 +172,12 @@ function mountWorkspace(): { container: HTMLElement; chart: RecordingChart; log:
   const container = document.createElement("div");
   document.body.append(container);
   const fetchImpl = liveStubFetch(log, { state: { ...IDLE } });
-  cleanups.push(
-    mountScopeWorkspace(container, {
-      client: new LntApiClient(fetchImpl),
-      live: createLiveApi(new LntApiClient(fetchImpl)),
-      waveform: { createView: () => chart },
-    }),
-  );
+  const workspace = mountScopeWorkspace(container, {
+    client: new LntApiClient(fetchImpl),
+    live: createLiveApi(new LntApiClient(fetchImpl)),
+    waveform: { createView: () => chart },
+  });
+  cleanups.push(() => workspace.dispose());
   return { container, chart, log };
 }
 

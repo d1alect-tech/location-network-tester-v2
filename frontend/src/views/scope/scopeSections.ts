@@ -159,6 +159,8 @@ export function buildScopeReadoutSection(): ScopeReadoutView {
  * уровень триггера CH1 (или середина размаха без триггера). */
 export interface ScopeMeasureView {
   readonly root: HTMLElement;
+  /** Тумблер измерений (#lnt-scope-measure) — хост полосы (ре-парент). */
+  readonly toggle: HTMLElement;
   applyFrame(frame: LiveFramePayload, levelV: number | null): void;
 }
 
@@ -220,6 +222,7 @@ export function buildScopeMeasureSection(): ScopeMeasureView {
         }),
       ]),
     ]),
+    toggle: measureSeg.root,
     applyFrame(frame: LiveFramePayload, levelV: number | null): void {
       const m = measureSeries(frame.ch1, levelV);
       vpp.textContent = formatMeasurement(m.vppV, formatVoltsValue);

@@ -24,6 +24,8 @@ export interface SaTraceControlsOptions {
 
 export interface SaTraceControls {
   readonly root: HTMLElement;
+  readonly toggles: HTMLElement;
+  readonly clearButton: HTMLButtonElement;
   visibleTraces(): ReadonlySet<SaTraceKind>;
   unit(): SaDisplayUnit;
   xLog(): boolean;
@@ -99,13 +101,14 @@ export function buildSaTraceControls(options: SaTraceControlsOptions): SaTraceCo
   logInput.id = nextId("sa-xlog");
   logInput.addEventListener("change", change);
 
+  const toggles = el("div", { className: "lnt-sa-trace-toggles" }, [
+    clearToggle.host,
+    maxToggle.host,
+    minToggle.host,
+    avgToggle.host,
+  ]);
   const root = el("div", { className: "lnt-sa-trace-controls" }, [
-    el("div", { className: "lnt-sa-trace-toggles" }, [
-      clearToggle.host,
-      maxToggle.host,
-      minToggle.host,
-      avgToggle.host,
-    ]),
+    toggles,
     clearButton,
     el("label", { className: "lnt-sa-field", text: "Единицы", attrs: { for: unitId } }, [
       unitSelect,
@@ -118,6 +121,8 @@ export function buildSaTraceControls(options: SaTraceControlsOptions): SaTraceCo
 
   return {
     root,
+    toggles,
+    clearButton,
     visibleTraces(): ReadonlySet<SaTraceKind> {
       return visible;
     },

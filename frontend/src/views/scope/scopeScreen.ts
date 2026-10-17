@@ -21,6 +21,16 @@ export const SCOPE_VOLTS_SPAN = 10;
 
 export interface ScopeScreenHandle {
   readonly root: HTMLElement;
+  /** Вьюпорт экрана — хост оверлея линии триггера (НЕ ре-парент). */
+  readonly viewport: HTMLElement;
+  /** Подпись кадров (.lnt-scope-screen-note) — хост полосы (ре-парент). */
+  readonly screenNote: HTMLElement;
+  /** Слайдер истории (#lnt-scope-history) — хост полосы (ре-парент). */
+  readonly history: HTMLInputElement;
+  /** Кнопка «Живой» (#lnt-scope-live) — хост полосы (ре-парент). */
+  readonly live: HTMLButtonElement;
+  /** Тумблер послесвечения (#lnt-scope-persist) — хост полосы (ре-парент). */
+  readonly persist: HTMLElement;
   applyFrame(frame: LiveFramePayload): void;
   isPersistenceOn(): boolean;
   historyOffset(): number;
@@ -190,6 +200,11 @@ export function buildScopeScreen(): ScopeScreenHandle {
 
   return {
     root,
+    viewport,
+    screenNote: note,
+    history: slider,
+    live: liveButton,
+    persist: persistSeg.root,
     applyFrame,
     isPersistenceOn: () => persistenceOn,
     historyOffset: () => offset,

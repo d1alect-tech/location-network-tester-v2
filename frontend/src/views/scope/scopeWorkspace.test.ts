@@ -167,12 +167,11 @@ function mountStub(log: LiveLog, live: { state: LiveStatePayload }): HTMLElement
   const container = document.createElement("div");
   document.body.append(container);
   const fetchImpl = liveStubFetch(log, live);
-  cleanups.push(
-    mountScopeWorkspace(container, {
-      client: new LntApiClient(fetchImpl),
-      live: createLiveApi(new LntApiClient(fetchImpl)),
-    }),
-  );
+  const workspace = mountScopeWorkspace(container, {
+    client: new LntApiClient(fetchImpl),
+    live: createLiveApi(new LntApiClient(fetchImpl)),
+  });
+  cleanups.push(() => workspace.dispose());
   return container;
 }
 
@@ -321,7 +320,7 @@ describe("scopeWorkspace skeleton (Todo 7)", () => {
     const fetchImpl = liveStubFetch(log, { state: { ...IDLE } });
     const container = document.createElement("div");
     document.body.append(container);
-    const cleanup = mountScopeWorkspace(container, {
+    const workspace = mountScopeWorkspace(container, {
       client: new LntApiClient(fetchImpl),
       live: createLiveApi(new LntApiClient(fetchImpl)),
     });
@@ -330,7 +329,7 @@ describe("scopeWorkspace skeleton (Todo 7)", () => {
     await flush();
 
     // When: вкладку размонтируют (смена маршрута внутри группы {scope, sa}).
-    cleanup();
+    workspace.dispose();
 
     // Then: поток закрыт, но stop не отправлен — решение за AppShell.
     expect(FakeLiveEventSource.instances[0]?.closed).toBe(true);

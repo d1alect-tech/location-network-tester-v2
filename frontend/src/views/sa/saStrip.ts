@@ -1,16 +1,17 @@
-/** Композиция SA-вкладки с полосой liveStrip (задача 16, зона-карта 13):
- * полоса монтируется ПОСЛЕ воркспейса (mountSaWorkspace БЕЗ изменений) и
- * переезжает готовые DOM-узлы SA в свои зоны — append(), НЕ cloneNode:
- * слушатели живы, программное управление идёт через них. Ре-парент:
- * поля полосы в степперах и RBW-сегменты (грамматика §2: дискрет ≤5 —
- * инлайн-сегменты) в линии 1; кнопки пуска в единый run-кластер ЗАПУСК
- * (тот же liveRunCluster, состояние из live-источника); тумблеры трасс +
- * «Сбросить статистику», «Убрать маркеры», «Найти пики» в линии 2;
- * stateLine/simBadge/busyLine и errorHost (absolute-оверлей) в
- * статус-зону. saStatus — staged-реестр span/RBW при idle (маркеры +
- * строка + бейдж); 409-исход — liveConflict с переходом на вкладку
- * «Осциллограф». Остаток панели ужимается классом lnt-sa-strip-mode
- * (сокрытие — НЕ удаление: склад/график живут и питаются свипами).
+/** Композиция SA-вкладки с полосой liveStrip (задача 16, зона-карта 13;
+ * задача 12 — инверсия зависимости): полоса монтируется ПОСЛЕ воркспейса
+ * и получает ГОТОВЫЕ узлы SA типизированным хэндлом (SaWorkspaceHosts) —
+ * селекторного поиска по DOM воркспейса больше нет. Узлы переезжают в
+ * свои зоны append()-ом (НЕ cloneNode: слушатели живы, программное
+ * управление идёт через них). Ре-парент: поля полосы в степперах и
+ * RBW-сегменты (грамматика §2: дискрет ≤5 — инлайн-сегменты) в линии 1;
+ * кнопки пуска в единый run-кластер ЗАПУСК (тот же liveRunCluster,
+ * состояние из live-источника); тумблеры трасс + «Сбросить статистику»,
+ * «Убрать маркеры», «Найти пики» в линии 2; stateLine/simBadge/busyLine
+ * и errorHost (absolute-оверлей) в статус-зону. Опустевшие обёртки
+ * leftover гасятся классом lnt-live-emptied (сокрытие, НЕ удаление).
+ * saStatus — staged-реестр span/RBW при idle (маркеры + строка + бейдж);
+ * 409-исход — liveConflict с переходом на вкладку «Осциллограф».
  * Рендер — общий стек saSpectrum (createUplotView), второй стек НЕ
  * заводится; SA-триггера нет — зеркало состояния сервиса (saWorkspace). */
 
@@ -27,6 +28,7 @@ import { mountLiveStrip } from "../../components/liveStrip/liveStrip";
 import type { LiveStripZoneDesc } from "../../components/liveStrip/liveStrip";
 import { el } from "../../components/primitives/dom";
 import { mountSaStatus } from "./saStatus";
+import type { SaWorkspaceHandle } from "./saWorkspaceHosts";
 
 /** Найквист дефолтного старта (8 МГц / 2) — потолок степпера полосы;
  * границу против реального захвата проверяет сервер (422). */
@@ -87,47 +89,33 @@ export interface SaStripOptions {
   live?: LiveApi;
   /** Сигнал 409 старта (обёртка signalLiveConflicts, проводит AppShell). */
   conflictSignal?: LiveConflictSignal;
+  /** Хэндл смонтированного воркспейса: hosts — источник узлов для зон. */
+  workspace: SaWorkspaceHandle;
 }
 
-export function mountSaStrip(container: HTMLElement, options: SaStripOptions = {}): () => void {
+export function mountSaStrip(container: HTMLElement, options: SaStripOptions): () => void {
   const live = options.live ?? sharedLiveApi();
-  const workspace = container.querySelector<HTMLElement>(".lnt-sa-workspace");
-  if (workspace === null) {
-    throw new Error("mountSaStrip: сначала монтируется воркспейс (mountSaWorkspace)");
-  }
+  const hosts = options.workspace.hosts;
   const strip = mountLiveStrip(SA_STRIP_ZONES);
   container.append(strip.root);
 
-  const move = (selector: string, key: string): HTMLElement => {
-    const node = workspace.querySelector<HTMLElement>(selector);
-    if (node === null) throw new Error(`mountSaStrip: нет узла ${selector}`);
-    strip.groupHost(key).append(node);
-    return node;
-  };
   // Опустевшие обёртки leftover гасятся классом (сокрытие, НЕ удаление).
-  const emptied = (node: Element): void => {
-    node.closest(".lnt-sa-field, .lnt-sa-marker-tools")?.classList.add("lnt-live-emptied");
+  const emptied = (node: HTMLElement): void => {
+    node.classList.add("lnt-live-emptied");
   };
 
   // ЗАПУСК: единый run-кластер поверх живых кнопок пуска/останова.
-  const run = workspace.querySelector<HTMLButtonElement>("#lnt-sa-run");
-  const stop = workspace.querySelector<HTMLButtonElement>("#lnt-sa-stop");
-  if (run === null || stop === null) {
-    throw new Error("mountSaStrip: нет кнопок пуска/останова");
-  }
-  const cluster = mountLiveRunCluster({ run, stop, live });
+  const cluster = mountLiveRunCluster({ run: hosts.run, stop: hosts.stop, live });
   strip.groupHost("run").append(cluster.root);
 
   // ПОЛОСА: два живых числовых поля в степперах (шаг 1 кГц, зажим Найквиста
   // дефолтного старта; поле — истина, запись — нативным change).
   const spanHost = strip.groupHost("span");
-  for (const [dataAttr, aria, edge] of [
-    ["data-sa-band-low", "Начало полосы, Гц", "Начало"],
-    ["data-sa-band-high", "Конец полосы, Гц", "Конец"],
+  for (const [field, fieldWrapper, aria, edge] of [
+    [hosts.bandLow, hosts.bandLowField, "Начало полосы, Гц", "Начало"],
+    [hosts.bandHigh, hosts.bandHighField, "Конец полосы, Гц", "Конец"],
   ] as const) {
-    const field = workspace.querySelector<HTMLInputElement>(`[${dataAttr}]`);
-    if (field === null) throw new Error(`mountSaStrip: нет поля ${dataAttr}`);
-    emptied(field);
+    emptied(fieldWrapper);
     spanHost.append(
       el("span", { className: "lnt-live-ctl-label", text: edge }),
       wrapLiveStepper(field, {
@@ -143,33 +131,20 @@ export function mountSaStrip(container: HTMLElement, options: SaStripOptions = {
   }
 
   // RBW: 5 инлайн-сегментов (select заменён в saSelectors, живой слушатель).
-  const rbwNode = workspace.querySelector<HTMLElement>("[data-sa-rbw]");
-  if (rbwNode === null) throw new Error("mountSaStrip: нет узла [data-sa-rbw]");
-  emptied(rbwNode);
-  strip.groupHost("rbw").append(rbwNode);
+  emptied(hosts.rbwField);
+  strip.groupHost("rbw").append(hosts.rbw);
 
   // ТРАССЫ: тумблеры склада + «Сбросить статистику» (локальные, мгновенно).
-  move(".lnt-sa-trace-toggles", "traces");
-  move("#lnt-sa-clear", "traces");
+  strip.groupHost("traces").append(hosts.toggles, hosts.traceClear);
 
   // МАРКЕРЫ / ПИКИ: действия с исходом (таблицы — в main-области).
-  const markersClear = workspace.querySelector("#lnt-sa-markers-clear");
-  if (markersClear === null) throw new Error("mountSaStrip: нет кнопки маркеров");
-  emptied(markersClear);
-  strip.groupHost("markers").append(markersClear);
-  const peakSearch = workspace.querySelector("#lnt-sa-peak-search");
-  if (peakSearch === null) throw new Error("mountSaStrip: нет кнопки пиков");
-  emptied(peakSearch);
-  strip.groupHost("peaks").append(peakSearch);
+  emptied(hosts.markerTools);
+  strip.groupHost("markers").append(hosts.markersClear);
+  strip.groupHost("peaks").append(hosts.peakSearch);
 
   // Статус-зона: живые строки состояния + ошибки (absolute-оверлей).
   const statusZone = strip.statusZone();
-  for (const selector of [".lnt-sa-state", ".lnt-sa-sim-badge", ".lnt-sa-busy"]) {
-    const node = workspace.querySelector(selector);
-    if (node !== null) statusZone.append(node);
-  }
-  const errorHost = workspace.querySelector<HTMLElement>(".lnt-sa-error-host");
-  if (errorHost !== null) statusZone.append(errorHost);
+  statusZone.append(hosts.stateLine, hosts.simBadge, hosts.busyLine, hosts.errorHost);
 
   const status = mountSaStatus({
     live,
@@ -180,25 +155,22 @@ export function mountSaStrip(container: HTMLElement, options: SaStripOptions = {
 
   // 409-клетка: конфликт живого захвата — баннер с переходом на вкладку
   // «Осциллограф» (сигнал + текст-зеркало errorHost), Run не залипает.
-  const conflict =
-    errorHost === null
-      ? null
-      : mountLiveConflict({
-          errorHost,
-          otherRoute: "scope",
-          otherTitle: "Осциллограф",
-          stop: () => live.stop(),
-          signal: options.conflictSignal,
-        });
+  const conflict = mountLiveConflict({
+    errorHost: hosts.errorHost,
+    otherRoute: "scope",
+    otherTitle: "Осциллограф",
+    stop: () => live.stop(),
+    signal: options.conflictSignal,
+  });
 
   // Компактный leftover: сокрытие хрома панелей, НЕ удаление модулей.
-  workspace.classList.add("lnt-sa-strip-mode");
+  hosts.root.classList.add("lnt-sa-strip-mode");
 
   return () => {
-    conflict?.dispose();
+    conflict.dispose();
     status.dispose();
     cluster.dispose();
     strip.destroy();
-    workspace.classList.remove("lnt-sa-strip-mode");
+    hosts.root.classList.remove("lnt-sa-strip-mode");
   };
 }

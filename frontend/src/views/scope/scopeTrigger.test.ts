@@ -179,12 +179,11 @@ function mountStub(log: LiveLog, live: { state: LiveStatePayload }): HTMLElement
   const container = document.createElement("div");
   document.body.append(container);
   const fetchImpl = liveStubFetch(log, live);
-  cleanups.push(
-    mountScopeWorkspace(container, {
-      client: new LntApiClient(fetchImpl),
-      live: createLiveApi(new LntApiClient(fetchImpl)),
-    }),
-  );
+  const workspace = mountScopeWorkspace(container, {
+    client: new LntApiClient(fetchImpl),
+    live: createLiveApi(new LntApiClient(fetchImpl)),
+  });
+  cleanups.push(() => workspace.dispose());
   return container;
 }
 

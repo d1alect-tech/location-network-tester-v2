@@ -30,6 +30,15 @@ import { VOLT_CURSOR_SPAN_V, clampFraction } from "./scopeCursors";
 export interface ScopeCursorView {
   /** Панель «Курсоры»: тумблер линий + ползунки + readout Δt/ΔV. */
   readonly root: HTMLElement;
+  /** Тумблер линий (#lnt-scope-cursors) — хост полосы (ре-парент). */
+  readonly toggle: HTMLElement;
+  /** Слайдеры T1/T2/V1/V2 — скрытый leftover с живыми слушателями. */
+  readonly sliders: {
+    readonly t1: HTMLInputElement;
+    readonly t2: HTMLInputElement;
+    readonly v1: HTMLInputElement;
+    readonly v2: HTMLInputElement;
+  };
   /** Инлайн-ридаут «Δt … · ΔV …» (r4-грамматика): полоса liveStrip несёт
    * одну строку без обрезки — клетки сетки не сжимаются (задача r5-9 W3). */
   readonly inlineReadout: HTMLElement;
@@ -188,6 +197,8 @@ export function buildScopeCursorSection(): ScopeCursorView {
 
   const view: ScopeCursorView = {
     inlineReadout,
+    toggle: toggle.root,
+    sliders: { t1: t1.input, t2: t2.input, v1: v1.input, v2: v2.input },
     root: el("section", { className: "panel lnt-scope-section lnt-scope-cursors" }, [
       el("div", { className: "panel-hd" }, [
         el("h3", { className: "panel-title", text: "Курсоры" }),

@@ -12,6 +12,12 @@ import type { ScopeDisplaySettings } from "./scopeScale";
 
 export interface ScopeControlsView {
   readonly root: HTMLElement;
+  /** Сегмент В/дел (#lnt-scope-vdiv) — хост полосы (ре-парент). */
+  readonly vdiv: HTMLElement;
+  /** Сегмент пробника (#lnt-scope-probe) — хост полосы (ре-парент). */
+  readonly probe: HTMLElement;
+  /** Подпись эффективных В/дел — zone-echo полосы (ре-парент). */
+  readonly vdivEffective: HTMLElement;
   /** Снимает настройки с DOM-контролов (значения задают только опции). */
   readSettings(): ScopeDisplaySettings;
 }
@@ -107,5 +113,11 @@ export function buildScopeControls(
     ],
   );
 
-  return { root, readSettings };
+  return {
+    root,
+    vdiv: vDivSeg.root,
+    probe: probeSeg.root,
+    vdivEffective: effectiveLine,
+    readSettings,
+  };
 }

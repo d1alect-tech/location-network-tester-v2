@@ -31,6 +31,8 @@ export interface ScopeWaveformOptions {
 
 export interface ScopeWaveformHandle {
   readonly root: HTMLElement;
+  /** Фигура развёртки (.lnt-scope-figure) — хост drag курсорных линий. */
+  readonly figure: HTMLElement;
   applyFrame(frame: LiveFramePayload, settings: ScopeDisplaySettings): void;
   /** Перерисовать последний кадр с новыми настройками (смена В/дел…). */
   rerender(settings: ScopeDisplaySettings): void;
@@ -180,6 +182,7 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
 
   return {
     root,
+    figure,
     applyFrame(frame, settings) {
       lastFrame = frame;
       render(frame, settings);

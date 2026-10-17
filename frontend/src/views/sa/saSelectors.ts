@@ -44,6 +44,12 @@ export const SA_DETECTOR_LABELS: Record<LiveSaDetector, string> = {
 
 export interface SaConfigSelectors {
   readonly root: HTMLElement;
+  readonly rbw: HTMLElement;
+  readonly rbwField: HTMLElement;
+  readonly bandLow: HTMLInputElement;
+  readonly bandLowField: HTMLElement;
+  readonly bandHigh: HTMLInputElement;
+  readonly bandHighField: HTMLElement;
   /** Текущая конфигурация; null — панель невалидна (полоса мусорная). */
   config(): LiveSaConfig | null;
 }
@@ -156,32 +162,36 @@ export function buildSaConfigSection(options: SaSelectorOptions): SaConfigSelect
     node.addEventListener("change", commit);
   }
 
+  const rbwField = el("div", { className: "lnt-sa-field" }, [
+    el("span", { className: "lnt-sa-field-label", text: "RBW, Гц" }),
+    rbwSeg.root,
+  ]);
+  const lowField = el(
+    "label",
+    { className: "lnt-sa-field", text: "Начало полосы, Гц", attrs: { for: lowId } },
+    [lowInput],
+  );
+  const highField = el(
+    "label",
+    { className: "lnt-sa-field", text: "Конец полосы, Гц", attrs: { for: highId } },
+    [highInput],
+  );
+
   const root = el("section", { className: "panel lnt-sa-section lnt-sa-config" }, [
     el("div", { className: "panel-hd" }, [
       el("h3", { className: "panel-title", text: "Настройки анализа" }),
     ]),
     el("div", { className: "panel-bd" }, [
       el("div", { className: "lnt-sa-config-grid" }, [
-        el("div", { className: "lnt-sa-field" }, [
-          el("span", { className: "lnt-sa-field-label", text: "RBW, Гц" }),
-          rbwSeg.root,
-        ]),
+        rbwField,
         el("label", { className: "lnt-sa-field", text: "Окно", attrs: { for: windowId } }, [
           windowSelect,
         ]),
         el("label", { className: "lnt-sa-field", text: "Детектор", attrs: { for: detectorId } }, [
           detectorSelect,
         ]),
-        el(
-          "label",
-          { className: "lnt-sa-field", text: "Начало полосы, Гц", attrs: { for: lowId } },
-          [lowInput],
-        ),
-        el(
-          "label",
-          { className: "lnt-sa-field", text: "Конец полосы, Гц", attrs: { for: highId } },
-          [highInput],
-        ),
+        lowField,
+        highField,
       ]),
       el("p", {
         className: "t-compact",
@@ -193,6 +203,12 @@ export function buildSaConfigSection(options: SaSelectorOptions): SaConfigSelect
 
   return {
     root,
+    rbw: rbwSeg.root,
+    rbwField,
+    bandLow: lowInput,
+    bandLowField: lowField,
+    bandHigh: highInput,
+    bandHighField: highField,
     config(): LiveSaConfig | null {
       return current();
     },

@@ -186,13 +186,12 @@ function mountStub(
   document.body.append(container);
   const fetchImpl = liveStubFetch(log, live);
   const view = fakeChartView();
-  cleanups.push(
-    mountSaWorkspace(container, {
-      client: new LntApiClient(fetchImpl),
-      live: createLiveApi(new LntApiClient(fetchImpl)),
-      spectrum: { createView: view.createView },
-    }),
-  );
+  const workspace = mountSaWorkspace(container, {
+    client: new LntApiClient(fetchImpl),
+    live: createLiveApi(new LntApiClient(fetchImpl)),
+    spectrum: { createView: view.createView },
+  });
+  cleanups.push(() => workspace.dispose());
   return { container, requests: view.requests, chartOptions: view.chartOptions };
 }
 

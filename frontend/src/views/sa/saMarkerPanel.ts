@@ -35,6 +35,9 @@ export interface SaMarkerPanelDeps {
 
 export interface SaMarkerPanelView {
   readonly root: HTMLElement;
+  readonly tools: HTMLElement;
+  readonly peakSearch: HTMLButtonElement;
+  readonly markersClear: HTMLButtonElement;
   /** Маркеры для плагина отрисовки графика (M1..M4). */
   markerLines(): readonly SaMarkerLine[];
   /** Снимок пиков поиска для подсветки графика. */
@@ -141,13 +144,14 @@ export function buildSaMarkerPanel(deps: SaMarkerPanelDeps): SaMarkerPanelView {
     notice.hidden = true;
   }
 
+  const tools = el("div", { className: "lnt-sa-marker-tools" }, [peakSearchButton, clearButton]);
   const view: SaMarkerPanelView = {
     root: el("section", { className: "panel lnt-sa-section lnt-sa-markers" }, [
       el("div", { className: "panel-hd" }, [
         el("h3", { className: "panel-title", text: "Маркеры и пики" }),
       ]),
       el("div", { className: "panel-bd" }, [
-        el("div", { className: "lnt-sa-marker-tools" }, [peakSearchButton, clearButton]),
+        tools,
         notice,
         markerEmpty,
         markerTable,
@@ -155,6 +159,9 @@ export function buildSaMarkerPanel(deps: SaMarkerPanelDeps): SaMarkerPanelView {
         peakTable,
       ]),
     ]),
+    tools,
+    peakSearch: peakSearchButton,
+    markersClear: clearButton,
     markerLines(): readonly SaMarkerLine[] {
       return markers.list().map((marker) => ({
         frequencyHz: marker.frequencyHz,

@@ -108,6 +108,10 @@ function field(label: string, control: HTMLElement): HTMLElement {
 
 export interface ScopeTriggerView {
   readonly root: HTMLElement;
+  readonly mode: HTMLElement;
+  readonly source: HTMLElement;
+  readonly slope: HTMLElement;
+  readonly level: HTMLInputElement;
   /** Текущий триггер панели: полный объект, готовый к POST/старту. */
   getTrigger(): LiveTrigger;
   /** Текущая ошибка валидации уровня; null — поле валидно. */
@@ -252,6 +256,10 @@ export function buildScopeTriggerSection(options: {
 
   return {
     root,
+    mode: modeSeg.root,
+    source: sourceSeg.root,
+    slope: slopeSeg.root,
+    level: levelInput,
     getTrigger: () => ({ ...trigger }),
     validationError: () => levelError,
     paintTrigger(next: LiveTrigger): void {
