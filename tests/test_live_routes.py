@@ -65,6 +65,8 @@ if TYPE_CHECKING:
     from fastapi.sse import ServerSentEvent
     from httpx2 import Response
 
+    from lnt.instrument.frames import LiveFrame
+    from lnt.instrument.sa import SaEngine
     from lnt.scope_io import ScopeProtocol
 
 # Тот же детерминированный стенд, что в test_live_gate: 1 МГц (код 1), профиль
@@ -683,6 +685,93 @@ def test_stop_terminates_the_stream_with_the_final_frame(rig: Rig) -> None:
     assert final.frame_index > 0
     assert rig.gate.is_active is False
     assert rig.scope.calls[-1] == "close_handle"
+
+
+# ---------------------------------------------------------------------------
+# SA-трасса: свип не на цикле событий
+# ---------------------------------------------------------------------------
+
+
+def test_paced_spectrum_sweep_runs_off_the_event_loop_thread(
+    rig: Rig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Замер задачи 5: свип SA — десятки мс p95 (default 31.3, worst 63.1);
+    # на цикле событий он съедает бюджет кадра (33.3 мс) и роняет каденцию
+    # ниже 27/с. Трасса обязана считаться в рабочем потоке, как и poll
+    # драйвера. Ассерт — на идентификаторе потока исполнения, не на тайминге:
+    # цикл ``asyncio.run`` живёт в потоке теста.
+    sweep_threads: list[int] = []
+
+    def fake_spectrum_event(_engine: SaEngine, _frame: LiveFrame) -> ServerSentEvent | None:
+        sweep_threads.append(threading.get_ident())
+        return None
+
+    monkeypatch.setattr(routes_live, "spectrum_event", fake_spectrum_event)
+
+    async def scenario() -> list[ServerSentEvent]:
+        events: list[ServerSentEvent] = []
+        started = False
+        published = 0
+        async for event in live_stream(rig.gate):
+            events.append(event)
+            if not started:
+                assert event.event == "heartbeat"
+                rig.gate.start(start_config())
+                rig.advance(2)
+                started = True
+            # Свип кадра исполняется ближайшим ``__anext__`` ПОСЛЕ его события
+            # (генератор стоит на ``yield``): дожидаемся второго кадра — к его
+            # выдаче свип первого уже исполнен, разрыв стрима не раньше.
+            if event.event == "frame":
+                published += 1
+                if published >= 2:
+                    break
+        return events
+
+    events = asyncio.run(scenario())
+
+    assert sum(1 for item in events if item.event == "frame") >= 2
+    assert sweep_threads, "трасса SA не считалась за опубликованный кадр"
+    loop_thread = threading.get_ident()
+    assert all(thread != loop_thread for thread in sweep_threads)
+
+
+def test_final_spectrum_sweep_runs_off_the_event_loop_thread(
+    rig: Rig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Хвост остановки (_final_events) — тот же контракт: финальные кадры
+    # со своими трассами SA, свип вне цикла событий.
+    sweep_threads: list[int] = []
+
+    def fake_spectrum_event(_engine: SaEngine, _frame: LiveFrame) -> ServerSentEvent | None:
+        sweep_threads.append(threading.get_ident())
+        return None
+
+    monkeypatch.setattr(routes_live, "spectrum_event", fake_spectrum_event)
+
+    stopped = False
+
+    async def scenario() -> None:
+        nonlocal stopped
+        started = False
+        async for event in live_stream(rig.gate):
+            if not started:
+                assert event.event == "heartbeat"
+                rig.gate.start(start_config())
+                rig.advance(2)
+                started = True
+            if not stopped and event.event == "frame":
+                rig.gate.stop()
+                stopped = True
+
+    asyncio.run(scenario())
+
+    assert stopped
+    assert sweep_threads, "трасса SA не считалась в хвосте остановки"
+    loop_thread = threading.get_ident()
+    assert all(thread != loop_thread for thread in sweep_threads)
 
 
 # ---------------------------------------------------------------------------

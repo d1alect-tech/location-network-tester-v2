@@ -254,7 +254,10 @@ async def _paced_events(
         if event is None:
             continue
         yield event
-        if (trace := spectrum_event(spectrum, frame)) is not None:
+        # Свип SA — десятки мс p95 (замер r5, задача 5): считаем в рабочем
+        # потоке (``asyncio.to_thread``, как poll выше), чтобы тяжёлый расчёт
+        # не останавливал цикл событий и не ронял каденцию кадров.
+        if (trace := await asyncio.to_thread(spectrum_event, spectrum, frame)) is not None:
             yield trace
 
 
@@ -275,5 +278,6 @@ async def _final_events(
             calibration_used=calibration_used,
             skipped_frames=pacer.take_skipped(),
         )
-        if (trace := spectrum_event(spectrum, frame)) is not None:
+        # Тот же контракт, что и в _paced_events: свип вне цикла событий.
+        if (trace := await asyncio.to_thread(spectrum_event, spectrum, frame)) is not None:
             yield trace
