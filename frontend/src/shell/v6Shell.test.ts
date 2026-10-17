@@ -24,6 +24,8 @@ function nextFrame(): Promise<void> {
 const TITLES: Record<(typeof TAB_ROUTES)[number], string> = {
   catalog: "Каталог",
   capture: "Захват",
+  scope: "Осциллограф",
+  sa: "Спектроанализатор",
   inspect: "Инспекция",
   experiments: "Эксперименты",
   reports: "Отчёты",

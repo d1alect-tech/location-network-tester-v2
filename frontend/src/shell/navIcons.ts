@@ -15,6 +15,14 @@ const ICONS = {
     ["circle", { cx: "8", cy: "8", r: "5.2" }],
     ["circle", { cx: "8", cy: "8", r: "1.9", fill: "currentColor", stroke: "none" }],
   ],
+  scope: [
+    ["rect", { x: "2", y: "3.2", width: "12", height: "9.6", rx: "1" }],
+    ["path", { d: "M4.2 8.8h1.2l1.2-3.4 1.6 5.2 1.2-1.8h2" }],
+  ],
+  sa: [
+    ["path", { d: "M4.8 12.6V9.4M8 12.6V4.8M11.2 12.6V7.2" }],
+    ["path", { d: "M3 13.4h10" }],
+  ],
   inspect: [
     ["circle", { cx: "7", cy: "7", r: "4.3" }],
     ["path", { d: "M10.2 10.2 14 14" }],
