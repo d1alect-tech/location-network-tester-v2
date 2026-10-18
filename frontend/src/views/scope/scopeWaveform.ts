@@ -10,7 +10,10 @@
  * по нефильтрованному payload в scopeMeasureConfig); ярлык состояния
  * [data-wave-bw] несёт подпись «программный фильтр, не аналоговый предел».
  * Хэндл регистрируется по фигуре (WeakMap, прецедент scopeCursorSection):
- * полоса находит его без правок воркспейса — findScopeWaveformView. */
+ * полоса находит его без правок воркспейса — findScopeWaveformView.
+ * Задача 22: оверлей послесвечения поверх uPlot-канваса (пассивный
+ * канвас, НЕ второй стек) — режим setPersistMode, накопление отображения
+ * по ОТОБРАЖАЕМЫМ рядам (после ФНЧ/прореживания), dt — из emitted_at_s. */
 
 import type { LiveFramePayload } from "../../api/types-live";
 import { decimateMinMax } from "../../components/charts/series";
@@ -21,8 +24,10 @@ import { createUplotView } from "../../components/charts/uplotView";
 import { POINT_BUDGETS } from "../../components/charts/viewModels";
 import { el } from "../../components/primitives/dom";
 import { BW_FILTER_HINT, BW_MODE_TEXT, type BwFilterMode, filterLiveFrame } from "./scopeBwFilter";
+import type { PersistenceMode } from "./scopePersistence";
 import { halfSpanVolts, yAxisRange } from "./scopeScale";
 import type { ScopeDisplaySettings } from "./scopeScale";
+import { createPersistenceTag, mountWavePersistence } from "./scopeWavePersistence";
 import "./scopeWaveform.css";
 
 const SYNC_KEY = "lnt-scope-waveform";
@@ -43,6 +48,8 @@ export interface ScopeWaveformHandle {
   /** Режим программного ФНЧ отображения (задача 24): фильтрует кадр
    *  перед отрисовкой, ярлык честности виден при любом не-full режиме. */
   setBwFilter(mode: BwFilterMode): void;
+  /** Режим послесвечения отображения (задача 22): off / ~0,5 с / ~2 с. */
+  setPersistMode(mode: PersistenceMode): void;
   applyFrame(frame: LiveFramePayload, settings: ScopeDisplaySettings): void;
   /** Перерисовать последний кадр с новыми настройками (смена В/дел…). */
   rerender(settings: ScopeDisplaySettings): void;
@@ -149,8 +156,12 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
     className: "t-compact lnt-scope-wave-tag",
     attrs: { "data-wave-bw": "full", hidden: "" },
   });
-  // Ряд состояния развёртки: ярлыки режимов (задача 24) + статус кадра.
-  const meta = el("div", { className: "lnt-scope-wave-meta" }, [bwTag, status]);
+  // Задача 22: оверлей послесвечения — канвас ПОСЛЕ корня графика в DOM
+  // (красится поверх), pointer-events: none — курсор/drag не задет.
+  const persistOverlay = mountWavePersistence(figure);
+  const persistTag = createPersistenceTag();
+  // Ряд состояния: ярлыки режимов (задачи 22/24) + статус кадра.
+  const meta = el("div", { className: "lnt-scope-wave-meta" }, [bwTag, persistTag.root, status]);
   const bodyChildren: Node[] = [];
   if (options.controls !== undefined) bodyChildren.push(options.controls);
   bodyChildren.push(figure, meta);
@@ -162,6 +173,7 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
   ]);
   let lastFrame: LiveFramePayload | null = null;
   let lastSettings: ScopeDisplaySettings | null = null;
+  let lastEmitS: number | null = null;
   let bwMode: BwFilterMode = "full";
 
   function applyBwMode(mode: BwFilterMode): void {
@@ -194,12 +206,12 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
     status.textContent = problems.join("; ");
   }
 
-  function render(frame: LiveFramePayload, settings: ScopeDisplaySettings): void {
+  function render(frame: LiveFramePayload, settings: ScopeDisplaySettings): WaveData | null {
     // Задача 24: ФНЧ отображения — вход рендера фильтрован, payload цел.
     const displayFrame = bwMode === "full" ? frame : filterLiveFrame(frame, bwMode);
     const data = buildWaveData(displayFrame, settings);
     announceProblems(data);
-    if (data === null) return; // предыдущий рендер остаётся, статус виден
+    if (data === null) return null; // предыдущий рендер остаётся, статус виден
     const theme = readChartTheme();
     const request: ChartRenderRequest = {
       xLabel: "Время, с",
@@ -213,6 +225,7 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
       ],
     };
     chart.render(request);
+    return data;
   }
 
   const handle: ScopeWaveformHandle = {
@@ -224,16 +237,31 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
       // Смена режима перерисовывает последний кадр (тумблер горячий).
       if (lastFrame !== null && lastSettings !== null) render(lastFrame, lastSettings);
     },
+    setPersistMode(mode: PersistenceMode): void {
+      persistOverlay.setMode(mode);
+      persistTag.paint(mode);
+    },
     applyFrame(frame, settings) {
       lastFrame = frame;
       lastSettings = settings;
-      render(frame, settings);
+      const data = render(frame, settings);
+      if (data === null) return;
+      // Задача 22: шаг накопления — затухание по dt кадра, оба канала.
+      const emitS = frame.emitted_at_s;
+      const dt =
+        Number.isFinite(emitS) && lastEmitS !== null && emitS > lastEmitS
+          ? emitS - lastEmitS
+          : 1 / 30;
+      if (Number.isFinite(emitS)) lastEmitS = emitS;
+      const [yMin, yMax] = yAxisRange(settings.vDiv, settings.probe);
+      persistOverlay.accumulate(data.x, data.ch1, data.ch2, yMin, yMax, dt);
     },
     rerender(settings) {
       if (lastFrame === null) return;
       render(lastFrame, settings);
     },
     destroy() {
+      persistOverlay.destroy();
       chart.destroy();
     },
   };

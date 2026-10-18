@@ -123,6 +123,17 @@
   display: none;
 }
 
+/* Задача 22: канвас послесвечения поверх uPlot — пассивный слой
+ * (pointer-events: none), inset 0 по фигуре; краска scopeWavePersistence
+ * кладёт ячейки в область построения .u-over. */
+.lnt-scope-workspace .lnt-scope-figure .lnt-scope-wave-persist {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 /* Статус кадра: проблема (NaN/клип) — предупреждающий бейдж (паттерн
  * .lnt-scope-sim-badge, контраст axe-проверен в Todo 7); ожидание/пустой
  * кадр — нейтральный текст-статус. */

@@ -37,6 +37,7 @@ import { mountScopeStatus } from "./scopeStatus";
 import { SCOPE_STRIP_ZONES } from "./scopeStripManifest";
 import { TRIGGER_LEVEL_LIMIT_V } from "./scopeTrigger";
 import { mountScopeTriggerLine } from "./scopeTriggerLine";
+import { buildPersistenceMenuSection } from "./scopeWavePersistence";
 import { findScopeWaveformView } from "./scopeWaveform";
 import type { ScopeWorkspaceHandle } from "./scopeWorkspaceHosts";
 
@@ -149,12 +150,17 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
     current: "full",
     onPick: (mode) => waveformView?.setBwFilter(mode),
   });
+  // Задача 22: секция «Послесвечение» — режимы времени спада оверлея.
+  const persistSection = buildPersistenceMenuSection({
+    current: "off",
+    onPick: (mode) => waveformView?.setPersistMode(mode),
+  });
   // Задача 21 (GATE A): расширенное меню захвата — кнопка в ИЗМЕР, панель-
   // оверлей, пишет те же поля живыми слушателями листьев (staged-грамматика).
   const captureMenu = mountScopeCaptureMenu({
     host: strip.groupHost("capture"),
     controls: controlHosts,
-    extras: el("div", {}, [bwSection]),
+    extras: el("div", {}, [bwSection, persistSection]),
   });
   const echoSlot = (key: string): HTMLElement =>
     el("span", {

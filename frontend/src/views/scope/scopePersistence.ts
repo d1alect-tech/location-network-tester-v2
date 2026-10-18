@@ -5,8 +5,12 @@
  * Попадания кладутся и по сегментам между соседними точками — след копится
  * вдоль ЛИНИИ развёртки, а не в отдельных точках сэмпла. Бюджет памяти
  * фиксирован: 512×256×1 Б = 128 КиБ, роста нет. Затухание вызывается
- * ПЕРЕД pushChannel — свежий кадр светится полным уровнем. */
-
+ * ПЕРЕД pushChannel — свежий кадр светится полным уровнем.
+ * Задача 22 (директива GATE A 2026-10-18): режимы времени спада
+ * Выкл / ~0,5 с / ~2 с — decayByFactor(фактор кадра) с фактором
+ * 256^(-dt/T): за T секунд яркость падает в 256 раз. Оверлей развёртки
+ * и секции меню живут в scopeWavePersistence.ts (сплит по потолку 250
+ * чистых LOC, точка сплита названа до кода). */
 export const PERSISTENCE_GRID_W = 512;
 export const PERSISTENCE_GRID_H = 256;
 export const PERSISTENCE_HIT_LEVEL = 96;
@@ -58,6 +62,20 @@ export class ScopePersistence {
     }
   }
 
+  /** Затухание произвольным фактором кадра (режимы времени спада,
+   * задача 22): 0 — мгновенно темно, ≥ 1 — без изменения; пол. */
+  decayByFactor(factor: number): void {
+    if (factor <= 0) {
+      this.cells.fill(0);
+      return;
+    }
+    if (factor >= 1) return;
+    const cells = this.cells;
+    for (let i = 0; i < cells.length; i += 1) {
+      cells[i] = ((cells[i] as number) * factor) | 0;
+    }
+  }
+
   levelAt(x: number, y: number): number {
     if (x < 0 || x >= PERSISTENCE_GRID_W || y < 0 || y >= PERSISTENCE_GRID_H) return 0;
     return this.cells[y * PERSISTENCE_GRID_W + x] as number;
@@ -100,6 +118,30 @@ export class ScopePersistence {
       this.hit(x, y);
     }
   }
+}
+
+/** Режимы времени спада послесвечения развёртки (задача 22). */
+export type PersistenceMode = "off" | "short" | "long";
+
+export const PERSISTENCE_MODE_TEXT: Record<PersistenceMode, string> = {
+  off: "Выкл",
+  short: "~0,5 с",
+  long: "~2 с",
+};
+
+/** Время спада яркости до 1/256 от исходной: «~0,5 с» / «~2 с». */
+const MODE_FALL_S: Record<Exclude<PersistenceMode, "off">, number> = {
+  short: 0.5,
+  long: 2,
+};
+
+/** Фактор затухания за кадр: 256^(-dt/T) — за T секунд яркость падает
+ *  в 256 раз (до порога темноты floor). off — 0 (мгновенно темно);
+ *  мусорный/неположительный dt — номинальный кадр 1/30 с. */
+export function persistenceDecayFactor(mode: PersistenceMode, frameDtS: number): number {
+  if (mode === "off") return 0;
+  const dt = Number.isFinite(frameDtS) && frameDtS > 0 ? frameDtS : 1 / 30;
+  return 256 ** (-dt / MODE_FALL_S[mode]);
 }
 
 function clampCell(fraction: number, size: number): number {
