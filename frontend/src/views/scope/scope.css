@@ -794,3 +794,41 @@
     display: none;
   }
 }
+
+/* Задача 19 (GATE A 2026-10-18): ghost-репетиция кромки В/дел — пунктир
+   у верхней кромки стекла/фигуры + значение (текущее на hover, детент в
+   drag). БЕЗ анимации — PRM-политика: никаких transition/animation/
+   transform; кромка — не кнопка, отклик = сама линия, не scale.
+   [data-edge-hover] — курсор ns-resize на поверхности под кромкой. */
+
+.lnt-scope-edge-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 12px;
+  border-top: 2px dashed var(--lnt-accent);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.lnt-scope-edge-ghost[hidden] {
+  display: none;
+}
+
+.lnt-scope-edge-ghost-value {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  padding: 0 4px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: 2px;
+  background: var(--lnt-elev);
+  color: var(--lnt-text-sec);
+  font: 500 10px / 12px var(--lnt-mono);
+  white-space: nowrap;
+}
+
+[data-edge-hover] {
+  cursor: ns-resize;
+}

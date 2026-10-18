@@ -611,3 +611,58 @@ describe("scopeStrip: задача 17 — пресеты задач (staged-до
     window.localStorage.clear();
   });
 });
+
+describe("scopeStrip: задача 19 — edge-drag В/дел (staged-эхо)", () => {
+  it("кромка стекла: детент вниз пишет staged-маркер без клика по сегменту", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+    const viewport = container.querySelector<HTMLElement>(".lnt-scope-viewport");
+    const figure = container.querySelector<HTMLElement>(".lnt-scope-figure");
+    expect(viewport).toBeInstanceOf(HTMLElement);
+    expect(figure).toBeInstanceOf(HTMLElement);
+    // jsdom даёт нулевые прямоугольники — стабы реальной геометрии.
+    vi.spyOn(viewport!, "getBoundingClientRect").mockReturnValue(new DOMRect(10, 100, 400, 300));
+    vi.spyOn(figure!, "getBoundingClientRect").mockReturnValue(new DOMRect(10, 420, 300, 200));
+    const move = (y: number) =>
+      viewport!.dispatchEvent(
+        new MouseEvent("pointermove", {
+          clientX: 200,
+          clientY: y,
+          bubbles: true,
+          cancelable: true,
+          buttons: 1,
+        }),
+      );
+    viewport!.dispatchEvent(
+      new MouseEvent("pointerdown", {
+        clientX: 200,
+        clientY: 105,
+        bubbles: true,
+        cancelable: true,
+        buttons: 1,
+      }),
+    );
+    move(145);
+    // Эхо в зоне ВЕРТ видно БЕЗ клика: staged-маркер «→ 1 В/дел».
+    const mark = container.querySelector<HTMLElement>('[data-live-mark="vdiv"]');
+    expect(mark?.hidden).toBe(false);
+    expect(mark?.textContent).toBe("→ 1 В/дел");
+    expect(log.starts).toHaveLength(0);
+    expect(log.configs).toBe(0);
+    // Ghost-репетиция кромки показывает значение детента.
+    const ghost = viewport!.querySelector<HTMLElement>(".lnt-scope-edge-ghost");
+    expect(ghost?.hidden).toBe(false);
+    expect(ghost?.textContent).toContain("В/дел 1");
+    move(145);
+    viewport!.dispatchEvent(
+      new MouseEvent("pointerup", {
+        clientX: 200,
+        clientY: 145,
+        bubbles: true,
+        cancelable: true,
+        buttons: 1,
+      }),
+    );
+  });
+});

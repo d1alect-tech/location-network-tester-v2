@@ -312,3 +312,80 @@ test("задача 17: пресеты — диалог из меню захва�
   await page.locator("[data-presets-name]").press("Escape");
   await expect(dialog).toBeHidden();
 });
+
+/** Задача 19 (GATE A 2026-10-18): edge-drag В/дел — верхняя кромка «экрана»
+ * (стекло + фигура развёртки): 3 детента 5/1/0.5, эхо в зоне ВЕРТ без клика
+ * (staged-маркер), арбитраж кромка > линия триггера > курсорные линии
+ * (capture-фазой на предке; существующие drag-линии не правятся),
+ * ghost-репетиция hover без анимации (PRM). Полоса не растёт (≤140 до
+ * staged-дрифта: рост эха ВЕРТ от маркера — существующее поведение). */
+test("задача 19: edge-drag В/дел — кромка, детенты, арбитраж, ghost @1280×720", async ({
+  page,
+}) => {
+  await runLiveGeometryGate(
+    page,
+    SCOPE_LIVE_TAB,
+    { width: 1280, height: 720 },
+    recordLiveGeometryRow,
+  );
+
+  const viewport = page.locator(".lnt-scope-viewport");
+  const box = await viewport.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box!.x + box!.width / 2;
+  // Полоса не растёт от кромки/ghost (до staged-дрифта В/дел).
+  const bandH = await page.evaluate(() =>
+    Math.round(document.querySelector("[data-band]")?.getBoundingClientRect().height ?? 999),
+  );
+  expect(bandH, `полоса ${bandH}px > 140`).toBeLessThanOrEqual(140);
+
+  // Ghost-репетиция hover: пунктир + текущее значение, БЕЗ анимации (PRM).
+  await page.mouse.move(x, box!.y + 5);
+  const ghost = page.locator(".lnt-scope-edge-ghost");
+  await expect(ghost).toBeVisible();
+  await expect(ghost).toContainText("В/дел 5");
+  const motion = await page.evaluate(() => {
+    const el = document.querySelector<HTMLElement>(".lnt-scope-edge-ghost");
+    if (el === null) return { duration: "?", animation: "?" };
+    const computed = getComputedStyle(el);
+    return { duration: computed.transitionDuration, animation: computed.animationName };
+  });
+  expect(motion.duration).toBe("0s");
+  expect(motion.animation).toBe("none");
+
+  // Детент 1 (5 → 1): эхо в ВЕРТ видно без клика — staged-маркер.
+  await page.mouse.down();
+  await page.mouse.move(x, box!.y + 50, { steps: 5 });
+  await page.mouse.up();
+  const mark = page.locator('[data-live-mark="vdiv"]');
+  await expect(mark).toBeVisible();
+  await expect(mark).toHaveText("→ 1 В/дел");
+
+  // Арбитраж: линия триггера у верхней кромки не тянется (кромка выше).
+  const line = page.locator(".lnt-scope-trig-line");
+  const lineBox = await line.boundingBox();
+  expect(lineBox).not.toBeNull();
+  await page.mouse.move(lineBox!.x + 30, lineBox!.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(x, box!.y + 8, { steps: 4 });
+  await page.mouse.up();
+  const levelTop = await page.locator("#lnt-scope-level").inputValue();
+  await page.mouse.move(x, box!.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(x, box!.y + 50, { steps: 5 });
+  await page.mouse.up();
+  // Уровень триггера не сдвинулся (линия не получила жест), В/дел — 0.5
+  // (формат эха — 500 мВ/дел: тот же форматтер, что в зоне ВЕРТ).
+  expect(await page.locator("#lnt-scope-level").inputValue()).toBe(levelTop);
+  await expect(mark).toHaveText("→ 500 мВ/дел");
+
+  // Линия ниже кромки тянется как раньше: уровень меняется.
+  const lineTopBox = await line.boundingBox();
+  expect(lineTopBox).not.toBeNull();
+  // Старт ниже полосы кромки (12 px): жест у линии, не у кромки.
+  await page.mouse.move(lineTopBox!.x + 30, lineTopBox!.y + 38);
+  await page.mouse.down();
+  await page.mouse.move(x, box!.y + box!.height / 2, { steps: 6 });
+  await page.mouse.up();
+  expect(await page.locator("#lnt-scope-level").inputValue()).not.toBe(levelTop);
+});

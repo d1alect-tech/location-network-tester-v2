@@ -32,9 +32,12 @@ import { mountScopeAutoset } from "./scopeAutoset";
 import { buildBwFilterMenuSection } from "./scopeBwFilter";
 import { mountScopeCaptureMenu } from "./scopeCaptureMenu";
 import type { ScopeControlHosts } from "./scopeControlState";
+import { applyScopeControlTargets, readScopeControlState } from "./scopeControlState";
 import { mountScopeCursorDrag } from "./scopeCursorDrag";
+import { mountScopeEdgeDrag } from "./scopeEdgeDrag";
 import { buildMathTraceToggle } from "./scopeMathTrace";
 import { mountScopeReset } from "./scopeReset";
+import { VDIV_STEPS } from "./scopeScale";
 import { mountScopeStatus } from "./scopeStatus";
 import { SCOPE_STRIP_ZONES } from "./scopeStripManifest";
 import { TRIGGER_LEVEL_LIMIT_V } from "./scopeTrigger";
@@ -125,6 +128,19 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
 
   // Задача 15. Фигура: drag курсорных линий — геометрия живого uPlot,
   // состояние тумблера; слайдеры — скрытый leftover с живыми слушателями.
+  // Задача 19 (GATE A): edge-drag В/дел — кромка «экрана» (стекло + фигура
+  // развёртки): арбитраж кромка > линия триггера > курсорные линии держит
+  // capture-слушатель на hosts.root (списатели не правятся); В/дел пишется
+  // тем же полем -> staged-грамматика наследуется, манифест не тронут.
+  const edgeDrag = mountScopeEdgeDrag({
+    host: hosts.root,
+    surfaces: [hosts.viewport, hosts.figure],
+    readVDiv: () => readScopeControlState(controlHosts).vdiv ?? VDIV_STEPS[0]!,
+    writeVDiv: (value) => {
+      applyScopeControlTargets(controlHosts, { vdiv: value });
+    },
+  });
+
   const cursorDrag = mountScopeCursorDrag({
     figure: hosts.figure,
     geometry: () => hosts.cursorsView.chart(),
@@ -219,6 +235,7 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
   return () => {
     captureMenu.dispose();
     presets.dispose();
+    edgeDrag.dispose();
     conflict.dispose();
     cursorDrag.dispose();
     triggerLine.dispose();
