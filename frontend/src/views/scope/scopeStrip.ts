@@ -28,6 +28,7 @@ import { wrapLiveStepper } from "../../components/liveStrip/liveStepper";
 import { mountLiveStrip } from "../../components/liveStrip/liveStrip";
 import { el } from "../../components/primitives/dom";
 import { mountScopeAutoset } from "./scopeAutoset";
+import { mountScopeCaptureMenu } from "./scopeCaptureMenu";
 import type { ScopeControlHosts } from "./scopeControlState";
 import { mountScopeCursorDrag } from "./scopeCursorDrag";
 import { mountScopeReset } from "./scopeReset";
@@ -137,6 +138,13 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
     source: strip.groupHost("trigsource"),
     slope: strip.groupHost("trigslope"),
   };
+
+  // Задача 21 (GATE A): расширенное меню захвата — кнопка в ИЗМЕР, панель-
+  // оверлей, пишет те же поля живыми слушателями листьев (staged-грамматика).
+  const captureMenu = mountScopeCaptureMenu({
+    host: strip.groupHost("capture"),
+    controls: controlHosts,
+  });
   const echoSlot = (key: string): HTMLElement =>
     el("span", {
       className: "lnt-live-echo-line",
@@ -172,6 +180,7 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
   hosts.root.classList.add("lnt-scope-strip-mode");
 
   return () => {
+    captureMenu.dispose();
     conflict.dispose();
     cursorDrag.dispose();
     triggerLine.dispose();

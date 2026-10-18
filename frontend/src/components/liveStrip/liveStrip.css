@@ -256,6 +256,131 @@
   font: 600 12px / 16px var(--lnt-mono);
 }
 
+/* ── Задача 21: расширенное меню захвата (disclosure-оверлей, вверх) ──── */
+
+.lnt-live-capture {
+  position: relative;
+  display: flex;
+}
+
+.lnt-live-strip .lnt-live-capture-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 8px;
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+  font: 500 12px / 16px var(--lnt-ui);
+  cursor: pointer;
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease), transform var(--lnt-t-press)
+    var(--lnt-ease-out);
+}
+
+.lnt-live-strip .lnt-live-capture-btn:active {
+  transform: scale(var(--lnt-press-scale));
+}
+
+.lnt-live-capture-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 400px;
+  max-width: calc(100vw - 48px);
+  padding: 10px;
+  background: var(--lnt-elev);
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-radius-control);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
+}
+
+.lnt-live-capture-menu[hidden] {
+  display: none;
+}
+
+.lnt-live-capture-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lnt-live-capture-hd {
+  padding: 2px 4px;
+  font: 600 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+}
+
+.lnt-live-capture-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.lnt-live-capture-row-label {
+  flex: none;
+  width: 118px;
+  font: 400 11px / 14px var(--lnt-ui);
+  color: var(--lnt-text-sec);
+}
+
+.lnt-live-capture-opt {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-elev);
+  color: var(--lnt-text-sec);
+  font: 600 12px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: transform var(--lnt-t-press) var(--lnt-ease-out);
+}
+
+.lnt-live-capture-opt[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--lnt-accent) 22%, var(--lnt-elev));
+  border-color: var(--lnt-accent);
+  color: var(--lnt-text);
+  font-weight: 700;
+}
+
+.lnt-live-strip .lnt-live-capture-opt:active {
+  transform: scale(var(--lnt-press-scale));
+}
+
+.lnt-live-capture-level-input {
+  min-height: 44px;
+  min-width: 90px;
+  padding: 0 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+  font: 500 12px / 16px var(--lnt-mono);
+}
+
+.lnt-live-capture-level-error {
+  margin: 0;
+  flex: 1 1 100%;
+  color: var(--lnt-err);
+}
+
+.lnt-live-capture-hint {
+  margin: 0;
+  padding: 0 4px;
+  color: var(--lnt-text-sec);
+}
+
 /* ── Степпер (непрерывный): −/+ вокруг живого числового поля ──────────── */
 
 .lnt-live-stepper {
@@ -735,6 +860,16 @@
 
   .lnt-live-strip .lnt-live-step-btn:hover {
     border-color: var(--lnt-line-hot);
+  }
+
+  .lnt-live-strip .lnt-live-capture-btn:hover {
+    border-color: var(--lnt-line-hot);
+  }
+
+  .lnt-live-strip .lnt-live-capture-opt:hover {
+    border-color: var(--lnt-line-hot);
+    transition: background var(--lnt-t-fast) var(--lnt-ease), border-color var(--lnt-t-fast)
+      var(--lnt-ease);
   }
 
   .lnt-live-strip .lnt-scope-seg-btn:hover {

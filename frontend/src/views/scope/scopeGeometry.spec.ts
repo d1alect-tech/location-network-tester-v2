@@ -105,3 +105,93 @@ test("r5-9 W1/W3: экран r4-пропорций + ридауты без об�
   expect(audit.inlineText).toContain("Δt");
   expect(audit.inlineText).toContain("ΔV");
 });
+
+/** Задача 21 (GATE A 2026-10-18): расширенное меню захвата — disclosure-
+ * оверлей по r4-прецеденту. Открытие НЕ растит полосу (панель absolute,
+ * открывается вверх), окно вида не переполняется, цели меню ≥ 44×44, меню
+ * целиком в окне вида. Пункт меню пишет то же поле, что и полоса: staged-
+ * маркер зажигается, слот чипа частоты НЕ врёт; Esc закрывает stateless. */
+test("задача 21: меню захвата — overlay, полоса не растёт, staged-запись @1280×720", async ({
+  page,
+}) => {
+  await runLiveGeometryGate(
+    page,
+    SCOPE_LIVE_TAB,
+    { width: 1280, height: 720 },
+    recordLiveGeometryRow,
+  );
+
+  const panel = page.locator(".lnt-live-capture-menu");
+  await expect(panel).toBeHidden();
+  const menuButton = page.locator('[data-action="capture"] .lnt-live-capture-btn');
+  await expect(menuButton).toBeVisible();
+  await menuButton.click();
+  await expect(panel).toBeVisible();
+
+  const audit = await page.evaluate(() => {
+    const round = (n: number): number => Math.round(n * 10) / 10;
+    const doc = document.documentElement;
+    const band = document.querySelector("[data-band]");
+    const panelNode = document.querySelector(".lnt-live-capture-menu");
+    if (!(band instanceof HTMLElement) || !(panelNode instanceof HTMLElement)) {
+      throw new Error("нет полосы/панели меню");
+    }
+    const small: string[] = [];
+    for (const node of panelNode.querySelectorAll<HTMLElement>("button, input")) {
+      if (node.getClientRects().length === 0) continue;
+      const r = node.getBoundingClientRect();
+      if (r.width < 43.5 || r.height < 43.5) {
+        small.push(
+          `${node.getAttribute("data-menu-value") ?? node.tagName}: ${r.width}×${r.height}`,
+        );
+      }
+    }
+    const box = panelNode.getBoundingClientRect();
+    const button = document.querySelector('[data-action="capture"] button');
+    const buttonBox = button instanceof HTMLElement ? button.getBoundingClientRect() : null;
+    return {
+      bandH: round(band.getBoundingClientRect().height),
+      docScrollH: doc.scrollHeight,
+      docClientH: doc.clientHeight,
+      docScrollW: doc.scrollWidth,
+      docClientW: doc.clientWidth,
+      menuTop: round(box.top),
+      menuLeft: round(box.left),
+      menuRight: round(box.right),
+      menuBottom: round(box.bottom),
+      small,
+      buttonH: buttonBox === null ? 0 : round(buttonBox.height),
+    };
+  });
+
+  // Полоса-гейт держится при открытом меню: высота и отсутствие прокрутки.
+  expect(audit.bandH, `полоса ${audit.bandH}px > 140 при открытом меню`).toBeLessThanOrEqual(140);
+  expect(audit.docScrollH).toBeLessThanOrEqual(audit.docClientH + 1);
+  expect(audit.docScrollW).toBeLessThanOrEqual(audit.docClientW + 1);
+  // Меню целиком в окне вида, кнопка ≥ 44, цели меню ≥ 44×44.
+  expect(audit.menuTop).toBeGreaterThanOrEqual(0);
+  expect(audit.menuLeft).toBeGreaterThanOrEqual(0);
+  expect(audit.menuRight).toBeLessThanOrEqual(1280);
+  expect(audit.menuBottom).toBeLessThanOrEqual(720);
+  expect(audit.buttonH).toBeGreaterThanOrEqual(44);
+  expect(audit.small, `мелкие цели меню: ${audit.small.join("; ")}`).toEqual([]);
+
+  // Пункт меню пишет то же поле, что и полоса: staged-маркер + честный слот.
+  await page.locator('.lnt-live-capture-menu [data-menu-row="vdiv"] [data-menu-value="1"]').click();
+  const mark = page.locator('[data-live-mark="vdiv"]');
+  await expect(mark).toBeVisible();
+  await expect(mark).toHaveText("→ 1 В/дел");
+  await expect(page.locator("[data-slot='rate']")).toHaveText("8 МГц");
+
+  // Esc закрывает stateless: маркер остаётся staged-целью, панель скрыта.
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  await expect(mark).toBeVisible();
+
+  // Клик мимо закрывает без изменений: повторное открытие показывает цель.
+  await menuButton.click();
+  await expect(panel).toBeVisible();
+  await expect(
+    page.locator('.lnt-live-capture-menu [data-menu-row="vdiv"] button[aria-pressed="true"]'),
+  ).toHaveAttribute("data-menu-value", "1");
+});
