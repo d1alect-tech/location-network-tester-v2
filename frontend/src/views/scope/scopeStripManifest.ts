@@ -57,6 +57,7 @@ export const SCOPE_STRIP_ZONES: readonly LiveStripZoneDesc[] = [
           { action: "reset" },
           { local: "measure" },
           { local: "persist" },
+          { local: "math" },
         ],
       },
     ],

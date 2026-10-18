@@ -32,6 +32,7 @@ import { buildBwFilterMenuSection } from "./scopeBwFilter";
 import { mountScopeCaptureMenu } from "./scopeCaptureMenu";
 import type { ScopeControlHosts } from "./scopeControlState";
 import { mountScopeCursorDrag } from "./scopeCursorDrag";
+import { buildMathTraceToggle } from "./scopeMathTrace";
 import { mountScopeReset } from "./scopeReset";
 import { mountScopeStatus } from "./scopeStatus";
 import { SCOPE_STRIP_ZONES } from "./scopeStripManifest";
@@ -141,6 +142,11 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
     source: strip.groupHost("trigsource"),
     slope: strip.groupHost("trigslope"),
   };
+
+  // Задача 16 (GATE A): тумблер математ-трассы CH1−CH2 в ИЗМЕР линии 2 —
+  // третья серия стека развёртки (хэндл по фигуре, воркспейс не правится).
+  const mathToggle = buildMathTraceToggle((on) => waveformView?.setMathMode(on));
+  strip.groupHost("math").append(mathToggle.root);
 
   // Задача 24 (GATE A): секция «Полоса» в меню захвата — программный ФНЧ
   // отображения развёртки (клиентский, ярлык честности в секции и в [data-

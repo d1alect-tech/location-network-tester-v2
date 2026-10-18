@@ -195,3 +195,39 @@ test("задача 21: меню захвата — overlay, полоса не р
     page.locator('.lnt-live-capture-menu [data-menu-row="vdiv"] button[aria-pressed="true"]'),
   ).toHaveAttribute("data-menu-value", "1");
 });
+
+/** Задача 16 (GATE A 2026-10-18): математ-трасса CH1−CH2 — тумблер в ИЗМЕР
+ * линии 2 (манифест local math), третья серия существующего стека развёртки,
+ * ярлык честности [data-wave-math]. Полоса не растёт (≤140, линия 2 не
+ * переносится), staged-грамматика не затрагивается. */
+test("задача 16: математ-трасса — тумблер ИЗМЕР, полоса не растёт, ярлык виден @1280×720", async ({
+  page,
+}) => {
+  await runLiveGeometryGate(
+    page,
+    SCOPE_LIVE_TAB,
+    { width: 1280, height: 720 },
+    recordLiveGeometryRow,
+  );
+
+  const toggle = page.locator('#lnt-scope-math');
+  await expect(toggle).toBeVisible();
+  await expect(toggle.locator("button")).toHaveCount(2);
+  const tag = page.locator("[data-wave-math]");
+  await expect(tag).toBeHidden();
+
+  await toggle.locator('[data-value="on"]').click();
+  await expect(tag).toBeVisible();
+  await expect(tag).toContainText("CH1−CH2");
+
+  // Живой захват идёт (гейт выше нажал Run): кадры пишут размах ряда разности.
+  await expect(tag).toContainText("размах", { timeout: 15000 });
+
+  // Полоса держит бюджет с новым тумблером; staged-маркеры не зажглись.
+  const bandH = await page.evaluate(() =>
+    Math.round(document.querySelector("[data-band]")?.getBoundingClientRect().height ?? 999),
+  );
+  expect(bandH, `полоса ${bandH}px > 140`).toBeLessThanOrEqual(140);
+  const stagedVisible = await page.locator("[data-live-mark]:not([hidden])").count();
+  expect(stagedVisible).toBe(0);
+});

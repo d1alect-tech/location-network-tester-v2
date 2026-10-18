@@ -522,3 +522,30 @@ describe("scopeStrip: задача 12 — характеризация хост�
     expect(container.contains(workspace)).toBe(true);
   });
 });
+
+describe("scopeStrip: задача 16 — математ-трасса CH1−CH2", () => {
+  it("тумблер в ИЗМЕР линии 2; включение зажигает ярлык, staged-грамматика не тронута", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+
+    const math = container.querySelector<HTMLElement>('[data-local="math"]');
+    expect(math).toBeInstanceOf(HTMLElement);
+    expect(math?.closest("[data-zone]")?.getAttribute("data-zone")).toBe("measure");
+    expect(math?.querySelectorAll("button")).toHaveLength(2);
+    // Новых live-подписок нет: вкладка держит свои 5.
+    expect(FakeLiveEventSource.instances).toHaveLength(5);
+
+    const tag = container.querySelector<HTMLElement>("[data-wave-math]");
+    expect(tag?.hidden).toBe(true);
+    button(container, '[data-local="math"] [data-value="on"]').click();
+    await flush();
+    expect(tag?.hidden).toBe(false);
+    expect(tag?.textContent).toContain("CH1−CH2");
+    // Мат-трасса — режим отображения: ни staged-маркеров, ни POST.
+    const marks = [...container.querySelectorAll<HTMLElement>("[data-live-mark]")];
+    expect(marks.every((mark) => mark.hidden)).toBe(true);
+    expect(log.starts).toHaveLength(0);
+    expect(log.configs).toBe(0);
+  });
+});

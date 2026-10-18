@@ -10,6 +10,7 @@ import { LntApiClient } from "../../api/client";
 import { createLiveApi } from "../../api/client-live";
 import type { LiveChannelSeries, LiveFramePayload, LiveStatePayload } from "../../api/types-live";
 import type { ChartHandle, ChartRenderRequest } from "../../components/charts/types";
+import { formatVoltsValue } from "./scopeMeasurements";
 import { DEFAULT_SCOPE_SETTINGS } from "./scopeScale";
 import { mountScopeWaveform } from "./scopeWaveform";
 import type { ScopeWaveformHandle } from "./scopeWaveform";
@@ -346,5 +347,75 @@ describe("scopeWorkspace wiring (Todo 8)", () => {
     await flush();
     expect(chart.requests).toHaveLength(2);
     expect(chart.requests[1]?.yRange).not.toEqual(before);
+  });
+});
+
+describe("scopeWaveform: математ-трасса CH1−CH2 (задача 16)", () => {
+  it("по умолчанию выключена: две серии, ярлык скрыт", () => {
+    const { wave, chart } = mountWave();
+    wave.applyFrame(frame(1), { ...DEFAULT_SCOPE_SETTINGS });
+    expect(chart.requests.at(-1)?.series).toHaveLength(2);
+    const tag = wave.root.querySelector<HTMLElement>("[data-wave-math]");
+    expect(tag).toBeInstanceOf(HTMLElement);
+    expect(tag?.hidden).toBe(true);
+  });
+
+  it("третья серия общего стека: значения = поэлементная разность payload", () => {
+    const ch1 = series(32, 1);
+    const ch2 = series(32, 0.5, Math.PI / 2);
+    const { wave, chart } = mountWave();
+    wave.setMathMode(true);
+    wave.applyFrame(frame(1, ch1, ch2), { ...DEFAULT_SCOPE_SETTINGS });
+    const request = chart.requests.at(-1);
+    expect(request?.series).toHaveLength(3);
+    expect(request?.series[2]?.label).toBe("CH1−CH2");
+    const expected = ch1.voltage_v.map((value, i) => value - (ch2.voltage_v[i] ?? 0));
+    expect(request?.series[2]?.values).toEqual(expected);
+    // Отличие не только цветом (DESIGN.md): пунктир и маркер.
+    expect(request?.series[2]?.dash).toEqual([2, 3]);
+    expect(request?.series[2]?.marker).toBe("▲");
+  });
+
+  it("тумблер горячий: последний кадр перерисовывается без нового кадра", () => {
+    const { wave, chart } = mountWave();
+    wave.applyFrame(frame(1), { ...DEFAULT_SCOPE_SETTINGS });
+    const count = chart.requests.length;
+    wave.setMathMode(true);
+    expect(chart.requests.length).toBe(count + 1);
+    expect(chart.requests.at(-1)?.series).toHaveLength(3);
+    wave.setMathMode(false);
+    expect(chart.requests.at(-1)?.series).toHaveLength(2);
+  });
+
+  it("ярлык честности: размах ряда разности; выключение прячет", () => {
+    const ch1 = series(64, 1.2);
+    const ch2 = series(64, 0.4, Math.PI / 3);
+    const { wave } = mountWave();
+    wave.setMathMode(true);
+    wave.applyFrame(frame(1, ch1, ch2), { ...DEFAULT_SCOPE_SETTINGS });
+    const tag = wave.root.querySelector<HTMLElement>("[data-wave-math]");
+    expect(tag?.hidden).toBe(false);
+    const diff = ch1.voltage_v.map((value, i) => value - (ch2.voltage_v[i] ?? 0));
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const value of diff) {
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+    expect(tag?.textContent).toContain(`размах ${formatVoltsValue(max - min)}`);
+    expect(tag?.textContent).toContain("8 бит");
+    wave.setMathMode(false);
+    expect(wave.root.querySelector<HTMLElement>("[data-wave-math]")?.hidden).toBe(true);
+  });
+
+  it("инверсия канала входит в разность отображаемых рядов", () => {
+    const ch1 = series(16, 1);
+    const ch2 = series(16, 0.5);
+    const { wave, chart } = mountWave();
+    wave.setMathMode(true);
+    wave.applyFrame(frame(1, ch1, ch2), { ...DEFAULT_SCOPE_SETTINGS, invertCh2: true });
+    expect(chart.requests.at(-1)?.series[2]?.values).toEqual(
+      ch1.voltage_v.map((value, i) => value + (ch2.voltage_v[i] ?? 0)),
+    );
   });
 });
