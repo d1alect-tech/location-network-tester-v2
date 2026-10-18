@@ -9,7 +9,7 @@
 
 import type { ScopeControlsView } from "./scopeControls";
 import type { ScopeCursorView } from "./scopeCursorSection";
-import type { ScopeMeasureView } from "./scopeMeasureConfig";
+import type { MeasureRowState, ScopeMeasureView } from "./scopeMeasureConfig";
 import type { ScopeRateField } from "./scopeRateField";
 import type { ScopeScreenHandle } from "./scopeScreen";
 import type { ScopeStatusView } from "./scopeSections";
@@ -36,6 +36,9 @@ export interface ScopeWorkspaceHosts {
   readonly live: HTMLButtonElement;
   readonly screenNote: HTMLElement;
   readonly measure: HTMLElement;
+  /** Ряды измерений (lnt.live.meas.v1): пресеты задач читают/пишут их
+   *  живым API состояния (задача 17), не срезами DOM грида. */
+  readonly measureRows: MeasureRowState;
   readonly persist: HTMLElement;
   readonly stateLine: HTMLElement;
   readonly simBadge: HTMLElement;
@@ -60,10 +63,11 @@ export function scopeHostsFromViews(views: {
   trigger: ScopeTriggerView;
   screen: ScopeScreenHandle;
   measure: ScopeMeasureView;
+  measureRows: MeasureRowState;
   cursors: ScopeCursorView;
   figure: HTMLElement;
 }): ScopeWorkspaceHosts {
-  const { status, controls, rateField, trigger, screen, measure, cursors } = views;
+  const { status, controls, rateField, trigger, screen, measure, measureRows, cursors } = views;
   return {
     root: views.root,
     run: status.runButton,
@@ -82,6 +86,7 @@ export function scopeHostsFromViews(views: {
     live: screen.live,
     screenNote: screen.screenNote,
     measure: measure.toggle,
+    measureRows,
     persist: screen.persist,
     stateLine: status.stateLine,
     simBadge: status.simBadge,

@@ -210,7 +210,7 @@ test("задача 16: математ-трасса — тумблер ИЗМЕР
     recordLiveGeometryRow,
   );
 
-  const toggle = page.locator('#lnt-scope-math');
+  const toggle = page.locator("#lnt-scope-math");
   await expect(toggle).toBeVisible();
   await expect(toggle.locator("button")).toHaveCount(2);
   const tag = page.locator("[data-wave-math]");
@@ -230,4 +230,85 @@ test("задача 16: математ-трасса — тумблер ИЗМЕР
   expect(bandH, `полоса ${bandH}px > 140`).toBeLessThanOrEqual(140);
   const stagedVisible = await page.locator("[data-live-mark]:not([hidden])").count();
   expect(stagedVisible).toBe(0);
+});
+
+/** Задача 17 (GATE A 2026-10-18): пресеты задач — секция «Пресеты» в меню
+ * захвата (кнопка в существующем кластере — бюджет строки 2 полосы на
+ * 1280×720 исчерпан математ-тумблером), stateless-диалог поверх полосы,
+ * localStorage lnt.live.presets.v1, применение — staged-дорогой: маркер
+ * «применится при следующем запуске» виден, запуска не уходит. */
+test("задача 17: пресеты — диалог из меню захвата, staged-применение @1280×720", async ({
+  page,
+}) => {
+  await runLiveGeometryGate(
+    page,
+    SCOPE_LIVE_TAB,
+    { width: 1280, height: 720 },
+    recordLiveGeometryRow,
+  );
+
+  await page.locator('[data-action="capture"] .lnt-live-capture-btn').click();
+  const menu = page.locator(".lnt-live-capture-menu");
+  await expect(menu).toBeVisible();
+  await expect(page.locator("[data-presets-open]")).toBeVisible();
+  await page.locator("[data-presets-open]").click();
+  const dialog = page.locator(".lnt-live-presets");
+  await expect(dialog).toBeVisible();
+  await expect(menu).toBeHidden();
+
+  // Геометрия: полоса не растёт от диалога (absolute-оверлей), диалог в окне
+  // вида, интерактивные цели ≥ 44 — ДО staged-дрифта В/дел (рост эха зоны
+  // ВЕРТ от маркера — существующее поведение, гейтом r4 не проверяется).
+  const bandH = await page.evaluate(() =>
+    Math.round(document.querySelector("[data-band]")?.getBoundingClientRect().height ?? 999),
+  );
+  expect(bandH, `полоса ${bandH}px > 140`).toBeLessThanOrEqual(140);
+  const audit = await page.evaluate(() => {
+    const dialogEl = document.querySelector<HTMLElement>(".lnt-live-presets");
+    if (dialogEl === null) return { inView: false, targets: [] as number[] };
+    const rect = dialogEl.getBoundingClientRect();
+    const inView = rect.top >= 0 && rect.left >= 0 && rect.right <= window.innerWidth;
+    const targets = [...dialogEl.querySelectorAll("button, input")].map((node) => {
+      const r = node.getBoundingClientRect();
+      return Math.min(Math.round(r.width), Math.round(r.height));
+    });
+    return { inView, targets };
+  });
+  expect(audit.inView, "диалог вылез за окно вида").toBe(true);
+  for (const target of audit.targets) {
+    expect(target, `цель ${target}px < 44`).toBeGreaterThanOrEqual(44);
+  }
+
+  // Statelessness до действия: Esc закрывает без изменений.
+  await page.locator("[data-presets-name]").press("Escape");
+  await expect(dialog).toBeHidden();
+
+  // Снимок с ЦЕЛЬЮ В/дел 1 (запущено 5): цель ≠ применённое — staged-семантика.
+  await page.locator('#lnt-scope-vdiv [data-value="1"]').click();
+  await page.locator('[data-action="capture"] .lnt-live-capture-btn').click();
+  await page.locator("[data-presets-open]").click();
+  await expect(dialog).toBeVisible();
+  await page.locator("[data-presets-name]").fill("рабочий-1");
+  await page.locator("[data-presets-save]").click();
+  await expect(page.locator("[data-presets-list]")).toContainText("рабочий-1");
+  await expect(dialog).toBeHidden();
+
+  // Вернулись к применённому 5, применили пресет: цель 1 ≠ применённое 5 —
+  // staged-маркер «применится при следующем запуске», без перезапуска.
+  await page.locator('#lnt-scope-vdiv [data-value="5"]').click();
+  await page.locator('[data-action="capture"] .lnt-live-capture-btn').click();
+  await page.locator("[data-presets-open]").click();
+  await expect(dialog).toBeVisible();
+  await page.locator('[data-preset-name="рабочий-1"] [data-presets-apply]').click();
+  const mark = page.locator('[data-live-mark="vdiv"]');
+  await expect(mark).toBeVisible();
+  await expect(mark).toHaveText("→ 1 В/дел");
+
+  // Диалог закрылся после применения; повторное открытие + Esc — stateless.
+  await expect(dialog).toBeHidden();
+  await page.locator('[data-action="capture"] .lnt-live-capture-btn').click();
+  await page.locator("[data-presets-open]").click();
+  await expect(dialog).toBeVisible();
+  await page.locator("[data-presets-name]").press("Escape");
+  await expect(dialog).toBeHidden();
 });

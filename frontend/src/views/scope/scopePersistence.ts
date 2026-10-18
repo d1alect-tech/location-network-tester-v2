@@ -129,6 +129,10 @@ export const PERSISTENCE_MODE_TEXT: Record<PersistenceMode, string> = {
   long: "~2 с",
 };
 
+export const PERSISTENCE_MODES: readonly PersistenceMode[] = Object.keys(
+  PERSISTENCE_MODE_TEXT,
+) as PersistenceMode[];
+
 /** Время спада яркости до 1/256 от исходной: «~0,5 с» / «~2 с». */
 const MODE_FALL_S: Record<Exclude<PersistenceMode, "off">, number> = {
   short: 0.5,

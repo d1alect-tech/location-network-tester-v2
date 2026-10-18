@@ -115,6 +115,7 @@ export function mountScopeWorkspace(
     trigger: triggerPanel,
     screen,
     measure,
+    measureRows,
     cursors,
     figure: waveform.figure,
   });

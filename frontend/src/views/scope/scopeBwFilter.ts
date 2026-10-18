@@ -32,6 +32,8 @@ export const BW_MODE_TEXT: Record<BwFilterMode, string> = {
   "1mhz": "~1 МГц",
 };
 
+export const BW_FILTER_MODES: readonly BwFilterMode[] = Object.keys(BW_MODE_TEXT) as BwFilterMode[];
+
 const MODE_CUTOFF_HZ: Record<Exclude<BwFilterMode, "full">, number> = {
   "5mhz": 5_000_000,
   "1mhz": 1_000_000,

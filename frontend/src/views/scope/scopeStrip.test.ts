@@ -549,3 +549,65 @@ describe("scopeStrip: задача 16 — математ-трасса CH1−CH2"
     expect(log.configs).toBe(0);
   });
 });
+
+describe("scopeStrip: задача 17 — пресеты задач (staged-дорога)", () => {
+  it("сохранить → изменить → применить: staged-маркер без запуска; на ходу триггер — конфигом", async () => {
+    window.localStorage.clear();
+    const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
+    const { container } = mountTab(log, { state: { ...IDLE } });
+    await flush();
+
+    // Уходим от дефолтов: В/дел 1, режим «Норм» (на простое — без POST).
+    button(container, '#lnt-scope-vdiv [data-value="1"]').click();
+    button(container, '[data-trigger-mode="normal"]').click();
+    await flush();
+
+    // Меню захвата → пресеты: сохранить снимок «норм-1».
+    button(container, '[data-action="capture"] .lnt-live-capture-btn').click();
+    await flush();
+    button(container, "[data-presets-open]").click();
+    await flush();
+    const name = container.querySelector<HTMLInputElement>("[data-presets-name]");
+    if (name === null) throw new Error("нет поля имени пресета");
+    name.value = "норм-1";
+    name.dispatchEvent(new Event("input", { bubbles: true }));
+    button(container, "[data-presets-save]").click();
+    await flush();
+    expect(container.querySelector<HTMLElement>(".lnt-live-presets")?.hidden).toBe(true);
+    expect(window.localStorage.getItem("lnt.live.presets.v1")).toContain("норм-1");
+
+    // Уходим от снимка: В/дел 0.5, режим «Авто».
+    button(container, '#lnt-scope-vdiv [data-value="0.5"]').click();
+    button(container, '[data-trigger-mode="auto"]').click();
+    await flush();
+
+    // Применить «норм-1»: staged-маркер В/дел (1 ≠ стартовый дефолт 5),
+    // запуска и мгновенного применения НЕТ (фабрикация запрещена).
+    button(container, '[data-action="capture"] .lnt-live-capture-btn').click();
+    await flush();
+    button(container, '[data-preset-name="норм-1"] [data-presets-apply]').click();
+    await flush();
+    const mark = container.querySelector<HTMLElement>('[data-live-mark="vdiv"]');
+    expect(mark?.hidden).toBe(false);
+    expect(mark?.textContent).toBe("→ 1 В/дел");
+    expect(log.starts).toHaveLength(0);
+    expect(log.configs).toBe(0);
+
+    // На ходу (реальный Run — мок ведёт state как сервер): пресет с «Норм»
+    // применяется горячим конфигом триггера, БЕЗ нового запуска.
+    button(container, "#lnt-scope-run").click();
+    await flush();
+    expect(log.starts).toHaveLength(1);
+    button(container, '[data-trigger-mode="auto"]').click();
+    await flush();
+    expect(log.configs).toBe(1);
+    button(container, '[data-action="capture"] .lnt-live-capture-btn').click();
+    await flush();
+    button(container, '[data-preset-name="норм-1"] [data-presets-apply]').click();
+    await flush();
+    expect(log.configs).toBe(2);
+    // Пресет на ходу не перезапускает захват: запусков по-прежнему один.
+    expect(log.starts).toHaveLength(1);
+    window.localStorage.clear();
+  });
+});

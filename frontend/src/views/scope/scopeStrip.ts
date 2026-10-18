@@ -27,6 +27,7 @@ import { mountLiveRunCluster } from "../../components/liveStrip/liveRunCluster";
 import { wrapLiveStepper } from "../../components/liveStrip/liveStepper";
 import { mountLiveStrip } from "../../components/liveStrip/liveStrip";
 import { el } from "../../components/primitives/dom";
+import { mountLivePresets } from "./livePresets";
 import { mountScopeAutoset } from "./scopeAutoset";
 import { buildBwFilterMenuSection } from "./scopeBwFilter";
 import { mountScopeCaptureMenu } from "./scopeCaptureMenu";
@@ -148,6 +149,15 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
   const mathToggle = buildMathTraceToggle((on) => waveformView?.setMathMode(on));
   strip.groupHost("math").append(mathToggle.root);
 
+  // Задача 17 (GATE A): пресеты задач — секция в меню захвата + stateless
+  // диалог; хранение lnt.live.presets.v1, применение живыми слушателями
+  // листьев (staged-грамматика полосы наследуется, мгновенного применения
+  // старт-ручек нет). Хост — группа capture (якорь оверлея, тот же кластер).
+  const presets = mountLivePresets({
+    controls: controlHosts,
+    measureRows: hosts.measureRows,
+  });
+
   // Задача 24 (GATE A): секция «Полоса» в меню захвата — программный ФНЧ
   // отображения развёртки (клиентский, ярлык честности в секции и в [data-
   // wave-bw]); хэндл развёртки берётся по фигуре, воркспейс не правится.
@@ -166,8 +176,12 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
   const captureMenu = mountScopeCaptureMenu({
     host: strip.groupHost("capture"),
     controls: controlHosts,
-    extras: el("div", {}, [bwSection, persistSection]),
+    extras: el("div", {}, [bwSection, persistSection, presets.section]),
   });
+  // Диалог пресетов встаёт в группу capture ПОСЛЕ кластера меню: первая
+  // кнопка группы остаётся «Меню» (контракт scopeCaptureMenu).
+  presets.attach(strip.groupHost("capture"));
+
   const echoSlot = (key: string): HTMLElement =>
     el("span", {
       className: "lnt-live-echo-line",
@@ -204,6 +218,7 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
 
   return () => {
     captureMenu.dispose();
+    presets.dispose();
     conflict.dispose();
     cursorDrag.dispose();
     triggerLine.dispose();

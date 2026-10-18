@@ -31,7 +31,15 @@ export type MeasureRowKey = "vpp" | "vmax" | "vmin" | "rms" | "freq" | "period" 
 
 export const MEASURE_STORAGE_KEY = "lnt.live.meas.v1";
 
-const ROW_KEYS: readonly MeasureRowKey[] = ["vpp", "vmax", "vmin", "rms", "freq", "period", "duty"];
+export const ROW_KEYS: readonly MeasureRowKey[] = [
+  "vpp",
+  "vmax",
+  "vmin",
+  "rms",
+  "freq",
+  "period",
+  "duty",
+];
 
 function isMeasureRowKey(value: unknown): value is MeasureRowKey {
   return typeof value === "string" && (ROW_KEYS as readonly string[]).includes(value);
