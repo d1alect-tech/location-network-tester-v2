@@ -4,7 +4,13 @@
  * стабильна между кадрами, меняется только В/дел/пробник. Данные кадра
  * копируются (инверсия — знак копии, исходники не мутируются). Нечисловые
  * отсчёты отбрасываются по правилу выравнивания рядов (prepareAligned);
- * выход за окно сетки и пустой кадр — видимый статус, без исключений. */
+ * выход за окно сетки и пустой кадр — видимый статус, без исключений.
+ * Задача 24 (GATE A 2026-10-18): программный ФНЧ полосы — фильтр кадра
+ * ПЕРЕД отрисовкой (режим setBwFilter), измерения не трогаются (считаются
+ * по нефильтрованному payload в scopeMeasureConfig); ярлык состояния
+ * [data-wave-bw] несёт подпись «программный фильтр, не аналоговый предел».
+ * Хэндл регистрируется по фигуре (WeakMap, прецедент scopeCursorSection):
+ * полоса находит его без правок воркспейса — findScopeWaveformView. */
 
 import type { LiveFramePayload } from "../../api/types-live";
 import { decimateMinMax } from "../../components/charts/series";
@@ -14,6 +20,7 @@ import type { ChartRenderRequest } from "../../components/charts/types";
 import { createUplotView } from "../../components/charts/uplotView";
 import { POINT_BUDGETS } from "../../components/charts/viewModels";
 import { el } from "../../components/primitives/dom";
+import { BW_FILTER_HINT, BW_MODE_TEXT, type BwFilterMode, filterLiveFrame } from "./scopeBwFilter";
 import { halfSpanVolts, yAxisRange } from "./scopeScale";
 import type { ScopeDisplaySettings } from "./scopeScale";
 import "./scopeWaveform.css";
@@ -33,10 +40,21 @@ export interface ScopeWaveformHandle {
   readonly root: HTMLElement;
   /** Фигура развёртки (.lnt-scope-figure) — хост drag курсорных линий. */
   readonly figure: HTMLElement;
+  /** Режим программного ФНЧ отображения (задача 24): фильтрует кадр
+   *  перед отрисовкой, ярлык честности виден при любом не-full режиме. */
+  setBwFilter(mode: BwFilterMode): void;
   applyFrame(frame: LiveFramePayload, settings: ScopeDisplaySettings): void;
   /** Перерисовать последний кадр с новыми настройками (смена В/дел…). */
   rerender(settings: ScopeDisplaySettings): void;
   destroy(): void;
+}
+
+/** Хэндл развёртки по фигуре (WeakMap): полоса берёт его без селекторного
+ *  поиска по DOM воркспейса — прецедент findScopeCursorView. */
+const viewsByFigure = new WeakMap<HTMLElement, ScopeWaveformHandle>();
+
+export function findScopeWaveformView(figure: HTMLElement): ScopeWaveformHandle | undefined {
+  return viewsByFigure.get(figure);
 }
 
 interface WaveData {
@@ -127,9 +145,15 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
   // Корень хэндла монтируется в фигуру (как ChartShell.setContent): его
   // CSS-высота даёт контейнеру размер, иначе draw() уходит по нулю.
   figure.append(chart.root);
+  const bwTag = el("p", {
+    className: "t-compact lnt-scope-wave-tag",
+    attrs: { "data-wave-bw": "full", hidden: "" },
+  });
+  // Ряд состояния развёртки: ярлыки режимов (задача 24) + статус кадра.
+  const meta = el("div", { className: "lnt-scope-wave-meta" }, [bwTag, status]);
   const bodyChildren: Node[] = [];
   if (options.controls !== undefined) bodyChildren.push(options.controls);
-  bodyChildren.push(figure, status);
+  bodyChildren.push(figure, meta);
   const root = el("section", { className: "panel lnt-scope-section lnt-scope-wave" }, [
     el("div", { className: "panel-hd" }, [
       el("h3", { className: "panel-title", text: "Живая развёртка" }),
@@ -137,6 +161,15 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
     el("div", { className: "panel-bd" }, bodyChildren),
   ]);
   let lastFrame: LiveFramePayload | null = null;
+  let lastSettings: ScopeDisplaySettings | null = null;
+  let bwMode: BwFilterMode = "full";
+
+  function applyBwMode(mode: BwFilterMode): void {
+    bwMode = mode;
+    bwTag.setAttribute("data-wave-bw", mode);
+    bwTag.hidden = mode === "full";
+    bwTag.textContent = mode === "full" ? "" : `Полоса: ${BW_MODE_TEXT[mode]} — ${BW_FILTER_HINT}`;
+  }
 
   function announceProblems(data: WaveData | null): void {
     if (data === null) {
@@ -162,7 +195,9 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
   }
 
   function render(frame: LiveFramePayload, settings: ScopeDisplaySettings): void {
-    const data = buildWaveData(frame, settings);
+    // Задача 24: ФНЧ отображения — вход рендера фильтрован, payload цел.
+    const displayFrame = bwMode === "full" ? frame : filterLiveFrame(frame, bwMode);
+    const data = buildWaveData(displayFrame, settings);
     announceProblems(data);
     if (data === null) return; // предыдущий рендер остаётся, статус виден
     const theme = readChartTheme();
@@ -180,11 +215,18 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
     chart.render(request);
   }
 
-  return {
+  const handle: ScopeWaveformHandle = {
     root,
     figure,
+    setBwFilter(mode: BwFilterMode): void {
+      if (bwMode === mode) return;
+      applyBwMode(mode);
+      // Смена режима перерисовывает последний кадр (тумблер горячий).
+      if (lastFrame !== null && lastSettings !== null) render(lastFrame, lastSettings);
+    },
     applyFrame(frame, settings) {
       lastFrame = frame;
+      lastSettings = settings;
       render(frame, settings);
     },
     rerender(settings) {
@@ -195,4 +237,6 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
       chart.destroy();
     },
   };
+  viewsByFigure.set(figure, handle);
+  return handle;
 }

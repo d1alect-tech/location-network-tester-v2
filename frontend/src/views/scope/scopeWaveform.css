@@ -94,6 +94,35 @@
   }
 }
 
+/* Ряд состояния развёртки (задача 24): ярлык режима ФНЧ полосы +
+ * статус кадра — одна строка под фигурой. Ярлык — нейтральная пилюля
+ * (как waiting-статус), несёт подпись «программный фильтр, не
+ * аналоговый предел» при любом не-full режиме. */
+
+.lnt-scope-workspace .lnt-scope-wave-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.lnt-scope-workspace .lnt-scope-wave-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-pill);
+  color: var(--lnt-text-sec);
+  font: 400 12px / 16px var(--lnt-ui);
+  margin: 0;
+  flex: none;
+}
+
+.lnt-scope-workspace .lnt-scope-wave-tag[hidden] {
+  display: none;
+}
+
 /* Статус кадра: проблема (NaN/клип) — предупреждающий бейдж (паттерн
  * .lnt-scope-sim-badge, контраст axe-проверен в Todo 7); ожидание/пустой
  * кадр — нейтральный текст-статус. */

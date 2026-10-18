@@ -739,7 +739,7 @@
     min-height: 0;
   }
 
-  .lnt-scope-strip-mode .lnt-scope-wave-status {
+  .lnt-scope-strip-mode .lnt-scope-wave-meta {
     grid-area: 5 / 1;
   }
 

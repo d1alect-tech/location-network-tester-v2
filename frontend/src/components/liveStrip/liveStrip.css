@@ -328,7 +328,7 @@
 
 .lnt-live-capture-row-label {
   flex: none;
-  width: 118px;
+  width: 96px;
   font: 400 11px / 14px var(--lnt-ui);
   color: var(--lnt-text-sec);
 }
@@ -379,6 +379,29 @@
   margin: 0;
   padding: 0 4px;
   color: var(--lnt-text-sec);
+}
+
+/* Задачи 22/24 (GATE A): секции отображения (ФНЧ полосы, послесвечение)
+   удлиняют панель — одиночная колонка не помещается над полосой в окне
+   720 (замер: запас был 29 px, секция ~110 px). >= 768 панель — сетка в
+   ДВЕ колонки, центрирована на кнопке: capture-группы слева, триггер и
+   секции отображения справа — панель КОРОЧЕ прежней одиночной, окно вида
+   не переполняется; < 768 — прежняя одиночная колонка с правым якорем. */
+@media (min-width: 768px) {
+  .lnt-live-capture-menu {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 700px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .lnt-live-capture-menu > .lnt-live-menu-hd,
+  .lnt-live-capture-menu > .lnt-live-capture-hint {
+    grid-column: 1 / -1;
+  }
 }
 
 /* ── Степпер (непрерывный): −/+ вокруг живого числового поля ──────────── */

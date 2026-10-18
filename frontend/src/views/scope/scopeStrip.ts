@@ -28,6 +28,7 @@ import { wrapLiveStepper } from "../../components/liveStrip/liveStepper";
 import { mountLiveStrip } from "../../components/liveStrip/liveStrip";
 import { el } from "../../components/primitives/dom";
 import { mountScopeAutoset } from "./scopeAutoset";
+import { buildBwFilterMenuSection } from "./scopeBwFilter";
 import { mountScopeCaptureMenu } from "./scopeCaptureMenu";
 import type { ScopeControlHosts } from "./scopeControlState";
 import { mountScopeCursorDrag } from "./scopeCursorDrag";
@@ -36,6 +37,7 @@ import { mountScopeStatus } from "./scopeStatus";
 import { SCOPE_STRIP_ZONES } from "./scopeStripManifest";
 import { TRIGGER_LEVEL_LIMIT_V } from "./scopeTrigger";
 import { mountScopeTriggerLine } from "./scopeTriggerLine";
+import { findScopeWaveformView } from "./scopeWaveform";
 import type { ScopeWorkspaceHandle } from "./scopeWorkspaceHosts";
 
 export interface ScopeStripOptions {
@@ -139,11 +141,20 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
     slope: strip.groupHost("trigslope"),
   };
 
+  // Задача 24 (GATE A): секция «Полоса» в меню захвата — программный ФНЧ
+  // отображения развёртки (клиентский, ярлык честности в секции и в [data-
+  // wave-bw]); хэндл развёртки берётся по фигуре, воркспейс не правится.
+  const waveformView = findScopeWaveformView(hosts.figure);
+  const bwSection = buildBwFilterMenuSection({
+    current: "full",
+    onPick: (mode) => waveformView?.setBwFilter(mode),
+  });
   // Задача 21 (GATE A): расширенное меню захвата — кнопка в ИЗМЕР, панель-
   // оверлей, пишет те же поля живыми слушателями листьев (staged-грамматика).
   const captureMenu = mountScopeCaptureMenu({
     host: strip.groupHost("capture"),
     controls: controlHosts,
+    extras: el("div", {}, [bwSection]),
   });
   const echoSlot = (key: string): HTMLElement =>
     el("span", {

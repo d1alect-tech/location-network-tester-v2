@@ -97,6 +97,10 @@ export interface ScopeCaptureMenuOptions {
   host: HTMLElement;
   /** Живые хосты контролов полосы: чтение снапшота + запись кликами. */
   controls: ScopeControlHosts;
+  /** Дополнительные секции отображения (задачи 22/24: ФНЧ полосы,
+   *  послесвечение) — узел вставляется после capture-блока; секции
+   *  монтируются владельцем, это локальные контролы, не поля полосы. */
+  extras?: Node;
 }
 
 export interface ScopeCaptureMenuHandle {
@@ -203,6 +207,7 @@ export function mountScopeCaptureMenu(options: ScopeCaptureMenuOptions): ScopeCa
       group("Вертикаль", ["vdiv", "probe"]),
       group("Горизонталь", ["rate"]),
       group("Триггер", ["trigmode", "trigsource", "trigslope"], levelRow),
+      ...(options.extras === undefined ? [] : [options.extras]),
       el("p", {
         className: "t-compact lnt-live-capture-hint",
         text: "В/дел, пробник и частота — при следующем запуске; триггер на ходу — сразу.",
