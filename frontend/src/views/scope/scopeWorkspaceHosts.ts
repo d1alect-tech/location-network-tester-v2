@@ -9,9 +9,10 @@
 
 import type { ScopeControlsView } from "./scopeControls";
 import type { ScopeCursorView } from "./scopeCursorSection";
+import type { ScopeMeasureView } from "./scopeMeasureConfig";
 import type { ScopeRateField } from "./scopeRateField";
 import type { ScopeScreenHandle } from "./scopeScreen";
-import type { ScopeMeasureView, ScopeStatusView } from "./scopeSections";
+import type { ScopeStatusView } from "./scopeSections";
 import type { ScopeTriggerView } from "./scopeTrigger";
 
 export interface ScopeWorkspaceHosts {

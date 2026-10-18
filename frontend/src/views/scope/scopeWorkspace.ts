@@ -19,13 +19,13 @@ import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { buildScopeControls } from "./scopeControls";
 import { buildScopeCursorSection } from "./scopeCursorSection";
+import { buildScopeMeasureSection, createMeasureRowState } from "./scopeMeasureConfig";
 import { buildScopeRateField } from "./scopeRateField";
 import { DEFAULT_SCOPE_SETTINGS } from "./scopeScale";
 import type { ScopeDisplaySettings } from "./scopeScale";
 import { buildScopeScreen } from "./scopeScreen";
 import {
   LIVE_STATE_TEXT,
-  buildScopeMeasureSection,
   buildScopeReadoutSection,
   buildScopeStatusSection,
   errorBlock,
@@ -67,7 +67,9 @@ export function mountScopeWorkspace(
   const status = buildScopeStatusSection({ rateField: rateField.root });
   const screen = buildScopeScreen();
   const cursors = buildScopeCursorSection();
-  const measure = buildScopeMeasureSection();
+  // Задача 23: видимость measure-рядов — состояние lnt.live.meas.v1 (localStorage).
+  const measureRows = createMeasureRowState();
+  const measure = buildScopeMeasureSection(measureRows);
   const readout = buildScopeReadoutSection();
 
   let settings: ScopeDisplaySettings = { ...DEFAULT_SCOPE_SETTINGS };

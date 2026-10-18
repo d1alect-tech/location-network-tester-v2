@@ -4,19 +4,14 @@
  * построение DOM из готовых данных и форматирование: без сети — интерактив
  * остаётся в scopeWorkspace (курсоры экрана — в scopeCursorSection).
  * Исключение (задача 14): локальный тумблер измерений Выкл|Вкл — local-контроль
- * полосы, чистая видимость ряда, без стейджинга. */
+ * полосы, чистая видимость ряда, без стейджинга.
+ * Задача 23 (GATE A 2026-10-18): секция измерений (buildScopeMeasureSection)
+ * ПЕРЕЕХАЛА в scopeMeasureConfig.ts — точка сплита названа до кода: модуль
+ * поглощает measure-ряды вместе с фильтром видимости и localStorage
+ * lnt.live.meas.v1; здесь остаются статус, поток и ошибки. */
 
 import type { LiveFramePayload, LiveInstrumentState } from "../../api/types-live";
-import { createLiveSeg } from "../../components/liveStrip/liveSeg";
 import { el } from "../../components/primitives/dom";
-import {
-  formatDutyValue,
-  formatFrequencyValue,
-  formatMeasurement,
-  formatPeriodValue,
-  formatVoltsValue,
-  measureSeries,
-} from "./scopeMeasurements";
 
 export const LIVE_STATE_TEXT: Record<LiveInstrumentState, string> = {
   idle: "не запущен",
@@ -150,88 +145,6 @@ export function buildScopeReadoutSection(): ScopeReadoutView {
       dropped.textContent = String(frame.dropped_samples);
       skipped.textContent = String(frame.skipped_frames);
       calibration.textContent = frame.calibration_used ? "по таблице АЦП" : "по номинальной шкале";
-    },
-  };
-}
-
-/** Показания измерений канала CH1 (Todo 10): чистый measureSeries +
- * форматтеры; null → «—» (нет измерения), никогда NaN. Порог фронта —
- * уровень триггера CH1 (или середина размаха без триггера). */
-export interface ScopeMeasureView {
-  readonly root: HTMLElement;
-  /** Тумблер измерений (#lnt-scope-measure) — хост полосы (ре-парент). */
-  readonly toggle: HTMLElement;
-  applyFrame(frame: LiveFramePayload, levelV: number | null): void;
-}
-
-export function buildScopeMeasureSection(): ScopeMeasureView {
-  const vpp = el("dd", { className: "t-mono lnt-scope-vpp", text: "—" });
-  const vmax = el("dd", { className: "t-mono lnt-scope-vmax", text: "—" });
-  const vmin = el("dd", { className: "t-mono lnt-scope-vmin", text: "—" });
-  const rms = el("dd", { className: "t-mono lnt-scope-rms", text: "—" });
-  const freq = el("dd", { className: "t-mono lnt-scope-freq", text: "—" });
-  const period = el("dd", { className: "t-mono lnt-scope-period", text: "—" });
-  const duty = el("dd", { className: "t-mono lnt-scope-duty", text: "—" });
-
-  const row = (label: string, value: HTMLElement): Node[] => [
-    el("dt", { className: "readout-label", text: label }),
-    value,
-  ];
-
-  const grid = el(
-    "dl",
-    { className: "readout-grid" },
-    row("Vpp", vpp)
-      .concat(row("Vmax", vmax))
-      .concat(row("Vmin", vmin))
-      .concat(row("VRMS", rms))
-      .concat(row("f (фронт)", freq))
-      .concat(row("T", period))
-      .concat(row("D (высокий)", duty)),
-  );
-  // Локальный тумблер измерений (local-контроль полосы): прячет ряд,
-  // БЕЗ стейджинга — мгновенно и без сети (зона-карта §3.4).
-  const measureSeg = createLiveSeg(
-    {
-      key: "measure",
-      kind: "local",
-      aria: "Измерения",
-      options: [
-        { value: "on", text: "Вкл" },
-        { value: "off", text: "Выкл" },
-      ],
-      current: "on",
-      groupAttrs: { id: "lnt-scope-measure" },
-    },
-    (value) => {
-      grid.hidden = value === "off";
-    },
-  );
-
-  return {
-    root: el("section", { className: "panel lnt-scope-section lnt-scope-measure" }, [
-      el("div", { className: "panel-hd" }, [
-        el("h3", { className: "panel-title", text: "Измерения CH1" }),
-      ]),
-      el("div", { className: "panel-bd" }, [
-        measureSeg.root,
-        grid,
-        el("p", {
-          className: "t-compact",
-          text: "По отсчётам кадра CH1; АЦП 8 бит — уровни сырые, без калибровочных заявлений.",
-        }),
-      ]),
-    ]),
-    toggle: measureSeg.root,
-    applyFrame(frame: LiveFramePayload, levelV: number | null): void {
-      const m = measureSeries(frame.ch1, levelV);
-      vpp.textContent = formatMeasurement(m.vppV, formatVoltsValue);
-      vmax.textContent = formatMeasurement(m.vmaxV, formatVoltsValue);
-      vmin.textContent = formatMeasurement(m.vminV, formatVoltsValue);
-      rms.textContent = formatMeasurement(m.rmsV, formatVoltsValue);
-      freq.textContent = formatMeasurement(m.frequencyHz, formatFrequencyValue);
-      period.textContent = formatMeasurement(m.periodS, formatPeriodValue);
-      duty.textContent = formatMeasurement(m.duty, formatDutyValue);
     },
   };
 }

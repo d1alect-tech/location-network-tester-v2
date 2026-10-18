@@ -137,6 +137,54 @@ for (const width of [375, 1280]) {
   });
 }
 
+/** Задача 23 (GATE A 2026-10-18): настройка отображения измерений —
+ * тумблеры рядов рядом с ридaутом (подпись ряда dt = label-тумблер,
+ * прецедент компактных чекбоксов рельса), состояние lnt.live.meas.v1.
+ * Реальный браузерный путь: клик по чекбоксу, localStorage, переживание
+ * перемонта вкладки (уход/возврат в группу маршрутов), кадры заполняют
+ * видимые ряды, скрытый ряд не рендерится (НЕ «н/д»). */
+test("задача 23: тумблеры рядов измерений скрывают ряды и живут в localStorage", async ({
+  page,
+}) => {
+  await openScope(page);
+
+  const vpp = page.locator(".lnt-scope-measure dd.lnt-scope-vpp");
+  const rms = page.locator(".lnt-scope-measure dd.lnt-scope-rms");
+  const toggles = page.locator(".lnt-scope-measure [data-measure-toggle]");
+  await expect(toggles).toHaveCount(7);
+  await expect(vpp).toBeVisible();
+  await expect(rms).toBeVisible();
+
+  // Клик по подписи-тумблеру Vpp: ряд скрыт, сосед виден, хранилище записано.
+  await page.locator(".lnt-scope-measure [data-measure-toggle='vpp']").click();
+  await expect(vpp).toBeHidden();
+  await expect(rms).toBeVisible();
+  expect(await page.evaluate(() => window.localStorage.getItem("lnt.live.meas.v1"))).toBe(
+    JSON.stringify({ vpp: false }),
+  );
+
+  // Кадры Run: видимые ряды заполняются истиной, скрытый ряд не рендерится.
+  await page.click("#lnt-scope-run");
+  await expect(page.locator(".lnt-scope-frame-count")).not.toHaveText("—");
+  await expect(rms).not.toHaveText("—");
+  await expect(vpp).toBeHidden();
+  await page.click("#lnt-scope-stop");
+
+  // Переживание перемонта: уход в SA и возврат — скрытие читано из хранилища.
+  await page.goto(`${BASE}#/sa`);
+  await page.goto(`${BASE}#/scope`);
+  const vppAfter = page.locator(".lnt-scope-measure dd.lnt-scope-vpp");
+  const rmsAfter = page.locator(".lnt-scope-measure dd.lnt-scope-rms");
+  await expect(vppAfter).toBeHidden();
+  await expect(rmsAfter).toBeVisible();
+  await expect(page.locator(".lnt-scope-measure [data-measure-toggle='vpp']")).not.toBeChecked();
+
+  // Обратное включение возвращает ряд и чистит хранилище.
+  await page.locator(".lnt-scope-measure [data-measure-toggle='vpp']").click();
+  await expect(vppAfter).toBeVisible();
+  expect(await page.evaluate(() => window.localStorage.getItem("lnt.live.meas.v1"))).toBeNull();
+});
+
 test("axe reports no serious or critical violations on the scope skeleton", async ({ page }) => {
   await openScope(page);
   await injectAxe(page);

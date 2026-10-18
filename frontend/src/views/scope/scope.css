@@ -189,6 +189,37 @@
   overflow-wrap: anywhere;
 }
 
+/* ── Задача 23 (GATE A): подписи-тумблеры measure-рядов ─────────────────
+ * Подпись ряда = его тумблер (dt > label > checkbox + текст): высота
+ * панели измерений не меняется (стейдж-доминирование на 625), состояние —
+ * lnt.live.meas.v1. Прецедент компактных чекбоксов рельса: инверсии
+ * CH1/CH2 (scopeControls). */
+.lnt-scope-workspace .lnt-scope-measure-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform var(--lnt-t-press) var(--lnt-ease-out);
+}
+
+.lnt-scope-workspace .lnt-scope-measure-row input {
+  margin: 0;
+  width: 13px;
+  height: 13px;
+  flex: none;
+  accent-color: var(--lnt-accent);
+}
+
+.lnt-scope-workspace .lnt-scope-measure-row:active {
+  transform: scale(var(--lnt-press-scale));
+}
+
+/* Выключенный ряд: значение не рендерится, подпись-тумблер притушена
+ * (контрол остаётся доступным — ряд можно вернуть). */
+.lnt-scope-workspace .lnt-scope-measure dt:has(+ dd[hidden]) .lnt-scope-measure-row {
+  opacity: 0.55;
+}
+
 /* ── Специфика вкладки: бейдж симуляции и строка статуса ────────────────── */
 
 .lnt-scope-workspace .lnt-scope-state-row {
