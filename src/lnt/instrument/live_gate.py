@@ -40,6 +40,7 @@ from lnt.instrument.frames import (
     DEFAULT_MAX_BUFFERED_BLOCKS,
     UNSTABLE_LEAD_SAMPLES,
 )
+from lnt.instrument.ripple_types import continuity_basis_for
 from lnt.instrument.sa import SaEngine
 from lnt.instrument.service import (
     DEFAULT_CH1_RANGE_V,
@@ -231,6 +232,7 @@ class LiveCaptureGate:
                 cancellation_token=self._cancellation_token,
                 adc_calibration=self._adc_calibration,
                 poll_timeout_ms=self._poll_timeout_ms,
+                continuity_basis=continuity_basis_for(self._mode.value),
             )
             blockers = self._blockers(config)
             if blockers:

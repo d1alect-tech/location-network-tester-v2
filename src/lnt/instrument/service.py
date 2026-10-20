@@ -24,7 +24,6 @@ from lnt.acquire_validation import _range_code, _rate_code
 from lnt.adc_calibration import AdcCalibration
 from lnt.errors import InputError
 from lnt.instrument.device import (
-    block_to_volts,
     configure_scope,
     validated_poll_timeout_ms,
     validated_probe_multiplier,
@@ -35,6 +34,8 @@ from lnt.instrument.frames import (
     UNSTABLE_LEAD_SAMPLES,
     LiveFrame,
 )
+from lnt.instrument.intake import InstrumentIntake
+from lnt.instrument.ripple_types import HOST_CONTIGUOUS_UNVERIFIED
 from lnt.instrument.stream import FrameStream
 from lnt.instrument.trigger import TriggerConfig, TriggerMode
 from lnt.scope_io import (
@@ -85,6 +86,7 @@ class InstrumentService:
         cancellation_token: CancellationToken = NEVER_CANCELLED,
         adc_calibration: AdcCalibration | None = None,
         poll_timeout_ms: int = MAX_POLL_TIMEOUT_MS,
+        continuity_basis: str = HOST_CONTIGUOUS_UNVERIFIED,
     ) -> None:
         """Проверяет границы входа и запоминает конфигурацию; прибор не открывает."""
         self._scope_factory: Final = scope_factory
@@ -104,10 +106,20 @@ class InstrumentService:
         )
         self._lock: Final = RLock()
         self._sinks: list[FrameSink] = []
-        self._pending: list[tuple[object, object]] = []
-        self._pending_cap: Final = 2 * max_buffered_blocks
-        self.dropped_blocks: int = 0
+        self._intake: Final = InstrumentIntake(
+            stream=self._stream,
+            range_code=self._ch1_range_code,
+            probe_multiplier=self._ch1_probe_multiplier,
+            calibration=adc_calibration,
+            sample_rate_hz=sample_rate_hz,
+            ch1_range_v=ch1_range_v,
+            continuity_basis=continuity_basis,
+            discard_lead_samples=discard_lead_samples,
+            max_buffered_blocks=max_buffered_blocks,
+        )
         self.last_poll_s: float = 0.0
+        self.ripple: Final = self._intake.ripple
+        self.dropped_blocks: int = 0
         self._scope: ScopeProtocol | None = None
         self._shutdown: _StopEvent | None = None
         self._trigger: TriggerConfig = trigger
@@ -177,6 +189,7 @@ class InstrumentService:
                         raw=True,
                     ),
                 )
+                self._intake.restart()
                 scope.start_capture()
                 armed = True
             finally:
@@ -188,7 +201,6 @@ class InstrumentService:
                     scope.close_handle()
             self._scope = scope
             self._stream.reset()
-            self._pending.clear()
             self._last_emit_s = self._clock()
             # Момент взятия ручки — стартовая точка reaper-гейта простоя.
             self.last_poll_s = self._last_emit_s
@@ -226,27 +238,13 @@ class InstrumentService:
         return scope
 
     def _on_block(self, ch1_raw: object, ch2_raw: object) -> None:
-        """Колбэк ``read_async``: блок ждёт ``poll``; сверх капа режутся старейшие."""
-        self._pending.append((ch1_raw, ch2_raw))
-        overflow = max(len(self._pending) - self._pending_cap, 0)
-        del self._pending[:overflow]
-        self.dropped_blocks += overflow
+        """Колбэк ``read_async``: блок ждёт ``poll``; штамп прогресса — в intake."""
+        self._intake.on_block(ch1_raw, ch2_raw)
+        self.dropped_blocks = self._intake.dropped_blocks
 
     def _absorb_blocks(self) -> None:
-        pending, self._pending = self._pending, []
-        for ch1_raw, ch2_raw in pending:
-            ch1 = block_to_volts(
-                ch1_raw,
-                range_code=self._ch1_range_code,
-                probe_multiplier=self._ch1_probe_multiplier,
-                calibration=self._adc_calibration,
-            )
-            # Общая ось экрана: вольты CH2 масштабируются тем же кодом, что и
-            # CH1 (настройка тракта — device.configure_scope), пробника на CH2 нет.
-            ch2 = block_to_volts(
-                ch2_raw, range_code=self._ch1_range_code, calibration=self._adc_calibration
-            )
-            self._stream.push(ch1, ch2)
+        self._intake.absorb()
+        self.dropped_blocks = self._intake.dropped_blocks
 
     def _emit_ready(self) -> int:
         trigger = self._trigger
@@ -279,6 +277,7 @@ class InstrumentService:
         self._scope = None
         self._shutdown = None
         self._state = InstrumentState.STOPPED
+        self._intake.stop()
         if scope is None:
             return
         scope.stop_capture()
