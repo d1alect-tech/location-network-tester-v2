@@ -37,6 +37,7 @@ from lnt.ui.dependencies import (
     require_csrf,
 )
 from lnt.ui.live_events import Pacer, frame_event, heartbeat_event, spectrum_event
+from lnt.ui.live_ripple_events import RippleEmitter
 from lnt.ui.models_live import (
     LIVE_ALREADY_RUNNING_RU,
     LIVE_NOT_RUNNING_RU,
@@ -156,6 +157,7 @@ async def live_frames(
     """
     announced_running = gate.service is not None and gate.service.is_running
     pacer = Pacer(gate=gate, min_interval_s=min_interval_s)
+    ripple = RippleEmitter()
     yield heartbeat_event(gate)
     # Анонс коннекта мог уйти до старта: переход idle→running, увиденный
     # этим стримом, повторяется событием состояния тем же форматом
@@ -181,6 +183,7 @@ async def live_frames(
                 queue,
                 pacer,
                 gate.spectrum,
+                ripple=ripple,
                 max_points=max_points,
             ):
                 yield event
@@ -189,12 +192,13 @@ async def live_frames(
         return
 
 
-async def _pump(
+async def _pump(  # noqa: PLR0913 - контур владельца: прибор, очередь, темп, SA, риппл
     service: InstrumentService,
     queue: deque[LiveFrame],
     pacer: Pacer,
     spectrum: SaEngine,
     *,
+    ripple: RippleEmitter,
     max_points: int,
 ) -> AsyncIterator[ServerSentEvent]:
     """Контур владельца: ``poll`` в рабочем потоке, кадры и трассы SA до остановки."""
@@ -212,6 +216,7 @@ async def _pump(
             break
         emitted = False
         async for event in _paced_events(
+            service,
             queue,
             pacer,
             spectrum,
@@ -220,10 +225,18 @@ async def _pump(
         ):
             emitted = True
             yield event
-        if not emitted:
+        # Статус/числа риппла — после кадров этого шага: кадровый контракт
+        # остаётся первым, а событие идёт даже при пустой очереди триггера.
+        if (ripple_event := ripple.event_if_due(service.ripple)) is not None:
+            yield ripple_event
+        if not emitted and service.is_running:
             if (beat := pacer.heartbeat_due()) is not None:
                 yield beat
             await asyncio.sleep(POLL_INTERVAL_S)
+    # Остановка: статус stopped уходит до хвоста финальных кадров, чтобы
+    # контракт stop -> финальный кадр -> close_handle остался последним.
+    if (stopped_ripple := ripple.event_if_due(service.ripple, force=True)) is not None:
+        yield stopped_ripple
     # Остаток очереди — финальный кадр контракта ``stop``: темп его не задерживает.
     async for event in _final_events(
         queue,
@@ -235,7 +248,8 @@ async def _pump(
         yield event
 
 
-async def _paced_events(
+async def _paced_events(  # noqa: PLR0913 - общий контур кадров/SA/риппла
+    service: InstrumentService,
     queue: deque[LiveFrame],
     pacer: Pacer,
     spectrum: SaEngine,
@@ -244,7 +258,7 @@ async def _paced_events(
     calibration_used: bool,
 ) -> AsyncIterator[ServerSentEvent]:
     """Кадры очереди в темпе панели; за каждым опубликованным — трасса SA."""
-    while queue:
+    while queue and service.is_running:
         frame = queue.popleft()
         event = pacer.paced_frame(
             frame,
