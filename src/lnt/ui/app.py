@@ -28,6 +28,7 @@ from lnt.ui import (
     routes_profiles,
     routes_quality,
     routes_research,
+    routes_ripple,
     routes_sessions,
     routes_statistics,
 )
@@ -142,6 +143,7 @@ def create_app(  # noqa: PLR0913 - панель прибора: каждая р�
     app.include_router(routes_experiments.router)
     app.include_router(routes_statistics.router)
     app.include_router(routes_research.router)
+    app.include_router(routes_ripple.router)
     app.include_router(routes_quality.router)
     app.include_router(routes_live.router)
 
