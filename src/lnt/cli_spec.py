@@ -23,6 +23,7 @@ CLI_SUBCOMMANDS: Final = frozenset(
         "hypothesis",
         "profiles",
         "reindex",
+        "ripple",
         "selftest",
         "sessions",
         "simulate",

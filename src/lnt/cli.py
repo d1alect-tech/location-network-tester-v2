@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Never, cast, override
 
 from lnt._cli_capture import add_capture_arguments
+from lnt._cli_ripple import cmd_ripple as _cmd_ripple
+from lnt._cli_ripple import configure_ripple_parser
 from lnt.analysis import (
     LineQualityAnalysis,
     render_line_quality_analysis,
@@ -129,6 +131,13 @@ def _build_parser() -> argparse.ArgumentParser:
     analyze = subparsers.add_parser("analyze", help="анализ сессии: metrics.json + spectrum.csv")
     analyze.add_argument("session", help="каталог сессии")
     analyze.set_defaults(handler=_cmd_analyze)
+
+    ripple = subparsers.add_parser(
+        "ripple",
+        help="риппл/шум сессии: сайдкар ripple.json (аддитивно, без вердиктов)",
+    )
+    configure_ripple_parser(ripple, finite_float=_finite_float)
+    ripple.set_defaults(handler=_cmd_ripple)
 
     compare = subparsers.add_parser("compare", help="таблица дельт двух сессий (B - A)")
     compare.add_argument("session_a", help="каталог сессии A (база)")
