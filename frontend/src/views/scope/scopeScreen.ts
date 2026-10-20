@@ -63,7 +63,13 @@ function framesWord(count: number): string {
   return "кадров";
 }
 
-export function buildScopeScreen(): ScopeScreenHandle {
+export interface ScopeScreenOptions {
+  /** Оверлей стекла (todo 9: живой чип риппла) — абсолютный слой поверх
+   * канвасов, нулевой след в раскладке (паттерн screen-note/edge-ghost). */
+  overlay?: Node;
+}
+
+export function buildScopeScreen(options: ScopeScreenOptions = {}): ScopeScreenHandle {
   const persistenceCanvas = el("canvas", {
     className: "lnt-scope-persistence",
     attrs: { "aria-hidden": "true", "data-scope-persistence": "" },
@@ -77,6 +83,7 @@ export function buildScopeScreen(): ScopeScreenHandle {
     persistenceCanvas,
     traceCanvas,
     note,
+    ...(options.overlay !== undefined ? [options.overlay] : []),
   ]);
 
   const slider = el("input", {

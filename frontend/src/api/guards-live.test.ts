@@ -1,9 +1,11 @@
 /** Контракт-примеры guards-live: зеркала models_live.py — статус (state+mode),
- * триггер и кадр; некорректные формы отбрасываются без исключений. */
+ * триггер, кадр и событие ripple (models_ripple_live.py); некорректные
+ * формы отбрасываются без исключений. */
 
 import { describe, expect, it } from "vitest";
 import {
   isLiveFramePayload,
+  isLiveRipplePayload,
   isLiveSaConfig,
   isLiveSpectrumPayload,
   isLiveStatePayload,
@@ -180,5 +182,112 @@ describe("isLiveFramePayload", () => {
     expect(isLiveFramePayload({ ...FRAME, triggered: "yes" })).toBe(false);
     expect(isLiveFramePayload({ ...FRAME, ch1: { ...FRAME.ch1, voltage_v: ["0"] } })).toBe(false);
     expect(isLiveFramePayload("frame")).toBe(false);
+  });
+});
+
+describe("isLiveRipplePayload", () => {
+  const ADAPTER = {
+    topology_id: "series_c_at_dut_tip_x1_v1",
+    cap_nf: 100,
+    series_r_ohm: 0,
+    probe_multiplier: 1,
+    component_values_basis: "nominal",
+    hardware_qualification: "unverified",
+    transfer_status: "nominal_transfer_declared",
+    rail_nominal_v: null,
+    tau_s: 0.1,
+    fc_hz: 1.5915,
+    settling_s: 1,
+    settle_samples: 8000,
+    assumption_codes: ["one_pole_nominal_transfer"],
+  };
+  const BASE = {
+    status: "settling",
+    reason_codes: ["settling_window"],
+    epoch_id: 1,
+    config_id: "cfg1",
+    continuity_id: 1,
+    continuity_basis: "host_contiguous_unverified",
+    gap_count: 0,
+    block_count: 3,
+    dropped_blocks: 0,
+    dropped_samples: 0,
+    samples_received: 1000,
+    sample_progress: 1000,
+    ring_capacity_samples: 524_288,
+    ring_sample_count: 1000,
+    ring_limited: false,
+    settle_samples: 8000,
+    settled: false,
+    startup_discard_samples: 0,
+    settling_basis: "capture_start_assuming_preconnected",
+    settling_remaining_samples: 7000,
+    excluded_prefix_samples: 8000,
+    span_start_sample: null,
+    span_sample_count: 0,
+    span_duration_s: null,
+    mean_v: null,
+    rms_ac_v: null,
+    vpp_v: null,
+    clipped_low: 0,
+    clipped_high: 0,
+    clip_count_scope: "current_span",
+    sample_rate_hz: 8000,
+    ch1_range_v: 5,
+    ch1_probe_multiplier: 1,
+    calibration_used: false,
+    voltage_label: "некалиброванные вольты",
+    adapter: ADAPTER,
+  };
+  const READY = {
+    ...BASE,
+    status: "ready",
+    settled: true,
+    settling_remaining_samples: 0,
+    span_start_sample: 8000,
+    span_sample_count: 4000,
+    span_duration_s: 0.5,
+    mean_v: 0.0012,
+    rms_ac_v: 0.0354,
+    vpp_v: 0.1,
+  };
+
+  it("принимает settling (числа null) и ready (числа конечны)", () => {
+    expect(isLiveRipplePayload(BASE)).toBe(true);
+    expect(isLiveRipplePayload(READY)).toBe(true);
+    expect(isLiveRipplePayload({ ...BASE, continuity_basis: "synthetic_exact" })).toBe(true);
+  });
+
+  it("инвариант статуса: числа ровно у ready, иначе все три null", () => {
+    expect(isLiveRipplePayload({ ...BASE, status: "ready" })).toBe(false);
+    expect(isLiveRipplePayload({ ...READY, status: "stopped" })).toBe(false);
+    expect(isLiveRipplePayload({ ...READY, rms_ac_v: null })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, mean_v: 0.001 })).toBe(false);
+  });
+
+  it("отбрасывает NaN/Infinity, нулевую частоту и нецелые счётчики", () => {
+    expect(isLiveRipplePayload({ ...READY, rms_ac_v: Number.NaN })).toBe(false);
+    expect(isLiveRipplePayload({ ...READY, vpp_v: Number.POSITIVE_INFINITY })).toBe(false);
+    expect(isLiveRipplePayload({ ...READY, sample_rate_hz: 0 })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, epoch_id: 1.5 })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, dropped_samples: -1 })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, settling_remaining_samples: -3 })).toBe(false);
+  });
+
+  it("отбрасывает чужие enum-значения, ярлык и битый адаптер", () => {
+    expect(isLiveRipplePayload({ ...BASE, status: "paused" })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, continuity_basis: "hardware" })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, settling_basis: "connection_observed" })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, voltage_label: "вольты" })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, clip_count_scope: "whole_record" })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, reason_codes: "settling_window" })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, ring_limited: "no" })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, adapter: { ...ADAPTER, cap_nf: Number.NaN } })).toBe(
+      false,
+    );
+    expect(isLiveRipplePayload({ ...BASE, adapter: { topology_id: "x" } })).toBe(false);
+    expect(isLiveRipplePayload({ ...BASE, settle_samples: "8000" })).toBe(false);
+    expect(isLiveRipplePayload("ripple")).toBe(false);
+    expect(isLiveRipplePayload(null)).toBe(false);
   });
 });

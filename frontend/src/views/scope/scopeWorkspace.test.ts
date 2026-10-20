@@ -502,3 +502,125 @@ describe("scope measurements and cursors (Todo 10)", () => {
     }
   });
 });
+
+describe("scopeWorkspace: живой чип риппла (todo 9)", () => {
+  const RIPPLE_ADAPTER = {
+    topology_id: "series_c_at_dut_tip_x1_v1",
+    cap_nf: 100,
+    series_r_ohm: 0,
+    probe_multiplier: 1,
+    component_values_basis: "nominal",
+    hardware_qualification: "unverified",
+    transfer_status: "nominal_transfer_declared",
+    rail_nominal_v: null,
+    tau_s: 0.1,
+    fc_hz: 1.5915,
+    settling_s: 1,
+    settle_samples: 8000,
+    assumption_codes: ["one_pole_nominal_transfer"],
+  };
+
+  function ripplePayload(status: "settling" | "ready"): Record<string, unknown> {
+    const ready = status === "ready";
+    return {
+      status,
+      reason_codes: ready ? [] : ["settling_window"],
+      epoch_id: 1,
+      config_id: "cfg1",
+      continuity_id: 1,
+      continuity_basis: "host_contiguous_unverified",
+      gap_count: 0,
+      block_count: 3,
+      dropped_blocks: 0,
+      dropped_samples: 0,
+      samples_received: ready ? 12_000 : 1000,
+      sample_progress: ready ? 12_000 : 1000,
+      ring_capacity_samples: 524_288,
+      ring_sample_count: ready ? 4000 : 1000,
+      ring_limited: false,
+      settle_samples: 8000,
+      settled: ready,
+      startup_discard_samples: 0,
+      settling_basis: "capture_start_assuming_preconnected",
+      settling_remaining_samples: ready ? 0 : 7000,
+      excluded_prefix_samples: 8000,
+      span_start_sample: ready ? 8000 : null,
+      span_sample_count: ready ? 4000 : 0,
+      span_duration_s: ready ? 0.5 : null,
+      mean_v: ready ? 0.0012 : null,
+      rms_ac_v: ready ? 0.0354 : null,
+      vpp_v: ready ? 0.1 : null,
+      clipped_low: 0,
+      clipped_high: 0,
+      clip_count_scope: "current_span",
+      sample_rate_hz: 8000,
+      ch1_range_v: 5,
+      ch1_probe_multiplier: 1,
+      calibration_used: false,
+      voltage_label: "некалиброванные вольты",
+      adapter: RIPPLE_ADAPTER,
+    };
+  }
+
+  it("чип-оверлей на стекле осциллографа: событие ripple рисует значения, Run сбрасывает", async () => {
+    const log: LiveLog = { starts: [], stops: 0, states: 0 };
+    const container = mountStub(log, { state: { ...IDLE } });
+    await flush();
+
+    // Чип смонтирован оверлеем в стекле и до событий нейтрален.
+    const viewport = container.querySelector(".lnt-scope-viewport");
+    expect(viewport?.querySelector("[data-ripple-chip]")).toBeInstanceOf(HTMLElement);
+    expect(viewport?.querySelector("[data-ripple-rms]")?.textContent).toBe("—");
+
+    // When: событие ripple с готовыми метриками полного тракта.
+    FakeLiveEventSource.instances[0]?.emit("ripple", ripplePayload("ready"));
+    await flush();
+
+    // Then: значения + ярлык честности; никакой клиентской математики.
+    expect(viewport?.querySelector("[data-ripple-rms]")?.textContent).toBe("35.4 мВ");
+    expect(viewport?.querySelector("[data-ripple-vpp]")?.textContent).toBe("100.0 мВ");
+    expect(viewport?.querySelector("[data-ripple-label]")?.textContent).toContain(
+      "некалиброванные вольты",
+    );
+
+    // When: новый запуск — новая эпоха, старые числа не переживают старт.
+    (container.querySelector("#lnt-scope-run") as HTMLButtonElement).click();
+    await flush();
+    expect(viewport?.querySelector("[data-ripple-rms]")?.textContent).toBe("—");
+
+    // When: первая сводка новой эпохи — установление, без чисел.
+    FakeLiveEventSource.instances[0]?.emit("ripple", ripplePayload("settling"));
+    await flush();
+    expect(viewport?.querySelector("[data-ripple-state]")?.textContent).toBe("установление");
+    expect(viewport?.querySelector("[data-ripple-rms]")?.textContent).toBe("—");
+  });
+
+  it("битое событие ripple гасит числа; кадры и heartbeat их не трогают", async () => {
+    // Захват уже идёт (монтирование поверх живого потока): heartbeat RUNNING
+    // не переход — не сброс, возраст риппла не обновляется чужими событиями.
+    const log: LiveLog = { starts: [], stops: 0, states: 0 };
+    const liveState = { state: { ...RUNNING } as LiveStatePayload };
+    const container = mountStub(log, liveState);
+    await flush();
+    const viewport = container.querySelector(".lnt-scope-viewport");
+
+    FakeLiveEventSource.instances[0]?.emit("ripple", ripplePayload("ready"));
+    await flush();
+    expect(viewport?.querySelector("[data-ripple-rms]")?.textContent).toBe("35.4 мВ");
+
+    // Нериппл-события не обновляют возраст риппла и не гасят его.
+    FakeLiveEventSource.instances[0]?.emit("frame", frame(20));
+    FakeLiveEventSource.instances[0]?.emit("heartbeat", RUNNING);
+    await flush();
+    expect(viewport?.querySelector("[data-ripple-rms]")?.textContent).toBe("35.4 мВ");
+
+    // When: битое тело события ripple (гвард отбросил).
+    FakeLiveEventSource.instances[0]?.emit("ripple", { status: "ready" });
+    await flush();
+
+    // Then: числа погашены — «нет данных», не NaN и не старые значения.
+    expect(viewport?.querySelector("[data-ripple-state]")?.textContent).toBe("нет данных");
+    expect(viewport?.querySelector("[data-ripple-rms]")?.textContent).toBe("—");
+    expect(viewport?.querySelector("[data-ripple-vpp]")?.textContent).toBe("—");
+  });
+});

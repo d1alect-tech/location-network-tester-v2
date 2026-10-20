@@ -21,6 +21,8 @@ import type {
   LiveFramePayload,
   LiveInstrumentState,
   LiveMode,
+  LiveRipplePayload,
+  LiveRippleStatus,
   LiveSaConfig,
   LiveSpectrumPayload,
   LiveStartRequest,
@@ -49,6 +51,16 @@ const TONE_INDEX = 8;
  * до каждого открытого подписчика; при ~3 стримах с периодом retry: 150
  * окно 12 ответов покрывает каждый минимум дважды. */
 const ANNOUNCE_WINDOW_RESPONSES = 12;
+/** Canned-числа риппла мока (как mockGolden: фиксированные, не «измеренные»):
+ * синус ~50 мВ размаха. */
+const RIPPLE_RMS_AC_V = 0.0354;
+const RIPPLE_VPP_V = 0.1;
+const RIPPLE_MEAN_V = 0.0012;
+const RIPPLE_SPAN_S = 0.5;
+const RIPPLE_RATE_HZ = 8_000_000;
+const RIPPLE_SETTLE_SAMPLES = 8_000_000;
+/** Шаг прогресса полного тракта на один SSE-ответ (монотонный, как сервис). */
+const RIPPLE_PROGRESS_STEP = 50_000;
 
 function series(phase: number, amplitude: number): LiveChannelSeries {
   const time_s: number[] = [];
@@ -73,6 +85,15 @@ export class LiveStore {
   saConfig: LiveSaConfig | null = null;
   /** Действующий триггер сервиса (зеркало start/config): SINGLE в кадре. */
   runningTrigger: LiveTrigger | null = null;
+  /** Сценарий ripple-событий для спеки: очередь статусов, каждый уходит с
+   * SSE-ответом при running; пустая очередь — повтор последнего статуса.
+   * null — авто-цикл (первый ответ settling, дальше ready), как сервер. */
+  rippleScript: readonly LiveRippleStatus[] | null = null;
+  /** Последний статус риппла мока (stopped после stop — терминален). */
+  private rippleStatus: LiveRippleStatus | null = null;
+  private rippleEpoch = 0;
+  private rippleProgress = 0;
+  private rippleScriptIndex = 0;
   /** Последний анонсированный статус: смена — событие перехода. */
   private lastAnnouncedState: LiveInstrumentState | null = null;
   /** Осталось ответов с heartbeat текущего перехода (окно вещания). */
@@ -153,9 +174,11 @@ export class LiveStore {
    * открытого подписчика, а в мок-среде каждый EventSource живёт
    * переподключениями с периодом retry: 150 — окно покрывает их все.
    * Инъекция heartbeat в каждый ответ маскировала QA round4/F1. Кадр при
-   * настроенном SA-контуре несёт и трассу спектра. SINGLE — контракт
-   * InstrumentService: ровно один сработавший кадр, затем прибор освобождён
-   * (state=stopped); смена состояния анонсируется окном, как переход. */
+   * настроенном SA-контуре несёт и трассу спектра. Ripple-событие — одно на
+   * ответ при running (контракт routes_live: независимо от кадров, темп свой);
+   * stop — честный stopped ровно один раз (терминальный статус сервера).
+   * SINGLE — контракт InstrumentService: ровно один сработавший кадр, затем
+   * прибор освобождён (state=stopped); смена состояния анонсируется окном. */
   private framesBody(): string {
     let body = "retry: 150\n\n";
     if (this.state !== this.lastAnnouncedState) {
@@ -166,6 +189,8 @@ export class LiveStore {
       this.announceLeft -= 1;
       body += `event: heartbeat\ndata: ${JSON.stringify(this.statePayload())}\n\n`;
     }
+    const ripple = this.rippleEvent();
+    if (ripple !== null) body += ripple;
     const single = this.state === "running" && this.runningTrigger?.mode === "single";
     const limit = single ? 1 : this.framesPerResponse;
     for (let i = 0; i < limit && this.state === "running"; i += 1) {
@@ -180,6 +205,94 @@ export class LiveStore {
     return body;
   }
 
+  /** Одно ripple-событие на SSE-ответ (строгая схема models_ripple_live.py):
+   * авто-цикл settling→ready или сценарий спеки; после stop — один stopped. */
+  private rippleEvent(): string | null {
+    if (this.state !== "running") {
+      if (this.rippleStatus === null || this.rippleStatus === "stopped") return null;
+      this.rippleStatus = "stopped";
+      return this.rippleBody("stopped");
+    }
+    let status: LiveRippleStatus;
+    const script = this.rippleScript;
+    if (script !== null && script.length > 0) {
+      const index = Math.min(this.rippleScriptIndex, script.length - 1);
+      this.rippleScriptIndex += 1;
+      status = script[index] ?? "ready";
+    } else if (script !== null) {
+      status = "ready";
+    } else if (this.rippleStatus === null) {
+      status = "settling";
+    } else {
+      status = "ready";
+    }
+    this.rippleStatus = status;
+    return this.rippleBody(status);
+  }
+
+  /** Canned-снимок: числа только у ready, идентичности монотонны. */
+  private rippleBody(status: LiveRippleStatus): string {
+    const ready = status === "ready";
+    if (status !== "stopped") this.rippleProgress += RIPPLE_PROGRESS_STEP;
+    const payload: LiveRipplePayload = {
+      status,
+      reason_codes: ready
+        ? []
+        : status === "settling"
+          ? ["settling_window"]
+          : ["insufficient_samples"],
+      epoch_id: this.rippleEpoch,
+      config_id: "mock-cfg",
+      continuity_id: 1,
+      continuity_basis: "synthetic_exact",
+      gap_count: 0,
+      block_count: 3,
+      dropped_blocks: 0,
+      dropped_samples: 0,
+      samples_received: this.rippleProgress,
+      sample_progress: this.rippleProgress,
+      ring_capacity_samples: 524_288,
+      ring_sample_count: ready ? 4000 : 1000,
+      ring_limited: false,
+      settle_samples: RIPPLE_SETTLE_SAMPLES,
+      settled: ready || status === "stopped",
+      startup_discard_samples: 0,
+      settling_basis: "capture_start_assuming_preconnected",
+      settling_remaining_samples: ready ? 0 : RIPPLE_SETTLE_SAMPLES - this.rippleProgress,
+      excluded_prefix_samples: RIPPLE_SETTLE_SAMPLES,
+      span_start_sample: ready ? RIPPLE_SETTLE_SAMPLES : null,
+      span_sample_count: ready ? 4000 : 0,
+      span_duration_s: ready ? RIPPLE_SPAN_S : null,
+      mean_v: ready ? RIPPLE_MEAN_V : null,
+      rms_ac_v: ready ? RIPPLE_RMS_AC_V : null,
+      vpp_v: ready ? RIPPLE_VPP_V : null,
+      clipped_low: 0,
+      clipped_high: 0,
+      clip_count_scope: "current_span",
+      sample_rate_hz: RIPPLE_RATE_HZ,
+      ch1_range_v: 5,
+      ch1_probe_multiplier: 1,
+      calibration_used: false,
+      voltage_label: "некалиброванные вольты",
+      adapter: {
+        topology_id: "series_c_at_dut_tip_x1_v1",
+        cap_nf: 100,
+        series_r_ohm: 0,
+        probe_multiplier: 1,
+        component_values_basis: "nominal",
+        hardware_qualification: "unverified",
+        transfer_status: "nominal_transfer_declared",
+        rail_nominal_v: null,
+        tau_s: 0.1,
+        fc_hz: 1.5915,
+        settling_s: 1,
+        settle_samples: RIPPLE_SETTLE_SAMPLES,
+        assumption_codes: ["one_pole_nominal_transfer", "settling_policy_10_tau"],
+      },
+    };
+    return `event: ripple\ndata: ${JSON.stringify(payload)}\n\n`;
+  }
+
   /** Маршруты живого режима; null — не наш путь. */
   route(request: MockHttpRequest): MockHttpReply | null {
     const { method, path } = request;
@@ -191,6 +304,11 @@ export class LiveStore {
       this.runningTrigger = request.bodyJson<LiveStartRequest>().trigger ?? null;
       // Контракт бэкенда: старт сбрасывает SA-контур — конфиг задаётся заново.
       this.saConfig = null;
+      // Новая эпоха риппла (RippleEngine.restart): пустой тракт, монотонный id.
+      this.rippleEpoch += 1;
+      this.rippleProgress = 0;
+      this.rippleScriptIndex = 0;
+      this.rippleStatus = null;
       this.state = "running";
       return ok(this.statePayload());
     }

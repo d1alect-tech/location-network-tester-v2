@@ -832,3 +832,68 @@
 [data-edge-hover] {
   cursor: ns-resize;
 }
+
+/* Todo 9: живой чип риппла — read-only оверлей в нижнем углу стекла
+   осциллографа (как экранные показания приборов). Абсолютный слой поверх
+   канвасов: НУЛЕВОЙ след в раскладке — строка ярлыков не растёт,
+   экран-доминанта (AC3, 1280×625) не проседает, рельс показаний не
+   перекрывается (паттерн screen-note/edge-ghost). Слоты значений имеют
+   фиксированные min-width: смена текста при переходах settling/ready/
+   stopped НЕ двигает соседей. Числа — только у ready; прочерк везде —
+   «нет данных», не ноль. */
+
+.lnt-scope-workspace .lnt-scope-viewport .lnt-scope-ripple {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+  max-width: calc(100% - 16px);
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+  pointer-events: none;
+}
+
+.lnt-scope-workspace .lnt-scope-ripple-key {
+  font-weight: 600;
+}
+
+.lnt-scope-workspace .lnt-scope-ripple-val {
+  display: inline-block;
+  text-align: left;
+}
+
+.lnt-scope-workspace .lnt-scope-ripple-metric-key {
+  color: var(--lnt-text-sec);
+}
+
+/* Ширины — под самый широкий текст каждого слота: статус
+   «установление», прогресс «осталось ~999 мс», значения «999.9 мВ»,
+   окно «999 мс», адаптер «100 нФ · 0 Ом · ×1». */
+.lnt-scope-workspace .lnt-scope-ripple-state {
+  min-width: 13ch;
+}
+
+.lnt-scope-workspace .lnt-scope-ripple-progress {
+  min-width: 16ch;
+}
+
+.lnt-scope-workspace .lnt-scope-ripple-rms,
+.lnt-scope-workspace .lnt-scope-ripple-vpp {
+  min-width: 9ch;
+}
+
+.lnt-scope-workspace .lnt-scope-ripple-window {
+  min-width: 7ch;
+}
+
+.lnt-scope-workspace .lnt-scope-ripple-adapter {
+  min-width: 17ch;
+}
+
+.lnt-scope-workspace .lnt-scope-ripple-label {
+  color: var(--lnt-text-sec);
+}
