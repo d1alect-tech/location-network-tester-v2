@@ -75,6 +75,7 @@ export function mountSaWorkspace(
     store,
     sweepPeaks: () => lastPeaks,
     rerender: () => spectrum.rerender(viewOptions()),
+    redraw: () => spectrum.redrawMarkers(),
   });
   const spectrum = mountSaSpectrum({
     createView: options.spectrum?.createView,
@@ -82,6 +83,9 @@ export function mountSaWorkspace(
     markers: markerPanel.markerLines,
     peaks: markerPanel.peakHighlight,
     onFrequencyClick: markerPanel.placeMarker,
+    onMarkerSelect: markerPanel.selectMarker,
+    onMarkerMove: markerPanel.moveMarker,
+    onMarkerRemove: markerPanel.removeMarker,
   });
   const status = buildSaStatusSection();
   const readout = buildSaReadoutSection();
@@ -241,6 +245,7 @@ export function mountSaWorkspace(
         return;
       }
       lastPeaks = payload.peaks;
+      markerPanel.refreshFromStore();
       spectrum.applyStore(store, viewOptions());
       readout.applySpectrum(payload, store.sweepCount());
     },

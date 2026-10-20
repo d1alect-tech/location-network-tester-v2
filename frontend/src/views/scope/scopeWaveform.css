@@ -74,6 +74,41 @@
   min-width: 0;
 }
 
+/* Нулевые линии каналов (директива 2026-10-19): ручки «1»/«2» на левой
+   кромке фигуры — drag по вертикали (ns-resize), сдвиг отображения 0 В
+   канала; CH2 сдвинут вправо, чтобы обе ручки были схватываемы при
+   совпадении линий. Токены каналов A/B — DESIGN.md. PRM: без анимаций. */
+.lnt-scope-workspace .lnt-scope-ground {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  z-index: 3;
+  cursor: ns-resize;
+  touch-action: none;
+  font: 600 12px / 42px var(--lnt-mono);
+  color: var(--lnt-text);
+  background: var(--lnt-panel);
+  border: 1px solid var(--lnt-line);
+  border-radius: 0 var(--lnt-r-ctl) var(--lnt-r-ctl) 0;
+  padding: 0;
+}
+
+.lnt-scope-workspace .lnt-scope-ground-ch1 {
+  border-color: var(--lnt-a);
+}
+
+.lnt-scope-workspace .lnt-scope-ground-ch2 {
+  left: 46px;
+  border-color: var(--lnt-b);
+}
+
+.lnt-scope-workspace .lnt-scope-ground:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -2px;
+}
+
 .lnt-scope-workspace .lnt-scope-figure .lnt-uplot-root,
 .lnt-scope-workspace .lnt-scope-figure .lnt-uplot-host {
   inline-size: 100%;

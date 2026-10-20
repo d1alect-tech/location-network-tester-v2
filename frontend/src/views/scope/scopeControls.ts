@@ -1,13 +1,22 @@
-/** Управление развёрткой (Todo 8; задача 14 — сегменты liveSeg): В/дел и
- * пробник CH1 — сегментные группы полосы (значение на контроле; контрактные
- * #lnt-scope-vdiv/#lnt-scope-probe и класс .lnt-scope-seg сохраняются для
- * ре-парента), инверсия каналов и подпись эффективных В/дел — компакт-leftover
- * главной области. Только DOM и события: закон масштаба — в scopeScale,
- * интерактив — в scopeWorkspace (стейджинг помечает scopeStatus полосы). */
+/** Управление развёрткой (Todo 8; задача 14 — сегменты liveSeg; директива
+ * владельца 2026-10-19 — В/дел чипом с меню): В/дел — stateless-чип
+ * (девять шагов 5 В…10 мВ не влезают в сегмент; паттерн частоты),
+ * пробник CH1 — сегмент (две опции), инверсия каналов и подпись эффективных
+ * В/дел — компакт-leftover главной области. Контрактный #lnt-scope-vdiv
+ * остаётся на обёртке чипа: zone-хосты полосы читают опции по data-value.
+ * Только DOM и события: закон масштаба — в scopeScale, интерактив — в
+ * scopeWorkspace (стейджинг помечает scopeStatus полосы). */
 
+import { createLiveChip } from "../../components/liveStrip/liveChip";
 import { createLiveSeg } from "../../components/liveStrip/liveSeg";
 import { el } from "../../components/primitives/dom";
-import { PROBE_STEPS, VDIV_STEPS, effectiveVDiv, formatVDiv } from "./scopeScale";
+import {
+  DEFAULT_SCOPE_SETTINGS,
+  PROBE_STEPS,
+  VDIV_STEPS,
+  effectiveVDiv,
+  formatVDiv,
+} from "./scopeScale";
 import type { ScopeDisplaySettings } from "./scopeScale";
 
 export interface ScopeControlsView {
@@ -25,17 +34,17 @@ export interface ScopeControlsView {
 export function buildScopeControls(
   onChange: (settings: ScopeDisplaySettings) => void,
 ): ScopeControlsView {
-  const vDivSeg = createLiveSeg(
+  let vDiv = DEFAULT_SCOPE_SETTINGS.vDiv;
+  const vDivSeg = createLiveChip(
     {
       key: "vdiv",
-      kind: "ctl",
       aria: "Вольт на деление",
-      options: VDIV_STEPS.map((vDiv) => ({ value: String(vDiv), text: String(vDiv) })),
-      current: "5",
-      groupAttrs: { id: "lnt-scope-vdiv" },
-      groupClassName: "lnt-scope-seg",
+      options: VDIV_STEPS.map((vDiv) => ({ value: String(vDiv), text: formatVDiv(vDiv) })),
+      current: String(DEFAULT_SCOPE_SETTINGS.vDiv),
+      menuTitle: "В/дел · применяется при запуске",
     },
-    () => {
+    (value) => {
+      vDiv = Number(value);
       refresh();
       onChange(readSettings());
     },
@@ -63,10 +72,12 @@ export function buildScopeControls(
 
   function readSettings(): ScopeDisplaySettings {
     return {
-      vDiv: Number(vDivSeg.selection()),
+      vDiv,
       probe: Number(probeSeg.selection()),
       invertCh1: invertCh1.checked,
       invertCh2: invertCh2.checked,
+      groundCh1V: 0,
+      groundCh2V: 0,
     };
   }
 
@@ -83,6 +94,14 @@ export function buildScopeControls(
   }
   refresh();
 
+  /** Контрактный #lnt-scope-vdiv — только сам чип: подпись поля живёт в
+   *  панели воркспейса и НЕ переезжает в полосу (иначе группа ВЕРТ
+   *  складывает две подписи и полоса растёт за 150 px). */
+  const vdivHost = el("div", { attrs: { id: "lnt-scope-vdiv" } }, [vDivSeg.root]);
+  const vdivField = el("div", { className: "lnt-scope-field" }, [
+    el("span", { className: "lnt-scope-field-label", text: "В/дел (оба канала)" }),
+    vdivHost,
+  ]);
   const root = el(
     "div",
     {
@@ -90,10 +109,7 @@ export function buildScopeControls(
       attrs: { role: "group", "aria-label": "Управление развёрткой" },
     },
     [
-      el("div", { className: "lnt-scope-field" }, [
-        el("span", { className: "lnt-scope-field-label", text: "В/дел (оба канала)" }),
-        vDivSeg.root,
-      ]),
+      vdivField,
       el("div", { className: "lnt-scope-field" }, [
         el("span", { className: "lnt-scope-field-label", text: "Пробник CH1" }),
         probeSeg.root,
@@ -115,7 +131,7 @@ export function buildScopeControls(
 
   return {
     root,
-    vdiv: vDivSeg.root,
+    vdiv: vdivHost,
     probe: probeSeg.root,
     vdivEffective: effectiveLine,
     readSettings,

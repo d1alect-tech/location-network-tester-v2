@@ -15,7 +15,7 @@ import { paintLiveChip } from "../../components/liveStrip/liveChip";
 import type { LiveStateSource } from "../../components/liveStrip/liveStrip";
 import { el } from "../../components/primitives/dom";
 import { rateLabelHz } from "./scopeRateField";
-import { formatVDiv } from "./scopeScale";
+import { DEFAULT_SCOPE_SETTINGS, formatVDiv } from "./scopeScale";
 
 const KEY_LABELS: Readonly<Record<string, string>> = {
   vdiv: "В/дел",
@@ -68,7 +68,7 @@ interface HostBinding {
 
 export function mountScopeStatus(options: ScopeStatusOptions): ScopeStatusHandle {
   const baseline: Record<string, string> = {
-    vdiv: String(DEFAULT_LIVE_START_REQUEST.ch1_range_v),
+    vdiv: String(DEFAULT_SCOPE_SETTINGS.vDiv),
     probe: String(DEFAULT_LIVE_START_REQUEST.ch1_probe_multiplier),
     rate: String(DEFAULT_LIVE_START_REQUEST.sample_rate_hz),
     trigmode: DEFAULT_LIVE_START_REQUEST.trigger.mode,
@@ -117,6 +117,7 @@ export function mountScopeStatus(options: ScopeStatusOptions): ScopeStatusHandle
       parts.length === 0 ? "" : `применится при следующем запуске: ${parts.join(", ")}`;
     stagedLine.hidden = parts.length === 0;
     options.onPendingChange?.(staged.size);
+    paintLiveChip(options.hosts.vdiv, baseline.vdiv ?? null, staged.get("vdiv")?.value ?? null);
     paintLiveChip(options.hosts.rate, baseline.rate ?? null, staged.get("rate")?.value ?? null);
   }
 

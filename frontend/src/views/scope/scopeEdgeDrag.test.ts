@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { el } from "../../components/primitives/dom";
 import { mountScopeCursorDrag } from "./scopeCursorDrag";
 import { mountScopeEdgeDrag } from "./scopeEdgeDrag";
-import { VDIV_STEPS } from "./scopeScale";
+import { VDIV_STEPS, formatVDiv } from "./scopeScale";
 import { mountScopeTriggerLine } from "./scopeTriggerLine";
 
 const VIEWPORT_RECT = {
@@ -95,6 +95,7 @@ function mountHarness(vdiv = 5): Harness {
   // V-курсор: вольты ±5 сверху вниз, V1 = 4.9 — у верхней кромки фигуры.
   v1Slider.value = "490";
   const chart = {
+    over: figure,
     bbox: {
       left: FIGURE_RECT.left,
       top: FIGURE_RECT.top,
@@ -102,13 +103,9 @@ function mountHarness(vdiv = 5): Harness {
       height: FIGURE_RECT.height,
     },
     valToPos: (value: number, scale: string) =>
-      scale === "y"
-        ? FIGURE_RECT.top + (FIGURE_RECT.height * (5 - value)) / 10
-        : FIGURE_RECT.left + FIGURE_RECT.width * value,
+      scale === "y" ? (FIGURE_RECT.height * (5 - value)) / 10 : FIGURE_RECT.width * value,
     posToVal: (pixel: number, scale: string) =>
-      scale === "y"
-        ? 5 - ((pixel - FIGURE_RECT.top) / FIGURE_RECT.height) * 10
-        : (pixel - FIGURE_RECT.left) / FIGURE_RECT.width,
+      scale === "y" ? 5 - (pixel / FIGURE_RECT.height) * 10 : pixel / FIGURE_RECT.width,
     scales: { x: { min: 0, max: 1 } },
   };
   const cursorDrag = mountScopeCursorDrag({
@@ -156,17 +153,20 @@ afterEach(() => {
 });
 
 describe("scopeEdgeDrag: детенты В/дел", () => {
-  it("кромка стекла: тянуть вниз = мельче (5 → 1 → 0.5), зажим на конце", () => {
+  it("кромка стекла: тянуть вниз = мельче, зажим на 10 мВ/дел", () => {
     const h = mountHarness(5);
     pointer(h.viewport, "pointerdown", 200, VIEWPORT_RECT.top + 5);
     pointer(h.viewport, "pointermove", 200, VIEWPORT_RECT.top + 5 + 40);
-    expect(h.writes).toEqual([1]);
+    expect(h.writes).toEqual([2]);
     pointer(h.viewport, "pointermove", 200, VIEWPORT_RECT.top + 5 + 72);
-    expect(h.writes).toEqual([1, 0.5]);
-    // За концом таблицы детент не пишет (зажим 0.5).
+    expect(h.writes).toEqual([2, 1]);
     pointer(h.viewport, "pointermove", 200, VIEWPORT_RECT.top + 5 + 200);
-    expect(h.writes).toEqual([1, 0.5]);
-    pointer(h.viewport, "pointerup", 200, VIEWPORT_RECT.top + 5 + 200);
+    expect(h.writes).toEqual([2, 1, 0.05]);
+    pointer(h.viewport, "pointermove", 200, VIEWPORT_RECT.top + 5 + 300);
+    expect(h.writes).toEqual([2, 1, 0.05, 0.01]);
+    pointer(h.viewport, "pointermove", 200, VIEWPORT_RECT.top + 5 + 400);
+    expect(h.writes).toEqual([2, 1, 0.05, 0.01]);
+    pointer(h.viewport, "pointerup", 200, VIEWPORT_RECT.top + 5 + 400);
     h.dispose();
   });
 
@@ -190,7 +190,7 @@ describe("scopeEdgeDrag: детенты В/дел", () => {
     const h = mountHarness(5);
     pointer(h.figure, "pointerdown", 100, FIGURE_RECT.top + 4);
     pointer(h.figure, "pointermove", 100, FIGURE_RECT.top + 4 + 40);
-    expect(h.writes).toEqual([1]);
+    expect(h.writes).toEqual([2]);
     pointer(h.figure, "pointerup", 100, FIGURE_RECT.top + 4 + 40);
     h.dispose();
   });
@@ -211,7 +211,7 @@ describe("scopeEdgeDrag: арбитраж трёх указателей", () => 
     );
     pointer(h.viewport, "pointermove", 200, lineY + 60);
     // Кромка забрала жест: линия не тянута, В/дел ушёл детентом вниз.
-    expect(h.writes).toEqual([1]);
+    expect(h.writes).toEqual([2]);
     h.dispose();
 
     // Тот же жест без кромки (уровень 0, линия в середине): линия тянута.
@@ -235,7 +235,7 @@ describe("scopeEdgeDrag: арбитраж трёх указателей", () => 
     pointer(h.figure, "pointerdown", 100, v1Top);
     pointer(h.figure, "pointermove", 100, v1Top + 60);
     expect(h.v1Slider.value).toBe("490");
-    expect(h.writes).toEqual([1]);
+    expect(h.writes).toEqual([2]);
     pointer(h.figure, "pointerup", 100, v1Top + 60);
     h.dispose();
 
@@ -268,7 +268,7 @@ describe("scopeEdgeDrag: ghost-репетиция (PRM)", () => {
     const ghost = h.viewport.querySelector<HTMLElement>(".lnt-scope-edge-ghost");
     expect(ghost).toBeInstanceOf(HTMLElement);
     expect(ghost?.hidden).toBe(false);
-    expect(ghost?.textContent).toContain(`В/дел ${VDIV_STEPS[0]}`);
+    expect(ghost?.textContent).toContain(formatVDiv(VDIV_STEPS[0] ?? 5));
     pointer(h.viewport, "pointermove", 200, VIEWPORT_RECT.top + 60, 0);
     expect(h.viewport.querySelector<HTMLElement>(".lnt-scope-edge-ghost")?.hidden).toBe(true);
     h.dispose();
@@ -282,7 +282,7 @@ describe("scopeEdgeDrag: ghost-репетиция (PRM)", () => {
     pointer(h.figure, "pointermove", 100, FIGURE_RECT.top + 5 + 40);
     const ghost = h.figure.querySelector<HTMLElement>(".lnt-scope-edge-ghost");
     expect(ghost?.hidden).toBe(false);
-    expect(ghost?.textContent).toContain("В/дел 1");
+    expect(ghost?.textContent).toContain("2 В/дел");
     pointer(h.figure, "pointerup", 100, FIGURE_RECT.top + 5 + 40);
     h.dispose();
   });

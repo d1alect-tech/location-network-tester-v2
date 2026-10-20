@@ -14,7 +14,7 @@ import type uPlot from "uplot";
 import type { LiveFramePayload } from "../../api/types-live";
 import { createLiveSeg } from "../../components/liveStrip/liveSeg";
 import { el } from "../../components/primitives/dom";
-import { cursorField } from "./scopeCursorFields";
+import { cursorField, setVoltageCursorWindow } from "./scopeCursorFields";
 import {
   type CursorPositions,
   DEFAULT_T1,
@@ -50,6 +50,7 @@ export interface ScopeCursorView {
   cursorsOn(): boolean;
   /** Текущий инстанс uPlot — геометрия для drag линий (scopeCursorDrag). */
   chart(): uPlot | null;
+  setWindow(half: number): void;
 }
 
 /** Хэндлы секций по корню: полоса берёт геометрию/состояние без правок
@@ -248,6 +249,10 @@ export function buildScopeCursorSection(): ScopeCursorView {
     },
     cursorsOn: () => enabled,
     chart: () => chart,
+    setWindow(half): void {
+      setVoltageCursorWindow(v1.input, v2.input, positions, half);
+      updateCursorReadout();
+    },
   };
   viewsByRoot.set(view.root, view);
   return view;

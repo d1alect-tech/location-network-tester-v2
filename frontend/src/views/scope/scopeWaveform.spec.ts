@@ -32,7 +32,8 @@ test("Run draws both channels on uPlot with the selected V/div and probe", async
 
   // Выбранные В/дел и пробник уходят в тело запуска (диапазон общий на пару).
   // Задача 14: В/дел и пробник — сегментные группы полосы liveStrip.
-  await page.locator("#lnt-scope-vdiv [data-value='1']").click();
+  await page.locator("#lnt-scope-vdiv .lnt-live-chip-btn").click();
+  await page.locator("#lnt-scope-vdiv [data-value='0.2']").click();
   await page.locator("#lnt-scope-probe [data-value='10']").click();
   await page.locator("#lnt-scope-run").click();
 
@@ -52,7 +53,7 @@ test("Run draws both channels on uPlot with the selected V/div and probe", async
   await expect(figure.locator(".lnt-uplot-host canvas").first()).toBeVisible();
   await expect(figure.locator(".u-legend")).toContainText("CH1");
   await expect(figure.locator(".u-legend")).toContainText("CH2");
-  await expect(page.locator(".lnt-scope-vdiv-effective")).toHaveText("10 В/дел");
+  await expect(page.locator(".lnt-scope-vdiv-effective")).toHaveText("2 В/дел");
 
   // Чистый поток: индикатор проблем свёрнут, сетка стабильна.
   await expect(page.locator(".lnt-scope-wave-status")).toBeHidden();
@@ -77,7 +78,7 @@ test("inversion toggle and probe re-render the sweep; label scales", async ({ pa
 
   // Пробник ×10 масштабирует подпись readout эффективных В/дел.
   await page.locator("#lnt-scope-probe [data-value='10']").click();
-  await expect(page.locator(".lnt-scope-vdiv-effective")).toHaveText("50 В/дел");
+  await expect(page.locator(".lnt-scope-vdiv-effective")).toHaveText("10 В/дел");
 
   mkdirSync(EVIDENCE_DIR, { recursive: true });
   // Задача 17b: снимок — фигура (панель .lnt-scope-wave — display: contents).

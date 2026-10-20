@@ -15,7 +15,7 @@
  * Slop 4 px: клик без движения ничего не пишет; детент — каждые 32 px. */
 
 import { el } from "../../components/primitives/dom";
-import { VDIV_STEPS } from "./scopeScale";
+import { VDIV_STEPS, formatVDiv } from "./scopeScale";
 
 /** Полоса захвата у верхней кромки поверхности (px). */
 const EDGE_HIT_PX = 12;
@@ -51,7 +51,7 @@ function vdivIndex(value: number): number {
 }
 
 function formatGhost(value: number): string {
-  return `В/дел ${value}`;
+  return formatVDiv(value);
 }
 
 export function mountScopeEdgeDrag(options: ScopeEdgeDragOptions): ScopeEdgeDragHandle {
@@ -89,6 +89,7 @@ export function mountScopeEdgeDrag(options: ScopeEdgeDragOptions): ScopeEdgeDrag
 
   function onPointerDown(event: PointerEvent): void {
     if (event.buttons !== 1) return;
+    if (event.target instanceof Element && event.target.closest("[data-ground]")) return;
     const surface = hitSurface(event.clientX, event.clientY);
     if (surface === null) {
       // Жест не кромки (например, drag линии): репетиция гасится.

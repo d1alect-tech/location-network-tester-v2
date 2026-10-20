@@ -3,6 +3,7 @@
  * DOM-строитель уходит в свой модуль, поведение без изменений. */
 
 import { el } from "../../components/primitives/dom";
+import type { CursorPositions } from "./scopeCursorModel";
 
 export interface CursorField {
   readonly field: HTMLElement;
@@ -35,4 +36,23 @@ export function cursorField(
     input,
     field: el("div", { className: "lnt-scope-cursor-field" }, [caption, input]),
   };
+}
+
+/** Шкала ползунков V1/V2 следует окну развёртки и удерживает курсоры внутри. */
+export function setVoltageCursorWindow(
+  v1: HTMLInputElement,
+  v2: HTMLInputElement,
+  positions: CursorPositions,
+  half: number,
+): void {
+  for (const [input, key] of [
+    [v1, "v1"],
+    [v2, "v2"],
+  ] as const) {
+    input.min = String(-half * 100);
+    input.max = String(half * 100);
+    input.step = String(half / 5);
+    positions[key] = Math.max(-half, Math.min(half, positions[key]));
+    input.value = String(positions[key] * 100);
+  }
 }

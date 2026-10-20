@@ -191,20 +191,20 @@ afterEach(() => {
 });
 
 describe("scopeAutoset: фолбэк «сигнал слишком велик» (r4-final f2)", () => {
-  it("пик 4,5 В не влезает ни в один диапазон: автосет берёт 5 В/дел", async () => {
+  it("пик 45 В не влезает ни в одно окно: автосет берёт 5 В/дел", async () => {
     const log: LiveLog = { starts: [], stops: 0, states: 0, configs: 0 };
     const container = mountTab(log, { state: { ...IDLE } });
     await flush();
-    emitAll("frame", frame(4.5));
+    emitAll("frame", frame(45));
     await flush();
 
     button(container, '[data-action="autoset"] button').click();
     await flush();
 
-    // Самый широкий диапазон — 5 В/дел (halfSpan 5,12 В), не [0] списка.
+    // Самое широкое окно — 5 В/дел (±20 В), не [0] списка.
     expect(log.starts[0]?.body).toMatchObject({ ch1_range_v: 5 });
-    // В/дел уже стоит дефолтный: эхо называет только реально изменённое.
-    expect(echoOf(container).textContent).toBe("Автонастройка: частота 1 МГц");
+    expect(echoOf(container).textContent).toContain("В/дел 5");
+    expect(echoOf(container).textContent).toContain("частота 1 МГц");
   });
 
   it("обычный кадр 1,7 В: подбор по-прежнему точен, фолбэк не мешает", async () => {

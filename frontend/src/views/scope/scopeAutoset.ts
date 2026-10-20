@@ -1,8 +1,8 @@
 /** «Автосет» (задача 15, план (b)): пересчёт по последнему кадру — модель
- * flat.html:2585-2597 (Rigol AUToscale): В/дел — наименьший диапазон, где
- * размах влезает в 80 % полэкрана (halfSpanVolts с учётом пробника);
- * уровень — середина размаха с зажимом ±5; частота — окно ≈ 3 периода
- * (frame_samples·f/3, ближайшая из манифеста). Guards модели закрыты
+ * flat.html:2585-2597 (Rigol AUToscale): В/дел — наименьшее окно, где
+ * размах влезает в 80 % полэкрана (windowHalfVolts, закон директивы
+ * 2026-10-19); уровень — середина размаха с зажимом ±5; частота — окно ≈ 3
+ * периода (frame_samples·f/3, ближайшая из манифеста). Guards модели закрыты
  * эхом: список ТОЛЬКО реально изменённых параметров или честное
  * «Автонастройка: нечего менять» — молчаливых no-op нет. Всегда
  * перезапуск (кластер Run). Управление — только живыми слушателями DOM
@@ -16,7 +16,7 @@ import { applyScopeControlTargets, readScopeControlState } from "./scopeControlS
 import type { ScopeControlHosts, ScopeControlTargets } from "./scopeControlState";
 import { measureSeries } from "./scopeMeasurements";
 import { SCOPE_SAMPLE_RATES_HZ } from "./scopeRateField";
-import { VDIV_STEPS, halfSpanVolts } from "./scopeScale";
+import { DEFAULT_SCOPE_SETTINGS, VDIV_STEPS, windowHalfVolts } from "./scopeScale";
 import { TRIGGER_LEVEL_LIMIT_V } from "./scopeTrigger";
 
 export interface ScopeAutosetOptions {
@@ -47,24 +47,25 @@ function computeTargets(
     slope: "rising",
   };
   if (frame === null) {
-    targets.vdiv = 5;
+    targets.vdiv = DEFAULT_SCOPE_SETTINGS.vDiv;
     targets.levelV = 0;
     return targets;
   }
   const m = measureSeries(frame.ch1, null);
   if (m.vppV === null) return targets;
   const peak = Math.max(Math.abs(m.vmaxV ?? 0), Math.abs(m.vminV ?? 0));
-  // Фолбэк «сигнал слишком велик» (r4-final f2): самый широкий диапазон
-  // (наибольший halfSpanVolts), а не первый элемент списка — порядок
-  // VDIV_STEPS не решает честность автосета.
+  // Фолбэк «сигнал слишком велик» (r4-final f2): самое широкое окно экрана
+  // (наибольший windowHalfVolts). Подбор — НАИМЕНЬШИЙ влезающий шаг, выбор
+  // не зависит от порядка VDIV_STEPS (мин по значению, не «последний
+  // удовлетворяющий» — перевёрнутый список ловушку вскрывает).
   const widest = VDIV_STEPS.reduce((w, v) =>
-    halfSpanVolts(v, probe) > halfSpanVolts(w, probe) ? v : w,
+    windowHalfVolts(v, probe) > windowHalfVolts(w, probe) ? v : w,
   );
-  let pick = widest;
+  let pick: number | null = null;
   for (const v of VDIV_STEPS) {
-    if (peak <= 0.8 * halfSpanVolts(v, probe)) pick = v;
+    if (peak <= 0.8 * windowHalfVolts(v, probe) && (pick === null || v < pick)) pick = v;
   }
-  targets.vdiv = pick;
+  targets.vdiv = pick ?? widest;
   targets.levelV = Math.max(
     -TRIGGER_LEVEL_LIMIT_V,
     Math.min(TRIGGER_LEVEL_LIMIT_V, ((m.vmaxV ?? 0) + (m.vminV ?? 0)) / 2),

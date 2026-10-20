@@ -263,7 +263,7 @@ describe("scopeTrigger view (Todo 9)", () => {
     expect(text).not.toContain("предтриггер");
   });
 
-  it("rate field: чип с семью частотами прибора, слот — применённое, выбор отложен", () => {
+  it("rate field: чип с девятью частотами прибора, слот — применённое, выбор отложен", () => {
     const field = buildScopeRateField();
     document.body.append(field.root);
 
@@ -275,7 +275,17 @@ describe("scopeTrigger view (Todo 9)", () => {
     const labels = [...field.root.querySelectorAll("[role='option']")].map(
       (option) => option.querySelector(".lnt-live-opt-text")?.textContent,
     );
-    expect(labels).toEqual(["100 кГц", "200 кГц", "500 кГц", "1 МГц", "2 МГц", "4 МГц", "8 МГц"]);
+    expect(labels).toEqual([
+      "20 кГц",
+      "50 кГц",
+      "100 кГц",
+      "200 кГц",
+      "500 кГц",
+      "1 МГц",
+      "2 МГц",
+      "4 МГц",
+      "8 МГц",
+    ]);
 
     (field.root.querySelector("[role='option'][data-value='500000']") as HTMLButtonElement).click();
     expect(field.rateHz()).toBe(500_000);

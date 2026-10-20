@@ -433,6 +433,42 @@
   font-weight: 600;
 }
 
+.lnt-sa-workspace .lnt-sa-marker-select,
+.lnt-sa-workspace .lnt-sa-marker-remove {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  color: var(--lnt-text);
+  background: var(--lnt-panel);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  cursor: pointer;
+}
+
+.lnt-sa-workspace .lnt-sa-marker-select[aria-pressed="true"] {
+  border-color: var(--lnt-delta);
+  color: var(--lnt-delta);
+}
+
+.lnt-sa-workspace .lnt-sa-marker-frequency {
+  box-sizing: border-box;
+  width: 88px;
+  min-height: 44px;
+  color: var(--lnt-text);
+  background: var(--lnt-panel);
+  border: 1px solid var(--lnt-line);
+  font: inherit;
+}
+
+.lnt-sa-workspace [data-sa-markers] td,
+.lnt-sa-workspace [data-sa-markers] th {
+  padding: 2px 4px;
+}
+
+.lnt-sa-strip-mode .lnt-sa-markers .panel-bd {
+  overflow: auto;
+}
+
 .lnt-sa-workspace .lnt-sa-table-empty {
   margin: 0;
 }

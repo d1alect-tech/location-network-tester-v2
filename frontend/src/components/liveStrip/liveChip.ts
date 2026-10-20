@@ -122,18 +122,19 @@ export function createLiveChip(
   function openMenu(): void {
     menu.hidden = false;
     chipBtn.setAttribute("aria-expanded", "true");
-    paint();
     const focusTarget =
-      options.find((node) => node.dataset.value === target) ??
-      options.find((node) => node.dataset.value === applied) ??
+      options.find(
+        (node) => node.querySelector<HTMLElement>(".lnt-live-opt-mark")?.hidden === false,
+      ) ??
+      options.find((node) => node.getAttribute("aria-selected") === "true") ??
       options[0];
-    focusTarget?.focus();
+    focusTarget?.focus({ preventScroll: true });
   }
 
   function close(refocus: boolean): void {
     menu.hidden = true;
     chipBtn.setAttribute("aria-expanded", "false");
-    if (refocus) chipBtn.focus();
+    if (refocus) chipBtn.focus({ preventScroll: true });
   }
 
   chipBtn.addEventListener("click", () => {
@@ -169,7 +170,7 @@ export function createLiveChip(
     else if (event.key === "End") next = options.length - 1;
     else if (event.key === "ArrowDown") next = index < 0 ? 0 : (index + 1) % options.length;
     else next = index < 0 ? options.length - 1 : (index - 1 + options.length) % options.length;
-    options[next]?.focus();
+    options[next]?.focus({ preventScroll: true });
   });
   const onPointerDown = (event: Event): void => {
     if (!root.isConnected) {

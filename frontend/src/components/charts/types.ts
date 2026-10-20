@@ -20,6 +20,13 @@ export interface ChartRenderSeries {
   marker?: string;
 }
 
+/** Подписи оси X: формат значения и минимальный шаг подписей, px — частота
+ *  с шагом 50 px слипается («250,000»); спектр задаёт короткий формат. */
+export interface ChartXAxisTick {
+  format?: (value: number) => string;
+  space?: number;
+}
+
 export interface ChartRenderRequest {
   xLabel: string;
   yLabel: string;
@@ -34,6 +41,8 @@ export interface ChartRenderRequest {
   xRange?: readonly [number, number];
   /** Фиксированное окно оси Y: сетка стабильна между кадрами. */
   yRange?: readonly [number, number];
+  /** Настройка подписей оси X (шаг и формат); по умолчанию — uPlot. */
+  xTick?: ChartXAxisTick;
 }
 
 export interface ChartHandle {

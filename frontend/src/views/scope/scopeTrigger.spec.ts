@@ -42,7 +42,7 @@ test("trigger panel: honest labels, rate table, 44px targets, axe clean", async 
   // Таблица прибора (pins: LibUsbScope.py:74-99) — ровно семь записей в
   // списке чипа частоты (задача 14: слот — применённое, выбор отложен).
   const rateField = page.locator(".lnt-scope-rate-field");
-  await expect(rateField.locator("[role='option']")).toHaveCount(7);
+  await expect(rateField.locator("[role='option']")).toHaveCount(9);
   await expect(rateField.locator("[data-slot='rate']")).toHaveText("8 МГц");
   await expect(
     rateField.locator("[role='option'][data-value='100000'] .lnt-live-opt-text"),
@@ -155,18 +155,19 @@ test("keyboard state flip is instant: no background transition after keydown", a
   await openScope(page);
   await page.setViewportSize({ width: 1280, height: 720 });
 
-  await page.locator('#lnt-scope-vdiv [data-value="5"]').focus();
-  await page.keyboard.press("ArrowRight");
-  await expect(page.locator('#lnt-scope-vdiv [data-value="1"]')).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await page.locator("#lnt-scope-vdiv .lnt-live-chip-btn").focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(page.locator('[data-live-mark="vdiv"]')).toHaveText("→ 2 В/дел");
   const segTransition = await page.evaluate(() => {
-    const node = document.querySelector('#lnt-scope-vdiv [data-value="1"]');
+    const node = document.querySelector("#lnt-scope-vdiv .lnt-live-chip-btn");
     return node === null ? "MISSING" : getComputedStyle(node).transitionProperty;
   });
-  expect(segTransition, `сегмент после ArrowRight: ${segTransition}`).not.toContain("background");
-  expect(segTransition).not.toContain("border-color");
+  // Чип В/дел: фон не меняется вовсе (транзишена нет); border-color —
+  // обратная связь указателя, объявленная в r5-11, и это НЕ кроссфейд фона.
+  expect(segTransition, `чип после ArrowRight: ${segTransition}`).not.toContain("background");
 
   // Spacebar вне интерактива: run-кластер стартует; клавиша без транзишена.
   await page.evaluate(() => {

@@ -16,8 +16,9 @@ import type {
 } from "../../components/charts/types";
 import { createUplotView } from "../../components/charts/uplotView";
 import { el } from "../../components/primitives/dom";
+import { mountSaMarkerDrag } from "./saMarkerDrag";
 import type { SaTraceKind, SaTraceStore } from "./saTraceStore";
-import { type SaDisplayUnit, saLevelToDisplay, saYAxisLabel } from "./saUnits";
+import { type SaDisplayUnit, formatFrequencyTick, saLevelToDisplay, saYAxisLabel } from "./saUnits";
 import "./sa.css";
 
 const SYNC_KEY = "lnt-sa-spectrum";
@@ -32,8 +33,10 @@ export interface SaSpectrumViewOptions {
 
 /** Вертикаль маркера пользователя на графике: частота и бирка M1..M4. */
 export interface SaMarkerLine {
+  readonly id: number;
   readonly frequencyHz: number;
   readonly label: string;
+  readonly selected?: boolean;
 }
 
 export interface SaSpectrumOptions {
@@ -47,10 +50,14 @@ export interface SaSpectrumOptions {
   peaks?: () => readonly ChartPeak[];
   /** Клик по полю графика: частота в Гц (перевод — на стороне uPlot). */
   onFrequencyClick?: (frequencyHz: number) => void;
+  onMarkerSelect?: (id: number) => void;
+  onMarkerMove?: (id: number, frequencyHz: number) => void;
+  onMarkerRemove?: (id: number) => void;
 }
 
 export interface SaSpectrumHandle {
   readonly root: HTMLElement;
+  redrawMarkers(): void;
   /** Рендер склада под текущие опции отображения (вызов на свип). */
   applyStore(store: SaTraceStore, options: SaSpectrumViewOptions): void;
   /** Перерисовка последнего склада под новые опции (единицы/шкала/вид). */
@@ -104,7 +111,8 @@ function createSaMarkersPlugin(options: SaMarkersPluginOptions): uPlot.Plugin {
         ctx.font = options.font;
         for (const marker of markers) {
           if (!Number.isFinite(marker.frequencyHz)) continue;
-          const x = self.valToPos(marker.frequencyHz, "x");
+          const x = self.valToPos(marker.frequencyHz, "x", true);
+          ctx.lineWidth = marker.selected ? 2 : 1;
           ctx.beginPath();
           ctx.moveTo(x, top);
           ctx.lineTo(x, top + height);
@@ -134,6 +142,7 @@ export function mountSaSpectrum(options: SaSpectrumOptions = {}): SaSpectrumHand
   // Цвета аннотаций фиксируются на монтировании (паритет workbench):
   // пики поиска — accentB, маркеры — delta с биркой на фоне панели.
   const theme = readChartTheme();
+  let plot: uPlot | null = null;
   const chart = factory({
     container: figure,
     syncKey: SYNC_KEY,
@@ -143,6 +152,13 @@ export function mountSaSpectrum(options: SaSpectrumOptions = {}): SaSpectrumHand
       color: theme.accentB,
     }),
     plugins: [
+      {
+        hooks: {
+          init: (self: uPlot) => {
+            plot = self;
+          },
+        },
+      },
       createSaMarkersPlugin({
         markers: options.markers ?? (() => []),
         color: theme.delta,
@@ -153,6 +169,14 @@ export function mountSaSpectrum(options: SaSpectrumOptions = {}): SaSpectrumHand
     ],
   });
   figure.append(chart.root);
+  const markerDrag = mountSaMarkerDrag({
+    figure,
+    geometry: () => plot,
+    markers: options.markers ?? (() => []),
+    select: (id) => options.onMarkerSelect?.(id),
+    move: (id, frequencyHz) => options.onMarkerMove?.(id, frequencyHz),
+    remove: (id) => options.onMarkerRemove?.(id),
+  });
   const bodyChildren: Node[] = [];
   if (options.controls !== undefined) bodyChildren.push(options.controls);
   bodyChildren.push(figure, status);
@@ -209,6 +233,8 @@ export function mountSaSpectrum(options: SaSpectrumOptions = {}): SaSpectrumHand
       x: Array.from(freq),
       xLog: view.xLog,
       xRange: view.xLog ? undefined : [freq[0] ?? 0, freq[freq.length - 1] ?? 0],
+      // Метка «4,000,000» шире шага 50 px — короткий формат держит ось читаемой.
+      xTick: { format: formatFrequencyTick, space: 64 },
       series,
       peaks: options.peaks === undefined ? [] : options.peaks(),
     };
@@ -217,6 +243,7 @@ export function mountSaSpectrum(options: SaSpectrumOptions = {}): SaSpectrumHand
 
   return {
     root,
+    redrawMarkers: () => plot?.redraw(false, false),
     applyStore(store, view) {
       lastStore = store;
       render(store, view);
@@ -229,6 +256,7 @@ export function mountSaSpectrum(options: SaSpectrumOptions = {}): SaSpectrumHand
       paintRejected();
     },
     destroy() {
+      markerDrag.dispose();
       chart.destroy();
     },
   };

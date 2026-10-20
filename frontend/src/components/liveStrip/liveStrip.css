@@ -108,11 +108,8 @@
   white-space: nowrap;
 }
 
-/* Хинт зоны (грамматика тайминга частоты): 10px под группой, absolute. */
+/* Хинт тайминга живёт в статус-строке, не поверх заголовка следующего ряда. */
 .lnt-live-zone-note {
-  position: absolute;
-  left: 0;
-  bottom: -12px;
   font: 400 10px / 12px var(--lnt-ui);
   color: var(--lnt-text-sec);
   white-space: nowrap;
@@ -167,7 +164,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  width: 150px;
+  width: 140px;
   min-height: 44px;
   padding: 0 10px;
   border: 1px solid var(--lnt-line-struct);
@@ -196,13 +193,17 @@
 
 .lnt-live-menu {
   position: absolute;
-  top: calc(100% + 4px);
+  bottom: calc(100% + 4px);
   left: 0;
   z-index: 5;
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 190px;
+  /* Список из 9 частот при 1280×625 не должен уходить ВЫШЕ окна: меню
+     открывается вверх от чипа, поэтому потолок считается от высоты окна. */
+  max-height: min(320px, 45vh);
+  overflow-y: auto;
   padding: 4px;
   background: var(--lnt-elev);
   border: 1px solid var(--lnt-line-struct);
@@ -522,19 +523,23 @@
 /* ── Run-кластер: «литые» клавиши 90×48, пара role=switch ─────────────── */
 
 .lnt-live-runctl {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .lnt-live-strip .lnt-live-runctl > button {
+  box-sizing: border-box;
+  flex: 0 0 96px;
+  width: 96px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   min-height: 48px;
   min-width: 90px;
-  padding: 0 14px;
+  padding: 0 8px;
   border: 1px solid var(--lnt-line-struct);
   border-radius: var(--lnt-r-ctl);
   background: linear-gradient(
@@ -567,13 +572,12 @@
 }
 
 .lnt-live-runbadge {
+  position: absolute;
+  right: 0;
+  top: -12px;
   font: 600 10px / 12px var(--lnt-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 2px 6px;
-  border: 1px solid var(--lnt-run);
-  border-radius: var(--lnt-radius-control);
-  background: var(--lnt-run-bg);
   color: var(--lnt-run);
   white-space: nowrap;
 }
@@ -598,16 +602,22 @@
 }
 
 .lnt-live-mark {
+  position: absolute;
+  top: -12px;
+  right: 0;
   font: 600 10px / 12px var(--lnt-mono);
   color: var(--lnt-run);
   white-space: nowrap;
 }
 
 .lnt-live-trig-state {
+  flex: 0 0 13ch;
+  width: 13ch;
   font: 600 10px / 12px var(--lnt-ui);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--lnt-text-sec);
+  white-space: nowrap;
 }
 
 /* Ре-парент строк статуса воркспейса: ряд 10/12 (грамматика band-status v1). */
@@ -825,6 +835,8 @@
    «Δt … · ΔV …» одной строкой, БЕЗ обрезки; сетка 6 пар и ряд измерений
    живут в воркспейсе (рельс/скрытый leftover) — полоса их не сжимает. */
 .lnt-live-strip .lnt-scope-cursor-inline {
+  flex: 0 0 28ch;
+  width: 28ch;
   font: 500 11px / 14px var(--lnt-mono);
   color: var(--lnt-text);
   white-space: nowrap;

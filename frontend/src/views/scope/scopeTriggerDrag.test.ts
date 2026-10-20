@@ -216,18 +216,18 @@ describe("scopeTriggerDrag: конфиг триггера при drag линии
     const line = triggerLineOf(container);
     const level = levelFieldOf(container);
 
-    // 20 шагов по 2 px (0,1 В на шаг): поле живое, конфигов нет.
+    // 20 шагов по 2 px в окне ±4 В: поле живое, конфигов нет.
     pointer(line, "pointerdown", 200, 100);
     for (let i = 1; i <= 20; i += 1) pointer(line, "pointermove", 200, 100 - 2 * i);
     await flush();
-    expect(level.value).toBe("2");
+    expect(level.value).toBe("1.6");
     expect(log.configs).toHaveLength(0);
 
     // Settle: финальный уровень уходит одним конфигом.
     pointer(line, "pointerup", 200, 60);
     await flush();
     expect(log.configs).toHaveLength(1);
-    expect(log.configs[0]).toMatchObject({ level_v: 2, mode: "auto", slope: "rising" });
+    expect(log.configs[0]).toMatchObject({ level_v: 1.6, mode: "auto", slope: "rising" });
   });
 
   it("порядок: поздний устаревший ответ конфига не затирает новый уровень", async () => {
@@ -278,9 +278,9 @@ describe("scopeTriggerDrag: конфиг триггера при drag линии
     await flush();
     expect(log.configs).toHaveLength(1);
 
-    // Сердцебиение подтверждает уровень — линия остаётся на 2 В (y=38).
+    // Сердцебиение задаёт уровень 2 В в окне ±4 В.
     emitAll("heartbeat", runningAt(2));
     await flush();
-    expect(line.style.transform).toBe("translateY(38px)");
+    expect(line.style.transform).toBe("translateY(28px)");
   });
 });

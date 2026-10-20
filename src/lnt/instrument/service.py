@@ -42,7 +42,6 @@ from lnt.scope_io import (
     MAX_POLL_TIMEOUT_MS,
     NEVER_CANCELLED,
     OUTSTANDING_TRANSFERS,
-    RANGE_CODE_5V,
     CancellationToken,
     ScopeProtocol,
 )
@@ -51,7 +50,7 @@ Clock = Callable[[], float]
 FrameSink = Callable[[LiveFrame], None]
 
 # Дефолты живого режима совпадают с захватом сессии (``lnt.acquire``): 8 МГц в
-# dual-режиме и диапазон CH1 +-5 В; CH2 всегда +-5 В (см. ``device``).
+# dual-режиме и диапазон CH1 +-5 В; код CH2 следует за CH1 (общая ось экрана).
 DEFAULT_SAMPLE_RATE_HZ: Final = 8_000_000.0
 DEFAULT_CH1_RANGE_V: Final = 5.0
 
@@ -242,8 +241,10 @@ class InstrumentService:
                 probe_multiplier=self._ch1_probe_multiplier,
                 calibration=self._adc_calibration,
             )
+            # Общая ось экрана: вольты CH2 масштабируются тем же кодом, что и
+            # CH1 (настройка тракта — device.configure_scope), пробника на CH2 нет.
             ch2 = block_to_volts(
-                ch2_raw, range_code=RANGE_CODE_5V, calibration=self._adc_calibration
+                ch2_raw, range_code=self._ch1_range_code, calibration=self._adc_calibration
             )
             self._stream.push(ch1, ch2)
 

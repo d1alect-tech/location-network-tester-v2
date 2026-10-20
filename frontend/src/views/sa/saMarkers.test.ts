@@ -41,6 +41,28 @@ describe("readoutDbAt (±1 бин + парабола в дБ)", () => {
 describe("SaMarkers (лимит 4, клиентские)", () => {
   const trace = { freq: FREQ, psdDb: [-31, -30, -39] };
 
+  it("двигает только выбранный маркер и освобождает отдельный слот", () => {
+    const markers = new SaMarkers();
+    markers.place(trace, 1050);
+    markers.place(trace, 1150);
+    const second = markers.list()[1];
+    markers.move(1, { freq: [100, 200, 300], psdDb: [-60, -20, -60] }, 200);
+    expect(markers.list()[0]).toMatchObject({ id: 1, frequencyHz: 200, levelDb: -20 });
+    expect(markers.list()[1]).toEqual(second);
+    markers.remove(1);
+    expect(markers.list()).toEqual([second]);
+  });
+
+  it("обновляет уровень нового свипа, сохраняя частоту маркера", () => {
+    const markers = new SaMarkers();
+    markers.place(trace, 1100);
+    markers.refresh({ freq: FREQ, psdDb: [-41, -40, -49] });
+    expect(markers.list()[0]?.frequencyHz).toBe(1060);
+    expect(markers.list()[0]?.levelDb).toBeCloseTo(-39.2);
+    markers.refresh({ freq: [2000, 3000], psdDb: [-20, -30] });
+    expect(markers.list()[0]?.levelDb).toBeNaN();
+  });
+
   it("ставит маркеры с порядковыми id и отсчётом", () => {
     const markers = new SaMarkers();
     const first = markers.place(trace, 1050);

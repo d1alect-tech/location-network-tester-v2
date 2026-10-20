@@ -211,9 +211,9 @@ describe("scopeCaptureMenu: манифест-респек и overlay-геоме�
     }
     // Опции — те же таблицы, что у полосы: В/дел 5/1/0.5, пробник ×1/×10,
     // частота 7 записей, триггер авто/норм/одиночный, CH1/CH2, подъём/спад.
-    expect(panel.querySelectorAll('[data-menu-row="vdiv"] [data-menu-value]')).toHaveLength(3);
+    expect(panel.querySelectorAll('[data-menu-row="vdiv"] [data-menu-value]')).toHaveLength(9);
     expect(panel.querySelectorAll('[data-menu-row="probe"] [data-menu-value]')).toHaveLength(2);
-    expect(panel.querySelectorAll('[data-menu-row="rate"] [data-menu-value]')).toHaveLength(7);
+    expect(panel.querySelectorAll('[data-menu-row="rate"] [data-menu-value]')).toHaveLength(9);
     expect(panel.querySelectorAll('[data-menu-row="trigmode"] [data-menu-value]')).toHaveLength(3);
     expect(panel.querySelectorAll('[data-menu-row="trigsource"] [data-menu-value]')).toHaveLength(
       2,
@@ -244,9 +244,9 @@ describe("scopeCaptureMenu: stateless-диалог (r4-прецедент)", () 
     // БЕЗ изменений: сегменты полосы, чип частоты, поле уровня, staged-строка.
     expect(
       container
-        .querySelector('#lnt-scope-vdiv button[aria-pressed="true"]')
+        .querySelector('#lnt-scope-vdiv button[aria-selected="true"]')
         ?.getAttribute("data-value"),
-    ).toBe("5");
+    ).toBe("1");
     expect(container.querySelector("[data-slot='rate']")?.textContent).toBe("8 МГц");
     expect(container.querySelector<HTMLInputElement>("#lnt-scope-level")?.value).toBe("0");
     for (const mark of container.querySelectorAll<HTMLElement>("[data-live-mark]")) {
@@ -276,7 +276,7 @@ describe("scopeCaptureMenu: каждый пункт пишет то же пол�
     await flush();
     const panel = openMenu(container);
 
-    button(panel, '[data-menu-row="vdiv"] [data-menu-value="1"]').click();
+    button(panel, '[data-menu-row="vdiv"] [data-menu-value="2"]').click();
     button(panel, '[data-menu-row="probe"] [data-menu-value="10"]').click();
     button(panel, '[data-menu-row="rate"] [data-menu-value="2000000"]').click();
     await flush();
@@ -284,10 +284,10 @@ describe("scopeCaptureMenu: каждый пункт пишет то же пол�
     // Те же поля, что у полосы: реальные сегменты переехали, маркеры зажглись.
     expect(
       container
-        .querySelector('#lnt-scope-vdiv button[aria-pressed="true"]')
+        .querySelector('#lnt-scope-vdiv button[aria-selected="true"]')
         ?.getAttribute("data-value"),
     ).toBe("1");
-    expect(container.querySelector('[data-live-mark="vdiv"]')?.textContent).toBe("→ 1 В/дел");
+    expect(container.querySelector('[data-live-mark="vdiv"]')?.textContent).toBe("→ 2 В/дел");
     expect(container.querySelector('[data-live-mark="probe"]')?.textContent).toBe("→ ×10");
     expect(container.querySelector('[data-live-mark="rate"]')?.textContent).toBe("→ 2 МГц");
     expect(container.querySelector("[data-staged-line]")?.textContent).toContain(
@@ -301,7 +301,7 @@ describe("scopeCaptureMenu: каждый пункт пишет то же пол�
     button(container, "#lnt-scope-run").click();
     await flush();
     expect(log.starts[0]?.body).toMatchObject({
-      ch1_range_v: 1,
+      ch1_range_v: 5,
       ch1_probe_multiplier: 10,
       sample_rate_hz: 2_000_000,
     });
@@ -386,10 +386,10 @@ describe("scopeCaptureMenu: running — старт-ручки только stage
     await flush();
     const panel = openMenu(container);
 
-    button(panel, '[data-menu-row="vdiv"] [data-menu-value="1"]').click();
+    button(panel, '[data-menu-row="vdiv"] [data-menu-value="2"]').click();
     await flush();
     // Старт-ручка: только staged-маркер, в прибор ничего не ушло.
-    expect(container.querySelector('[data-live-mark="vdiv"]')?.textContent).toBe("→ 1 В/дел");
+    expect(container.querySelector('[data-live-mark="vdiv"]')?.textContent).toBe("→ 2 В/дел");
     expect(log.configs).toHaveLength(0);
 
     button(panel, '[data-menu-row="trigmode"] [data-menu-value="normal"]').click();

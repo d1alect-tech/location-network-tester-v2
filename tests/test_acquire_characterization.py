@@ -62,6 +62,17 @@ def _line_probe() -> TransformerLineProbe:
 @pytest.mark.parametrize(
     ("sample_rate_hz", "expected_code"),
     [
+        (20_000.0, 102),
+        (32_000.0, 103),
+        (40_000.0, 104),
+        (50_000.0, 105),
+        (64_000.0, 106),
+        (100_000.0, 110),
+        (128_000.0, 113),
+        (200_000.0, 120),
+        (400_000.0, 140),
+        (500_000.0, 150),
+        (640_000.0, 164),
         (1_000_000.0, 1),
         (2_000_000.0, 2),
         (4_000_000.0, 4),
@@ -70,7 +81,12 @@ def _line_probe() -> TransformerLineProbe:
         (15_000_000.0, 15),
     ],
 )
-def test_rate_code_maps_integer_megahertz(sample_rate_hz: float, expected_code: int) -> None:
+def test_rate_code_maps_supported_rates(sample_rate_hz: float, expected_code: int) -> None:
+    """Директива владельца 2026-10-19: суб-мегагерцовые частоты доступны.
+
+    Медленные коды — pins PyHT6022/LibUsbScope.py:74-99 (Ho-Ro e65d52b):
+    FX2 держит 20..640 кС/с в dual-режиме той же таблицей, что и целые МГц.
+    """
     assert _rate_code(sample_rate_hz) == expected_code
 
 
@@ -88,13 +104,18 @@ def test_rate_code_rejects_non_finite_or_non_positive(sample_rate_hz: float) -> 
     assert str(excinfo.value) == _RATE_NOT_FINITE
 
 
+# Директива владельца 2026-10-19: медленные коды FX2 доступны в dual-режиме.
+_RATE_SLOW_HINT = "и медленная лестница 20..640 кГц (dual)"
+
+
 @pytest.mark.parametrize(
     ("sample_rate_hz", "expected_message"),
     [
-        (500_000.0, "частота 500000 Гц: допустимы целые 1..15 МГц (dual)"),
-        (8_500_000.0, "частота 8500000 Гц: допустимы целые 1..15 МГц (dual)"),
-        (16_000_000.0, "частота 16000000 Гц: допустимы целые 1..15 МГц (dual)"),
-        (48_000_000.0, "частота 48000000 Гц: допустимы целые 1..15 МГц (dual)"),
+        (30_000.0, f"частота 30000 Гц: допустимы целые 1..15 МГц {_RATE_SLOW_HINT}"),
+        (250_000.0, f"частота 250000 Гц: допустимы целые 1..15 МГц {_RATE_SLOW_HINT}"),
+        (8_500_000.0, f"частота 8500000 Гц: допустимы целые 1..15 МГц {_RATE_SLOW_HINT}"),
+        (16_000_000.0, f"частота 16000000 Гц: допустимы целые 1..15 МГц {_RATE_SLOW_HINT}"),
+        (48_000_000.0, f"частота 48000000 Гц: допустимы целые 1..15 МГц {_RATE_SLOW_HINT}"),
     ],
 )
 def test_rate_code_rejects_unsupported_rate(sample_rate_hz: float, expected_message: str) -> None:

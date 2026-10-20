@@ -1,37 +1,42 @@
-/** Todo 8 RED: масштаб живой развёртки — зеркало RANGE_CODES
- * (acquire_validation.py:18) и закон raw→V = 5.12·probe/(code<<7)
- * (adc_calibration.py:94) ровно на трёх LNT-верифицированных кодах
- * {5.0, 1.0, 0.5} В/дел; остальные 6 шагов OpenHantek вне MVP. */
+/** Todo 8 + директива владельца 2026-10-19: лестница В/дел до 10 мВ/дел,
+ * окно оси = ±4·В/дел·probe (8 делений экрана), закон raw→V не изменился.
+ * Младшие шаги — экранное усиление: vdivTagText честно называет вход АЦП. */
 
 import { describe, expect, it } from "vitest";
 import {
   ADC_CENTER,
   DEFAULT_SCOPE_SETTINGS,
   PROBE_STEPS,
+  SCREEN_DIVISIONS,
   VDIV_STEPS,
   effectiveVDiv,
   formatVDiv,
+  formatVolts,
   halfSpanVolts,
+  hardwareRangeFor,
   rangeCodeOf,
   rawToVolts,
+  vdivTagText,
   voltsPerLsb,
+  windowHalfVolts,
   yAxisRange,
 } from "./scopeScale";
 
-describe("scale law of the live sweep (Todo 8)", () => {
-  it("V/div steps are exactly the three LNT-verified range codes", () => {
-    expect(VDIV_STEPS).toEqual([5, 1, 0.5]);
-    expect(rangeCodeOf(5)).toBe(1);
-    expect(rangeCodeOf(1)).toBe(5);
-    expect(rangeCodeOf(0.5)).toBe(10);
-    // Шаги OpenHantek вне тройки (2, 0.2, …) — не MVP, вход отвергается.
-    expect(() => rangeCodeOf(2)).toThrow();
-    expect(DEFAULT_SCOPE_SETTINGS.vDiv).toBe(5);
+describe("scale law of the live sweep (Todo 8, owner directive 2026-10-19)", () => {
+  it("V/div ladder runs 5 V..10 mV in 1-2-5 steps", () => {
+    expect(VDIV_STEPS).toEqual([5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01]);
+    expect(DEFAULT_SCOPE_SETTINGS.vDiv).toBe(1);
     expect(DEFAULT_SCOPE_SETTINGS.probe).toBe(1);
+    expect(DEFAULT_SCOPE_SETTINGS.groundCh1V).toBe(0);
+    expect(DEFAULT_SCOPE_SETTINGS.groundCh2V).toBe(0);
   });
 
   it("raw→V follows 5.12·probe/(code<<7) on each verified code", () => {
-    // Аналитика, не движок: полная шкала ±5.12/код В на каждом коде.
+    expect(rangeCodeOf(5)).toBe(1);
+    expect(rangeCodeOf(1)).toBe(5);
+    expect(rangeCodeOf(0.5)).toBe(10);
+    // Шаги экрана вне АЦП-таблицы — не коды гейна (закон ниже на кодах).
+    expect(() => rangeCodeOf(0.2)).toThrow();
     const analytic: ReadonlyArray<readonly [number, number, number]> = [
       [5, 1, 5.12],
       [1, 5, 1.024],
@@ -46,6 +51,43 @@ describe("scale law of the live sweep (Todo 8)", () => {
     }
   });
 
+  it("y window is ±4·V/div·probe — eight screen divisions", () => {
+    expect(SCREEN_DIVISIONS).toBe(8);
+    expect(windowHalfVolts(1, 1)).toBeCloseTo(4, 12);
+    const [min, max] = yAxisRange(0.01, 1);
+    expect(min).toBeCloseTo(-0.04, 12);
+    expect(max).toBeCloseTo(0.04, 12);
+    const [probeMin, probeMax] = yAxisRange(0.01, 10);
+    expect(probeMin).toBeCloseTo(-0.4, 12);
+    expect(probeMax).toBeCloseTo(0.4, 12);
+  });
+
+  it("hardware range picks the tightst code that fits the window", () => {
+    expect(hardwareRangeFor(5)).toBe(5);
+    expect(hardwareRangeFor(2)).toBe(5);
+    expect(hardwareRangeFor(1)).toBe(5);
+    expect(hardwareRangeFor(0.5)).toBe(5);
+    expect(hardwareRangeFor(0.2)).toBe(1);
+    expect(hardwareRangeFor(0.1)).toBe(0.5);
+    expect(hardwareRangeFor(0.05)).toBe(0.5);
+    expect(hardwareRangeFor(0.02)).toBe(0.5);
+    expect(hardwareRangeFor(0.01)).toBe(0.5);
+  });
+
+  it("honesty tag: screen gain below the ADC floor, dead space above", () => {
+    expect(vdivTagText(1, 1)).toBeNull();
+    expect(vdivTagText(0.2, 1)).toBeNull();
+    expect(vdivTagText(0.1, 1)).toBeNull();
+    expect(vdivTagText(5, 1)).toContain("сетка шире входа АЦП");
+    expect(vdivTagText(2, 1)).toContain("сетка шире входа АЦП");
+    expect(vdivTagText(0.5, 1)).toContain("экранное усиление");
+    expect(vdivTagText(0.01, 1)).toContain("×12.8");
+    expect(vdivTagText(0.01, 1)).toContain("±512 мВ");
+    // Пробник масштабирует и окно, и вход — ярлык честен при ×10.
+    expect(vdivTagText(0.01, 10)).toContain("×12.8");
+    expect(vdivTagText(0.01, 10)).toContain("±5.12 В");
+  });
+
   it("probe ×10 scales volts and the label, keeping the code", () => {
     expect(PROBE_STEPS).toEqual([1, 10]);
     for (const probe of PROBE_STEPS) {
@@ -56,17 +98,12 @@ describe("scale law of the live sweep (Todo 8)", () => {
     expect(effectiveVDiv(5, 1)).toBe(5);
   });
 
-  it("y-axis window is symmetric around zero — stable grid", () => {
-    const [min, max] = yAxisRange(1, 1);
-    expect(min).toBeCloseTo(-max, 12);
-    const [narrowMin, narrowMax] = yAxisRange(0.5, 1);
-    expect(narrowMin).toBeCloseTo(-0.512, 9);
-    expect(narrowMax).toBeCloseTo(0.512, 9);
-  });
-
-  it("formats V/div readouts in volts and millivolts", () => {
+  it("formats V/div and volts readouts in volts and millivolts", () => {
     expect(formatVDiv(5)).toBe("5 В/дел");
     expect(formatVDiv(50)).toBe("50 В/дел");
     expect(formatVDiv(0.5)).toBe("500 мВ/дел");
+    expect(formatVDiv(0.01)).toBe("10 мВ/дел");
+    expect(formatVolts(5.12)).toBe("5.12 В");
+    expect(formatVolts(0.512)).toBe("512 мВ");
   });
 });

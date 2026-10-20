@@ -43,7 +43,7 @@ export function drawCursorLines(self: uPlot, readPositions: () => CursorPosition
   for (const [label, fraction] of timePairs) {
     if (typeof xMin !== "number" || typeof xMax !== "number") continue;
     const xValue = xMin + clampFraction(fraction) * (xMax - xMin);
-    const x = self.valToPos(xValue, "x");
+    const x = self.valToPos(xValue, "x", true);
     ctx.strokeStyle = theme.timeCursor;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
@@ -60,7 +60,7 @@ export function drawCursorLines(self: uPlot, readPositions: () => CursorPosition
     ["V2", positions.v2],
   ];
   for (const [label, volts] of voltPairs) {
-    const y = self.valToPos(volts, "y");
+    const y = self.valToPos(volts, "y", true);
     ctx.strokeStyle = theme.voltCursor;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();

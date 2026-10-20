@@ -149,6 +149,11 @@ export function buildScopeReadoutSection(): ScopeReadoutView {
   };
 }
 
+/** Текст ошибки для честного баннера: message как есть, прочее — строкой. */
+export function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /** Баннер ошибки (role=alert): видимый русский текст, без подавления. */
 export function errorBlock(text: string): HTMLElement {
   return el(

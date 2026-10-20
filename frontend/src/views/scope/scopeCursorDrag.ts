@@ -10,6 +10,7 @@
 
 /** Структурное подмножество uPlot, нужное для hit-теста линий. */
 export interface CursorChartLike {
+  readonly over: HTMLElement;
   readonly bbox: {
     readonly left: number;
     readonly top: number;
@@ -41,9 +42,6 @@ export interface ScopeCursorDragHandle {
 
 /** Полуширина hit-полосы вокруг линии: 44/2. */
 const HIT_PX = 22;
-/** Номинальный домен V-курсоров: ±5 В (в центах слайдера: ±500). */
-const VOLTS_LIMIT = 5;
-
 interface DragTarget {
   kind: "t" | "v";
   slider: HTMLInputElement;
@@ -91,11 +89,14 @@ export function mountScopeCursorDrag(options: ScopeCursorDragOptions): ScopeCurs
     const chart = options.geometry();
     const positions = chart === null ? null : linePositions(chart);
     if (chart === null || positions === null) return null;
+    const rect = chart.over.getBoundingClientRect();
+    const localX = x - rect.left;
+    const localY = y - rect.top;
     const candidates: Array<{ target: DragTarget; distance: number }> = [
-      { target: { kind: "t", slider: sliders.t1 }, distance: Math.abs(x - positions.t1) },
-      { target: { kind: "t", slider: sliders.t2 }, distance: Math.abs(x - positions.t2) },
-      { target: { kind: "v", slider: sliders.v1 }, distance: Math.abs(y - positions.v1) },
-      { target: { kind: "v", slider: sliders.v2 }, distance: Math.abs(y - positions.v2) },
+      { target: { kind: "t", slider: sliders.t1 }, distance: Math.abs(localX - positions.t1) },
+      { target: { kind: "t", slider: sliders.t2 }, distance: Math.abs(localX - positions.t2) },
+      { target: { kind: "v", slider: sliders.v1 }, distance: Math.abs(localY - positions.v1) },
+      { target: { kind: "v", slider: sliders.v2 }, distance: Math.abs(localY - positions.v2) },
     ];
     candidates.sort((a, b) => a.distance - b.distance);
     const best = candidates[0];
@@ -109,7 +110,7 @@ export function mountScopeCursorDrag(options: ScopeCursorDragOptions): ScopeCurs
     dragging = hit;
     last = hit;
     event.preventDefault();
-    figure.focus();
+    figure.focus({ preventScroll: true });
     if (typeof figure.setPointerCapture === "function") {
       try {
         figure.setPointerCapture(event.pointerId);
@@ -123,13 +124,17 @@ export function mountScopeCursorDrag(options: ScopeCursorDragOptions): ScopeCurs
     if (dragging === null) return;
     const chart = options.geometry();
     if (chart === null) return;
+    const rect = chart.over.getBoundingClientRect();
     if (dragging.kind === "t") {
-      const fraction = (event.clientX - chart.bbox.left) / chart.bbox.width;
+      const fraction = (event.clientX - rect.left) / rect.width;
       const clamped = Math.max(0, Math.min(1, fraction));
       writeSlider(dragging, roundToStep(clamped * 1000, dragging.slider));
     } else {
-      const volts = chart.posToVal(event.clientY, "y");
-      const clamped = Math.max(-VOLTS_LIMIT, Math.min(VOLTS_LIMIT, volts));
+      const volts = chart.posToVal(event.clientY - rect.top, "y");
+      const clamped = Math.max(
+        Number(dragging.slider.min) / 100,
+        Math.min(Number(dragging.slider.max) / 100, volts),
+      );
       writeSlider(dragging, roundToStep(clamped * 100, dragging.slider));
     }
   }

@@ -9,8 +9,9 @@
 import type { LiveSaPeak } from "../../api/types-live";
 import type { ChartPeak } from "../../components/charts/types";
 import { el } from "../../components/primitives/dom";
+import { peakRow, tableHead } from "./saMarkerRows";
 import { SaMarkers, peaksFromSweep } from "./saMarkers";
-import type { SaMarker, SaMarkerRejectReason } from "./saMarkers";
+import type { SaMarkerRejectReason } from "./saMarkers";
 import type { SaMarkerLine } from "./saSpectrum";
 import type { SaTraceStore } from "./saTraceStore";
 import { formatDb, formatHz } from "./saUnits";
@@ -31,6 +32,7 @@ export interface SaMarkerPanelDeps {
   sweepPeaks(): readonly LiveSaPeak[];
   /** Перерисовка спектра после смены маркеров/подсветки. */
   rerender(): void;
+  redraw?(): void;
 }
 
 export interface SaMarkerPanelView {
@@ -44,42 +46,15 @@ export interface SaMarkerPanelView {
   peakHighlight(): readonly ChartPeak[];
   /** Клик по полю графика: постановка маркера с отсчётом. */
   placeMarker(frequencyHz: number): void;
-}
-
-function tableHead(labels: readonly string[]): HTMLElement {
-  const head = el("thead");
-  head.append(
-    el(
-      "tr",
-      {},
-      labels.map((label) => el("th", { text: label })),
-    ),
-  );
-  return head;
-}
-
-function markerRow(marker: SaMarker): HTMLElement {
-  return el("tr", { attrs: { "data-sa-marker": String(marker.id) } }, [
-    el("td", { className: "lnt-sa-marker-tag", text: `M${marker.id}` }),
-    el("td", { text: formatHz(marker.frequencyHz) }),
-    el("td", { text: formatDb(marker.levelDb) }),
-  ]);
-}
-
-function peakRow(peak: LiveSaPeak): HTMLElement {
-  return el("tr", {}, [
-    el("td", { text: formatHz(peak.frequency_hz) }),
-    el("td", { text: formatDb(peak.level_db) }),
-    el("td", { text: formatDb(peak.prominence_db) }),
-    el("td", {
-      text:
-        peak.q_factor === null || !Number.isFinite(peak.q_factor) ? "—" : peak.q_factor.toFixed(2),
-    }),
-  ]);
+  selectMarker(id: number): void;
+  moveMarker(id: number, frequencyHz: number): void;
+  removeMarker(id: number): void;
+  refreshFromStore(): void;
 }
 
 export function buildSaMarkerPanel(deps: SaMarkerPanelDeps): SaMarkerPanelView {
   const markers = new SaMarkers();
+  let selected: number | null = null;
   let highlight: readonly ChartPeak[] = [];
 
   const peakSearchButton = el("button", {
@@ -121,6 +96,7 @@ export function buildSaMarkerPanel(deps: SaMarkerPanelDeps): SaMarkerPanelView {
   });
   const markerTable = el("table", { className: "lnt-sa-table", attrs: { "data-sa-markers": "" } });
   markerTable.append(tableHead(["Маркер", "Частота", "Уровень, дБ"]));
+  markerTable.querySelector("thead tr")?.append(el("th", { attrs: { "aria-label": "Удалить" } }));
   const markerBody = el("tbody");
   markerTable.append(markerBody);
   markerTable.hidden = true;
@@ -138,7 +114,53 @@ export function buildSaMarkerPanel(deps: SaMarkerPanelDeps): SaMarkerPanelView {
 
   function applyMarkers(): void {
     const list = markers.list();
-    markerBody.replaceChildren(...list.map(markerRow));
+    markerBody.replaceChildren(
+      ...list.map((marker) => {
+        const select = el("button", {
+          className: "lnt-sa-marker-select",
+          text: `M${marker.id}`,
+          attrs: {
+            type: "button",
+            "aria-pressed": String(marker.id === selected),
+            "aria-label": `Выбрать M${marker.id}`,
+          },
+        });
+        select.addEventListener("click", () => view.selectMarker(marker.id));
+        const frequency = el("input", {
+          className: "lnt-sa-marker-frequency",
+          attrs: {
+            type: "number",
+            min: "0",
+            step: "any",
+            value: String(marker.frequencyHz),
+            "aria-label": `Частота M${marker.id}, Гц`,
+          },
+        });
+        frequency.hidden = marker.id !== selected;
+        frequency.addEventListener("change", () => {
+          const value = Number(frequency.value);
+          if (frequency.value.trim() !== "" && Number.isFinite(value))
+            view.moveMarker(marker.id, value);
+        });
+        const text = el("span", { text: formatHz(marker.frequencyHz) });
+        text.hidden = marker.id === selected;
+        const remove = el("button", {
+          className: "lnt-sa-marker-remove",
+          text: "×",
+          attrs: {
+            type: "button",
+            "aria-label": `Удалить M${marker.id}`,
+          },
+        });
+        remove.addEventListener("click", () => view.removeMarker(marker.id));
+        return el("tr", { attrs: { "data-sa-marker": String(marker.id) } }, [
+          el("td", { className: "lnt-sa-marker-tag" }, [select]),
+          el("td", {}, [text, frequency]),
+          el("td", { attrs: { "data-marker-level": "" }, text: formatDb(marker.levelDb) }),
+          el("td", {}, [remove]),
+        ]);
+      }),
+    );
     markerEmpty.hidden = list.length > 0;
     markerTable.hidden = list.length === 0;
     notice.hidden = true;
@@ -164,12 +186,49 @@ export function buildSaMarkerPanel(deps: SaMarkerPanelDeps): SaMarkerPanelView {
     markersClear: clearButton,
     markerLines(): readonly SaMarkerLine[] {
       return markers.list().map((marker) => ({
+        id: marker.id,
         frequencyHz: marker.frequencyHz,
         label: `M${marker.id}`,
+        selected: marker.id === selected,
       }));
     },
     peakHighlight(): readonly ChartPeak[] {
       return highlight;
+    },
+    selectMarker(id): void {
+      selected = id;
+      applyMarkers();
+      (deps.redraw ?? deps.rerender)();
+    },
+    moveMarker(id, frequencyHz): void {
+      const freq = deps.store.freq();
+      const clear = deps.store.trace("clear");
+      markers.move(
+        id,
+        freq === null || clear === null ? null : { freq, psdDb: clear },
+        frequencyHz,
+      );
+      selected = id;
+      applyMarkers();
+      (deps.redraw ?? deps.rerender)();
+    },
+    removeMarker(id): void {
+      markers.remove(id);
+      if (selected === id) selected = null;
+      applyMarkers();
+      (deps.redraw ?? deps.rerender)();
+    },
+    refreshFromStore(): void {
+      const freq = deps.store.freq();
+      const clear = deps.store.trace("clear");
+      if (freq === null || clear === null) return;
+      markers.refresh({ freq, psdDb: clear });
+      for (const marker of markers.list()) {
+        const level = markerBody.querySelector(
+          `[data-sa-marker="${marker.id}"] [data-marker-level]`,
+        );
+        if (level !== null) level.textContent = formatDb(marker.levelDb);
+      }
     },
     placeMarker(frequencyHz: number): void {
       const freq = deps.store.freq();

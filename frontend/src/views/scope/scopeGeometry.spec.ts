@@ -177,10 +177,14 @@ test("задача 21: меню захвата — overlay, полоса не р
   expect(audit.small, `мелкие цели меню: ${audit.small.join("; ")}`).toEqual([]);
 
   // Пункт меню пишет то же поле, что и полоса: staged-маркер + честный слот.
-  await page.locator('.lnt-live-capture-menu [data-menu-row="vdiv"] [data-menu-value="1"]').click();
+  // Дефолт В/дел = 1: staged-цель — соседний шаг 0.5 (иначе цель совпадает
+  // с применённой и маркер честно не появляется).
+  await page
+    .locator('.lnt-live-capture-menu [data-menu-row="vdiv"] [data-menu-value="0.5"]')
+    .click();
   const mark = page.locator('[data-live-mark="vdiv"]');
   await expect(mark).toBeVisible();
-  await expect(mark).toHaveText("→ 1 В/дел");
+  await expect(mark).toHaveText("→ 500 мВ/дел");
   await expect(page.locator("[data-slot='rate']")).toHaveText("8 МГц");
 
   // Esc закрывает stateless: маркер остаётся staged-целью, панель скрыта.
@@ -193,7 +197,7 @@ test("задача 21: меню захвата — overlay, полоса не р
   await expect(panel).toBeVisible();
   await expect(
     page.locator('.lnt-live-capture-menu [data-menu-row="vdiv"] button[aria-pressed="true"]'),
-  ).toHaveAttribute("data-menu-value", "1");
+  ).toHaveAttribute("data-menu-value", "0.5");
 });
 
 /** Задача 16 (GATE A 2026-10-18): математ-трасса CH1−CH2 — тумблер в ИЗМЕР
@@ -284,7 +288,8 @@ test("задача 17: пресеты — диалог из меню захва�
   await expect(dialog).toBeHidden();
 
   // Снимок с ЦЕЛЬЮ В/дел 1 (запущено 5): цель ≠ применённое — staged-семантика.
-  await page.locator('#lnt-scope-vdiv [data-value="1"]').click();
+  await page.locator("#lnt-scope-vdiv .lnt-live-chip-btn").click();
+  await page.locator('#lnt-scope-vdiv [data-value="2"]').click();
   await page.locator('[data-action="capture"] .lnt-live-capture-btn').click();
   await page.locator("[data-presets-open]").click();
   await expect(dialog).toBeVisible();
@@ -295,14 +300,15 @@ test("задача 17: пресеты — диалог из меню захва�
 
   // Вернулись к применённому 5, применили пресет: цель 1 ≠ применённое 5 —
   // staged-маркер «применится при следующем запуске», без перезапуска.
-  await page.locator('#lnt-scope-vdiv [data-value="5"]').click();
+  await page.locator("#lnt-scope-vdiv .lnt-live-chip-btn").click();
+  await page.locator('#lnt-scope-vdiv [data-value="1"]').click();
   await page.locator('[data-action="capture"] .lnt-live-capture-btn').click();
   await page.locator("[data-presets-open]").click();
   await expect(dialog).toBeVisible();
   await page.locator('[data-preset-name="рабочий-1"] [data-presets-apply]').click();
   const mark = page.locator('[data-live-mark="vdiv"]');
   await expect(mark).toBeVisible();
-  await expect(mark).toHaveText("→ 1 В/дел");
+  await expect(mark).toHaveText("→ 2 В/дел");
 
   // Диалог закрылся после применения; повторное открытие + Esc — stateless.
   await expect(dialog).toBeHidden();
@@ -343,7 +349,7 @@ test("задача 19: edge-drag В/дел — кромка, детенты, а�
   await page.mouse.move(x, box!.y + 5);
   const ghost = page.locator(".lnt-scope-edge-ghost");
   await expect(ghost).toBeVisible();
-  await expect(ghost).toContainText("В/дел 5");
+  await expect(ghost).toContainText("1 В/дел");
   const motion = await page.evaluate(() => {
     const el = document.querySelector<HTMLElement>(".lnt-scope-edge-ghost");
     if (el === null) return { duration: "?", animation: "?" };
@@ -359,7 +365,7 @@ test("задача 19: edge-drag В/дел — кромка, детенты, а�
   await page.mouse.up();
   const mark = page.locator('[data-live-mark="vdiv"]');
   await expect(mark).toBeVisible();
-  await expect(mark).toHaveText("→ 1 В/дел");
+  await expect(mark).toHaveText("→ 500 мВ/дел");
 
   // Арбитраж: линия триггера у верхней кромки не тянется (кромка выше).
   const line = page.locator(".lnt-scope-trig-line");
@@ -377,7 +383,7 @@ test("задача 19: edge-drag В/дел — кромка, детенты, а�
   // Уровень триггера не сдвинулся (линия не получила жест), В/дел — 0.5
   // (формат эха — 500 мВ/дел: тот же форматтер, что в зоне ВЕРТ).
   expect(await page.locator("#lnt-scope-level").inputValue()).toBe(levelTop);
-  await expect(mark).toHaveText("→ 500 мВ/дел");
+  await expect(mark).toHaveText("→ 200 мВ/дел");
 
   // Линия ниже кромки тянется как раньше: уровень меняется.
   const lineTopBox = await line.boundingBox();

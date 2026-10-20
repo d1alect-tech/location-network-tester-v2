@@ -1,11 +1,12 @@
 /** Чтение и программное применение манифест-контролов полосы «Осциллограф»
  * (задача 15, зона-карта §8.11): значения читаются из ЖИВОГО DOM (нажатые
- * сегменты, staged-цель/применённое значение чипа частоты, поле уровня), а
+ * сегменты, staged-цель/применённое значение чипа, поле уровня), а
  * применяются ТОЛЬКО через живые слушатели листьев (клик сегментов и опции
- * частоты, change поля уровня) — хэндлы листьев замкнуты в воркспейсе,
- * это паттерн «слушатели живы», не дублирование логики. Хэндлы для
- * автосета/сброса (scopeAutoset/scopeReset): эхо называет только реально
- * изменённое. */
+ * чипа/частоты, change поля уровня) — хэндлы листьев замкнуты в воркспейсе,
+ * это паттерн «слушатели живы», не дублирование логики. В/дел — чип
+ * (директива 2026-10-19): чтение по семантике чипа, как у частоты.
+ * Хэндлы для автосета/сброса (scopeAutoset/scopeReset): эхо называет только
+ * реально изменённое. */
 
 import type { LiveTriggerMode, LiveTriggerSlope, LiveTriggerSource } from "../../api/types-live";
 
@@ -63,9 +64,9 @@ function pressedAttr(host: HTMLElement, attr: string): string | null {
   return button?.getAttribute(attr) ?? null;
 }
 
-/** Текущая частота: staged-цель (опция с меткой «→») или применённое
- * (aria-selected) — то, что уйдёт со следующим Run. */
-function currentRateHz(host: HTMLElement): number | null {
+/** Значение чипа (В/дел, частота): staged-цель (опция с меткой «→») или
+ *  применённое (aria-selected) — то, что уйдёт со следующим Run. */
+function chipValue(host: HTMLElement): number | null {
   const marked = host.querySelector<HTMLElement>(".lnt-live-opt-mark:not([hidden])");
   const target = marked?.closest("[role='option']")?.getAttribute("data-value");
   const applied = host.querySelector("[aria-selected='true']")?.getAttribute("data-value");
@@ -75,13 +76,13 @@ function currentRateHz(host: HTMLElement): number | null {
 }
 
 export function readScopeControlState(hosts: ScopeControlHosts): ScopeControlState {
-  const vdiv = Number(pressedAttr(hosts.vdiv, "data-value"));
+  const vdiv = chipValue(hosts.vdiv);
   const probe = Number(pressedAttr(hosts.probe, "data-value"));
   const level = Number(hosts.level.value);
   return {
-    vdiv: Number.isFinite(vdiv) ? vdiv : undefined,
+    vdiv: vdiv === null ? undefined : vdiv,
     probe: Number.isFinite(probe) ? probe : undefined,
-    rateHz: currentRateHz(hosts.rate) ?? undefined,
+    rateHz: chipValue(hosts.rate) ?? undefined,
     levelV: hosts.level.value.trim() === "" || !Number.isFinite(level) ? undefined : level,
     mode: (pressedAttr(hosts.mode, "data-trigger-mode") as LiveTriggerMode | null) ?? undefined,
     source:

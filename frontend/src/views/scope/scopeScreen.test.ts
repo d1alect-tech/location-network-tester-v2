@@ -7,6 +7,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import type { LiveFramePayload } from "../../api/types-live";
+import { DEFAULT_SCOPE_SETTINGS } from "./scopeScale";
 import { SCOPE_PERSISTENCE_STORAGE_KEY, buildScopeScreen } from "./scopeScreen";
 
 function frame(index: number): LiveFramePayload {
@@ -59,10 +60,11 @@ describe("buildScopeScreen: панель экрана (Todo 11)", () => {
   it("кадры растят ползунок истории и подпись живого кадра", () => {
     const screen = buildScopeScreen();
     const note = screen.root.querySelector(".lnt-scope-screen-note") as HTMLElement;
+    const settings = { ...DEFAULT_SCOPE_SETTINGS };
 
-    screen.applyFrame(frame(1));
-    screen.applyFrame(frame(2));
-    screen.applyFrame(frame(3));
+    screen.applyFrame(frame(1), settings);
+    screen.applyFrame(frame(2), settings);
+    screen.applyFrame(frame(3), settings);
 
     const slider = screen.root.querySelector("#lnt-scope-history") as HTMLInputElement;
     expect(slider.max).toBe("2");
@@ -74,7 +76,8 @@ describe("buildScopeScreen: панель экрана (Todo 11)", () => {
 
   it("прокрутка назад показывает прошлый кадр; «Живой» возвращает текущий", () => {
     const screen = buildScopeScreen();
-    for (const i of [1, 2, 3, 4, 5]) screen.applyFrame(frame(i));
+    const settings = { ...DEFAULT_SCOPE_SETTINGS };
+    for (const i of [1, 2, 3, 4, 5]) screen.applyFrame(frame(i), settings);
     const note = screen.root.querySelector(".lnt-scope-screen-note") as HTMLElement;
     const slider = screen.root.querySelector("#lnt-scope-history") as HTMLInputElement;
     const live = screen.root.querySelector("#lnt-scope-live") as HTMLButtonElement;
@@ -118,14 +121,15 @@ describe("buildScopeScreen: панель экрана (Todo 11)", () => {
 
   it("кадры продолжают писаться в историю, пока экран прокручен назад", () => {
     const screen = buildScopeScreen();
-    for (const i of [1, 2, 3]) screen.applyFrame(frame(i));
+    const settings = { ...DEFAULT_SCOPE_SETTINGS };
+    for (const i of [1, 2, 3]) screen.applyFrame(frame(i), settings);
     const slider = screen.root.querySelector("#lnt-scope-history") as HTMLInputElement;
     slider.value = "2";
     slider.dispatchEvent(new Event("input", { bubbles: true }));
 
     // When: живые кадры продолжают приходить.
-    screen.applyFrame(frame(4));
-    screen.applyFrame(frame(5));
+    screen.applyFrame(frame(4), settings);
+    screen.applyFrame(frame(5), settings);
 
     // Then: ползунок дорос до 4 кадров, экран остаётся на кадре 1.
     expect(slider.max).toBe("4");

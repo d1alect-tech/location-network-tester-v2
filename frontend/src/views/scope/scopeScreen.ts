@@ -13,11 +13,11 @@ import { createLiveSeg } from "../../components/liveStrip/liveSeg";
 import { el } from "../../components/primitives/dom";
 import { ScopeHistory } from "./scopeHistory";
 import { ScopePersistence } from "./scopePersistence";
+import { DEFAULT_SCOPE_SETTINGS, windowHalfVolts } from "./scopeScale";
+import type { ScopeDisplaySettings } from "./scopeScale";
 import { paintScopePersistence, paintScopeTrace } from "./scopeScreenPaint";
 
 export const SCOPE_PERSISTENCE_STORAGE_KEY = "lnt.scope.persistence";
-/** Полный размах экрана по вертикали, В: ±5 — дефолт live-старта. */
-export const SCOPE_VOLTS_SPAN = 10;
 
 export interface ScopeScreenHandle {
   readonly root: HTMLElement;
@@ -31,7 +31,9 @@ export interface ScopeScreenHandle {
   readonly live: HTMLButtonElement;
   /** Тумблер послесвечения (#lnt-scope-persist) — хост полосы (ре-парент). */
   readonly persist: HTMLElement;
-  applyFrame(frame: LiveFramePayload): void;
+  applyFrame(frame: LiveFramePayload, settings: ScopeDisplaySettings): void;
+  /** Экранные настройки (В/дел/пробник/нулевые линии): перерисовка истории. */
+  applySettings(settings: ScopeDisplaySettings): void;
   isPersistenceOn(): boolean;
   historyOffset(): number;
   dispose(): void;
@@ -135,6 +137,7 @@ export function buildScopeScreen(): ScopeScreenHandle {
   const history = new ScopeHistory();
   const persistence = new ScopePersistence();
   let offset = 0;
+  let settings: ScopeDisplaySettings = { ...DEFAULT_SCOPE_SETTINGS };
 
   function applyNote(): void {
     const frame = history.view(offset);
@@ -149,7 +152,7 @@ export function buildScopeScreen(): ScopeScreenHandle {
   }
 
   function repaintTrace(): void {
-    paintScopeTrace(traceCanvas, history.view(offset), SCOPE_VOLTS_SPAN);
+    paintScopeTrace(traceCanvas, history.view(offset), settings);
   }
 
   function applyOffset(next: number): void {
@@ -165,7 +168,8 @@ export function buildScopeScreen(): ScopeScreenHandle {
     applyNote();
   }
 
-  function applyFrame(frame: LiveFramePayload): void {
+  function applyFrame(frame: LiveFramePayload, next: ScopeDisplaySettings): void {
+    settings = next;
     history.push(frame);
     slider.max = String(Math.max(0, history.frameCount() - 1));
     if (offset > 0) {
@@ -174,13 +178,30 @@ export function buildScopeScreen(): ScopeScreenHandle {
     }
     repaintTrace();
     if (persistenceOn) {
-      const halfSpan = SCOPE_VOLTS_SPAN / 2;
+      const halfSpan = windowHalfVolts(settings.vDiv, settings.probe);
       persistence.decay();
-      persistence.pushChannel(frame.ch1.time_s, frame.ch1.voltage_v, -halfSpan, halfSpan);
-      persistence.pushChannel(frame.ch2.time_s, frame.ch2.voltage_v, -halfSpan, halfSpan);
+      persistence.pushChannel(
+        frame.ch1.time_s,
+        frame.ch1.voltage_v.map((v) => v * (settings.invertCh1 ? -1 : 1) + settings.groundCh1V),
+        -halfSpan,
+        halfSpan,
+      );
+      persistence.pushChannel(
+        frame.ch2.time_s,
+        frame.ch2.voltage_v.map((v) => v * (settings.invertCh2 ? -1 : 1) + settings.groundCh2V),
+        -halfSpan,
+        halfSpan,
+      );
       paintScopePersistence(persistenceCanvas, persistence);
     }
     applyNote();
+  }
+
+  function applySettings(next: ScopeDisplaySettings): void {
+    settings = next;
+    persistence.clear();
+    repaintTrace();
+    if (persistenceOn) paintScopePersistence(persistenceCanvas, persistence);
   }
 
   slider.addEventListener("input", () => {
@@ -206,6 +227,7 @@ export function buildScopeScreen(): ScopeScreenHandle {
     live: liveButton,
     persist: persistSeg.root,
     applyFrame,
+    applySettings,
     isPersistenceOn: () => persistenceOn,
     historyOffset: () => offset,
     dispose: () => observer?.disconnect(),

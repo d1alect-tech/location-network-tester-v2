@@ -79,6 +79,7 @@ export function mountLiveStrip(zones: readonly LiveStripZoneDesc[]): LiveStripHa
     return lines[n - 1] as HTMLElement;
   };
   const hosts = new Map<string, HTMLElement>();
+  const notes: HTMLElement[] = [];
 
   function buildGroup(group: LiveStripGroupDesc): HTMLElement {
     const attrs: Record<string, string> = {};
@@ -127,7 +128,7 @@ export function mountLiveStrip(zones: readonly LiveStripZoneDesc[]): LiveStripHa
       for (const group of row.groups) prow.append(buildGroup(group));
       part.append(prow);
       if (row.note !== undefined) {
-        part.append(
+        notes.push(
           el("p", {
             className: "lnt-live-zone-note",
             text: row.note,
@@ -144,6 +145,7 @@ export function mountLiveStrip(zones: readonly LiveStripZoneDesc[]): LiveStripHa
     className: "lnt-live-bandstatus",
     attrs: { "data-band-status": "" },
   });
+  statusZone.append(...notes);
   root.append(statusZone);
 
   return {

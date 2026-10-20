@@ -12,19 +12,22 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mountScopeCursorDrag } from "./scopeCursorDrag";
 
 const BBOX = { left: 40, top: 10, width: 360, height: 240 };
+const over = document.createElement("div");
+over.getBoundingClientRect = () => new DOMRect(40, 10, 360, 240);
 
 /** Фальшивая геометрия: окно X 0..2 мс, домен Y ±5 В, bbox 40/10/360/240 —
  * те же пропорции, что у фальшивого uPlot в scopeCursorSection.test. */
 const GEOMETRY = {
   bbox: BBOX,
+  over,
   scales: { x: { min: 0, max: 0.002 } },
   valToPos: (value: number, scale: string): number => {
-    if (scale === "x") return 40 + (value / 0.002) * 360;
-    return 10 + 240 * (0.5 - value / 10);
+    if (scale === "x") return (value / 0.002) * 360;
+    return 240 * (0.5 - value / 10);
   },
   posToVal: (pixel: number, scale: string): number => {
-    if (scale === "x") return ((pixel - 40) / 360) * 0.002;
-    return (0.5 - (pixel - 10) / 240) * 10;
+    if (scale === "x") return (pixel / 360) * 0.002;
+    return (0.5 - pixel / 240) * 10;
   },
 };
 

@@ -307,6 +307,27 @@ def test_start_takes_ownership_and_configures_the_device_once() -> None:
     assert rig.service.sample_rate_hz == RATE_HZ
 
 
+def test_ch2_gain_and_volts_follow_ch1_range_for_a_shared_axis() -> None:
+    """Директива владельца 2026-10-19: экран делит ось Y — гейн-код CH2 следует за CH1.
+
+    Фейк даёт сеть ±75 LSB на CH2 независимо от кода: при коде 5 это ±0,6 В
+    в тех же вольтах на деление, что и CH1 (старое поведение рисовало CH2
+    в масштабе ±5 В на оси CH1).
+    """
+    rig = _rig(ch1_range_v=1.0)
+    rig.service.start()
+
+    assert (rig.scope.ch1_range_code, rig.scope.ch2_range_code) == (5, 5)
+    rig.pump(1)
+    assert rig.sink.frames
+    # Фейк эмулирует аппаратный гейн: вход ±3 В шире шкалы кода 5 (±1,024 В),
+    # АЦП в рельсах (raw 255). Вольты CH2 считаются КОДОМ 5: рельс — 1,016 В,
+    # а не 5,08 В старого закона (код 1 на CH2).
+    lsb5 = 5.12 / (5 << 7)
+    narrow = rig.sink.frames[0].ch2
+    assert float(narrow.max()) == pytest.approx((255 - 128) * lsb5, rel=1e-5)
+
+
 def test_poll_before_start_is_an_input_error() -> None:
     rig = _rig()
 

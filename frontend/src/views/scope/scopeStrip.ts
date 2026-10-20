@@ -35,9 +35,10 @@ import type { ScopeControlHosts } from "./scopeControlState";
 import { applyScopeControlTargets, readScopeControlState } from "./scopeControlState";
 import { mountScopeCursorDrag } from "./scopeCursorDrag";
 import { mountScopeEdgeDrag } from "./scopeEdgeDrag";
+import { mountScopeGroundLine } from "./scopeGroundLine";
 import { buildMathTraceToggle } from "./scopeMathTrace";
 import { mountScopeReset } from "./scopeReset";
-import { VDIV_STEPS } from "./scopeScale";
+import { VDIV_STEPS, windowHalfVolts } from "./scopeScale";
 import { mountScopeStatus } from "./scopeStatus";
 import { SCOPE_STRIP_ZONES } from "./scopeStripManifest";
 import { TRIGGER_LEVEL_LIMIT_V } from "./scopeTrigger";
@@ -119,12 +120,41 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
   strip.groupHost("trigState").append(status.trigState);
   statusZone.append(status.stagedLine);
 
-  // Задача 15. Экран: линия триггера — DOM-оверлей ±5 В, синхронна полю.
+  // Живые хосты контролов: читаются ДО монтажа экранной механики (окно
+  // линии триггера и ручек нулевых линий живёт по staged-В/дел).
+  const controlHosts: ScopeControlHosts = {
+    vdiv: strip.groupHost("vdiv"),
+    probe: strip.groupHost("probe"),
+    rate: strip.groupHost("rate"),
+    level: hosts.level,
+    mode: strip.groupHost("trigmode"),
+    source: strip.groupHost("trigsource"),
+    slope: strip.groupHost("trigslope"),
+  };
+
+  /** Половина окна экрана по живым контролов: staged В/дел + пробник. */
+  const liveWindowHalf = (): number => {
+    const state = readScopeControlState(controlHosts);
+    return windowHalfVolts(state.vdiv ?? VDIV_STEPS[0]!, state.probe ?? 1);
+  };
+
+  // Задача 15. Экран: линия триггера — DOM-оверлей, окно — ±4·В/дел
+  // (директива 2026-10-19), синхронна полю и зоне ВЕРТ полосы.
   const triggerLine = mountScopeTriggerLine({
     viewport: hosts.viewport,
     field: hosts.level,
     live,
+    windowHalfVolts: liveWindowHalf,
   });
+  // Смена В/дел/пробника (клик в зоне ВЕРТ) переставляет линию триггера
+  // и ручки нулевых линий под новое окно: слушатель в bubble-фазе читает
+  // уже обновлённый живой DOM опций чипа/сегмента.
+  for (const host of [strip.groupHost("vdiv"), strip.groupHost("probe")]) {
+    host.addEventListener("click", () => {
+      triggerLine.refresh();
+      groundLine.repaint();
+    });
+  }
 
   // Задача 15. Фигура: drag курсорных линий — геометрия живого uPlot,
   // состояние тумблера; слайдеры — скрытый leftover с живыми слушателями.
@@ -148,17 +178,18 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
     enabled: () => hosts.cursorsView.cursorsOn(),
   });
 
+  // Директива владельца 2026-10-19: ручки нулевых линий каналов «1»/«2» —
+  // drag на левой кромке фигуры развёртки, зажим в окно, сброс двойным
+  // кликом; пишет через мост воркспейса (сдвиг ОТОБРАЖЕНИЯ, не измерений).
+  const groundLine = mountScopeGroundLine({
+    figure: hosts.viewport,
+    read: () => hosts.ground.read(),
+    write: (channel, volts) => hosts.ground.write(channel, volts),
+    windowHalf: liveWindowHalf,
+  });
+
   // Задача 15. ИЗМЕР: автосет (пересчёт по кадру + эхо + перезапуск) и
   // «Сброс» (дефолты манифеста) — живые слушатели листьев, эхо в статус-зоне.
-  const controlHosts: ScopeControlHosts = {
-    vdiv: strip.groupHost("vdiv"),
-    probe: strip.groupHost("probe"),
-    rate: strip.groupHost("rate"),
-    level: hosts.level,
-    mode: strip.groupHost("trigmode"),
-    source: strip.groupHost("trigsource"),
-    slope: strip.groupHost("trigslope"),
-  };
 
   // Задача 16 (GATE A): тумблер математ-трассы CH1−CH2 в ИЗМЕР линии 2 —
   // третья серия стека развёртки (хэндл по фигуре, воркспейс не правится).
@@ -238,6 +269,7 @@ export function mountScopeStrip(container: HTMLElement, options: ScopeStripOptio
     edgeDrag.dispose();
     conflict.dispose();
     cursorDrag.dispose();
+    groundLine.dispose();
     triggerLine.dispose();
     autoset.dispose();
     reset.dispose();

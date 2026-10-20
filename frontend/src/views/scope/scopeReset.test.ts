@@ -1,5 +1,5 @@
 /** Задача 15 RED: «Сброс» — манифест-контролы возвращаются к дефолтам
- * DEFAULT_LIVE_START_REQUEST (В/дел 5, пробник ×1, частота 8 МГц, триггер
+ * DEFAULT_LIVE_START_REQUEST (В/дел 1, пробник ×1, частота 8 МГц, триггер
  * 0 В / авто / CH1 / подъём) ТОЛЬКО через живые слушатели DOM (клик
  * сегментов и опции частоты, change поля уровня); staged-реестр полосы
  * очищается той же дорожкой (клик дефолта = отклонение от baseline
@@ -148,7 +148,7 @@ describe("scopeReset: манифест → дефолт", () => {
     const container = mountTab(log, { state: { ...IDLE } });
     await flush();
     // Уводим всё от дефолтов.
-    button(container, '#lnt-scope-vdiv [data-value="1"]').click();
+    button(container, '#lnt-scope-vdiv [data-value="2"]').click();
     button(container, '#lnt-scope-probe [data-value="10"]').click();
     button(container, "[role='option'][data-value='2000000']").click();
     button(container, '[data-trigger-mode="single"]').click();
@@ -164,7 +164,9 @@ describe("scopeReset: манифест → дефолт", () => {
     await flush();
 
     // Значения == дефолтам манифеста (нажатые сегменты, поле уровня).
-    expect(pressedValue(container, "#lnt-scope-vdiv")).toBe("5");
+    expect(
+      container.querySelector('#lnt-scope-vdiv [aria-selected="true"]')?.getAttribute("data-value"),
+    ).toBe("1");
     expect(pressedValue(container, "#lnt-scope-probe")).toBe("1");
     expect(
       container.querySelector('[data-trigger-mode="auto"]')?.getAttribute("aria-pressed"),

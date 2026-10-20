@@ -15,6 +15,12 @@ import type { ScopeScreenHandle } from "./scopeScreen";
 import type { ScopeStatusView } from "./scopeSections";
 import type { ScopeTriggerView } from "./scopeTrigger";
 
+export interface ScopeGroundBridge {
+  /** Нулевые линии каналов, В: сдвиг отображения (drag ручек «1»/«2»). */
+  read(): { ch1V: number; ch2V: number };
+  write(channel: "ch1" | "ch2", volts: number): void;
+}
+
 export interface ScopeWorkspaceHosts {
   /** Корень воркспейса (.lnt-scope-workspace): полоса вешает класс режима. */
   readonly root: HTMLElement;
@@ -46,6 +52,8 @@ export interface ScopeWorkspaceHosts {
   readonly errorHost: HTMLElement;
   readonly viewport: HTMLElement;
   readonly figure: HTMLElement;
+  /** Нулевые линии каналов: полоса монтирует drag-ручки на фигуре. */
+  readonly ground: ScopeGroundBridge;
 }
 
 export interface ScopeWorkspaceHandle {
@@ -66,6 +74,7 @@ export function scopeHostsFromViews(views: {
   measureRows: MeasureRowState;
   cursors: ScopeCursorView;
   figure: HTMLElement;
+  ground: ScopeGroundBridge;
 }): ScopeWorkspaceHosts {
   const { status, controls, rateField, trigger, screen, measure, measureRows, cursors } = views;
   return {
@@ -94,5 +103,6 @@ export function scopeHostsFromViews(views: {
     errorHost: status.errorHost,
     viewport: screen.viewport,
     figure: views.figure,
+    ground: views.ground,
   };
 }

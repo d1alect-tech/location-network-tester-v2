@@ -61,7 +61,7 @@ function mountStatus(): {
         { value: "5", text: "5" },
         { value: "1", text: "1" },
       ],
-      current: "5",
+      current: "1",
     },
     () => undefined,
   );
@@ -148,21 +148,21 @@ afterEach(() => {
 });
 
 describe("mountScopeStatus: staged-реестр", () => {
-  it("изменил В/дел → маркер «→ 1 В/дел», строка и pendingCount; возврат к базлайну гасит", () => {
+  it("изменил В/дел → маркер, строка и pendingCount; возврат к базлайну гасит", () => {
     const { vdiv, pending } = mountStatus();
     const mark = vdiv.querySelector<HTMLElement>('[data-live-mark="vdiv"]');
     const line = document.querySelector<HTMLElement>("[data-staged-line]");
     expect(mark?.hidden).toBe(true);
 
-    button(vdiv, '[data-value="1"]').click();
+    button(vdiv, '[data-value="5"]').click();
     expect(mark?.hidden).toBe(false);
-    expect(mark?.textContent).toBe("→ 1 В/дел");
+    expect(mark?.textContent).toBe("→ 5 В/дел");
     expect(line?.textContent).toContain("применится при следующем запуске");
-    expect(line?.textContent).toContain("В/дел 1 В/дел");
+    expect(line?.textContent).toContain("В/дел 5 В/дел");
     expect(pending.at(-1)).toBe(1);
 
-    // Возврат к применённому (5) — стейджинг снят честно.
-    button(vdiv, '[data-value="5"]').click();
+    // Возврат к применённому (1) — стейджинг снят честно.
+    button(vdiv, '[data-value="1"]').click();
     expect(mark?.hidden).toBe(true);
     expect(pending.at(-1)).toBe(0);
   });
@@ -180,7 +180,7 @@ describe("mountScopeStatus: staged-реестр", () => {
 
   it("Run (переход в running): маркеры гаснут, baseline принимает staged, чип применён", () => {
     const { emit, vdiv, rate, pending } = mountStatus();
-    button(vdiv, '[data-value="1"]').click();
+    button(vdiv, '[data-value="5"]').click();
     button(rate, ".lnt-live-chip-btn").click();
     button(rate, "[role='option'][data-value='2000000']").click();
     expect(pending.at(-1)).toBe(2);
@@ -191,8 +191,8 @@ describe("mountScopeStatus: staged-реестр", () => {
     expect(pending.at(-1)).toBe(0);
     expect(rate.querySelector("[data-slot='rate']")?.textContent).toBe("2 МГц");
 
-    // После применения 1 В/дел — новый клик «1» не стейджирует (baseline).
-    button(vdiv, '[data-value="1"]').click();
+    // После применения 5 В/дел повторный клик не стейджирует.
+    button(vdiv, '[data-value="5"]').click();
     expect(pending.at(-1)).toBe(0);
   });
 

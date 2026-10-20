@@ -253,14 +253,14 @@ describe("scopeStrip: полоса поверх воркспейса (задач
     const { container } = mountTab(log, { state: { ...IDLE } });
     await flush();
 
-    // When: оператор жмёт сегмент «1» без запуска.
-    button(container, '#lnt-scope-vdiv [data-value="1"]').click();
+    // When: оператор жмёт опцию «2» без запуска.
+    button(container, '#lnt-scope-vdiv [data-value="2"]').click();
     await flush();
 
     // Then: маркировка staged — маркер, строка, бейдж; слот не врёт.
     const mark = container.querySelector<HTMLElement>('[data-live-mark="vdiv"]');
     expect(mark?.hidden).toBe(false);
-    expect(mark?.textContent).toBe("→ 1 В/дел");
+    expect(mark?.textContent).toBe("→ 2 В/дел");
     expect(container.querySelector("[data-staged-line]")?.textContent).toContain(
       "применится при следующем запуске",
     );
@@ -271,7 +271,7 @@ describe("scopeStrip: полоса поверх воркспейса (задач
     // When: запуск применяет staged.
     button(container, "#lnt-scope-run").click();
     await flush();
-    expect(log.starts[0]?.body).toMatchObject({ ch1_range_v: 1 });
+    expect(log.starts[0]?.body).toMatchObject({ ch1_range_v: 5 });
     emitAll("heartbeat", RUNNING);
     await flush();
 
@@ -557,39 +557,39 @@ describe("scopeStrip: задача 17 — пресеты задач (staged-до
     const { container } = mountTab(log, { state: { ...IDLE } });
     await flush();
 
-    // Уходим от дефолтов: В/дел 1, режим «Норм» (на простое — без POST).
-    button(container, '#lnt-scope-vdiv [data-value="1"]').click();
+    // Уходим от дефолтов: В/дел 2, режим «Норм» (на простое — без POST).
+    button(container, '#lnt-scope-vdiv [data-value="2"]').click();
     button(container, '[data-trigger-mode="normal"]').click();
     await flush();
 
-    // Меню захвата → пресеты: сохранить снимок «норм-1».
+    // Меню захвата → пресеты: сохранить снимок «норм-2».
     button(container, '[data-action="capture"] .lnt-live-capture-btn').click();
     await flush();
     button(container, "[data-presets-open]").click();
     await flush();
     const name = container.querySelector<HTMLInputElement>("[data-presets-name]");
     if (name === null) throw new Error("нет поля имени пресета");
-    name.value = "норм-1";
+    name.value = "норм-2";
     name.dispatchEvent(new Event("input", { bubbles: true }));
     button(container, "[data-presets-save]").click();
     await flush();
     expect(container.querySelector<HTMLElement>(".lnt-live-presets")?.hidden).toBe(true);
-    expect(window.localStorage.getItem("lnt.live.presets.v1")).toContain("норм-1");
+    expect(window.localStorage.getItem("lnt.live.presets.v1")).toContain("норм-2");
 
     // Уходим от снимка: В/дел 0.5, режим «Авто».
     button(container, '#lnt-scope-vdiv [data-value="0.5"]').click();
     button(container, '[data-trigger-mode="auto"]').click();
     await flush();
 
-    // Применить «норм-1»: staged-маркер В/дел (1 ≠ стартовый дефолт 5),
+    // Применить «норм-2»: staged-маркер В/дел (2 ≠ стартовый дефолт 1),
     // запуска и мгновенного применения НЕТ (фабрикация запрещена).
     button(container, '[data-action="capture"] .lnt-live-capture-btn').click();
     await flush();
-    button(container, '[data-preset-name="норм-1"] [data-presets-apply]').click();
+    button(container, '[data-preset-name="норм-2"] [data-presets-apply]').click();
     await flush();
     const mark = container.querySelector<HTMLElement>('[data-live-mark="vdiv"]');
     expect(mark?.hidden).toBe(false);
-    expect(mark?.textContent).toBe("→ 1 В/дел");
+    expect(mark?.textContent).toBe("→ 2 В/дел");
     expect(log.starts).toHaveLength(0);
     expect(log.configs).toBe(0);
 
@@ -603,7 +603,7 @@ describe("scopeStrip: задача 17 — пресеты задач (staged-до
     expect(log.configs).toBe(1);
     button(container, '[data-action="capture"] .lnt-live-capture-btn').click();
     await flush();
-    button(container, '[data-preset-name="норм-1"] [data-presets-apply]').click();
+    button(container, '[data-preset-name="норм-2"] [data-presets-apply]').click();
     await flush();
     expect(log.configs).toBe(2);
     // Пресет на ходу не перезапускает захват: запусков по-прежнему один.
@@ -644,16 +644,16 @@ describe("scopeStrip: задача 19 — edge-drag В/дел (staged-эхо)", 
       }),
     );
     move(145);
-    // Эхо в зоне ВЕРТ видно БЕЗ клика: staged-маркер «→ 1 В/дел».
+    // Эхо в зоне ВЕРТ видно БЕЗ клика: applied 1 → детент вниз 500 мВ/дел.
     const mark = container.querySelector<HTMLElement>('[data-live-mark="vdiv"]');
     expect(mark?.hidden).toBe(false);
-    expect(mark?.textContent).toBe("→ 1 В/дел");
+    expect(mark?.textContent).toBe("→ 500 мВ/дел");
     expect(log.starts).toHaveLength(0);
     expect(log.configs).toBe(0);
     // Ghost-репетиция кромки показывает значение детента.
     const ghost = viewport!.querySelector<HTMLElement>(".lnt-scope-edge-ghost");
     expect(ghost?.hidden).toBe(false);
-    expect(ghost?.textContent).toContain("В/дел 1");
+    expect(ghost?.textContent).toContain("500 мВ/дел");
     move(145);
     viewport!.dispatchEvent(
       new MouseEvent("pointerup", {

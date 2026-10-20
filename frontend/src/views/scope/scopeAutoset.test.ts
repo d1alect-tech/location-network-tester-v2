@@ -237,7 +237,7 @@ describe("scopeAutoset: автосет с честным эхом", () => {
     const container = mountTab(log, { state: { ...IDLE } });
     await flush();
     // Уводим В/дел, уровень и фронт от вычисленных целей.
-    button(container, '#lnt-scope-vdiv [data-value="1"]').click();
+    button(container, '#lnt-scope-vdiv [data-value="2"]').click();
     const level = container.querySelector<HTMLInputElement>("#lnt-scope-level");
     if (level === null) throw new Error("нет поля уровня");
     level.value = "2.5";
@@ -250,7 +250,7 @@ describe("scopeAutoset: автосет с честным эхом", () => {
     await flush();
 
     const echo = echoOf(container).textContent ?? "";
-    expect(echo).toContain("В/дел 5");
+    expect(echo).toContain("В/дел 1");
     expect(echo).toContain("уровень 0 В");
     expect(echo).toContain("фронт подъём");
     expect(echo).toContain("частота 1 МГц");

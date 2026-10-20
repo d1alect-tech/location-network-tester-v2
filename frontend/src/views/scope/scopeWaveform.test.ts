@@ -223,9 +223,9 @@ describe("scopeWaveform rendering (Todo 8)", () => {
 
   it("V/div fixes the grid window per the scale law — grid positions", () => {
     const cases: ReadonlyArray<readonly [number, number]> = [
-      [5, 5.12],
-      [1, 1.024],
-      [0.5, 0.512],
+      [5, 20],
+      [1, 4],
+      [0.5, 2],
     ];
     for (const [vDiv, half] of cases) {
       const { wave, chart } = mountWave();
@@ -257,8 +257,8 @@ describe("scopeWaveform rendering (Todo 8)", () => {
     const { wave, chart } = mountWave();
     wave.applyFrame(frame(1), { ...DEFAULT_SCOPE_SETTINGS, probe: 10 });
     const [min, max] = chart.requests.at(-1)?.yRange ?? [Number.NaN, Number.NaN];
-    expect(max).toBeCloseTo(51.2, 9);
-    expect(min).toBeCloseTo(-51.2, 9);
+    expect(max).toBeCloseTo(40, 9);
+    expect(min).toBeCloseTo(-40, 9);
   });
 
   it("grid is stable between frames and moves only with V/div", () => {
@@ -271,7 +271,7 @@ describe("scopeWaveform rendering (Todo 8)", () => {
     expect(second?.yRange).toEqual(first?.yRange);
     expect(second?.xRange).toEqual(first?.xRange);
 
-    wave.applyFrame(frame(3, series(32, 3.1)), { ...DEFAULT_SCOPE_SETTINGS, vDiv: 1 });
+    wave.applyFrame(frame(3, series(32, 3.1)), { ...DEFAULT_SCOPE_SETTINGS, vDiv: 2 });
     const third = chart.requests[2];
     expect(third?.yRange).not.toEqual(second?.yRange);
     expect(third?.xRange).toEqual(second?.xRange);
@@ -319,7 +319,7 @@ describe("scopeWorkspace wiring (Todo 8)", () => {
     await flush();
 
     expect(log.starts).toHaveLength(1);
-    expect(log.starts[0]?.body).toMatchObject({ ch1_range_v: 1, ch1_probe_multiplier: 10 });
+    expect(log.starts[0]?.body).toMatchObject({ ch1_range_v: 5, ch1_probe_multiplier: 10 });
   });
 
   it("probe 1×/10× scales the effective V/div readout label", async () => {
@@ -327,11 +327,11 @@ describe("scopeWorkspace wiring (Todo 8)", () => {
     await flush();
 
     const label = container.querySelector(".lnt-scope-vdiv-effective");
-    expect(label?.textContent).toContain("5 В/дел");
+    expect(label?.textContent).toContain("1 В/дел");
 
     pickSegment(container, "#lnt-scope-probe", "10");
     await flush();
-    expect(label?.textContent).toContain("50 В/дел");
+    expect(label?.textContent).toContain("10 В/дел");
   });
 
   it("SSE frames reach the chart; a V/div change re-renders the last frame", async () => {

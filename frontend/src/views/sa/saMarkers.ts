@@ -113,6 +113,32 @@ export class SaMarkers {
     this.items.length = 0;
   }
 
+  move(id: number, trace: SaMarkerTrace | null, frequencyHz: number): void {
+    const index = this.items.findIndex((marker) => marker.id === id);
+    const readout = trace === null ? null : readoutDbAt(trace.freq, trace.psdDb, frequencyHz);
+    if (index < 0 || readout === null) return;
+    this.items[index] = { id, ...readout };
+  }
+
+  remove(id: number): void {
+    const index = this.items.findIndex((marker) => marker.id === id);
+    if (index >= 0) this.items.splice(index, 1);
+  }
+
+  refresh(trace: SaMarkerTrace): void {
+    const min = trace.freq[0] ?? Number.NaN;
+    const max = trace.freq[trace.freq.length - 1] ?? Number.NaN;
+    for (let i = 0; i < this.items.length; i += 1) {
+      const marker = this.items[i];
+      if (marker === undefined) continue;
+      const readout =
+        marker.frequencyHz < min || marker.frequencyHz > max
+          ? null
+          : readoutDbAt(trace.freq, trace.psdDb, marker.frequencyHz);
+      this.items[i] = { ...marker, levelDb: readout?.levelDb ?? Number.NaN };
+    }
+  }
+
   list(): readonly SaMarker[] {
     return [...this.items];
   }

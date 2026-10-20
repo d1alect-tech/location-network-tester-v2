@@ -2,10 +2,11 @@
 
 Последовательность настройки повторяет ``scope_io._configure_scope``: имя там
 приватное и без ``__all__``, поэтому импорт не проходит basedpyright
-(``reportPrivateUsage``), а модуль ``scope_io`` эта очередь не правит. Держим
-зеркало здесь: bulk alt 0 (WinUSB отверг iso на железе 2026-07-26), два канала,
-код частоты, диапазон CH1 и зафиксированные +-5 В на CH2 (трансформатор 230:6).
-Изменение там обязано быть повторено здесь.
+(``reportPrivateUsage``), а модуль ``scope_io`` эта очередь не правит. Отличие
+живой вкладки (директива владельца 2026-10-19): гейн-код CH2 следует за
+кодом CH1 — экран развёртки делит одну ось Y между каналами, одно В/дел
+на пару. Job-захват (``scope_io``, трансформаторная опора 230:6 на CH2)
+остаётся на зафиксированных ±5 В и это расхождение — намеренное.
 """
 
 import math
@@ -16,7 +17,7 @@ import numpy as np
 from lnt.adc_calibration import AdcCalibration, apply_adc_calibration
 from lnt.errors import DeviceNotFoundError, InputError
 from lnt.instrument.frames import Float32Array
-from lnt.scope_io import CHANNEL_COUNT, MAX_POLL_TIMEOUT_MS, RANGE_CODE_5V, ScopeProtocol
+from lnt.scope_io import CHANNEL_COUNT, MAX_POLL_TIMEOUT_MS, ScopeProtocol
 
 # Окно ``poll`` драйвера: 1..250 мс (``scope_io`` проверяет те же границы).
 MIN_POLL_TIMEOUT_MS: Final = 1
@@ -34,7 +35,7 @@ def configure_scope(scope: ScopeProtocol, *, rate_code: int, ch1_range_code: int
     scope.set_num_channels(CHANNEL_COUNT)
     scope.set_sample_rate(rate_code)
     scope.set_ch1_voltage_range(ch1_range_code)
-    scope.set_ch2_voltage_range(RANGE_CODE_5V)
+    scope.set_ch2_voltage_range(ch1_range_code)
 
 
 def validated_poll_timeout_ms(poll_timeout_ms: int) -> int:

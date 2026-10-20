@@ -30,6 +30,7 @@ import { BW_FILTER_HINT, BW_MODE_TEXT, type BwFilterMode, filterLiveFrame } from
 import { mathDiffVolts, mathTagText, mathTraceSeries, mathVppV } from "./scopeMathTrace";
 import type { PersistenceMode } from "./scopePersistence";
 import { yAxisRange } from "./scopeScale";
+import { vdivTagText } from "./scopeScale";
 import type { ScopeDisplaySettings } from "./scopeScale";
 import { type WaveData, buildWaveData } from "./scopeWaveData";
 import { createPersistenceTag, mountWavePersistence } from "./scopeWavePersistence";
@@ -86,6 +87,12 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
     className: "t-compact lnt-scope-wave-tag",
     attrs: { "data-wave-bw": "full", hidden: "" },
   });
+  // Директива владельца 2026-10-19: ярлык честности вертикали — экранные
+  // В/дел против входа АЦП (усиление ≥2× или сетка шире входа).
+  const vdivTag = el("p", {
+    className: "t-compact lnt-scope-wave-tag",
+    attrs: { "data-wave-vdiv": "", hidden: "" },
+  });
   // Задача 22: оверлей послесвечения — канвас ПОСЛЕ корня графика в DOM
   // (красится поверх), pointer-events: none — курсор/drag не задет.
   const persistOverlay = mountWavePersistence(figure);
@@ -95,10 +102,11 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
     className: "t-compact lnt-scope-wave-tag",
     attrs: { "data-wave-math": "off", hidden: "" },
   });
-  // Ряд состояния: ярлыки режимов (задачи 16/22/24) + статус кадра.
+  // Ряд состояния: ярлыки режимов (задачи 16/22/24 + вертикаль) + статус кадра.
   const meta = el("div", { className: "lnt-scope-wave-meta" }, [
     mathTag,
     bwTag,
+    vdivTag,
     persistTag.root,
     status,
   ]);
@@ -158,9 +166,12 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
       { label: "CH1", values: data.ch1, color: theme.accentA, marker: MARKER_A },
       { label: "CH2", values: data.ch2, color: theme.accentB, dash: CH2_DASH, marker: MARKER_B },
     ];
-    // Задача 16: разность отображаемых рядов — третья серия того же стека.
+    // Задача 16: разность ОТОБРАЖАЕМЫХ рядов — третья серия стека; нулевые
+    // линии каналов НЕ входят в разность (математика без ground-сдвига).
     if (mathOn) {
-      const diff = mathDiffVolts(data.ch1, data.ch2);
+      const raw1 = data.ch1.map((value) => value - settings.groundCh1V);
+      const raw2 = data.ch2.map((value) => value - settings.groundCh2V);
+      const diff = mathDiffVolts(raw1, raw2);
       series.push(mathTraceSeries(diff, theme));
       mathTag.textContent = mathTagText(mathVppV(diff));
     }
@@ -172,6 +183,9 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
       yRange: yAxisRange(settings.vDiv, settings.probe),
       series,
     };
+    const tag = vdivTagText(settings.vDiv, settings.probe);
+    vdivTag.textContent = tag ?? "";
+    vdivTag.hidden = tag === null;
     chart.render(request);
     return data;
   }
@@ -214,6 +228,8 @@ export function mountScopeWaveform(options: ScopeWaveformOptions = {}): ScopeWav
       persistOverlay.accumulate(data.x, data.ch1, data.ch2, yMin, yMax, dt);
     },
     rerender(settings) {
+      lastSettings = settings;
+      persistOverlay.clear();
       if (lastFrame === null) return;
       render(lastFrame, settings);
     },

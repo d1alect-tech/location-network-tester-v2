@@ -102,6 +102,16 @@ describe("createLiveChip", () => {
 });
 
 describe("paintLiveChip (модульная покраска по хосту)", () => {
+  it("сохраняет внешнее применённое значение и цель при повторном открытии", () => {
+    const { chip } = mountChip();
+    paintLiveChip(chip.root, "2000000", "100000");
+    button(chip.root, ".lnt-live-chip-btn").click();
+    expect(chip.root.querySelector('[aria-selected="true"]')?.getAttribute("data-value")).toBe(
+      "2000000",
+    );
+    expect(document.activeElement?.getAttribute("data-value")).toBe("100000");
+  });
+
   it("красит слот/aria-selected/метку цели по хосту зоны", () => {
     const { chip } = mountChip();
     paintLiveChip(chip.root, "2000000", "100000");

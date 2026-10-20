@@ -19,20 +19,20 @@ import { clearElement, el } from "../../components/primitives/dom";
 import { announcePolite } from "../../components/primitives/status";
 import { buildScopeControls } from "./scopeControls";
 import { buildScopeCursorSection } from "./scopeCursorSection";
+import { createScopeDisplayState } from "./scopeDisplayState";
 import { buildScopeMeasureSection, createMeasureRowState } from "./scopeMeasureConfig";
 import { buildScopeRateField } from "./scopeRateField";
-import { DEFAULT_SCOPE_SETTINGS } from "./scopeScale";
-import type { ScopeDisplaySettings } from "./scopeScale";
+import { hardwareRangeFor, windowHalfVolts } from "./scopeScale";
 import { buildScopeScreen } from "./scopeScreen";
 import {
   LIVE_STATE_TEXT,
   buildScopeReadoutSection,
   buildScopeStatusSection,
   errorBlock,
+  messageOf,
 } from "./scopeSections";
 import { buildScopeTriggerSection } from "./scopeTrigger";
-import { mountScopeWaveform } from "./scopeWaveform";
-import type { ScopeWaveformOptions } from "./scopeWaveform";
+import { type ScopeWaveformOptions, mountScopeWaveform } from "./scopeWaveform";
 import { type ScopeWorkspaceHandle, scopeHostsFromViews } from "./scopeWorkspaceHosts";
 import "./scope.css";
 
@@ -42,10 +42,6 @@ export interface ScopeWorkspaceOptions {
   live?: LiveApi;
   /** Шов рендера развёртки: тесты подменяют хэндл графика. */
   waveform?: ScopeWaveformOptions;
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function mountScopeWorkspace(
@@ -72,13 +68,12 @@ export function mountScopeWorkspace(
   const measure = buildScopeMeasureSection(measureRows);
   const readout = buildScopeReadoutSection();
 
-  let settings: ScopeDisplaySettings = { ...DEFAULT_SCOPE_SETTINGS };
-  const controls = buildScopeControls((next) => {
-    settings = next;
-    // Последний кадр перерисовывается под новые настройки; V/div и пробник
-    // уходят в железо со следующим Run (config на ходу меняет только триггер).
+  const display = createScopeDisplayState((settings) => {
+    cursors.setWindow(windowHalfVolts(settings.vDiv, settings.probe));
     waveform.rerender(settings);
+    screen.applySettings(settings);
   });
+  const controls = buildScopeControls(display.apply);
   // Шов createView пробрасывает плагин линий курсоров (Todo 10) в общий
   // стек uPlot: плагин живёт в каждой пересборке графика.
   const waveform = mountScopeWaveform({
@@ -118,6 +113,7 @@ export function mountScopeWorkspace(
     measureRows,
     cursors,
     figure: waveform.figure,
+    ground: display.ground,
   });
 
   let busy = false;
@@ -196,10 +192,10 @@ export function mountScopeWorkspace(
       applyState(
         await live.start({
           ...DEFAULT_LIVE_START_REQUEST,
-          // V/div и пробник из селекторов развёртки; частота и триггер —
-          // из панели Todo 9 (стейджинг до старта, конфиг на ходу).
-          ch1_range_v: settings.vDiv,
-          ch1_probe_multiplier: settings.probe,
+          // Диапазон АЦП (код один на пару) из экранных В/дел — закон
+          // hardwareRangeFor; пробник и частота — из панелей стейджинга.
+          ch1_range_v: hardwareRangeFor(display.read().vDiv),
+          ch1_probe_multiplier: display.read().probe,
           sample_rate_hz: rateField.rateHz(),
           trigger: triggerPanel.getTrigger(),
         }),
@@ -249,8 +245,9 @@ export function mountScopeWorkspace(
   // heartbeat-события со статусом владения — вкладка жива и до Run.
   const stream = live.watchFrames({
     onFrame: (frame) => {
+      const settings = display.read();
       readout.applyFrame(frame);
-      screen.applyFrame(frame);
+      screen.applyFrame(frame, settings);
       waveform.applyFrame(frame, settings);
       cursors.applyFrame(frame);
       measure.applyFrame(frame, triggerLevelV);

@@ -4,7 +4,7 @@
 
 import uPlot from "uplot";
 import type { ChartTheme } from "./theme";
-import type { ChartRenderRequest } from "./types";
+import type { ChartRenderRequest, ChartXAxisTick } from "./types";
 
 export interface UplotBuildContext {
   request: ChartRenderRequest;
@@ -23,8 +23,8 @@ export interface UplotBuildContext {
 const LOG_RANGE: uPlot.Range.Function = (_self, initMin, initMax) =>
   uPlot.rangeLog(initMin, initMax, 10, true);
 
-function axis(label: string, theme: ChartTheme): uPlot.Axis {
-  return {
+function axis(label: string, theme: ChartTheme, tick?: ChartXAxisTick): uPlot.Axis {
+  const built: uPlot.Axis = {
     label,
     stroke: theme.fgSecondary,
     grid: { stroke: theme.borderSubtle, width: theme.lineWidth },
@@ -32,6 +32,14 @@ function axis(label: string, theme: ChartTheme): uPlot.Axis {
     font: `${12}px ${theme.fontMono}`,
     labelFont: `${13}px ${theme.fontSans}`,
   };
+  if (tick?.space !== undefined) built.space = tick.space;
+  const format = tick?.format;
+  if (format !== undefined) {
+    // uPlot считает плотность по axis.space и рисует подписи на канвасе:
+    // свои value-подписи возвращаем тем же списком splits.
+    built.values = (_self, splits) => splits.map((value) => format(value));
+  }
+  return built;
 }
 
 function scale(log: boolean | undefined, fixed?: readonly [number, number]): uPlot.Scale {
@@ -60,7 +68,7 @@ export function buildUplotOptions(ctx: UplotBuildContext): uPlot.Options {
     class: "lnt-uplot",
     series,
     scales: { x: scale(request.xLog, request.xRange), y: scale(request.yLog, request.yRange) },
-    axes: [axis(request.xLabel, theme), axis(request.yLabel, theme)],
+    axes: [axis(request.xLabel, theme, request.xTick), axis(request.yLabel, theme)],
     legend: {
       show: true,
       live: true,

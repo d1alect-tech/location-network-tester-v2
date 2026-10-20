@@ -15,82 +15,20 @@
  * только реальные контролы. */
 
 import { el } from "../../components/primitives/dom";
+import { CAPTURE_ROWS, type MenuRowDesc } from "./scopeCaptureRows";
 import type {
   ScopeControlHosts,
   ScopeControlState,
   ScopeControlTargets,
 } from "./scopeControlState";
 import { applyScopeControlTargets, readScopeControlState } from "./scopeControlState";
-import { SCOPE_SAMPLE_RATES_HZ, rateLabelHz } from "./scopeRateField";
-import { PROBE_STEPS, VDIV_STEPS } from "./scopeScale";
 import { checkTriggerLevel } from "./scopeTrigger";
-
-/** Опция меню: value — DOM-ключ, target — ГОТОВАЯ цель живой записи. */
-interface MenuOption {
-  readonly value: string;
-  readonly text: string;
-  readonly target: Partial<ScopeControlTargets>;
-}
-
-interface MenuRowDesc {
-  readonly row: string;
-  readonly label: string;
-  readonly options: readonly MenuOption[];
-  /** Текущее значение живого контрола (staged-цель или применённое). */
-  readonly current: (state: ScopeControlState) => string;
-}
 
 interface MenuRow {
   readonly node: HTMLElement;
   readonly current: (state: ScopeControlState) => string;
   paint(value: string): void;
 }
-
-const TRIG_MODES: readonly MenuOption[] = [
-  { value: "auto", text: "Авто", target: { mode: "auto" } },
-  { value: "normal", text: "Норм", target: { mode: "normal" } },
-  { value: "single", text: "Одиночный", target: { mode: "single" } },
-];
-const TRIG_SOURCES: readonly MenuOption[] = [
-  { value: "ch1", text: "CH1", target: { source: "ch1" } },
-  { value: "ch2", text: "CH2", target: { source: "ch2" } },
-];
-const TRIG_SLOPES: readonly MenuOption[] = [
-  { value: "rising", text: "Подъём", target: { slope: "rising" } },
-  { value: "falling", text: "Спад", target: { slope: "falling" } },
-];
-
-/** Числовое поле снапшота как строка ряда (vdiv/probe/rateHz). */
-const numStr = (value: number | undefined): string => (value === undefined ? "" : String(value));
-
-/** Ряды меню зеркалят живые контролы полосы (те же таблицы опций). */
-const ROWS: readonly MenuRowDesc[] = [
-  {
-    row: "vdiv",
-    label: "В/дел (оба канала)",
-    options: VDIV_STEPS.map((v) => ({ value: String(v), text: String(v), target: { vdiv: v } })),
-    current: (s) => numStr(s.vdiv),
-  },
-  {
-    row: "probe",
-    label: "Пробник CH1",
-    options: PROBE_STEPS.map((p) => ({ value: String(p), text: `×${p}`, target: { probe: p } })),
-    current: (s) => numStr(s.probe),
-  },
-  {
-    row: "rate",
-    label: "Частота дискретизации",
-    options: SCOPE_SAMPLE_RATES_HZ.map((hz) => ({
-      value: String(hz),
-      text: rateLabelHz(hz),
-      target: { rateHz: hz },
-    })),
-    current: (s) => numStr(s.rateHz),
-  },
-  { row: "trigmode", label: "Режим", options: TRIG_MODES, current: (s) => s.mode ?? "" },
-  { row: "trigsource", label: "Источник", options: TRIG_SOURCES, current: (s) => s.source ?? "" },
-  { row: "trigslope", label: "Фронт", options: TRIG_SLOPES, current: (s) => s.slope ?? "" },
-];
 
 export interface ScopeCaptureMenuOptions {
   /** Хост группы [data-action="capture"] зоны ИЗМЕР (кнопка + панель). */
@@ -152,7 +90,7 @@ export function mountScopeCaptureMenu(options: ScopeCaptureMenuOptions): ScopeCa
     paintSnapshot();
   };
   const rows = new Map<string, MenuRow>();
-  for (const desc of ROWS) rows.set(desc.row, buildRow(desc, pick));
+  for (const desc of CAPTURE_ROWS) rows.set(desc.row, buildRow(desc, pick));
   const rowNode = (name: string): HTMLElement => {
     const row = rows.get(name);
     if (row === undefined) throw new Error(`scopeCaptureMenu: нет ряда ${name}`);
@@ -233,7 +171,7 @@ export function mountScopeCaptureMenu(options: ScopeCaptureMenuOptions): ScopeCa
   function close(refocus: boolean): void {
     panel.hidden = true;
     menuButton.setAttribute("aria-expanded", "false");
-    if (refocus) menuButton.focus();
+    if (refocus) menuButton.focus({ preventScroll: true });
   }
 
   menuButton.addEventListener("click", () => {
@@ -241,18 +179,28 @@ export function mountScopeCaptureMenu(options: ScopeCaptureMenuOptions): ScopeCa
       paintSnapshot();
       panel.hidden = false;
       menuButton.setAttribute("aria-expanded", "true");
-      panel.querySelector<HTMLButtonElement>(".lnt-live-capture-opt")?.focus();
+      panel
+        .querySelector<HTMLButtonElement>(".lnt-live-capture-opt")
+        ?.focus({ preventScroll: true });
     } else close(true);
   });
-  root.addEventListener("keydown", (event) => {
+  // Esc слушаем на документе: выбор пункта возвращает фокус чипу полосы
+  // (программный клик опции), и Esc с корня панели уже не доходил.
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (!root.isConnected) {
+      document.removeEventListener("keydown", onKeyDown, true);
+      return;
+    }
     if (event.key !== "Escape" || panel.hidden) return;
     // stateless: закрыть без изменений (снапшот просто уходит).
     event.preventDefault();
     close(true);
-  });
+  };
+  document.addEventListener("keydown", onKeyDown, true);
   const onPointerDown = (event: Event): void => {
     if (!root.isConnected) {
       document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown, true);
       return;
     }
     if (panel.hidden) return;
@@ -265,6 +213,7 @@ export function mountScopeCaptureMenu(options: ScopeCaptureMenuOptions): ScopeCa
     root,
     dispose: () => {
       document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown, true);
       root.remove();
     },
   };

@@ -1,0 +1,32 @@
+import { expect, test } from "@playwright/test";
+import { installMockBackend } from "../../testkit/mockBackend";
+
+test("маркеры выбираются, перемещаются и удаляются отдельно", async ({ page }) => {
+  installMockBackend(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("http://127.0.0.1:4101/static/v2/#/sa");
+  await page.locator("#lnt-sa-run").click();
+  const over = page.locator(".lnt-sa-figure .u-over");
+  await expect(over).toBeVisible();
+  await page.locator("#lnt-sa-stop").click();
+  await expect(page.locator("#lnt-sa-run")).toBeEnabled();
+  const box = await over.boundingBox();
+  if (box === null) throw new Error("нет спектра");
+  await over.click({ position: { x: box.width * 0.4, y: box.height * 0.6 } });
+  await over.click({ position: { x: box.width * 0.8, y: box.height * 0.6 } });
+  const rows = page.locator("[data-sa-markers] tbody tr");
+  await expect(rows).toHaveCount(2);
+  await page.getByRole("button", { name: "Выбрать M1", exact: true }).click();
+  const input = page.getByLabel("Частота M1, Гц", { exact: true });
+  const frequency = Number(await input.inputValue());
+  await page.mouse.move(box.x + (frequency / 4000000) * box.width, box.y + box.height * 0.5);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.5, { steps: 8 });
+  await page.mouse.up();
+  await expect(input).not.toHaveValue(String(frequency));
+  await expect(rows).toHaveCount(2);
+  await page.getByRole("button", { name: "Удалить M1", exact: true }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText("M2");
+  await page.screenshot({ path: "../.omo/evidence/instrument-bugs-markers.png" });
+});

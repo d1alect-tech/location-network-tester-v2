@@ -10,7 +10,7 @@
 import type { LiveFramePayload } from "../../api/types-live";
 import { decimateMinMax } from "../../components/charts/series";
 import { POINT_BUDGETS } from "../../components/charts/viewModels";
-import { halfSpanVolts } from "./scopeScale";
+import { windowHalfVolts } from "./scopeScale";
 import type { ScopeDisplaySettings } from "./scopeScale";
 
 /** Бюджет точек пары каналов развёртки (POINT_BUDGETS.waveform). */
@@ -46,8 +46,10 @@ export function decimateUnion(data: WaveData): void {
   data.ch2 = indices.map((index) => data.ch2[index]!);
 }
 
-/** Кадр -> выровненные копии рядов: знак инверсии, отбрасывание нечисловых
- * по общему индексу (как prepareAligned), подсчёт выхода за окно сетки. */
+/** Кадр -> выровненные копии рядов: знак инверсии, нулевые линии каналов
+ * (groundChN — сдвиг ОТОБРАЖЕНИЯ, измерения не трогаются), отбрасывание
+ * нечисловых по общему индексу (как prepareAligned), подсчёт выхода за
+ * окно сетки (±4·В/дел). */
 export function buildWaveData(
   frame: LiveFramePayload,
   settings: ScopeDisplaySettings,
@@ -57,7 +59,7 @@ export function buildWaveData(
   const rawCh2 = frame.ch2.voltage_v;
   const count = Math.min(times.length, rawCh1.length, rawCh2.length);
   if (count === 0) return null;
-  const half = halfSpanVolts(settings.vDiv, settings.probe);
+  const half = windowHalfVolts(settings.vDiv, settings.probe);
   const signCh1 = settings.invertCh1 ? -1 : 1;
   const signCh2 = settings.invertCh2 ? -1 : 1;
   const data: WaveData = {
@@ -81,8 +83,8 @@ export function buildWaveData(
       data.nanCount += 1;
       continue;
     }
-    const w1 = v1 * signCh1;
-    const w2 = v2 * signCh2;
+    const w1 = v1 * signCh1 + settings.groundCh1V;
+    const w2 = v2 * signCh2 + settings.groundCh2V;
     if (Math.abs(w1) > half || Math.abs(w2) > half) data.clipCount += 1;
     data.x.push(t);
     data.ch1.push(w1);

@@ -1,6 +1,7 @@
 /** Экранная линия триггера (задача 15, план (a)): DOM-оверлей поверх
- * .lnt-scope-viewport — номинальная шкала экрана ±5 В (та же пропорция,
- * что у paintScopeTrace: y = (0.5 − v/span)·h). Drag с hit-полосой 44 px
+ * .lnt-scope-viewport — окно экрана ±4·В/дел·probe (закон директивы
+ * 2026-10-19: y = (0.5 − v/(2·windowHalf))·h; дефолт windowHalf = 5 В —
+ * номинальная шкала дефолтного запуска). Drag с hit-полосой 44 px
  * пишет СУЩЕСТВУЮЩЕЕ поле #lnt-scope-level нативным change (живой
  * слушатель scopeTrigger применяет триггер — валидация и POST без
  * дублирования); пока поле в фокусе, drag его не затирает (контракт
@@ -9,13 +10,16 @@
  * при running истина сервиса перерисовывает линию (стрелка — за кадром,
  * в активном drag — нет); drag-POST коалесцирован: change не чаще раза
  * в 100 мс и финалом по settle (r4-final f1); dispose снимает всё,
- * финализируя отложенный шаг. */
+ * финализируя отложенный шаг. refresh() переставляет линию под сменившееся
+ * окно (В/дел/пробник) — полоса зовёт его по клику зон ВЕРТ. */
 
 import type { LiveWatchHandle, LiveWatchHandlers } from "../../api/types-live";
 import { el } from "../../components/primitives/dom";
 
-/** Номинальный размах экрана: −5..+5 В (SCOPE_VOLTS_SPAN экрана). */
-const VOLTS_SPAN = 10;
+/** Домен поля уровня (серверный предел триггера): ±5 В. */
+const FIELD_LIMIT_V = 5;
+/** Дефолтная половина окна экрана, В: ±5 — номинал дефолтного запуска. */
+const NOMINAL_WINDOW_HALF_V = 5;
 /** Высота hit-полосы вокруг линии: 44 px (прототип v1.html). */
 const HIT_BAND_PX = 44;
 
@@ -24,9 +28,13 @@ export interface ScopeTriggerLineOptions {
   field: HTMLInputElement;
   /** Истина сервиса: onState при running перерисовывает линию. */
   live?: { watchFrames(handlers: LiveWatchHandlers): LiveWatchHandle };
+  /** Половина окна экрана, В (±4·В/дел·probe); дефолт — номинал ±5. */
+  windowHalfVolts?: () => number;
 }
 
 export interface ScopeTriggerLineHandle {
+  /** Переставить линию под сменившееся окно (В/дел/пробник). */
+  refresh(): void;
   dispose(): void;
 }
 
@@ -39,7 +47,8 @@ function clampLevel(value: number, limit: number): number {
 
 export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTriggerLineHandle {
   const { viewport, field } = options;
-  let level = clampLevel(Number(field.value) || 0, VOLTS_SPAN / 2);
+  const windowHalf = options.windowHalfVolts ?? (() => NOMINAL_WINDOW_HALF_V);
+  let level = clampLevel(Number(field.value) || 0, FIELD_LIMIT_V);
   let dragging = false;
   /** Drag-коалесценция (r4-final f1): не-NULL — финал ждёт эмита. */
   let dragPending: number | null = null;
@@ -70,7 +79,7 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
     line.setAttribute("aria-valuetext", `${level} В`);
     const height = viewport.getBoundingClientRect().height;
     if (height <= 0) return;
-    const y = (0.5 - level / VOLTS_SPAN) * height;
+    const y = (0.5 - level / (2 * windowHalf())) * height;
     line.style.transform = `translateY(${y - HIT_BAND_PX / 2}px)`;
   }
 
@@ -120,7 +129,7 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
   function onFieldInput(): void {
     const value = Number(field.value);
     if (field.value.trim() === "" || !Number.isFinite(value)) return;
-    level = clampLevel(value, VOLTS_SPAN / 2);
+    level = clampLevel(value, FIELD_LIMIT_V);
     repaint();
   }
 
@@ -141,8 +150,8 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
     if (!dragging) return;
     const rect = viewport.getBoundingClientRect();
     if (rect.height <= 0) return;
-    const volts = (0.5 - (event.clientY - rect.top) / rect.height) * VOLTS_SPAN;
-    writeFieldDragged(clampLevel(Math.round(volts * 100) / 100, VOLTS_SPAN / 2));
+    const volts = (0.5 - (event.clientY - rect.top) / rect.height) * (2 * windowHalf());
+    writeFieldDragged(clampLevel(Math.round(volts * 100) / 100, FIELD_LIMIT_V));
   }
 
   function onPointerEnd(event: PointerEvent): void {
@@ -174,8 +183,8 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
     const step = steps[event.key];
     if (step === undefined) return;
     event.preventDefault();
-    const next = step === "min" ? -VOLTS_SPAN / 2 : step === "max" ? VOLTS_SPAN / 2 : level + step;
-    writeField(clampLevel(Math.round(next * 100) / 100, VOLTS_SPAN / 2));
+    const next = step === "min" ? -FIELD_LIMIT_V : step === "max" ? FIELD_LIMIT_V : level + step;
+    writeField(clampLevel(Math.round(next * 100) / 100, FIELD_LIMIT_V));
   }
 
   line.addEventListener("pointerdown", onPointerDown);
@@ -192,7 +201,7 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
       if (dragging) return;
       // Истина сервиса — только при running; в покое поле есть истина.
       if (state.state === "running" && state.trigger !== null) {
-        level = clampLevel(state.trigger.level_v, VOLTS_SPAN / 2);
+        level = clampLevel(state.trigger.level_v, FIELD_LIMIT_V);
         repaint();
       } else {
         onFieldInput();
@@ -209,6 +218,7 @@ export function mountScopeTriggerLine(options: ScopeTriggerLineOptions): ScopeTr
   repaint();
 
   return {
+    refresh: repaint,
     dispose: () => {
       // Финал активного drag не теряется при демонтаже полосы.
       flushDragChange();

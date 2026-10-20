@@ -1,15 +1,17 @@
-/** «Сброс» (задача 15, план (c)): манифест-контролы возвращаются к
- * дефолтам DEFAULT_LIVE_START_REQUEST — В/дел 5, пробник ×1, частота
- * 8 МГц, уровень 0 В, триггер авто/CH1/подъём — только через живые
- * слушатели DOM (scopeControlState): staged-реестр полосы гаснет той же
- * дорожкой (клик дефолта = отклонение от baseline снимает маркировку),
- * Run читает возвращённые значения. Эхо «манифест → дефолт»; перезапуска
- * сброс НЕ делает — только значения. */
+/** «Сброс» (задача 15, план (c)): контролы возвращаются к дефолтам —
+ * В/дел — экранный дефолт 1 В/дел (hardwareRangeFor(1)=5 = манифест
+ * ch1_range_v, директива 2026-10-19), пробник ×1, частота 8 МГц из
+ * DEFAULT_LIVE_START_REQUEST, уровень 0 В, триггер авто/CH1/подъём —
+ * только через живые слушатели DOM (scopeControlState): staged-реестр
+ * полосы гаснет той же дорожкой (клик дефолта = отклонение от baseline
+ * снимает маркировку), Run читает возвращённые значения. Эхо «манифест
+ * → дефолт»; перезапуска сброс НЕ делает — только значения. */
 
 import { DEFAULT_LIVE_START_REQUEST } from "../../api/types-live";
 import { el } from "../../components/primitives/dom";
 import { applyScopeControlTargets } from "./scopeControlState";
 import type { ScopeControlHosts, ScopeControlTargets } from "./scopeControlState";
+import { DEFAULT_SCOPE_SETTINGS } from "./scopeScale";
 
 export interface ScopeResetOptions {
   /** Группа [data-action="reset"] зоны ИЗМЕР (кнопка живёт здесь). */
@@ -24,7 +26,7 @@ export interface ScopeResetHandle {
 }
 
 const MANIFEST_DEFAULTS: ScopeControlTargets = {
-  vdiv: 5,
+  vdiv: DEFAULT_SCOPE_SETTINGS.vDiv,
   probe: 1,
   rateHz: DEFAULT_LIVE_START_REQUEST.sample_rate_hz,
   levelV: 0,

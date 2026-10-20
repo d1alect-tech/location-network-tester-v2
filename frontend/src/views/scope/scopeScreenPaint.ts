@@ -8,6 +8,8 @@
 import type { ScopeHistoryFrame, ScopeHistorySeries } from "./scopeHistory";
 import type { ScopePersistence } from "./scopePersistence";
 import { PERSISTENCE_GRID_H, PERSISTENCE_GRID_W } from "./scopePersistence";
+import type { ScopeDisplaySettings } from "./scopeScale";
+import { SCREEN_DIVISIONS, windowHalfVolts } from "./scopeScale";
 
 export interface Rgb {
   readonly r: number;
@@ -96,11 +98,14 @@ export function paintScopePersistence(canvas: HTMLCanvasElement, store: ScopePer
 }
 
 /** Трасса кадра: секция сетки (--lnt-line) + CH1 цветом A (--lnt-a) и
- * CH2 цветом B (--lnt-b), семантика пары DESIGN.md. null — только сетка. */
+ * CH2 цветом B (--lnt-b), семантика пары DESIGN.md. Нулевые линии каналов —
+ * ground-сдвиг ОТОБРАЖЕНИЯ (измерения не трогаются); окно — ±4·В/дел·probe
+ * (закон директивы 2026-10-19, тот же, что у развёртки uPlot).
+ * null — только сетка. */
 export function paintScopeTrace(
   canvas: HTMLCanvasElement,
   frame: ScopeHistoryFrame | null,
-  voltsSpan: number,
+  settings: ScopeDisplaySettings,
 ): void {
   const size = fitCanvas(canvas);
   if (size === null) return;
@@ -116,15 +121,29 @@ export function paintScopeTrace(
     ctx.moveTo(x, 0);
     ctx.lineTo(x, size.height);
   }
-  for (let i = 1; i < 6; i += 1) {
-    const y = (i / 6) * size.height;
+  for (let i = 1; i < SCREEN_DIVISIONS; i += 1) {
+    const y = (i / SCREEN_DIVISIONS) * size.height;
     ctx.moveTo(0, y);
     ctx.lineTo(size.width, y);
   }
   ctx.stroke();
+  for (const [ground, token, fallback] of [
+    [settings.groundCh1V, "--lnt-a", "#3ec9e6"],
+    [settings.groundCh2V, "--lnt-b", "#e6a13c"],
+  ] as const) {
+    const color = cssTokenColor(canvas, token, fallback);
+    const y = (0.5 - ground / (2 * windowHalfVolts(settings.vDiv, settings.probe))) * size.height;
+    ctx.strokeStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(size.width, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   if (frame === null) return;
-  drawSeries(ctx, canvas, size, frame.ch1, "--lnt-a", "#3ec9e6", voltsSpan);
-  drawSeries(ctx, canvas, size, frame.ch2, "--lnt-b", "#e6a13c", voltsSpan);
+  drawSeries(ctx, canvas, size, frame.ch1, "--lnt-a", "#3ec9e6", settings, "ch1");
+  drawSeries(ctx, canvas, size, frame.ch2, "--lnt-b", "#e6a13c", settings, "ch2");
 }
 
 function drawSeries(
@@ -134,11 +153,15 @@ function drawSeries(
   series: ScopeHistorySeries,
   token: string,
   fallback: string,
-  voltsSpan: number,
+  settings: ScopeDisplaySettings,
+  channel: "ch1" | "ch2",
 ): void {
   const timeS = series.timeS;
   const volts = series.voltageV;
-  if (timeS.length < 2 || voltsSpan <= 0) return;
+  const half = windowHalfVolts(settings.vDiv, settings.probe);
+  if (timeS.length < 2 || half <= 0) return;
+  const sign = (channel === "ch1" ? settings.invertCh1 : settings.invertCh2) ? -1 : 1;
+  const ground = channel === "ch1" ? settings.groundCh1V : settings.groundCh2V;
   const color = cssTokenColor(canvas, token, fallback);
   const tMin = timeS[0] as number;
   const tSpan = (timeS[timeS.length - 1] as number) - tMin || 1e-9;
@@ -151,7 +174,7 @@ function drawSeries(
     const v = volts[i] as number;
     if (!Number.isFinite(v)) continue;
     const x = (((timeS[i] as number) - tMin) / tSpan) * size.width;
-    const y = (0.5 - v / voltsSpan) * size.height;
+    const y = (0.5 - (v * sign + ground) / (2 * half)) * size.height;
     if (!started) {
       ctx.moveTo(x, y);
       started = true;
