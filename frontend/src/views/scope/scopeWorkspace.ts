@@ -22,15 +22,10 @@ import { buildScopeCursorSection } from "./scopeCursorSection";
 import { createScopeDisplayState } from "./scopeDisplayState";
 import { buildScopeMeasureSection, createMeasureRowState } from "./scopeMeasureConfig";
 import { buildScopeRateField } from "./scopeRateField";
+import { mountScopeRippleReadout } from "./scopeRippleReadout";
 import { hardwareRangeFor, windowHalfVolts } from "./scopeScale";
 import { buildScopeScreen } from "./scopeScreen";
-import {
-  LIVE_STATE_TEXT,
-  buildScopeReadoutSection,
-  buildScopeStatusSection,
-  errorBlock,
-  messageOf,
-} from "./scopeSections";
+import { LIVE_STATE_TEXT, buildScopeStatusSection, errorBlock, messageOf } from "./scopeSections";
 import { buildScopeTriggerSection } from "./scopeTrigger";
 import { type ScopeWaveformOptions, mountScopeWaveform } from "./scopeWaveform";
 import { type ScopeWorkspaceHandle, scopeHostsFromViews } from "./scopeWorkspaceHosts";
@@ -61,12 +56,14 @@ export function mountScopeWorkspace(
     },
   });
   const status = buildScopeStatusSection({ rateField: rateField.root });
-  const screen = buildScopeScreen();
+  // Живой чип риппла (todo 9): read-only оверлей полного тракта в нижнем
+  // углу стекла осциллографа; событие ripple идёт тем же SSE-контуром.
+  const readout = mountScopeRippleReadout();
+  const screen = buildScopeScreen({ overlay: readout.rippleRow });
   const cursors = buildScopeCursorSection();
   // Задача 23: видимость measure-рядов — состояние lnt.live.meas.v1 (localStorage).
   const measureRows = createMeasureRowState();
   const measure = buildScopeMeasureSection(measureRows);
-  const readout = buildScopeReadoutSection();
 
   const display = createScopeDisplayState((settings) => {
     cursors.setWindow(windowHalfVolts(settings.vDiv, settings.probe));
@@ -135,6 +132,7 @@ export function mountScopeWorkspace(
 
   function applyState(state: LiveStatePayload): void {
     lastState = state;
+    readout.applyLiveState(state);
     triggerLevelV =
       state.trigger !== null && state.trigger.source === "ch1" ? state.trigger.level_v : null;
     status.stateLine.setAttribute("data-live-state", state.state);
@@ -262,10 +260,9 @@ export function mountScopeWorkspace(
         void stopLive();
       }
     },
+    onRipple: readout.applyRipple,
     onState: applyState,
-    onConnection: (kind) => {
-      readout.connection.textContent = kind === "live" ? "передача данных" : "переподключение…";
-    },
+    onConnection: readout.setConnection,
   });
 
   void refreshDevice();
@@ -278,6 +275,7 @@ export function mountScopeWorkspace(
     dispose: () => {
       // Только подписка: авто-stop — решение AppShell по группе маршрутов.
       stream.close();
+      readout.dispose();
       screen.dispose();
       waveform.destroy();
     },

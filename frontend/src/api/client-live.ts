@@ -2,15 +2,20 @@
  * и SSE-кадры. Один экземпляр на панель — вкладки «Осциллограф» и «Анализатор»
  * (sa) делят состояние владения и поток. POST /api/live/* — мутации с
  * заголовком запуска (client.requestJson mutation: true); SSE — EventSource
- * с именованными событиями frame/spectrum/heartbeat, родное переподключение, при
- * затишье после сбоя — fallback-опрос GET /api/live/state (паттерн
- * capture/sse.ts). Подписка до старта разрешена: без захвата приходят
+ * с именованными событиями frame/spectrum/ripple/heartbeat, родное
+ * переподключение, при затишье после сбоя — fallback-опрос GET /api/live/state
+ * (паттерн capture/sse.ts). Подписка до старта разрешена: без захвата приходят
  * heartbeat-события со статусом владения. */
 
 import { LntApiClient } from "./client";
 import type { RequestOptions } from "./client";
 import { ApiError } from "./errors";
-import { isLiveFramePayload, isLiveSpectrumPayload, isLiveStatePayload } from "./guards-live";
+import {
+  isLiveFramePayload,
+  isLiveRipplePayload,
+  isLiveSpectrumPayload,
+  isLiveStatePayload,
+} from "./guards-live";
 import type {
   LiveConfigRequest,
   LiveSseDeps,
@@ -167,6 +172,22 @@ export function createLiveApi(client: LntApiClient): LiveApi {
       source.addEventListener("frame", onNamedEvent);
       source.addEventListener("spectrum", onNamedEvent);
       source.addEventListener("heartbeat", onNamedEvent);
+
+      // Событие ripple — отдельная строгая схема: битое тело или провал
+      // гварда доходят до потребителя как null (гасит чип), а не молчанием.
+      const onRippleEvent = (event: Event): void => {
+        if (closed) return;
+        clearStaleTimer();
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse((event as MessageEvent<string>).data);
+        } catch {
+          handlers.onRipple?.(null);
+          return;
+        }
+        handlers.onRipple?.(isLiveRipplePayload(parsed) ? parsed : null);
+      };
+      source.addEventListener("ripple", onRippleEvent);
 
       source.onerror = () => {
         if (closed) return;

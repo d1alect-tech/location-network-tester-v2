@@ -5,7 +5,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LntApiClient } from "./client";
 import { createLiveApi } from "./client-live";
-import type { LiveStartRequest, LiveTrigger, LiveWatchHandlers } from "./types-live";
+import type {
+  LiveRipplePayload,
+  LiveStartRequest,
+  LiveTrigger,
+  LiveWatchHandlers,
+} from "./types-live";
 
 const CONFIG = {
   root: "C:\\lnt-sessions-test",
@@ -215,6 +220,84 @@ describe("createLiveApi (routes_live.py)", () => {
     handle.close();
     handle.close(); // идемпотентно
     expect(source?.closed).toBe(true);
+  });
+
+  it("watchFrames доносит именованное событие ripple; битое событие — null", async () => {
+    const seen: Seen = { posts: [], states: 0 };
+    const api = createLiveApi(new LntApiClient(stubFetch(seen, { state: IDLE })));
+    const ripples: Array<LiveRipplePayload | null> = [];
+    const handlers: LiveWatchHandlers = {
+      onRipple: (payload) => ripples.push(payload),
+      onState: () => undefined,
+      onConnection: () => undefined,
+    };
+    const RIPPLE = {
+      status: "ready",
+      reason_codes: [],
+      epoch_id: 1,
+      config_id: "cfg1",
+      continuity_id: 1,
+      continuity_basis: "host_contiguous_unverified",
+      gap_count: 0,
+      block_count: 3,
+      dropped_blocks: 0,
+      dropped_samples: 0,
+      samples_received: 12_000,
+      sample_progress: 12_000,
+      ring_capacity_samples: 524_288,
+      ring_sample_count: 4000,
+      ring_limited: false,
+      settle_samples: 8000,
+      settled: true,
+      startup_discard_samples: 0,
+      settling_basis: "capture_start_assuming_preconnected",
+      settling_remaining_samples: 0,
+      excluded_prefix_samples: 8000,
+      span_start_sample: 8000,
+      span_sample_count: 4000,
+      span_duration_s: 0.5,
+      mean_v: 0.0012,
+      rms_ac_v: 0.0354,
+      vpp_v: 0.1,
+      clipped_low: 0,
+      clipped_high: 0,
+      clip_count_scope: "current_span",
+      sample_rate_hz: 8000,
+      ch1_range_v: 5,
+      ch1_probe_multiplier: 1,
+      calibration_used: false,
+      voltage_label: "некалиброванные вольты",
+      adapter: {
+        topology_id: "series_c_at_dut_tip_x1_v1",
+        cap_nf: 100,
+        series_r_ohm: 0,
+        probe_multiplier: 1,
+        component_values_basis: "nominal",
+        hardware_qualification: "unverified",
+        transfer_status: "nominal_transfer_declared",
+        rail_nominal_v: null,
+        tau_s: 0.1,
+        fc_hz: 1.5915,
+        settling_s: 1,
+        settle_samples: 8000,
+        assumption_codes: ["one_pole_nominal_transfer"],
+      },
+    };
+
+    vi.stubGlobal("EventSource", FakeEventSource);
+    api.watchFrames(handlers);
+    const source = FakeEventSource.instances.at(-1);
+
+    source?.emit("ripple", RIPPLE);
+    source?.emit("ripple", { status: "ready" });
+    source?.emit("ripple", undefined);
+    await flush();
+
+    expect(ripples).toHaveLength(3);
+    expect(ripples[0]?.status).toBe("ready");
+    expect(ripples[0]?.rms_ac_v).toBe(0.0354);
+    expect(ripples[1]).toBeNull();
+    expect(ripples[2]).toBeNull();
   });
 
   it("watchFrames announces reconnecting on error and stale-polls the state", async () => {

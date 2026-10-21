@@ -80,7 +80,6 @@ export const DEFAULT_LIVE_START_REQUEST: LiveStartRequest = {
 /** Детектор трасс SA: зеркало KNOWN_DETECTORS (psd/models.py); выборки
  * (sample) в MVP нет — только эти четыре. */
 export type LiveSaDetector = "mean" | "rms" | "max-hold" | "min-hold";
-
 /** Окно SA: пять известных (паритет MARKER_WINDOW_OPTIONS инспекции). */
 export type LiveSaWindow = "hann" | "flattop" | "kaiser" | "blackman" | "rect";
 
@@ -130,6 +129,76 @@ export interface LiveSpectrumPayload {
   meta: LiveSaMeta;
 }
 
+/** Статус живого риппла (RippleStatus, instrument/ripple_types.py):
+ * числа есть только у ready. */
+export type LiveRippleStatus = "settling" | "unavailable" | "ready" | "stopped";
+
+/** База непрерывности полного тракта (ripple_types.py). */
+export type LiveRippleContinuityBasis = "host_contiguous_unverified" | "synthetic_exact";
+
+/** Основание окна установления (ripple_types.py). */
+export type LiveRippleSettlingBasis = "capture_start_assuming_preconnected" | "settling_unknown";
+
+/** Провенанс AC-адаптера в каждом событии ripple (RippleAdapterView):
+ * номинальный preset, а не обнаруженное железо. */
+export interface LiveRippleAdapterPayload {
+  topology_id: string;
+  cap_nf: number;
+  series_r_ohm: number;
+  probe_multiplier: number;
+  component_values_basis: string;
+  hardware_qualification: string;
+  transfer_status: string;
+  rail_nominal_v: number | null;
+  tau_s: number | null;
+  fc_hz: number | null;
+  settling_s: number | null;
+  settle_samples: number | null;
+  assumption_codes: string[];
+}
+
+/** Событие ripple (models_ripple_live.py): метрики полного тракта CH1
+ * отдельным именованным SSE-событием. Числа — только при status=ready;
+ * схема ЖИВАЯ, отдельна от артефакта ripple.json. */
+export interface LiveRipplePayload {
+  status: LiveRippleStatus;
+  reason_codes: string[];
+  epoch_id: number;
+  config_id: string;
+  continuity_id: number;
+  continuity_basis: LiveRippleContinuityBasis;
+  gap_count: number;
+  block_count: number;
+  dropped_blocks: number;
+  dropped_samples: number;
+  samples_received: number;
+  sample_progress: number;
+  ring_capacity_samples: number;
+  ring_sample_count: number;
+  ring_limited: boolean;
+  settle_samples: number | null;
+  settled: boolean;
+  startup_discard_samples: number;
+  settling_basis: LiveRippleSettlingBasis;
+  settling_remaining_samples: number | null;
+  excluded_prefix_samples: number | null;
+  span_start_sample: number | null;
+  span_sample_count: number;
+  span_duration_s: number | null;
+  mean_v: number | null;
+  rms_ac_v: number | null;
+  vpp_v: number | null;
+  clipped_low: number;
+  clipped_high: number;
+  clip_count_scope: "current_span";
+  sample_rate_hz: number;
+  ch1_range_v: number;
+  ch1_probe_multiplier: number;
+  calibration_used: boolean;
+  voltage_label: "некалиброванные вольты";
+  adapter: LiveRippleAdapterPayload;
+}
+
 /** Тело POST /api/live/config: триггер целиком + опциональный SA-контур.
  * sa отсутствует — контур не трогается; явный null — выключает. */
 export interface LiveConfigRequest extends LiveTrigger {
@@ -137,11 +206,13 @@ export interface LiveConfigRequest extends LiveTrigger {
 }
 
 /** Подписка на живой поток (GET /api/live/frames): именованные события
- * frame/spectrum/heartbeat и объявления состояния соединения. Вкладка
- * подписывается на нужные ей события — прочие необязательны. */
+ * frame/spectrum/ripple/heartbeat и объявления состояния соединения. Вкладка
+ * подписывается на нужные ей события — прочие необязательны. onRipple получает
+ * валидный снимок либо null (битое событие) — потребитель гасит числа. */
 export interface LiveWatchHandlers {
   onFrame?(frame: LiveFramePayload): void;
   onSpectrum?(spectrum: LiveSpectrumPayload): void;
+  onRipple?(payload: LiveRipplePayload | null): void;
   onState(state: LiveStatePayload): void;
   onConnection(kind: "live" | "reconnecting"): void;
 }
