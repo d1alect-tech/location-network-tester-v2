@@ -21,6 +21,7 @@ _FROZEN_SURFACE: Final = frozenset(
         "hypothesis",
         "profiles",
         "reindex",
+        "ripple",
         "selftest",
         "sessions",
         "simulate",
