@@ -7,9 +7,11 @@
  * подменяет измеренное значение. При LNT_QA_DIR спек пишет скриншоты и
  * geometry JSON для ручного QA. */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { type Page, expect, test } from "@playwright/test";
+import { isRippleArtifact } from "../../../api/guards-ripple";
 import type { CatalogSession } from "../../../api/types";
 import type {
   RippleArtifactPayload,
@@ -20,6 +22,17 @@ import { installMockBackend } from "../../../testkit/mockBackend";
 
 const BASE = "http://127.0.0.1:4101/static/v2/#/inspect";
 const QA_DIR = process.env.LNT_QA_DIR;
+const FIXTURES = fileURLToPath(new URL("./fixtures/", import.meta.url));
+
+/** РЕАЛЬНЫЕ артефакты кампании (task-3 verify-qa-sessions), скопированные в
+ * fixtures/: constant 63a0ef56… (доступный спектр, все уровни 0) и
+ * clip-mismatch 31bea3ca… (недоступный спектр, длинный QC). Вне репозитория
+ * спек не читает ничего. */
+function realArtifact(name: string): RippleArtifactPayload {
+  const parsed: unknown = JSON.parse(readFileSync(`${FIXTURES}${name}.json`, "utf8"));
+  if (!isRippleArtifact(parsed)) throw new Error(`фикстура ${name} не прошла гвард ripple`);
+  return parsed;
+}
 
 const hex64 = (char: string): string => char.repeat(64);
 
@@ -50,6 +63,24 @@ const SESSIONS: CatalogSession[] = [
     session_type: "capture",
     profile: "lab",
     label: "Риппл C",
+  },
+  {
+    id: "ripple-real-constant",
+    health: "ok",
+    created_utc: "2026-07-31T10:00:00Z",
+    source: "capture",
+    session_type: "capture",
+    profile: "lab",
+    label: "Риппл: константа",
+  },
+  {
+    id: "ripple-real-clip",
+    health: "ok",
+    created_utc: "2026-07-30T10:00:00Z",
+    source: "capture",
+    session_type: "capture",
+    profile: "lab",
+    label: "Риппл: ценз не сошёлся",
   },
 ];
 
@@ -301,6 +332,8 @@ function install(page: Page): void {
   backend.seedRipple("ripple-a", artifact("ripple-a", NORMAL));
   backend.seedRipple("ripple-b", artifact("ripple-b", ABSENT));
   backend.seedRipple("ripple-c", artifact("ripple-c", LONG));
+  backend.seedRipple("ripple-real-constant", realArtifact("ripple-constant-zero-spectrum"));
+  backend.seedRipple("ripple-real-clip", realArtifact("ripple-clip-mismatch-qc"));
 }
 
 type Geometry = {
@@ -309,6 +342,15 @@ type Geometry = {
   readonly positions: number[][];
   readonly overlaps: string[];
   readonly clipped: string[];
+  readonly qc: {
+    readonly scrollWidth: number;
+    readonly clientWidth: number;
+    readonly scrollHeight: number;
+    readonly clientHeight: number;
+    readonly textLength: number;
+    readonly codes: string;
+    readonly omitted: string;
+  };
   readonly page: {
     readonly scrollY: number;
     readonly docOverflow: number;
@@ -362,12 +404,22 @@ async function measure(page: Page): Promise<Geometry> {
     const colMain = document.querySelector(".col-main");
     const colRect = colMain?.getBoundingClientRect() ?? null;
     const chips = root.querySelector<HTMLElement>(".ripple-chips");
+    const qc = root.querySelector<HTMLElement>("[data-ripple-qc]");
     return {
       state: root.getAttribute("data-state") ?? "",
       availability: root.getAttribute("data-availability") ?? "",
       positions,
       overlaps,
       clipped,
+      qc: {
+        scrollWidth: qc?.scrollWidth ?? -1,
+        clientWidth: qc?.clientWidth ?? -1,
+        scrollHeight: qc?.scrollHeight ?? -1,
+        clientHeight: qc?.clientHeight ?? -1,
+        textLength: (qc?.textContent ?? "").length,
+        codes: qc?.getAttribute("data-qc-codes") ?? "",
+        omitted: qc?.getAttribute("data-qc-omitted") ?? "",
+      },
       page: {
         scrollY: window.scrollY,
         docOverflow: document.documentElement.scrollHeight - window.innerHeight,
@@ -387,6 +439,12 @@ async function measure(page: Page): Promise<Geometry> {
 function expectClean(geometry: Geometry, label: string): void {
   expect(geometry.overlaps, `${label}: перекрытия слотов`).toEqual([]);
   expect(geometry.clipped, `${label}: обрезанные значения`).toEqual([]);
+  expect(geometry.qc.scrollWidth, `${label}: QC обрезана по ширине`).toBeLessThanOrEqual(
+    geometry.qc.clientWidth + 1,
+  );
+  expect(geometry.qc.scrollHeight, `${label}: QC обрезана по высоте`).toBeLessThanOrEqual(
+    geometry.qc.clientHeight + 1,
+  );
   expect(geometry.page.scrollY, `${label}: window.scrollY`).toBe(0);
   expect(geometry.page.docOverflow, `${label}: вертикальный скролл документа`).toBeLessThanOrEqual(
     1,
@@ -485,6 +543,69 @@ for (const width of [1280, 1920]) {
     saveEvidence(width, "asd-c", asd);
     if (QA_DIR !== undefined) {
       await page.screenshot({ path: join(QA_DIR, `ripple-${width}-asd-c.png`) });
+    }
+  });
+}
+
+for (const width of [1280, 1920]) {
+  test(`V8-3 @${width}×720: реальные артефакты кампании — честная метка спектра и QC без обрезки`, async ({
+    page,
+  }) => {
+    install(page);
+    await page.setViewportSize({ width, height: 720 });
+    await page.goto(`${BASE}?a=ripple-a&b=ripple-c`);
+    const panel = page.locator("[data-ripple-panel]");
+    await expect(panel).toHaveAttribute("data-state", "ready");
+    await panel.scrollIntoViewIfNeeded();
+    const normal = await measure(page);
+    expectClean(normal, `ready A @${width}`);
+    saveEvidence(width, "real-base", normal);
+
+    // 1) Реальный clip-mismatch (31bea3ca…): длинный QC помещается в слот,
+    //    полный текст и машинные коды достижимы, контролы не сдвинуты.
+    await page.locator('tr[data-session="ripple-real-clip"] [data-assign="a"]').click();
+    await expect(panel).toHaveAttribute("data-session-id", "ripple-real-clip");
+    await expect(panel).toHaveAttribute("data-state", "ready");
+    const clip = await measure(page);
+    expectClean(clip, `real clip-mismatch @${width}`);
+    expect(clip.qc.textLength, "clip-mismatch: QC-текст реальный, не пустой").toBeGreaterThan(70);
+    expect(clip.qc.omitted, "clip-mismatch: дубль кода оценки убран").toContain(
+      "clip_census_inconsistent",
+    );
+    expect(clip.positions, "clip-mismatch: контролы не сдвинулись").toEqual(normal.positions);
+    await expect(panel).toHaveAttribute("data-spectrum", "unavailable");
+    await expect(panel.locator("[data-ripple-qc]")).toHaveAttribute(
+      "title",
+      /clip_census_inconsistent/,
+    );
+    await expect(panel.locator("[data-role='chart-empty']")).toHaveAttribute(
+      "data-reason",
+      "unavailable",
+    );
+    saveEvidence(width, "real-clip", clip);
+    if (QA_DIR !== undefined) {
+      await page.screenshot({ path: join(QA_DIR, `ripple-${width}-real-clip.png`) });
+    }
+
+    // 2) Реальный constant (63a0ef56…): спектр ДОСТУПЕН, все уровни нулевые —
+    //    подпись говорит правду и не называет доступное недоступным.
+    await page.locator('tr[data-session="ripple-real-constant"] [data-assign="a"]').click();
+    await expect(panel).toHaveAttribute("data-session-id", "ripple-real-constant");
+    await expect(panel).toHaveAttribute("data-state", "ready");
+    const zero = await measure(page);
+    expectClean(zero, `real constant @${width}`);
+    expect(zero.positions, "constant: контролы не сдвинулись").toEqual(normal.positions);
+    await expect(panel).toHaveAttribute("data-spectrum", "available");
+    await expect(panel.locator("[data-role='chart-empty']")).toHaveAttribute(
+      "data-reason",
+      "zero_floor",
+    );
+    const emptyText = (await panel.locator("[data-role='chart-empty']").textContent()) ?? "";
+    expect(emptyText, "constant: доступный спектр не назван недоступным").not.toContain("недоступ");
+    expect(emptyText, "constant: подпись не сериализует -Infinity").not.toContain("Infinity");
+    saveEvidence(width, "real-constant", zero);
+    if (QA_DIR !== undefined) {
+      await page.screenshot({ path: join(QA_DIR, `ripple-${width}-real-constant.png`) });
     }
   });
 }

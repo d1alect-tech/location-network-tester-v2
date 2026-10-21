@@ -1,5 +1,6 @@
-/** Части вида панели ripple: фон рядом, QC-строка, честный ярлык вольт и
- * метаданные сохранённого спектра. Ни один помощник не считает измерение. */
+/** Части вида панели ripple: фон рядом, QC-строка, честный ярлык вольт,
+ * метаданные сохранённого спектра и подпись пустого слота графика.
+ * Ни один помощник не считает измерение. */
 
 import type {
   RippleArtifactPayload,
@@ -8,8 +9,10 @@ import type {
   RippleQc,
   RippleSelection,
 } from "../../../api/types-ripple";
+import type { RippleChartOutcome, RippleSpectrumMode } from "./rippleChart";
 import {
   RIPPLE_DASH,
+  SAMPLE_FORMAT,
   formatDuration,
   formatHz,
   formatVolts,
@@ -26,6 +29,19 @@ export type RippleBaselineView = {
   readonly vppRaw: number | null;
   readonly session: string | null;
   readonly reasons: readonly string[];
+};
+
+export type RippleQcView = {
+  readonly text: string;
+  readonly title: string;
+  readonly codes: readonly string[];
+  readonly omitted: readonly string[];
+};
+
+export type ChartEmptyView = {
+  readonly reason: string;
+  readonly text: string;
+  readonly title: string;
 };
 
 const CLIPPING: Readonly<Record<string, string>> = {
@@ -68,18 +84,90 @@ export function baselineView(baseline: RippleBaseline | null): RippleBaselineVie
   };
 }
 
-export function qcText(qc: RippleQc, selection: RippleSelection): string {
+/** Машинные коды, факт которых строка QC уже показывает сама: оценка
+ * клиппинга, счётчики рельсов и нечисловых отсчётов, непрерывность.
+ * Повторять их — удлинять строку без новой информации; всё остальное
+ * остаётся видимым дословно. */
+function representedCodes(qc: RippleQc, selection: RippleSelection): Set<string> {
+  const codes = new Set<string>([qc.clipping_assessment]);
+  if ((qc.clip_low_count ?? 0) + (qc.clip_high_count ?? 0) > 0) codes.add("clipped");
+  if (qc.nonfinite_count > 0) codes.add("nonfinite_samples");
+  if (selection.continuity_status !== "synthetic_exact") {
+    codes.add("host_contiguous_unverified");
+    for (const code of selection.continuity_reason_codes) codes.add(code);
+  }
+  return codes;
+}
+
+/** QC-строка: видимый текст без дублей, в title — тот же текст плюс объём
+ * ценза и ВСЕ машинные коды артефакта, поэтому сокращение ничего не прячет. */
+export function qcView(qc: RippleQc, selection: RippleSelection): RippleQcView {
   const clip = `${qc.clip_low_count ?? RIPPLE_DASH}/${qc.clip_high_count ?? RIPPLE_DASH}`;
   const continuity =
     selection.continuity_status === "synthetic_exact" ? "точная" : "не подтверждена";
   const parts = [
     CLIPPING[qc.clipping_assessment] ?? qc.clipping_assessment,
     `клиппинг ${clip}`,
-    `NaN ${qc.nonfinite_count}`,
+    `нечисловые ${qc.nonfinite_count}`,
     `непрерывность ${continuity}`,
   ];
-  if (qc.reason_codes.length > 0) parts.push(reasonList(qc.reason_codes));
-  return `QC: ${parts.join(" · ")}`;
+  const represented = representedCodes(qc, selection);
+  const omitted: string[] = [];
+  const rest: string[] = [];
+  for (const code of qc.reason_codes) {
+    if (represented.has(code)) {
+      omitted.push(code);
+      continue;
+    }
+    const text = reasonText(code);
+    if (!rest.includes(text)) rest.push(text);
+  }
+  if (rest.length > 0) parts.push(rest.join(" · "));
+  const text = `QC: ${parts.join(" · ")}`;
+  const scope = `ценз клиппинга: ${qc.clip_count_scope ?? RIPPLE_DASH} · нечисловые: ${qc.nonfinite_count_scope}`;
+  const codes = `коды QC: ${qc.reason_codes.length === 0 ? "нет" : qc.reason_codes.join(", ")}`;
+  return { text, title: `${text} · ${scope} · ${codes}`, codes: qc.reason_codes, omitted };
+}
+
+const ZERO_FLOOR_DETAIL: Readonly<Record<RippleSpectrumMode, string>> = {
+  psd: "каждое сохранённое значение PSD равно 0 В²/Гц, а 10·lg(0) не определён",
+  asd: "каждое сохранённое значение ASD равно 0 В/√Гц, а логарифмическая ось требует положительных значений",
+};
+
+/** Исход без графика: всё, кроме готового запроса. */
+export type RippleChartEmptyOutcome = Exclude<RippleChartOutcome, { readonly kind: "request" }>;
+
+/** Честная подпись пустого слота графика: доступный спектр никогда не
+ * называется недоступным, нулевой уровень показан как нулевой уровень,
+ * а неконечные значения не сериализуются ни в текст, ни в title. */
+export function chartEmptyView(
+  outcome: RippleChartEmptyOutcome,
+  mode: RippleSpectrumMode,
+  unavailableText: string,
+): ChartEmptyView {
+  if (outcome.kind === "unavailable") {
+    const text = unavailableText === "" ? "спектр недоступен" : unavailableText;
+    return { reason: "unavailable", text, title: text };
+  }
+  if (outcome.kind === "no_bins") {
+    return {
+      reason: "no_bins",
+      text: "спектр сохранён без бинов",
+      title: "Спектр доступен, но сохранённых бинов нет: точки для лог-оси брать неоткуда.",
+    };
+  }
+  const bins = SAMPLE_FORMAT.format(outcome.bins);
+  const zero = outcome.kind === "zero_floor";
+  const detail = zero
+    ? ZERO_FLOOR_DETAIL[mode]
+    : "в сохранённых уровнях нет ни одной конечной положительной точки";
+  return {
+    reason: outcome.kind,
+    text: zero
+      ? `спектр сохранён · бинов ${bins} · уровни = 0 · точек на лог-оси нет`
+      : `спектр сохранён · бинов ${bins} · точек на лог-оси нет`,
+    title: `Спектр доступен и сохранён (бинов ${bins}): ${detail}, поэтому график не строится. Уровни не выдуманы и не заменены порогом.`,
+  };
 }
 
 export function voltsChip(artifact: RippleArtifactPayload): string {

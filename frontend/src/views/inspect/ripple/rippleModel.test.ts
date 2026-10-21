@@ -9,7 +9,7 @@ import type {
   RippleSpectrum,
   RippleTimeDomain,
 } from "../../../api/types-ripple";
-import { chartRequest } from "./rippleChart";
+import { chartOutcome } from "./rippleChart";
 import { buildRippleView, formatVolts, reasonText } from "./rippleModel";
 
 const hex64 = (char: string): string => char.repeat(64);
@@ -304,10 +304,11 @@ describe("buildRippleView", () => {
   });
 });
 
-describe("chartRequest", () => {
+describe("chartOutcome", () => {
   it("PSD — 10·lg сохранённого PSD, нулевой бин отброшен", () => {
-    const request = chartRequest(fixture(), "psd", "#5681ff");
-    expect(request).not.toBeNull();
+    const outcome = chartOutcome(fixture(), "psd", "#5681ff");
+    expect(outcome.kind).toBe("request");
+    const request = outcome.kind === "request" ? outcome.request : null;
     expect(request?.x).toEqual([1, 2]);
     expect(request?.yLog).toBe(false);
     expect(request?.xLog).toBe(true);
@@ -316,7 +317,8 @@ describe("chartRequest", () => {
   });
 
   it("ASD — сохранённый ASD на лог-оси, без пересчёта в панели", () => {
-    const request = chartRequest(fixture(), "asd", "#5681ff");
+    const outcome = chartOutcome(fixture(), "asd", "#5681ff");
+    const request = outcome.kind === "request" ? outcome.request : null;
     expect(request?.series[0]?.values).toEqual([2.379e-5, 1.898e-5]);
     expect(request?.yLog).toBe(true);
     expect(request?.yLabel).toBe("В/√Гц (лог)");
@@ -334,6 +336,6 @@ describe("chartRequest", () => {
       psd_v2_per_hz: [],
       asd_v_per_sqrt_hz: [],
     };
-    expect(chartRequest(artifact, "psd", "#5681ff")).toBeNull();
+    expect(chartOutcome(artifact, "psd", "#5681ff").kind).toBe("unavailable");
   });
 });

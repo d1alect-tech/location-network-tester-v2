@@ -22,7 +22,7 @@ export type RipplePanelView = {
   fail(kind: string, reason: string, message: string): void;
   setBands(bands: readonly RippleBandOption[], selected: number): void;
   setMode(mode: RippleSpectrumMode): void;
-  chartEmpty(text: string): void;
+  chartEmpty(text: string, reason: string, title: string): void;
   chartReady(): void;
 };
 
@@ -48,6 +48,23 @@ export function createRipplePanelView(): RipplePanelView {
     baselineSession,
     chartEmpty,
   } = dom;
+
+  /** Пустой слот графика: текст, машинная причина и полный title. Причина
+   * различает «не загружен», «недоступен» и «сохранён, но точек на лог-оси
+   * нет»: доступные данные никогда не помечаются недоступными. */
+  function showChartEmpty(text: string, reason: string, title: string): void {
+    chartEmpty.textContent = text;
+    chartEmpty.title = title;
+    chartEmpty.dataset.reason = reason;
+    chartEmpty.hidden = false;
+    chartHost.hidden = true;
+  }
+
+  function showChart(): void {
+    chartEmpty.hidden = true;
+    chartEmpty.dataset.reason = "";
+    chartHost.hidden = false;
+  }
 
   function paintCards(view: RippleViewModel): void {
     for (const metric of view.metrics) {
@@ -107,6 +124,8 @@ export function createRipplePanelView(): RipplePanelView {
     intervalCount.textContent = "";
     qc.textContent = "";
     qc.title = "";
+    qc.dataset.qcCodes = "";
+    qc.dataset.qcOmitted = "";
     spectrumMeta.textContent = "";
     spectrumMeta.title = "";
     baselineStatus.textContent = "";
@@ -128,6 +147,7 @@ export function createRipplePanelView(): RipplePanelView {
       root.dataset.state = "loading";
       root.dataset.sessionId = session;
       root.dataset.availability = "none";
+      root.dataset.spectrum = "none";
       root.dataset.error = "";
       root.dataset.reason = "";
       sessionEl.textContent = session;
@@ -135,14 +155,13 @@ export function createRipplePanelView(): RipplePanelView {
       resetValues();
       message.textContent = "Загрузка ripple-артефакта…";
       message.dataset.tone = "info";
-      chartEmpty.textContent = "загрузка сохранённого спектра…";
-      chartEmpty.hidden = false;
-      chartHost.hidden = true;
+      showChartEmpty("загрузка сохранённого спектра…", "loading", "");
     },
     clear(session) {
       root.dataset.state = "idle";
       root.dataset.sessionId = session;
       root.dataset.availability = "none";
+      root.dataset.spectrum = "none";
       root.dataset.error = "";
       root.dataset.reason = "";
       sessionEl.textContent = session;
@@ -150,9 +169,7 @@ export function createRipplePanelView(): RipplePanelView {
       resetValues();
       message.textContent = "";
       message.dataset.tone = "";
-      chartEmpty.textContent = "сессия не выбрана";
-      chartEmpty.hidden = false;
-      chartHost.hidden = true;
+      showChartEmpty("сессия не выбрана", "idle", "");
       for (const item of chips) {
         item.textContent = "—";
         item.title = "";
@@ -161,6 +178,7 @@ export function createRipplePanelView(): RipplePanelView {
     paint(view) {
       root.dataset.state = "ready";
       root.dataset.availability = view.availability;
+      root.dataset.spectrum = view.spectrumAvailability;
       root.dataset.error = "";
       root.dataset.reason = "";
       message.textContent = "";
@@ -173,17 +191,16 @@ export function createRipplePanelView(): RipplePanelView {
       paintCards(view);
       paintIntervals(view);
       qc.textContent = view.qcText;
-      qc.title = view.qcText;
+      qc.title = view.qcTitle;
+      qc.dataset.qcCodes = view.qcCodes.join(" ");
+      qc.dataset.qcOmitted = view.qcOmitted.join(" ");
       spectrumMeta.textContent = view.spectrumMeta;
       spectrumMeta.title = view.spectrumMeta;
       paintBaseline(view);
       if (view.spectrumAvailable) {
-        chartEmpty.hidden = true;
-        chartHost.hidden = false;
+        showChart();
       } else {
-        chartEmpty.textContent = view.spectrumText;
-        chartEmpty.hidden = false;
-        chartHost.hidden = true;
+        showChartEmpty(view.spectrumText, "unavailable", view.spectrumText);
       }
     },
     fail(kind, reason, text) {
@@ -191,12 +208,11 @@ export function createRipplePanelView(): RipplePanelView {
       root.dataset.error = kind;
       root.dataset.reason = reason;
       root.dataset.availability = "none";
+      root.dataset.spectrum = "none";
       resetValues();
       message.textContent = text;
       message.dataset.tone = "error";
-      chartEmpty.textContent = "спектр не построен";
-      chartEmpty.hidden = false;
-      chartHost.hidden = true;
+      showChartEmpty("спектр не построен", "error", "");
       for (const item of chips) {
         item.textContent = "—";
         item.title = "";
@@ -214,14 +230,11 @@ export function createRipplePanelView(): RipplePanelView {
       psd.setAttribute("aria-pressed", String(mode === "psd"));
       asd.setAttribute("aria-pressed", String(mode === "asd"));
     },
-    chartEmpty(text) {
-      chartEmpty.textContent = text;
-      chartEmpty.hidden = false;
-      chartHost.hidden = true;
+    chartEmpty(text, reason, title) {
+      showChartEmpty(text, reason, title);
     },
     chartReady() {
-      chartEmpty.hidden = true;
-      chartHost.hidden = false;
+      showChart();
     },
   };
 }

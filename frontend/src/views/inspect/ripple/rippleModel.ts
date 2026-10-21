@@ -19,7 +19,7 @@ import {
 import {
   type RippleBaselineView,
   baselineView,
-  qcText,
+  qcView,
   settlingChip,
   spectrumMeta,
   voltsChip,
@@ -34,7 +34,7 @@ export {
   reasonList,
   reasonText,
 } from "./rippleFormat";
-export type { RippleBaselineView } from "./rippleViewParts";
+export type { RippleBaselineView, RippleQcView } from "./rippleViewParts";
 
 export type RippleMetricKey = "mean" | "rms-ac" | "vpp" | "band";
 
@@ -73,8 +73,12 @@ export type RippleViewModel = {
   readonly selectedBand: number;
   readonly chips: readonly string[];
   readonly qcText: string;
+  readonly qcTitle: string;
+  readonly qcCodes: readonly string[];
+  readonly qcOmitted: readonly string[];
   readonly baseline: RippleBaselineView;
   readonly spectrumAvailable: boolean;
+  readonly spectrumAvailability: RippleAvailability;
   readonly spectrumText: string;
   readonly spectrumMeta: string;
   readonly durationText: string;
@@ -152,6 +156,7 @@ export function buildRippleView(
   }
   const count = artifact.intervals.length;
   const spectrum = artifact.spectrum;
+  const qc = qcView(artifact.qc, artifact.selection);
   const spectrumText =
     spectrum.availability === "available"
       ? ""
@@ -206,9 +211,13 @@ export function buildRippleView(
         ? `${SAMPLE_FORMAT.format(artifact.selection.sample_count)} отсчётов · ${formatDuration(artifact.selection.realized_duration_s)}`
         : "полных отсчётов нет",
     ],
-    qcText: qcText(artifact.qc, artifact.selection),
+    qcText: qc.text,
+    qcTitle: qc.title,
+    qcCodes: qc.codes,
+    qcOmitted: qc.omitted,
     baseline: baselineView(artifact.baseline),
     spectrumAvailable: spectrum.availability === "available",
+    spectrumAvailability: spectrum.availability,
     spectrumText,
     spectrumMeta: spectrumMeta(artifact),
     durationText: formatDuration(artifact.selection.realized_duration_s),

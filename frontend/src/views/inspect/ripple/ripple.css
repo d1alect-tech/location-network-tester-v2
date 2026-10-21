@@ -171,13 +171,17 @@
   white-space: nowrap;
 }
 
+/* QC-строка: фиксированные две строки и перенос вместо многоточия — текст не
+ * обрезается ни по ширине, ни по высоте, а полная строка и все машинные коды
+ * остаются в title. 32 px входят в запас строки сетки (график 148 px), поэтому
+ * высота панели и позиции контролов от данных не зависят. */
 .app-v6 .ripple-qc {
   overflow: hidden;
-  block-size: 16px;
+  block-size: 32px;
   color: var(--lnt-text-dim);
   font: 400 10px / 16px var(--lnt-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .app-v6 .ripple-chart {

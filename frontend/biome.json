@@ -15,7 +15,8 @@
   "files": {
     "ignore": [
       "src/test-support/analysis-v2-fixtures/**",
-      "src/showcase-round2/**"
+      "src/showcase-round2/**",
+      "src/views/inspect/ripple/fixtures/**"
     ]
   },
   "formatter": {

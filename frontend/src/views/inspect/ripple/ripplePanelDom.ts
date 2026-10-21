@@ -93,7 +93,10 @@ export function createRipplePanelDom(): RipplePanelDom {
     ...intervalSlots,
     intervalCount,
   ]);
-  const qc = el("span", { className: "ripple-qc", attrs: { "data-ripple-qc": "", title: "" } });
+  const qc = el("span", {
+    className: "ripple-qc",
+    attrs: { "data-ripple-qc": "", "data-qc-codes": "", "data-qc-omitted": "", title: "" },
+  });
   const main = el("div", { className: "ripple-main" }, [metricGrid, intervals, qc]);
 
   const spectrumMeta = el("span", {
@@ -133,7 +136,7 @@ export function createRipplePanelDom(): RipplePanelDom {
   const chartEmpty = el("p", {
     className: "ripple-chart-empty",
     text: "сессия не выбрана",
-    attrs: { "data-role": "chart-empty" },
+    attrs: { "data-role": "chart-empty", "data-reason": "idle" },
   });
   chartHost.hidden = true;
   const chart = el("figure", { className: "ripple-chart" }, [chartHeader, chartHost, chartEmpty]);
@@ -195,6 +198,7 @@ export function createRipplePanelDom(): RipplePanelDom {
         "data-state": "idle",
         "data-session-id": "",
         "data-availability": "none",
+        "data-spectrum": "none",
         "data-error": "",
         "data-reason": "",
         "aria-label": "Риппл и шум",

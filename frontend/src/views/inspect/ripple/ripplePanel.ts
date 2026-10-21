@@ -10,10 +10,11 @@ import { readChartTheme } from "../../../components/charts/theme";
 import type { ChartHandle } from "../../../components/charts/types";
 import { createUplotView } from "../../../components/charts/uplotView";
 import type { UplotViewOptions } from "../../../components/charts/uplotView";
-import { chartRequest } from "./rippleChart";
+import { chartOutcome } from "./rippleChart";
 import type { RippleSpectrumMode } from "./rippleChart";
 import { buildRippleView } from "./rippleModel";
 import { createRipplePanelView } from "./ripplePanelView";
+import { chartEmptyView } from "./rippleViewParts";
 import "./ripple.css";
 
 export type RipplePanelHandle = {
@@ -75,17 +76,20 @@ export function createRipplePanel(opts: RipplePanelOptions): RipplePanelHandle {
 
   function renderChart(): void {
     if (artifact === null) {
-      view.chartEmpty("спектр не загружен");
+      view.chartEmpty("спектр не загружен", "not_loaded", "");
       return;
     }
-    const request = chartRequest(artifact, mode, theme.accentA);
-    if (request === null) {
-      const model = buildRippleView(artifact, bandIndex);
-      view.chartEmpty(model.spectrumText === "" ? "спектр недоступен" : model.spectrumText);
+    const outcome = chartOutcome(artifact, mode, theme.accentA);
+    if (outcome.kind === "request") {
+      view.chartReady();
+      chart.render(outcome.request);
       return;
     }
-    view.chartReady();
-    chart.render(request);
+    // Доступный спектр с нулевыми уровнями — НЕ «недоступен»: причина и подпись
+    // берутся из сохранённых фактов, −Infinity наружу не выходит.
+    const { spectrumText } = buildRippleView(artifact, bandIndex);
+    const empty = chartEmptyView(outcome, mode, spectrumText);
+    view.chartEmpty(empty.text, empty.reason, empty.title);
   }
 
   function paint(): void {
