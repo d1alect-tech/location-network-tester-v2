@@ -36,6 +36,25 @@ function realArtifact(name: string): RippleArtifactPayload {
 
 const hex64 = (char: string): string => char.repeat(64);
 
+/** Четырнадцать различных кодов причин: строка QC не влезает в слот, и
+ * панель обязана сказать об этом фактическим числом, а не обрезать молча. */
+const MANY_CODES = [
+  "clipping_unknown",
+  "clip_census_inconsistent",
+  "nonfinite_samples",
+  "known_gap",
+  "settling_unknown",
+  "settling",
+  "empty_span",
+  "insufficient_samples",
+  "insufficient_segments",
+  "baseline_incompatible",
+  "baseline_missing",
+  "baseline_calibration_identity_unknown",
+  "stale_input",
+  "some_unknown_machine_code",
+];
+
 const SESSIONS: CatalogSession[] = [
   {
     id: "ripple-a",
@@ -81,6 +100,15 @@ const SESSIONS: CatalogSession[] = [
     session_type: "capture",
     profile: "lab",
     label: "Риппл: ценз не сошёлся",
+  },
+  {
+    id: "ripple-many-codes",
+    health: "ok",
+    created_utc: "2026-07-29T10:00:00Z",
+    source: "capture",
+    session_type: "capture",
+    profile: "lab",
+    label: "Риппл: много кодов QC",
   },
 ];
 
@@ -316,6 +344,22 @@ function artifact(id: string, variant: Variant): RippleArtifactPayload {
   };
 }
 
+/** Артефакт с 14 различными кодами причин и девятизначными счётчиками
+ * клиппинга — худший случай для фиксированного слота QC. */
+function manyCodesArtifact(id: string): RippleArtifactPayload {
+  const base = artifact(id, NORMAL);
+  return {
+    ...base,
+    qc: {
+      ...base.qc,
+      clipping_assessment: "clip_census_inconsistent",
+      clip_low_count: 123_456_789,
+      clip_high_count: 987_654_321,
+      reason_codes: [...MANY_CODES],
+    },
+  };
+}
+
 function install(page: Page): void {
   const backend = installMockBackend(page);
   backend.seedCatalog(SESSIONS);
@@ -334,6 +378,7 @@ function install(page: Page): void {
   backend.seedRipple("ripple-c", artifact("ripple-c", LONG));
   backend.seedRipple("ripple-real-constant", realArtifact("ripple-constant-zero-spectrum"));
   backend.seedRipple("ripple-real-clip", realArtifact("ripple-clip-mismatch-qc"));
+  backend.seedRipple("ripple-many-codes", manyCodesArtifact("ripple-many-codes"));
 }
 
 type Geometry = {
@@ -350,6 +395,9 @@ type Geometry = {
     readonly textLength: number;
     readonly codes: string;
     readonly omitted: string;
+    readonly hidden: string;
+    readonly hiddenCodes: string;
+    readonly text: string;
   };
   readonly page: {
     readonly scrollY: number;
@@ -419,6 +467,9 @@ async function measure(page: Page): Promise<Geometry> {
         textLength: (qc?.textContent ?? "").length,
         codes: qc?.getAttribute("data-qc-codes") ?? "",
         omitted: qc?.getAttribute("data-qc-omitted") ?? "",
+        hidden: qc?.getAttribute("data-qc-hidden") ?? "",
+        hiddenCodes: qc?.getAttribute("data-qc-hidden-codes") ?? "",
+        text: qc?.textContent ?? "",
       },
       page: {
         scrollY: window.scrollY,
@@ -607,6 +658,56 @@ for (const width of [1280, 1920]) {
     if (QA_DIR !== undefined) {
       await page.screenshot({ path: join(QA_DIR, `ripple-${width}-real-constant.png`) });
     }
+  });
+}
+
+for (const width of [1280, 1920]) {
+  test(`V8-4 @${width}×720: 14 кодов причин — строка QC не обрезается молча`, async ({ page }) => {
+    install(page);
+    await page.setViewportSize({ width, height: 720 });
+    await page.goto(`${BASE}?a=ripple-a&b=ripple-c`);
+    const panel = page.locator("[data-ripple-panel]");
+    await expect(panel).toHaveAttribute("data-state", "ready");
+    await panel.scrollIntoViewIfNeeded();
+    const normal = await measure(page);
+    expectClean(normal, `ready A @${width}`);
+
+    await page.locator('tr[data-session="ripple-many-codes"] [data-assign="a"]').click();
+    await expect(panel).toHaveAttribute("data-session-id", "ripple-many-codes");
+    await expect(panel).toHaveAttribute("data-state", "ready");
+    const many = await measure(page);
+    saveEvidence(width, "many-codes", many);
+    if (QA_DIR !== undefined) {
+      await page.screenshot({ path: join(QA_DIR, `ripple-${width}-many-codes.png`) });
+    }
+
+    // Слот QC не обрезает видимую строку ни по высоте, ни по ширине.
+    expect(many.qc.scrollHeight, `QC @${width}: обрезки по высоте нет`).toBeLessThanOrEqual(
+      many.qc.clientHeight + 1,
+    );
+    expect(many.qc.scrollWidth, `QC @${width}: обрезки по ширине нет`).toBeLessThanOrEqual(
+      many.qc.clientWidth + 1,
+    );
+    // Строка называет ФАКТИЧЕСКОЕ число не показанных кодов.
+    const hidden = Number(many.qc.hidden);
+    expect(Number.isInteger(hidden), "data-qc-hidden — целое число").toBe(true);
+    expect(hidden, "часть кодов не показана").toBeGreaterThan(0);
+    expect(many.qc.text, "строка называет число не показанных кодов").toMatch(
+      new RegExp(`ещё ${hidden} (код|кода|кодов) QC`),
+    );
+    expect(many.qc.text, "многоточие не прячет содержимое").not.toContain("...");
+    expect(
+      many.qc.hiddenCodes.split(" ").filter((code) => code !== "").length,
+      "скрытых кодов ровно столько, сколько названо",
+    ).toBe(hidden);
+    // Полный текст и все машинные коды остаются в title.
+    const title = (await panel.locator("[data-ripple-qc]").getAttribute("title")) ?? "";
+    for (const code of MANY_CODES) {
+      expect(title, `title сохраняет код ${code}`).toContain(code);
+    }
+    // Контролы не сдвинулись, страница не поехала.
+    expect(many.positions, "контролы не сдвинулись").toEqual(normal.positions);
+    expectClean(many, `many codes @${width}`);
   });
 }
 

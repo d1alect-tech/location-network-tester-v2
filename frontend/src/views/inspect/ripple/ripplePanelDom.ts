@@ -95,7 +95,14 @@ export function createRipplePanelDom(): RipplePanelDom {
   ]);
   const qc = el("span", {
     className: "ripple-qc",
-    attrs: { "data-ripple-qc": "", "data-qc-codes": "", "data-qc-omitted": "", title: "" },
+    attrs: {
+      "data-ripple-qc": "",
+      "data-qc-codes": "",
+      "data-qc-omitted": "",
+      "data-qc-hidden": "",
+      "data-qc-hidden-codes": "",
+      title: "",
+    },
   });
   const main = el("div", { className: "ripple-main" }, [metricGrid, intervals, qc]);
 

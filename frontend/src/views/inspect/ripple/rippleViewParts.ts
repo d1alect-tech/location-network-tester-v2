@@ -19,6 +19,7 @@ import {
   reasonList,
   reasonText,
 } from "./rippleFormat";
+import { fitQcText } from "./rippleQcFit";
 
 export type RippleBaselineView = {
   readonly status: "none" | RippleAvailability;
@@ -36,6 +37,8 @@ export type RippleQcView = {
   readonly title: string;
   readonly codes: readonly string[];
   readonly omitted: readonly string[];
+  /** Коды, чей текст не попал в видимую строку: она о них честно сообщает. */
+  readonly hidden: readonly string[];
 };
 
 export type ChartEmptyView = {
@@ -105,7 +108,7 @@ export function qcView(qc: RippleQc, selection: RippleSelection): RippleQcView {
   const clip = `${qc.clip_low_count ?? RIPPLE_DASH}/${qc.clip_high_count ?? RIPPLE_DASH}`;
   const continuity =
     selection.continuity_status === "synthetic_exact" ? "точная" : "не подтверждена";
-  const parts = [
+  const head = [
     CLIPPING[qc.clipping_assessment] ?? qc.clipping_assessment,
     `клиппинг ${clip}`,
     `нечисловые ${qc.nonfinite_count}`,
@@ -113,20 +116,29 @@ export function qcView(qc: RippleQc, selection: RippleSelection): RippleQcView {
   ];
   const represented = representedCodes(qc, selection);
   const omitted: string[] = [];
-  const rest: string[] = [];
+  const entries: { text: string; codes: string[] }[] = [];
   for (const code of qc.reason_codes) {
     if (represented.has(code)) {
       omitted.push(code);
       continue;
     }
     const text = reasonText(code);
-    if (!rest.includes(text)) rest.push(text);
+    const entry = entries.find((item) => item.text === text);
+    if (entry === undefined) entries.push({ text, codes: [code] });
+    else if (!entry.codes.includes(code)) entry.codes.push(code);
   }
-  if (rest.length > 0) parts.push(rest.join(" · "));
-  const text = `QC: ${parts.join(" · ")}`;
+  const fit = fitQcText(head, entries, represented, new Set(qc.reason_codes));
+  const full =
+    entries.length > 0 ? [...head, entries.map((entry) => entry.text).join(" · ")] : head;
   const scope = `ценз клиппинга: ${qc.clip_count_scope ?? RIPPLE_DASH} · нечисловые: ${qc.nonfinite_count_scope}`;
   const codes = `коды QC: ${qc.reason_codes.length === 0 ? "нет" : qc.reason_codes.join(", ")}`;
-  return { text, title: `${text} · ${scope} · ${codes}`, codes: qc.reason_codes, omitted };
+  return {
+    text: fit.text,
+    title: `QC: ${full.join(" · ")} · ${scope} · ${codes}`,
+    codes: qc.reason_codes,
+    omitted,
+    hidden: fit.hidden,
+  };
 }
 
 const ZERO_FLOOR_DETAIL: Readonly<Record<RippleSpectrumMode, string>> = {
