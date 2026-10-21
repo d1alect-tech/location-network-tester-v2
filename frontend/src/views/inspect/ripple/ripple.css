@@ -1,0 +1,391 @@
+/* Панель «Риппл / шум» (todo 8). Только токены v6; ни одного разового
+ * цвета. Слоты значений фиксированы: смена числа/недоступности/длины текста
+ * не меняет ни ширину карточки, ни позицию тумблера PSD/ASD. */
+
+.app-v6 .ripple-panel {
+  flex: none;
+  min-width: 0;
+}
+
+.app-v6 .ripple-hd {
+  gap: var(--lnt-space-3);
+  min-height: 30px;
+  padding-inline: var(--lnt-space-3);
+}
+
+/* Название и сессия — один двухстрочный блок: шапка отдаёт всю ширину
+ * четырём честным чипам и не растёт при смене данных. */
+.app-v6 .ripple-titleblock {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: center;
+  max-inline-size: 240px;
+  min-width: 0;
+}
+
+.app-v6 .ripple-titleblock .panel-title {
+  line-height: 14px;
+}
+
+.app-v6 .ripple-session {
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 10px / 12px var(--lnt-mono);
+  color: var(--lnt-text-dim);
+}
+
+.app-v6 .ripple-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-inline-start: auto;
+  overflow: hidden;
+}
+
+.app-v6 .ripple-chip {
+  flex: none;
+  padding: 1px 6px;
+  background: var(--lnt-chrome);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-radius-status);
+  color: var(--lnt-text-sec);
+  font: 400 10px / 14px var(--lnt-ui);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.app-v6 .ripple-bd {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  grid-template-areas:
+    "main chart"
+    "baseline baseline"
+    "message message";
+  gap: 10px var(--lnt-space-4);
+  padding: 10px var(--lnt-space-3);
+  overflow: hidden;
+}
+
+.app-v6 .ripple-main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lnt-space-2);
+  min-width: 0;
+}
+
+.app-v6 .ripple-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.app-v6 .ripple-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  block-size: 64px;
+  min-width: 0;
+  padding: 6px;
+  background: var(--lnt-chrome);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+}
+
+.app-v6 .ripple-card-label {
+  overflow: hidden;
+  color: var(--lnt-text-sec);
+  font: 700 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.app-v6 .ripple-card-value {
+  overflow: hidden;
+  color: var(--lnt-text);
+  font: 600 15px / 18px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.01em;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.app-v6 .ripple-card[data-available="false"] .ripple-card-value {
+  color: var(--lnt-text-dim);
+}
+
+.app-v6 .ripple-card-note {
+  overflow: hidden;
+  color: var(--lnt-text-dim);
+  font: 400 10px / 12px var(--lnt-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-v6 .ripple-intervals {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  block-size: 26px;
+  min-width: 0;
+}
+
+.app-v6 .ripple-intervals-label {
+  flex: none;
+  color: var(--lnt-text-sec);
+  font: 700 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-v6 .ripple-interval {
+  flex: none;
+  inline-size: 78px;
+  padding: 2px 6px;
+  background: var(--lnt-chrome);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  color: var(--lnt-text);
+  font: 400 11px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.app-v6 .ripple-interval[data-value="null"] {
+  color: var(--lnt-text-dim);
+}
+
+.app-v6 .ripple-intervals-count {
+  flex: none;
+  color: var(--lnt-text-dim);
+  font: 400 10px / 12px var(--lnt-ui);
+  white-space: nowrap;
+}
+
+/* QC-строка: фиксированные две строки и перенос вместо многоточия — текст не
+ * обрезается ни по ширине, ни по высоте, а полная строка и все машинные коды
+ * остаются в title. 32 px входят в запас строки сетки (график 148 px), поэтому
+ * высота панели и позиции контролов от данных не зависят. */
+.app-v6 .ripple-qc {
+  overflow: hidden;
+  block-size: 32px;
+  color: var(--lnt-text-dim);
+  font: 400 10px / 16px var(--lnt-mono);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.app-v6 .ripple-chart {
+  grid-area: chart;
+  display: flex;
+  flex-direction: column;
+  block-size: 148px;
+  min-width: 0;
+  margin: 0;
+}
+
+.app-v6 .ripple-chart-hd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  block-size: 24px;
+  min-width: 0;
+}
+
+.app-v6 .ripple-chart-title {
+  flex: none;
+  color: var(--lnt-text-sec);
+  font: 700 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-v6 .ripple-chart-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lnt-text-dim);
+  font: 400 10px / 12px var(--lnt-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-v6 .ripple-band {
+  flex: none;
+  inline-size: 132px;
+  block-size: 24px;
+  padding: 0 6px;
+  font: 400 11px / 16px var(--lnt-ui);
+}
+
+.app-v6 .ripple-toggle {
+  display: flex;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+}
+
+.app-v6 .ripple-mode-btn {
+  block-size: 22px;
+  min-inline-size: 40px;
+  padding: 0 8px;
+  background: transparent;
+  border: 0;
+  color: var(--lnt-text-sec);
+  cursor: pointer;
+  font: 700 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.04em;
+  transition: background-color var(--lnt-t-fast) var(--lnt-ease);
+}
+
+.app-v6 .ripple-mode-btn[aria-pressed="true"] {
+  background: var(--lnt-elev);
+  color: var(--lnt-text);
+}
+
+.app-v6 .ripple-mode-btn:focus-visible {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: -2px;
+}
+
+.app-v6 .ripple-mode-btn:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .app-v6 .ripple-mode-btn:hover {
+    background: var(--lnt-chrome);
+    color: var(--lnt-text);
+  }
+}
+
+.app-v6 .ripple-chart-host {
+  position: relative;
+  flex: none;
+  block-size: 124px;
+  min-width: 0;
+}
+
+.app-v6 .ripple-chart-host .lnt-uplot-root,
+.app-v6 .ripple-chart-host .lnt-uplot-host {
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+/* Легенда дублирует подпись PSD/ASD в шапке и съедает треть компактной
+ * высоты; значения остаются в тултипе uPlot. */
+.app-v6 .ripple-chart-host .u-legend {
+  display: none;
+}
+
+.app-v6 .ripple-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 124px;
+  margin: 0;
+  padding: var(--lnt-space-2);
+  color: var(--lnt-text-dim);
+  font: 400 11px / 16px var(--lnt-mono);
+  text-align: center;
+}
+
+.app-v6 .ripple-baseline {
+  display: flex;
+  align-items: center;
+  gap: var(--lnt-space-2);
+  grid-area: baseline;
+  block-size: 30px;
+  min-width: 0;
+  padding: 0 var(--lnt-space-2);
+  overflow: hidden;
+  background: var(--lnt-chrome);
+  border: 1px solid var(--lnt-line);
+  border-radius: var(--lnt-r-ctl);
+  white-space: nowrap;
+}
+
+.app-v6 .ripple-baseline-label {
+  flex: none;
+  color: var(--lnt-text-sec);
+  font: 700 10px / 12px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-v6 .ripple-baseline-status {
+  flex: none;
+  inline-size: 132px;
+  overflow: hidden;
+  color: var(--lnt-text-sec);
+  font: 400 11px / 16px var(--lnt-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-v6 .ripple-baseline-cap {
+  flex: none;
+  color: var(--lnt-text-dim);
+  font: 400 10px / 12px var(--lnt-ui);
+}
+
+.app-v6 .ripple-baseline-value {
+  flex: none;
+  inline-size: 78px;
+  color: var(--lnt-text);
+  font: 400 11px / 16px var(--lnt-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  text-align: end;
+}
+
+.app-v6 .ripple-baseline-session {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--lnt-text-dim);
+  font: 400 11px / 16px var(--lnt-mono);
+  text-overflow: ellipsis;
+}
+
+.app-v6 .ripple-message {
+  grid-area: message;
+  min-block-size: 16px;
+  margin: 0;
+  color: var(--lnt-text-sec);
+  font: 400 11px / 16px var(--lnt-ui);
+}
+
+.app-v6 .ripple-message[data-tone="error"] {
+  color: var(--lnt-tone-error-fg);
+}
+
+@media (max-width: 900px) {
+  .app-v6 .ripple-bd {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "main"
+      "chart"
+      "baseline"
+      "message";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-v6 .ripple-mode-btn {
+    transition: none;
+  }
+
+  .app-v6 .ripple-mode-btn:active {
+    transform: none;
+  }
+}

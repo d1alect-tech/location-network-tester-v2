@@ -76,6 +76,8 @@ export class MockLntBackend {
     { recipe_id?: string; artifact_key: string } | null
   >();
   private readonly artifacts = new Map<string, ArtifactSeed>();
+  /** Сохранённые ripple.json v1 по session id (todo 8): 200/404/409. */
+  private readonly ripple = new Map<string, { status: number; body: unknown }>();
   /** session_id более чем одного каталога корпуса: detail/spectrum дают 409. */
   private readonly ambiguousIds = new Set<string>();
   /** Каталоги корпуса без валидного манифеста: detail-200 невозможен (404). */
@@ -159,6 +161,9 @@ export class MockLntBackend {
   }
   seedSpectrum(id: string, payload: unknown): void {
     this.spectra.set(id, payload);
+  }
+  seedRipple(id: string, payload: unknown, status = 200): void {
+    this.ripple.set(id, { status, body: payload });
   }
   seedReferredSpectrum(id: string, payload: unknown, status = 200): void {
     this.referred.set(id, { status, body: payload });
@@ -288,6 +293,12 @@ export class MockLntBackend {
         return detail
           ? { status: 200, body: detail }
           : { status: 404, body: { detail: "сессия не найдена" } };
+      }
+      if (suffix === "/ripple" && method === "GET") {
+        const seeded = this.ripple.get(id);
+        return seeded
+          ? { status: seeded.status, body: seeded.body }
+          : { status: 404, body: { reason: "not_built", detail: "ripple.json не построен" } };
       }
       if (suffix === "/spectrum" && method === "GET") {
         return { status: 200, body: this.spectra.get(id) ?? defaultSpectrum() };

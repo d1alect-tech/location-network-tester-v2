@@ -1,6 +1,8 @@
 import "./v6.css";
 import { LntApiClient } from "../../api/client";
 import { createDeviceApi } from "../../api/client-device";
+import { createRippleApi } from "../../api/client-ripple";
+import type { RippleApi } from "../../api/client-ripple";
 import { isAbortError } from "../../api/errors";
 import type { CatalogQuery, CatalogSession } from "../../api/types";
 import { createChannelbar } from "../../components/channelbar/channelbar";
@@ -23,6 +25,7 @@ import { createPairDetail } from "./pairDetail";
 import { type PairLoadFailure, pairLoadOutcomeFrom, reasonFromError } from "./pairLoadOutcome";
 import { createPairState } from "./pairState";
 import { createPairbar } from "./pairbarV6";
+import { createRipplePanel } from "./ripple/ripplePanel";
 import { buildSessionAlias, indexSessionMeta } from "./sessionAlias";
 import { createSpectrumGramSection } from "./spectrumGramSection";
 import type { SpectrumPanelClient } from "./spectrumPanelV6";
@@ -46,6 +49,8 @@ export type InspectV6Opts = {
   readonly client: InspectV6Client;
   readonly routes: RouteStore;
   readonly createView?: (options: UplotViewOptions) => ChartHandle;
+  /** Инъекция ripple-клиента для mount-тестов; в продукте — createRippleApi. */
+  readonly ripple?: RippleApi;
 };
 
 function paramId(params: Record<string, string>, key: string): string | undefined {
@@ -97,6 +102,12 @@ export async function mountInspectV6(
   analysisBand.update({ meters: [...EMPTY_METERS], peaks: [] });
   analysisBand.paintDelta(null, null);
   analysisBand.paintPeaksDelta(null, null);
+  // Задача 8: панель сохранённого ripple-артефакта — отдельная секция под
+  // лентой, сессия базы пары. Клиент тройки todo 7, без своих роутов.
+  const ripplePanel = createRipplePanel({
+    api: opts.ripple ?? (client instanceof LntApiClient ? createRippleApi(client) : null),
+    createView: opts.createView,
+  });
   // Задача 10 (D3): Δ-семейство (пики таблицы, Δ-полоса, Δср пары) считается
   // из пейлоадов ОТОБРАЖАЕМОЙ плоскости — тот же провод, что кормит соседний
   // график (onPayloads панели), а не отдельный scope-фетч ленты. Смена
@@ -139,6 +150,7 @@ export async function mountInspectV6(
     channelbar.root,
     signalSection.root,
     analysisBand.root,
+    ripplePanel.root,
     extras.root,
   ]);
   const body = el("div", { className: "app-body" }, [colCat, colMain]);
@@ -165,8 +177,12 @@ export async function mountInspectV6(
       b === null ? null : (sessionMap.get(b) ?? null),
     );
     routes.replaceParams({ a: a ?? "", b: b ?? "" });
-    if (a === null || a === "") return;
+    if (a === null || a === "") {
+      void ripplePanel.setPair(null);
+      return;
+    }
     chrome.hideError();
+    void ripplePanel.setPair(a);
     pairbar.setDelta(null);
     paintChannelbarFromPayload(channelbar, null, null);
     analysisBand.update({ meters: [...EMPTY_METERS], peaks: [] });
@@ -247,6 +263,7 @@ export async function mountInspectV6(
     stopDeviceStatus();
     unsubscribe();
     signalSection.destroy();
+    ripplePanel.destroy();
     extras.destroy();
     root.remove();
   };
