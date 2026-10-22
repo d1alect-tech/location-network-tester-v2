@@ -4,11 +4,11 @@
  * status=ready. Состояния честные: settling без чисел (только прогресс),
  * unavailable/остановлен — прочерк, никогда NaN. Свежесть чисел — ТОЛЬКО
  * по событиям ripple: таймер гасит числа, если событий нет (потеря потока,
- * смерть сервера). Переподключение EventSource само по себе числа НЕ гасит:
- * серверная эпоха переживает реконнект клиента (routes_live), а кадры и
- * heartbeat возраст риппла не обновляют. Геометрия стабильна: каждое
- * меняющееся значение сидит в слоте с фиксированной минимальной шириной
- * (scope.css), смена текста не двигает соседей. */
+ * смерть сервера). Ошибка транспорта (onerror) гасит числа сразу; сам
+ * реконнект (onopen), кадры и heartbeat возраст риппла не обновляют и числа
+ * не возвращают — это делает только следующее событие ripple. Геометрия
+ * стабильна: каждое меняющееся значение сидит в слоте с фиксированной
+ * минимальной шириной (scope.css), смена текста не двигает соседей. */
 
 import type { LiveRipplePayload, LiveStatePayload } from "../../api/types-live";
 import { el } from "../../components/primitives/dom";
@@ -36,6 +36,9 @@ export interface ScopeRippleChipHandle {
   readonly root: HTMLElement;
   /** Валидный снимок события ripple; null — битое событие, числа гаснут. */
   apply(payload: LiveRipplePayload | null): void;
+  /** Ошибка транспорта: числа гаснут до следующего события ripple.
+   * Идентичности эпохи сохраняются — откат и дубли по-прежнему отсекаются. */
+  invalidate(): void;
   /** Состояние владения из onState: переход в running = новая эпоха —
    * старые числа гаснут; повторный running (heartbeat) чип не трогает. */
   applyLiveState(state: LiveStatePayload): void;
@@ -136,6 +139,17 @@ export function mountScopeRippleChip(options: ScopeRippleChipOptions = {}): Scop
     }
   }
 
+  /** Транспорт потерян: числа и прогресс гаснут, провенанс последнего
+   * снимка остаётся. Эпоха не сбрасывается: следующее событие той же эпохи
+   * вернёт числа, а откат (старая эпоха/непрерывность/прогресс) — нет.
+   * Терминальный stopped уже без чисел и остаётся последним честным статусом. */
+  function invalidate(): void {
+    disarmStaleTimer();
+    if (data === null || data.status === "stopped") return;
+    stale = true;
+    render();
+  }
+
   /** Устаревший снимок (прошлая эпоха/непрерывность/прогресс) не рисуется. */
   function isRegression(payload: LiveRipplePayload): boolean {
     if (payload.epoch_id < lastEpoch) return true;
@@ -195,6 +209,7 @@ export function mountScopeRippleChip(options: ScopeRippleChipOptions = {}): Scop
   return {
     root,
     apply,
+    invalidate,
     applyLiveState: (state) => {
       const nowRunning = state.state === "running";
       if (nowRunning && running !== true) reset();

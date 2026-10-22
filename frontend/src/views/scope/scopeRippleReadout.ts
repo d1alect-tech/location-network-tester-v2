@@ -36,10 +36,11 @@ export function mountScopeRippleReadout(): ScopeRippleReadoutHandle {
     applyFrame: (frame) => view.applyFrame(frame),
     applyRipple: (payload) => chip.apply(payload),
     applyLiveState: (state) => chip.applyLiveState(state),
-    // Свежесть чисел чипа не зависит от реконнектов EventSource: серверная
-    // эпоха переживает переподключение клиента, возраст гасит только таймер
-    // отсутствия ripple-событий. Здесь — только индикатор соединения.
+    // Ошибка транспорта гасит числа чипа сразу: реконнект сам их не
+    // возвращает, это делает только следующее ripple-событие текущей эпохи.
+    // Здесь же обновляется индикатор соединения.
     setConnection: (kind) => {
+      if (kind === "reconnecting") chip.invalidate();
       view.connection.textContent = kind === "live" ? "передача данных" : "переподключение…";
     },
     dispose: () => chip.dispose(),

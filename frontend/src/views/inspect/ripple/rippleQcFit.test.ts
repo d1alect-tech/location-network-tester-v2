@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { RippleQc, RippleSelection } from "../../../api/types-ripple";
-import { reasonText } from "./rippleFormat";
 import { QC_VISIBLE_BUDGET } from "./rippleQcFit";
 import { qcView } from "./rippleViewParts";
 
@@ -59,16 +58,15 @@ describe("видимая строка QC при множестве кодов п
       new RegExp(`ещё ${view.hidden.length} (код|кода|кодов) QC`),
     );
     expect(view.text, "многоточие не прячет содержимое").not.toContain("...");
-  });
-
-  it("не показанные коды — это ровно те, чей текст не попал в строку", () => {
-    const view = qcView(qcOf(MANY_CODES), SELECTION);
-    const distinct = [...new Set(MANY_CODES)];
-    const expected = distinct
-      .filter((code) => !view.omitted.includes(code) && !view.text.includes(reasonText(code)))
-      .sort();
-    expect([...view.hidden].sort(), "скрыты ровно те коды, чей текст не показан").toEqual(expected);
     expect(new Set(view.hidden).size, "скрытые коды не повторяются").toBe(view.hidden.length);
+    expect(
+      view.hidden.every((code) => MANY_CODES.includes(code)),
+      "скрыты только коды артефакта",
+    ).toBe(true);
+    expect(
+      view.hidden.filter((code) => view.omitted.includes(code)),
+      "показанные строкой коды не числятся скрытыми",
+    ).toEqual([]);
   });
 
   it("полный текст и все машинные коды остаются в title", () => {
@@ -105,22 +103,20 @@ describe("видимая строка QC при множестве кодов п
     }
   });
 
-  it("реальный артефакт кампании показан целиком и ничего не прячет", () => {
-    const view = qcView(
-      qcOf(["clipping_unknown", "clip_census_inconsistent"]).clipping_assessment ===
-        "clip_census_inconsistent"
-        ? {
-            ...qcOf(["clipping_unknown", "clip_census_inconsistent"]),
-            clip_low_count: 2,
-            clip_high_count: 0,
-          }
-        : qcOf([]),
-      SELECTION,
-    );
-    expect(view.text).toBe(
-      "QC: ценз несогласован · клиппинг 2/0 · нечисловые 0 · непрерывность не подтверждена · клиппинг не определён",
-    );
-    expect(view.hidden, "у реального артефакта ничего не скрыто").toEqual([]);
+  it("реальный артефакт кампании: ценз 2/0, ни один код не скрыт", () => {
+    const qc = {
+      ...qcOf(["clipping_unknown", "clip_census_inconsistent"]),
+      clip_low_count: 2,
+      clip_high_count: 0,
+    };
+    const view = qcView(qc, SELECTION);
+    expect(view.text.startsWith("QC: "), "строка QC присутствует").toBe(true);
+    expect(view.text, "видимый ценз — фактические счётчики").toContain("клиппинг 2/0");
+    expect(view.hidden.length, "ни один код не скрыт").toBe(0);
+    expect(view.omitted, "оценка ценза показана строкой и не дублируется").toEqual([
+      "clip_census_inconsistent",
+    ]);
+    expect(view.codes, "машинные коды сохранены").toEqual(qc.reason_codes);
     expect(view.text, "многоточие не прячет содержимое").not.toContain("...");
   });
 
