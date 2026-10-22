@@ -21,6 +21,7 @@ const REASONS: Readonly<Record<string, string>> = {
   baseline_geometry_missing: "геометрия фона не записана",
   baseline_geometry_mismatch: "геометрия фона не совпадает",
   baseline_instrument_only: "фон только прибора, без сборки",
+  baseline_is_measurement: "фон совпадает с измерением",
   baseline_hookup_mismatch: "подключение канала фона не совпадает",
   stale_input: "входные файлы изменились",
 };

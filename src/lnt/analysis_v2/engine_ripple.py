@@ -78,6 +78,8 @@ def _baseline_payload(
         measurement=request.session.manifest,
         baseline=baseline_session.manifest,
         attachment=attachment,
+        measurement_dir=request.session.session_dir,
+        baseline_dir=baseline_session.session_dir,
     )
     hashes = session_input_hashes(baseline_session)
     baseline_dir = _sibling_session_dir(

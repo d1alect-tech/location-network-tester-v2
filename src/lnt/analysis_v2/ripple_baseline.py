@@ -42,6 +42,7 @@ REASON_GEOMETRY_MISSING: Final = "baseline_geometry_missing"
 REASON_GEOMETRY_MISMATCH: Final = "baseline_geometry_mismatch"
 REASON_INSTRUMENT_ONLY: Final = "baseline_instrument_only"
 REASON_HOOKUP: Final = "baseline_hookup_mismatch"
+REASON_SELF_BASELINE: Final = "baseline_is_measurement"
 DEVICE_IDENTITY_NOT_RECORDED: Final = "not_recorded"
 
 
@@ -60,9 +61,18 @@ def baseline_identity_reasons(
     measurement: SessionManifest,
     baseline: SessionManifest,
     attachment: BaselineAttachment | None,
+    measurement_dir: Path | None = None,
+    baseline_dir: Path | None = None,
 ) -> tuple[str, ...]:
     """Типовые коды несовместимости; пустой кортеж — геометрия совпадает."""
     reasons: list[str] = []
+    if _same_recording(
+        measurement=measurement,
+        baseline=baseline,
+        measurement_dir=measurement_dir,
+        baseline_dir=baseline_dir,
+    ):
+        reasons.append(REASON_SELF_BASELINE)
     if attachment is None:
         reasons.append(REASON_ATTACHMENT)
     if baseline.source != measurement.source:
@@ -82,6 +92,24 @@ def baseline_identity_reasons(
     if calibration_reason is not None:
         reasons.append(calibration_reason)
     return tuple(reasons)
+
+
+def _same_recording(
+    *,
+    measurement: SessionManifest,
+    baseline: SessionManifest,
+    measurement_dir: Path | None,
+    baseline_dir: Path | None,
+) -> bool:
+    """Самосравнение: тот же session_id или тот же разрешённый каталог."""
+    if measurement.session_id == baseline.session_id:
+        return True
+    if measurement_dir is None or baseline_dir is None:
+        return False
+    try:
+        return measurement_dir.resolve() == baseline_dir.resolve()
+    except OSError:
+        return False
 
 
 def _geometry_reasons(

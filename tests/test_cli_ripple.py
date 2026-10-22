@@ -213,6 +213,34 @@ def test_baseline_is_comparison_only_never_subtracted(
     assert baseline_time["availability"] == "available"
 
 
+def test_baseline_same_session_is_not_available(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: измерение, объявленное фоном самому себе.
+    session = _write_session(tmp_path / "meas", "ripple-cli-self")
+
+    # When
+    code, _, err = _run(
+        capsys,
+        [
+            "ripple",
+            str(session),
+            *_BANDED,
+            "--baseline",
+            str(session),
+            "--baseline-shorted-tip",
+        ],
+    )
+
+    # Then: самосравнение не является фоном — сравнение недоступно.
+    assert code == EXIT_OK
+    assert err == ""
+    baseline = cast("dict[str, object]", _sidecar_payload(session)["baseline"])
+    assert baseline["comparison_status"] == "unavailable"
+    assert "baseline_is_measurement" in cast("list[str]", baseline["reason_codes"])
+
+
 def test_missing_session_key_exits_2_one_line_stderr(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],

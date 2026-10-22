@@ -30,6 +30,10 @@ from lnt.types import (
     AcquisitionTelemetry,
     ChannelMeta,
     ChannelRole,
+    ComponentValuesBasis,
+    FloatingDifferentialRcShunt,
+    ReferenceAssumption,
+    ScopeInputTerminated,
     SessionManifest,
     SessionSource,
     SessionType,
@@ -79,14 +83,21 @@ def _telemetry(count: int) -> AcquisitionTelemetry:
     )
 
 
-def _manifest(*, session_id: str, count: int) -> SessionManifest:
+def _manifest(
+    *,
+    session_id: str,
+    count: int,
+    source: SessionSource = SessionSource.SYNTHETIC,
+    session_type: SessionType = SessionType.MEASUREMENT,
+    ch1_setup: FloatingDifferentialRcShunt | ScopeInputTerminated | None = None,
+) -> SessionManifest:
     return SessionManifest(
-        schema_version=1,
+        schema_version=2 if ch1_setup is not None else 1,
         session_id=session_id,
         created_utc="2026-10-20T00:00:00Z",
         completed_utc="2026-10-20T00:00:03Z",
-        source=SessionSource.SYNTHETIC,
-        session_type=SessionType.MEASUREMENT,
+        source=source,
+        session_type=session_type,
         sample_rate_hz=_FS_HZ,
         duration_s=count / _FS_HZ,
         sample_count=count,
@@ -105,13 +116,39 @@ def _manifest(*, session_id: str, count: int) -> SessionManifest:
         ch2=None,
         acquisition_telemetry=_telemetry(count),
         synthetic_truth=None,
+        ch1_setup=ch1_setup,
     )
 
 
-def _write_session(root: Path, name: str, *, session_id: str, count: int) -> LoadedSession:
+def _floating_setup() -> FloatingDifferentialRcShunt:
+    return FloatingDifferentialRcShunt(
+        resistance_ohm=100.0,
+        c1_f=10e-9,
+        c2_f=10e-9,
+        component_values_basis=ComponentValuesBasis.NOMINAL,
+        reference_assumption=ReferenceAssumption.FLOATING_HOST_UNVERIFIED,
+    )
+
+
+def _write_session(
+    root: Path,
+    name: str,
+    *,
+    session_id: str,
+    count: int,
+    source: SessionSource = SessionSource.SYNTHETIC,
+    session_type: SessionType = SessionType.MEASUREMENT,
+    ch1_setup: FloatingDifferentialRcShunt | ScopeInputTerminated | None = None,
+) -> LoadedSession:
     write_session(
         session_dir=root / name,
-        manifest=_manifest(session_id=session_id, count=count),
+        manifest=_manifest(
+            session_id=session_id,
+            count=count,
+            source=source,
+            session_type=session_type,
+            ch1_setup=ch1_setup,
+        ),
         ch1=_record(count),
         ch2=None,
     )
@@ -120,6 +157,26 @@ def _write_session(root: Path, name: str, *, session_id: str, count: int) -> Loa
 
 def _sidecar_path(session_dir: Path) -> Path:
     return session_dir / "ripple.json"
+
+
+def _force_stored_available(session_dir: Path, *, strip_evidence: bool) -> None:
+    """Восстанавливает до-фиксовый сайдкар: «available» без доказательств."""
+    path = _sidecar_path(session_dir)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    baseline = payload["baseline"]
+    if strip_evidence:
+        for key in (
+            "session_type",
+            "channel_role",
+            "ch1_setup",
+            "device_identity",
+            "connection_procedure",
+            "session_dir",
+        ):
+            baseline["session"].pop(key, None)
+    baseline["comparison_status"] = "available"
+    baseline["reason_codes"] = []
+    path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 @pytest.fixture(scope="module")
@@ -193,6 +250,50 @@ def ripple_routes(tmp_path_factory: pytest.TempPathFactory) -> Iterator[RippleRo
             baseline_attachment=BaselineAttachment.SAME_ADAPTER_TIP_SHORTED,
         )
     )
+    _write_session(
+        root,
+        "legacy-meas",
+        session_id="legacy-meas",
+        count=_COUNT_FULL,
+        source=SessionSource.DEVICE,
+        ch1_setup=_floating_setup(),
+    )
+    _write_session(
+        root,
+        "legacy-bg",
+        session_id="legacy-bg",
+        count=_COUNT_FULL,
+        source=SessionSource.DEVICE,
+        session_type=SessionType.SELF_NOISE,
+        ch1_setup=ScopeInputTerminated(termination_resistance_ohm=50.0),
+    )
+    legacy_measurement = load_session(root / "legacy-meas")
+    run_ripple(
+        RippleRequest(
+            session=legacy_measurement,
+            adapter=AdapterSpec(),
+            band_low_hz=99.0,
+            band_high_hz=101.0,
+            settling=SettlingDeclaration.PRECONNECTED,
+            baseline_path=root / "legacy-bg",
+            baseline_attachment=BaselineAttachment.SAME_ADAPTER_TIP_SHORTED,
+        )
+    )
+    _force_stored_available(root / "legacy-meas", strip_evidence=True)
+    _write_session(root, "selfbase", session_id="selfbase-id", count=_COUNT_FULL)
+    selfbase = load_session(root / "selfbase")
+    run_ripple(
+        RippleRequest(
+            session=selfbase,
+            adapter=AdapterSpec(),
+            band_low_hz=99.0,
+            band_high_hz=101.0,
+            settling=SettlingDeclaration.PRECONNECTED,
+            baseline_path=root / "selfbase",
+            baseline_attachment=BaselineAttachment.SAME_ADAPTER_TIP_SHORTED,
+        )
+    )
+    _force_stored_available(root / "selfbase", strip_evidence=False)
     with TestClient(create_app(root=root)) as client:
         yield RippleRoutesFixture(
             root=root,
@@ -316,6 +417,43 @@ def test_ripple_baseline_input_change_maps_409(ripple_routes: RippleRoutesFixtur
 
     assert response.status_code == 409
     assert response.json()["reason"] == "stale_input"
+
+
+def test_ripple_legacy_terminated_baseline_is_requalified_unavailable(
+    ripple_routes: RippleRoutesFixture,
+) -> None:
+    # Given: реконструированный до-фиксовый сайдкар без полей-доказательств,
+    # где сохранено «available», а манифест фона — self_noise + 50 Ом.
+    stored = json.loads(
+        _sidecar_path(ripple_routes.root / "legacy-meas").read_text(encoding="utf-8")
+    )
+    assert stored["baseline"]["comparison_status"] == "available"
+
+    # When
+    response = ripple_routes.client.get("/api/sessions/legacy-meas/ripple")
+
+    # Then: GET выводит статус сам; сохранённое утверждение не принимается на веру.
+    assert response.status_code == 200
+    baseline = response.json()["baseline"]
+    assert baseline["comparison_status"] == "unavailable"
+    assert "baseline_instrument_only" in baseline["reason_codes"]
+
+
+def test_ripple_self_baseline_is_requalified_unavailable(
+    ripple_routes: RippleRoutesFixture,
+) -> None:
+    # Given: сохранённый «available» для фона, который является самим измерением.
+    stored = json.loads(_sidecar_path(ripple_routes.root / "selfbase").read_text(encoding="utf-8"))
+    assert stored["baseline"]["comparison_status"] == "available"
+
+    # When
+    response = ripple_routes.client.get("/api/sessions/selfbase/ripple")
+
+    # Then
+    assert response.status_code == 200
+    baseline = response.json()["baseline"]
+    assert baseline["comparison_status"] == "unavailable"
+    assert "baseline_is_measurement" in baseline["reason_codes"]
 
 
 def test_ripple_directory_sidecar_maps_409(ripple_routes: RippleRoutesFixture) -> None:
