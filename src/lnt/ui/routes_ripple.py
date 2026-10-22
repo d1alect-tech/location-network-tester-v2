@@ -1,8 +1,11 @@
 """Read-only HTTP-раздача сохранённого сайдкара ripple.json сессии.
 
-Контракт (поправки исполнения №6): GET никогда не считает и не мутирует —
-отдаются сохранённые байты после проверки схемы, типа файла и хэшей входов;
-absent=404, corrupt/stale/schema-incompatible=409, ambiguous=409,
+Контракт (поправки исполнения №6): GET не пересчитывает метрики и не мутирует.
+Сохранённые байты отдаются после проверки схемы, типа файла и хэшей входов;
+если сохранён «available», статус фона переквалифицируется по хэш-пиннингованным
+манифестам через общий с записью помощник, и ответ 200 может нести производный
+«unavailable» (сайдкар не переписывается). Текстовые поля артефакта не
+участвуют. absent=404, corrupt/stale/schema-incompatible=409, ambiguous=409,
 unsafe ID=422; параметры запроса не принимаются, nonce не нужен.
 """
 
@@ -38,7 +41,10 @@ _STALE_INPUT: Final = "stale_input"
 
 @router.get("/{session_name}/ripple")
 def get_ripple_artifact(session_name: str, request: Request, services: Services) -> Response:
-    """Отдаёт сохранённый ripple.json как есть; вычислений и мутаций нет."""
+    """Отдаёт сохранённый ripple.json; файл не переписывается.
+
+    Статус фона выводится по хэш-пиннингованным манифестам.
+    """
     if request.query_params:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "GET ripple не принимает параметры запроса"
@@ -94,7 +100,7 @@ def _verify_current_inputs(session_dir: Path, artifact: RippleArtifact) -> Sessi
 
 
 def _measurement_manifest(session_dir: Path) -> SessionManifest:
-    """Читает манифест измерения для повторной квалификации фона."""
+    """Читает манифест измерения для переквалификации фона общим помощником."""
     try:
         return manifest_from_json((session_dir / _MANIFEST_FILENAME).read_text(encoding="utf-8"))
     except (InputError, OSError, UnicodeDecodeError) as error:

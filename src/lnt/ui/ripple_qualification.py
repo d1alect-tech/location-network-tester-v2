@@ -1,22 +1,18 @@
 """Переквалификация фона ripple при чтении: формат v1 остаётся замороженным.
 
-GET не доверяет сохранённому ``comparison_status="available"``. Те же правила
-квалификации, что применяет запись, повторяются по манифестам измерения и
-фона и по свидетельствам внутри сайдкара. Ответ 200 может нести производный
-статус ``unavailable``; файл ``ripple.json`` не переписывается.
+GET не доверяет сохранённому ``comparison_status="available"``. Единственный
+источник квалификации — хэш-пиннингованные манифесты измерения и фона: правила
+применяет общий с записью помощник ``baseline_identity_reasons``. Текстовые
+поля артефакта не участвуют. Ответ 200 может нести производный статус
+``unavailable``; файл ``ripple.json`` не переписывается.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final
 
-from lnt.analysis_v2.ripple_baseline import (
-    REASON_HOOKUP,
-    REASON_INSTRUMENT_ONLY,
-    baseline_identity_reasons,
-)
+from lnt.analysis_v2.ripple_baseline import baseline_identity_reasons
 from lnt.analysis_v2.ripple_options import BaselineAttachment
-from lnt.types import SessionType
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -26,7 +22,6 @@ if TYPE_CHECKING:
 
 _AVAILABLE: Final = "available"
 _UNAVAILABLE: Final = "unavailable"
-_TERMINATED_KIND: Final = "scope_input_terminated_v1"
 
 
 def requalified_payload(
@@ -37,7 +32,10 @@ def requalified_payload(
     measurement_dir: Path,
     baseline_dir: Path,
 ) -> dict[str, JsonValue] | None:
-    """Возвращает payload с производным статусом или None, если доверие подтверждено."""
+    """Возвращает payload с производным статусом по манифестам или None.
+
+    None означает, что сохранённое «available» подтверждено.
+    """
     raw = payload["baseline"]
     if not isinstance(raw, dict) or raw.get("comparison_status") != _AVAILABLE:
         return None
@@ -50,7 +48,6 @@ def requalified_payload(
             baseline_dir=baseline_dir,
         )
     )
-    reasons.extend(_artifact_evidence_reasons(raw, measurement))
     if not reasons:
         return None
     updated = dict(payload)
@@ -66,20 +63,3 @@ def _attachment(value: JsonValue | None) -> BaselineAttachment | None:
     if isinstance(value, str):
         return BaselineAttachment(value)
     return None
-
-
-def _artifact_evidence_reasons(
-    block: dict[str, JsonValue],
-    measurement: SessionManifest,
-) -> list[str]:
-    """Свидетельства внутри сайдкара: приборный фон и несовпадение канала."""
-    reasons: list[str] = []
-    if block.get("session_type") == SessionType.SELF_NOISE.value:
-        reasons.append(REASON_INSTRUMENT_ONLY)
-    setup = block.get("ch1_setup")
-    if isinstance(setup, dict) and setup.get("kind") == _TERMINATED_KIND:
-        reasons.append(REASON_INSTRUMENT_ONLY)
-    role = block.get("channel_role")
-    if isinstance(role, str) and role != measurement.ch1.role.value:
-        reasons.append(REASON_HOOKUP)
-    return reasons

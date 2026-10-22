@@ -1,9 +1,11 @@
 """GET /api/sessions/{id}/ripple — read-only отдача сохранённого сайдкара.
 
-Контракт (план todo 5 + поправки исполнения 2026-10-20): GET никогда не
-считает и не мутирует; absent=404, corrupt/stale/schema-incompatible=409,
+Контракт (план todo 5 + поправки исполнения 2026-10-20): GET не пересчитывает
+метрики и не мутирует; absent=404, corrupt/stale/schema-incompatible=409,
 ambiguous=409, unsafe ID=422, параметры запроса не принимаются. Тело 200 —
-байты сохранённого ``ripple.json`` без пересборки.
+сохранённые байты, если сохранённый «available» подтверждён хэш-пиннингованными
+манифестами; иначе производный payload с переквалифицированным статусом.
+Сайдкар не переписывается.
 """
 
 from __future__ import annotations
@@ -179,6 +181,22 @@ def _force_stored_available(session_dir: Path, *, strip_evidence: bool) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def _tamper_stored_evidence(session_dir: Path) -> None:
+    """Портит только текст артефакта: манифесты-источники остаются нетронутыми."""
+    path = _sidecar_path(session_dir)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    baseline = payload["baseline"]
+    baseline["session"]["session_type"] = SessionType.SELF_NOISE.value
+    baseline["session"]["ch1_setup"] = {
+        "kind": "scope_input_terminated_v1",
+        "termination_resistance_ohm": 50.0,
+    }
+    baseline["session"]["channel_role"] = ChannelRole.LF_TRANSFORMER.value
+    baseline["comparison_status"] = "available"
+    baseline["reason_codes"] = []
+    path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 @pytest.fixture(scope="module")
 def ripple_routes(tmp_path_factory: pytest.TempPathFactory) -> Iterator[RippleRoutesFixture]:
     root = tmp_path_factory.mktemp("ripple-routes")
@@ -294,6 +312,33 @@ def ripple_routes(tmp_path_factory: pytest.TempPathFactory) -> Iterator[RippleRo
         )
     )
     _force_stored_available(root / "selfbase", strip_evidence=False)
+    _write_session(
+        root,
+        "tampered-meas",
+        session_id="tampered-meas-id",
+        count=_COUNT_FULL,
+        ch1_setup=_floating_setup(),
+    )
+    _write_session(
+        root,
+        "tampered-bg",
+        session_id="tampered-bg-id",
+        count=_COUNT_FULL,
+        ch1_setup=_floating_setup(),
+    )
+    tampered_measurement = load_session(root / "tampered-meas")
+    run_ripple(
+        RippleRequest(
+            session=tampered_measurement,
+            adapter=AdapterSpec(),
+            band_low_hz=99.0,
+            band_high_hz=101.0,
+            settling=SettlingDeclaration.PRECONNECTED,
+            baseline_path=root / "tampered-bg",
+            baseline_attachment=BaselineAttachment.SAME_ADAPTER_TIP_SHORTED,
+        )
+    )
+    _tamper_stored_evidence(root / "tampered-meas")
     with TestClient(create_app(root=root)) as client:
         yield RippleRoutesFixture(
             root=root,
@@ -454,6 +499,33 @@ def test_ripple_self_baseline_is_requalified_unavailable(
     baseline = response.json()["baseline"]
     assert baseline["comparison_status"] == "unavailable"
     assert "baseline_is_measurement" in baseline["reason_codes"]
+
+
+def test_ripple_stored_evidence_cannot_override_hash_pinned_manifest(
+    ripple_routes: RippleRoutesFixture,
+) -> None:
+    # Given: текст сайдкара подменён на self_noise + terminated и «available»,
+    # но манифест фона — matched floating measurement; хэши входов не тронуты.
+    session_dir = ripple_routes.root / "tampered-meas"
+    baseline_dir = ripple_routes.root / "tampered-bg"
+    sidecar = _sidecar_path(session_dir)
+    tampered_bytes = sidecar.read_bytes()
+    stored = json.loads(tampered_bytes)
+    assert stored["baseline"]["session"]["session_type"] == "self_noise"
+    assert stored["baseline"]["session"]["ch1_setup"]["kind"] == "scope_input_terminated_v1"
+    assert stored["baseline"]["comparison_status"] == "available"
+    assert load_session(baseline_dir).manifest.session_type is SessionType.MEASUREMENT
+
+    # When
+    response = ripple_routes.client.get("/api/sessions/tampered-meas/ripple")
+
+    # Then: авторитет — хэш-пиннингованные манифесты, а не текст артефакта.
+    assert response.status_code == 200
+    baseline = response.json()["baseline"]
+    assert baseline["comparison_status"] == "available"
+    assert baseline["reason_codes"] == []
+    assert response.content == tampered_bytes
+    assert sidecar.read_bytes() == tampered_bytes
 
 
 def test_ripple_directory_sidecar_maps_409(ripple_routes: RippleRoutesFixture) -> None:
