@@ -1,10 +1,13 @@
 """Переквалификация фона ripple при чтении: формат v1 остаётся замороженным.
 
-GET не доверяет сохранённому ``comparison_status="available"``. Единственный
-источник квалификации — хэш-пиннингованные манифесты измерения и фона: правила
-применяет общий с записью помощник ``baseline_identity_reasons``. Текстовые
-поля артефакта не участвуют. Ответ 200 может нести производный статус
-``unavailable``; файл ``ripple.json`` не переписывается.
+GET не доверяет сохранённому ``comparison_status="available"``. Квалификация
+выводится из хэш-пиннингованных манифестов измерения и фона через общий с
+записью помощник ``baseline_identity_reasons`` плюс ровно одно поле артефакта —
+``baseline.attachment_basis`` (записанное объявление оператора о подключении
+фона; отсутствует — сравнение ``unavailable`` с кодом
+``baseline_attachment_unqualified``). Другие текстовые поля артефакта не
+читаются. Ответ 200 может нести производный статус ``unavailable``; файл
+``ripple.json`` не переписывается.
 """
 
 from __future__ import annotations
@@ -43,6 +46,8 @@ def requalified_payload(
         baseline_identity_reasons(
             measurement=measurement,
             baseline=baseline,
+            # Единственное поле артефакта в квалификации: записанное объявление
+            # подключения фона; его отсутствие даёт baseline_attachment_unqualified.
             attachment=_attachment(raw.get("attachment_basis")),
             measurement_dir=measurement_dir,
             baseline_dir=baseline_dir,
@@ -59,7 +64,7 @@ def requalified_payload(
 
 
 def _attachment(value: JsonValue | None) -> BaselineAttachment | None:
-    """Объявленное условие подключения фона из уже проверенного блока."""
+    """Записанное объявление подключения фона: единственное поле артефакта."""
     if isinstance(value, str):
         return BaselineAttachment(value)
     return None

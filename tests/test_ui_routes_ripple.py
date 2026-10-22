@@ -528,6 +528,46 @@ def test_ripple_stored_evidence_cannot_override_hash_pinned_manifest(
     assert sidecar.read_bytes() == tampered_bytes
 
 
+def test_ripple_missing_attachment_basis_is_requalified_unavailable(
+    ripple_routes: RippleRoutesFixture,
+) -> None:
+    # Given: совместимая пара, но в сайдкаре удалено объявление подключения фона
+    # (attachment_basis=null), а «available» сохранён.
+    root = ripple_routes.root
+    _write_session(root, "attach-meas", session_id="attach-meas-id", count=_COUNT_FULL)
+    _write_session(root, "attach-bg", session_id="attach-bg-id", count=_COUNT_FULL)
+    measurement = load_session(root / "attach-meas")
+    run_ripple(
+        RippleRequest(
+            session=measurement,
+            adapter=AdapterSpec(),
+            band_low_hz=99.0,
+            band_high_hz=101.0,
+            settling=SettlingDeclaration.PRECONNECTED,
+            baseline_path=root / "attach-bg",
+            baseline_attachment=BaselineAttachment.SAME_ADAPTER_TIP_SHORTED,
+        )
+    )
+    sidecar = _sidecar_path(root / "attach-meas")
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    payload["baseline"]["attachment_basis"] = None
+    payload["baseline"]["comparison_status"] = "available"
+    payload["baseline"]["reason_codes"] = []
+    sidecar.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
+    stored = sidecar.read_bytes()
+
+    # When
+    response = ripple_routes.client.get("/api/sessions/attach-meas/ripple")
+
+    # Then: отсутствие объявления делает сравнение недоступным; GET не доверяет
+    # сохранённому «available», а сайдкар не переписывается.
+    assert response.status_code == 200
+    baseline = response.json()["baseline"]
+    assert baseline["comparison_status"] == "unavailable"
+    assert "baseline_attachment_unqualified" in baseline["reason_codes"]
+    assert sidecar.read_bytes() == stored
+
+
 def test_ripple_directory_sidecar_maps_409(ripple_routes: RippleRoutesFixture) -> None:
     response = ripple_routes.client.get("/api/sessions/dirthief/ripple")
 
