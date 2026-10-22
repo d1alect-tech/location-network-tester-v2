@@ -14,8 +14,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final
 
 from lnt.errors import InputError
+from lnt.manifest import ch1_setup_mapping
 from lnt.session_store import load_session
-from lnt.types import SessionSource
+from lnt.types import ScopeInputTerminated, SessionSource, SessionType
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -37,6 +38,11 @@ REASON_CALIBRATION_IDENTITY: Final = "baseline_calibration_identity_unknown"
 REASON_BASELINE_RESULT: Final = "baseline_result_unavailable"
 REASON_MEASUREMENT_RESULT: Final = "measurement_result_unavailable"
 REASON_DURATION: Final = "baseline_duration_mismatch"
+REASON_GEOMETRY_MISSING: Final = "baseline_geometry_missing"
+REASON_GEOMETRY_MISMATCH: Final = "baseline_geometry_mismatch"
+REASON_INSTRUMENT_ONLY: Final = "baseline_instrument_only"
+REASON_HOOKUP: Final = "baseline_hookup_mismatch"
+DEVICE_IDENTITY_NOT_RECORDED: Final = "not_recorded"
 
 
 def load_baseline_session(path: Path) -> LoadedSession:
@@ -69,16 +75,40 @@ def baseline_identity_reasons(
         reasons.append(REASON_UNIT)
     if baseline.ch1.probe_multiplier != measurement.ch1.probe_multiplier:
         reasons.append(REASON_PROBE)
+    reasons.extend(_geometry_reasons(measurement, baseline))
+    if baseline.ch1.role != measurement.ch1.role:
+        reasons.append(REASON_HOOKUP)
     calibration_reason = _calibration_reason(measurement, baseline)
     if calibration_reason is not None:
         reasons.append(calibration_reason)
     return tuple(reasons)
 
 
+def _geometry_reasons(
+    measurement: SessionManifest,
+    baseline: SessionManifest,
+) -> tuple[str, ...]:
+    """Записанная и совпадающая геометрия входа; синтетика — математический план."""
+    if measurement.source is SessionSource.SYNTHETIC and baseline.source is SessionSource.SYNTHETIC:
+        return ()
+    if baseline.session_type is SessionType.SELF_NOISE or isinstance(
+        baseline.ch1_setup, ScopeInputTerminated
+    ):
+        # 50-ом вход прибора без адаптера/сборки — только приборный референс.
+        return (REASON_INSTRUMENT_ONLY,)
+    if baseline.ch1_setup is None or measurement.ch1_setup is None:
+        return (REASON_GEOMETRY_MISSING,)
+    if baseline.ch1_setup != measurement.ch1_setup:
+        return (REASON_GEOMETRY_MISMATCH,)
+    return ()
+
+
 def baseline_payload_block(  # noqa: PLR0913 - один аргумент на поле замороженной схемы
     *,
     manifest: SessionManifest,
     hashes: Mapping[str, str],
+    session_dir: str | None,
+    settling: str,
     attachment: BaselineAttachment | None,
     comparison_status: str,
     reason_codes: tuple[str, ...],
@@ -95,6 +125,12 @@ def baseline_payload_block(  # noqa: PLR0913 - один аргумент на п
             "ch1_sha256": hashes["ch1_sha256"],
             "channel": "ch1",
             "source": manifest.source.value,
+            "session_dir": session_dir,
+            "session_type": manifest.session_type.value,
+            "channel_role": manifest.ch1.role.value,
+            "ch1_setup": ch1_setup_mapping(manifest.ch1_setup),
+            "device_identity": DEVICE_IDENTITY_NOT_RECORDED,
+            "connection_procedure": settling,
         },
         "attachment_basis": attachment.value if attachment is not None else None,
         "comparison_status": comparison_status,

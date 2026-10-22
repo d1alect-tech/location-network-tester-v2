@@ -13,6 +13,18 @@ from typing import Final
 
 from lnt.context.json_codec import JsonValue, decode_object
 from lnt.errors import InputError
+from lnt.ui.models_ripple_primitives import RippleSchemaError
+from lnt.ui.models_ripple_schema import validate_ripple_payload
+
+__all__ = [
+    "ALGORITHM_ID_RIPPLE",
+    "CHANNEL_RIPPLE",
+    "RIPPLE_SCHEMA_VERSION",
+    "RippleArtifact",
+    "RippleBaselineIdentity",
+    "RippleSchemaError",
+    "parse_ripple_artifact",
+]
 
 RIPPLE_SCHEMA_VERSION: Final = 1
 ALGORITHM_ID_RIPPLE: Final = "ripple_observed_v1"
@@ -45,13 +57,14 @@ _OBJECT_KEYS: Final = (
 _LIST_KEYS: Final = ("intervals", "bands")
 
 
-class RippleSchemaError(ValueError):
-    """Сайдкар не проходит схему v1; ``reason`` — стабильный код причины."""
+@dataclass(frozen=True, slots=True)
+class RippleBaselineIdentity:
+    """Идентичность фона для повторной сверки хэшей на GET."""
 
-    def __init__(self, reason: str, message: str) -> None:
-        """Код причины схемы и человекочитаемое сообщение."""
-        super().__init__(message)
-        self.reason: str = reason
+    session_id: str
+    session_dir: str | None
+    manifest_sha256: str
+    ch1_sha256: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +74,7 @@ class RippleArtifact:
     payload: dict[str, JsonValue]
     manifest_sha256: str
     ch1_sha256: str
+    baseline: RippleBaselineIdentity | None
 
 
 def parse_ripple_artifact(text: str) -> RippleArtifact:
@@ -75,10 +89,22 @@ def parse_ripple_artifact(text: str) -> RippleArtifact:
         raise RippleSchemaError(
             "schema_incompatible", "ripple.json: session.channel должен быть ch1"
         )
+    baseline_session = validate_ripple_payload(payload)
     return RippleArtifact(
         payload=payload,
         manifest_sha256=_sha256(session, "manifest_sha256"),
         ch1_sha256=_sha256(session, "ch1_sha256"),
+        baseline=None if baseline_session is None else _baseline_identity(baseline_session),
+    )
+
+
+def _baseline_identity(session: dict[str, object]) -> RippleBaselineIdentity:
+    """Собирает идентичность фона из уже проверенного блока session."""
+    return RippleBaselineIdentity(
+        session_id=str(session["session_id"]),
+        session_dir=(None if session.get("session_dir") is None else str(session["session_dir"])),
+        manifest_sha256=str(session["manifest_sha256"]),
+        ch1_sha256=str(session["ch1_sha256"]),
     )
 
 

@@ -12,10 +12,9 @@ from __future__ import annotations
 
 import itertools
 import threading
-from typing import Final, final
+from typing import TYPE_CHECKING, Final, final
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
 
 from lnt.errors import InputError
 from lnt.instrument.ripple_snapshot import RippleState, build_snapshot, rail_codes
@@ -25,11 +24,11 @@ from lnt.instrument.ripple_types import (
     RippleConfig,
     RippleSnapshot,
 )
-from lnt.instrument.sa import (
-    _SampleRing,  # pyright: ignore[reportPrivateUsage] — механика кольца SA, не математика
-)
+from lnt.instrument.sample_ring import SampleRing
 
-Float32Array = NDArray[np.float32]
+if TYPE_CHECKING:
+    from numpy.typing import ArrayLike
+
 _EPOCH_COUNTER: Final = itertools.count(1)
 
 
@@ -49,8 +48,8 @@ class RippleEngine:
         self._lock: Final = threading.RLock()
         self._config = config
         self._capacity = capacity_samples
-        self._samples: Final = _SampleRing(capacity_samples)
-        self._rails: Final = _SampleRing(capacity_samples)
+        self._samples: Final = SampleRing(capacity_samples)
+        self._rails: Final = SampleRing(capacity_samples)
         self._epoch_id = 0
         self._continuity_id = 0
         self._capture_samples = 0

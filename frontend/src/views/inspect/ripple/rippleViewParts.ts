@@ -28,6 +28,8 @@ export type RippleBaselineView = {
   readonly vppText: string;
   readonly rmsRaw: number | null;
   readonly vppRaw: number | null;
+  /** true — текст обещает числа фона; false — панель показывает н/д. */
+  readonly numbersShown: boolean;
   readonly session: string | null;
   readonly reasons: readonly string[];
 };
@@ -65,16 +67,20 @@ export function baselineView(baseline: RippleBaseline | null): RippleBaselineVie
       vppText: RIPPLE_DASH,
       rmsRaw: null,
       vppRaw: null,
+      numbersShown: false,
       session: null,
       reasons: [],
     };
   }
   const td = baseline.time_domain;
   const status = baseline.comparison_status;
+  const hasNumbers = td.availability === "available";
   const text =
     status === "available"
       ? `Фон рядом: сравнение доступно, без вычитания (${baseline.session.session_id}).`
-      : `Фон рядом: сравнение недоступно — ${reasonList(baseline.reason_codes)}. Числа фона показаны как записаны.`;
+      : `Фон рядом: сравнение недоступно — ${reasonList(baseline.reason_codes)}. ${
+          hasNumbers ? "Числа фона показаны как записаны." : "Числа фона недоступны."
+        }`;
   return {
     status,
     text,
@@ -82,6 +88,7 @@ export function baselineView(baseline: RippleBaseline | null): RippleBaselineVie
     vppText: formatVolts(td.vpp_v),
     rmsRaw: td.rms_ac_v,
     vppRaw: td.vpp_v,
+    numbersShown: hasNumbers,
     session: baseline.session.session_id,
     reasons: baseline.reason_codes.map((code) => reasonText(code)),
   };

@@ -24,9 +24,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 import numpy as np
-from numpy.typing import NDArray
 
 from lnt.errors import InputError
+from lnt.instrument.sample_ring import SampleRing
 from lnt.psd.models import DEFAULT_DETECTOR, KNOWN_DETECTORS
 from lnt.psd.windows import DEFAULT_RBW_HZ, DEFAULT_WINDOW, canonical_window_name, validate_rbw_hz
 from lnt.spectrum import (
@@ -40,8 +40,6 @@ from lnt.spectrum import (
 
 if TYPE_CHECKING:
     from lnt.instrument.frames import LiveFrame
-
-Float32Array = NDArray[np.float32]
 
 # Кольцо SA: 2^19 отсчётов (2 МиБ float32) вмещает nperseg самого тонкого RBW
 # (10 Гц) на максимальной dual-частоте 8 МГц; заполнение — 65 мс живого потока.
@@ -80,56 +78,6 @@ class SaTrace:
     config: SaConfig
 
 
-class _SampleRing:
-    """Кольцо последних отсчётов CH1: запись по кругу, срез — по порядку."""
-
-    def __init__(self, capacity: int) -> None:
-        """Выделяет буфер ровно ``capacity`` отсчётов; границы проверяет владелец."""
-        self._data: Float32Array = np.empty(capacity, dtype=np.float32)
-        self._start: int = 0
-        self._size: int = 0
-
-    def clear(self) -> None:
-        """Обнуляет кольцо без перевыделения буфера."""
-        self._start = 0
-        self._size = 0
-
-    def push(self, samples: Float32Array) -> None:
-        """Дописывает отсчёты; переполнение выбывает старейшими (по кругу)."""
-        capacity = int(self._data.size)
-        count = int(samples.size)
-        if count == 0:
-            return
-        if count >= capacity:
-            self._data[:] = samples[count - capacity :]
-            self._start = 0
-            self._size = capacity
-            return
-        tail = (self._start + self._size) % capacity
-        first = min(count, capacity - tail)
-        self._data[tail : tail + first] = samples[:first]
-        second = count - first
-        if second > 0:
-            self._data[:second] = samples[first:]
-        overflow = self._size + count - capacity
-        if overflow > 0:
-            self._start = (self._start + overflow) % capacity
-            self._size = capacity
-        else:
-            self._size += count
-
-    def snapshot(self) -> Float32Array:
-        """Копия кольца по порядку «старейшие → новейшие»."""
-        capacity = int(self._data.size)
-        if self._size == 0:
-            return np.empty(0, dtype=np.float32)
-        if self._start + self._size <= capacity:
-            return self._data[self._start : self._start + self._size].copy()
-        head = self._data[self._start :]
-        tail_count = self._start + self._size - capacity
-        return np.concatenate((head, self._data[:tail_count]))
-
-
 class SaEngine:
     """Живой SA-контур: конфигурация, кольцо CH1 и пересчёт на свип.
 
@@ -147,7 +95,7 @@ class SaEngine:
                 f"SA: кольцо {capacity_samples} отсчётов меньше минимального окна {MIN_NPERSEG}"
             )
         self._lock: Final = threading.RLock()
-        self._ring: Final = _SampleRing(capacity_samples)
+        self._ring: Final = SampleRing(capacity_samples)
         self._config: SaConfig | None = None
         self._sample_rate_hz: float = 0.0
 

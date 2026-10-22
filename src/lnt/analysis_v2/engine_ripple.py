@@ -80,12 +80,18 @@ def _baseline_payload(
         attachment=attachment,
     )
     hashes = session_input_hashes(baseline_session)
+    baseline_dir = _sibling_session_dir(
+        request.session.session_dir,
+        baseline_session.session_dir,
+    )
     if reasons:
         # Несовместимая геометрия: числа фона не публикуются как согласованные —
         # сравнение недоступно, измерение остаётся валидным.
         return baseline_payload_block(
             manifest=baseline_session.manifest,
             hashes=hashes,
+            session_dir=baseline_dir,
+            settling=request.settling.value,
             attachment=attachment,
             comparison_status="unavailable",
             reason_codes=reasons,
@@ -116,6 +122,8 @@ def _baseline_payload(
     return baseline_payload_block(
         manifest=baseline_session.manifest,
         hashes=hashes,
+        session_dir=baseline_dir,
+        settling=request.settling.value,
         attachment=attachment,
         comparison_status="unavailable" if comparison_reasons else "available",
         reason_codes=comparison_reasons,
@@ -124,6 +132,16 @@ def _baseline_payload(
         spectrum=blocks.spectrum,
         bands=blocks.bands,
     )
+
+
+def _sibling_session_dir(measurement_dir: Path, baseline_dir: Path) -> str | None:
+    """Имя каталога фона, если он лежит рядом с измерением в общем корне."""
+    try:
+        measurement = measurement_dir.resolve()
+        baseline = baseline_dir.resolve()
+    except OSError:
+        return None
+    return baseline.name if baseline.parent == measurement.parent else None
 
 
 def _comparison_reasons(

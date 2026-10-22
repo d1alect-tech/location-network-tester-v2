@@ -298,7 +298,26 @@ describe("buildRippleView", () => {
     const withBaseline = buildRippleView(artifact, 0);
     expect(withBaseline.baseline.status).toBe("unavailable");
     expect(withBaseline.baseline.rmsText).toBe("1,00\u00A0мВ");
+    expect(withBaseline.baseline.numbersShown).toBe(true);
     expect(withBaseline.baseline.text).toContain("сравнение");
+
+    // Недоступный тайм-домен: текст не обещает числа, слоты остаются н/д.
+    const absent: RippleBaseline = {
+      ...baseline,
+      time_domain: {
+        availability: "unavailable",
+        reason_codes: ["baseline_geometry_missing"],
+        mean_v: null,
+        rms_ac_v: null,
+        vpp_v: null,
+      },
+    };
+    artifact.baseline = absent;
+    const withoutNumbers = buildRippleView(artifact, 0);
+    expect(withoutNumbers.baseline.numbersShown).toBe(false);
+    expect(withoutNumbers.baseline.rmsRaw).toBeNull();
+    expect(withoutNumbers.baseline.vppRaw).toBeNull();
+    expect(withoutNumbers.baseline.rmsText).toBe("н/д");
     // Измерение не подменяется фоном и не вычитается.
     expect(withBaseline.metrics[1]?.raw).toBe(0.002117531120011638);
   });

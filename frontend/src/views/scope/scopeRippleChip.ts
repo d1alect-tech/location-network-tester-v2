@@ -177,8 +177,8 @@ export function mountScopeRippleChip(options: ScopeRippleChipOptions = {}): Scop
       !stale && data.status === "settling" && data.settling_remaining_samples !== null
         ? `осталось ~${formatSeconds(data.settling_remaining_samples / data.sample_rate_hz)}`
         : "—";
-    slots.rms.textContent = showValues ? formatVolts(data.rms_ac_v ?? 0) : "—";
-    slots.vpp.textContent = showValues ? formatVolts(data.vpp_v ?? 0) : "—";
+    slots.rms.textContent = showValues ? formatVolts(data.rms_ac_v) : "—";
+    slots.vpp.textContent = showValues ? formatVolts(data.vpp_v) : "—";
     slots.window.textContent =
       showValues && data.span_duration_s !== null ? formatSeconds(data.span_duration_s) : "—";
     slots.adapter.textContent = formatAdapter(data.adapter);
@@ -222,7 +222,8 @@ export function mountScopeRippleChip(options: ScopeRippleChipOptions = {}): Scop
 }
 
 /** Вольты чипа: суб-вольтовые — мВ с десятыми (риппл мал по природе). */
-function formatVolts(value: number): string {
+function formatVolts(value: number | null): string {
+  if (value === null) return "—";
   if (Math.abs(value) >= 1) return `${value.toFixed(3)} В`;
   return `${(value * 1000).toFixed(1)} мВ`;
 }

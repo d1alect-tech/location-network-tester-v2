@@ -420,6 +420,22 @@ def test_startup_discard_is_the_later_excluded_boundary() -> None:
     assert snapshot.vpp_v == pytest.approx(0.1, abs=1e-6)
 
 
+def test_startup_discard_gates_settled_even_when_rc_window_is_shorter() -> None:
+    engine = RippleEngine(
+        config=_tiny_config(startup_discard_samples=4),
+        capacity_samples=64,
+    )
+    engine.restart()
+    _feed(engine, [0.1, 0.2], [128, 129], sequence=0)
+
+    snapshot = engine.snapshot()
+
+    assert snapshot.settle_samples == 1
+    assert snapshot.settled is False
+    assert snapshot.status is RippleStatus.SETTLING
+    assert snapshot.settling_remaining_samples == 2
+
+
 def test_settling_gate_excludes_the_nominal_rc_window() -> None:
     engine = RippleEngine(config=_tiny_config(), capacity_samples=64)
     engine.restart()

@@ -9,6 +9,7 @@ ambiguous=409, unsafe ID=422, параметры запроса не прини�
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -18,7 +19,11 @@ from starlette.testclient import TestClient
 
 from lnt.analysis_v2 import engine_ripple
 from lnt.analysis_v2.engine_ripple import run_ripple
-from lnt.analysis_v2.ripple_options import RippleRequest, SettlingDeclaration
+from lnt.analysis_v2.ripple_options import (
+    BaselineAttachment,
+    RippleRequest,
+    SettlingDeclaration,
+)
 from lnt.ripple.adapter import AdapterSpec
 from lnt.session_store import LoadedSession, load_session, write_session
 from lnt.types import (
@@ -48,6 +53,7 @@ class RippleRoutesFixture:
     root: Path
     client: TestClient
     meas_dir: Path
+    baseline_dir: Path
 
 
 def _record(count: int) -> np.ndarray:
@@ -142,6 +148,23 @@ def ripple_routes(tmp_path_factory: pytest.TempPathFactory) -> Iterator[RippleRo
             settling=SettlingDeclaration.PRECONNECTED,
         )
     )
+    _write_session(root, "nestedbad", session_id="nestedbad-id", count=_COUNT_FULL)
+    nested = load_session(root / "nestedbad")
+    run_ripple(
+        RippleRequest(
+            session=nested,
+            adapter=AdapterSpec(),
+            band_low_hz=99.0,
+            band_high_hz=101.0,
+            settling=SettlingDeclaration.PRECONNECTED,
+        )
+    )
+    nested_sidecar = _sidecar_path(root / "nestedbad")
+    nested_payload = json.loads(nested_sidecar.read_text(encoding="utf-8"))
+    nested_payload["time_domain"]["mean_v"] = "not-a-number"
+    nested_sidecar.write_text(
+        json.dumps(nested_payload, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     _write_session(root, "notjson", session_id="notjson-id", count=_COUNT_SMALL)
     (root / "notjson" / "ripple.json").write_bytes(b'{"schema_version": 1, "session": {')
     _write_session(root, "badschema", session_id="badschema-id", count=_COUNT_SMALL)
@@ -156,8 +179,27 @@ def ripple_routes(tmp_path_factory: pytest.TempPathFactory) -> Iterator[RippleRo
     (root / "dirthief" / "ripple.json").mkdir()
     _write_session(root, "amb-1", session_id="twin-id", count=_COUNT_SMALL)
     _write_session(root, "amb-2", session_id="twin-id", count=_COUNT_SMALL)
+    _write_session(root, "withbase", session_id="withbase-id", count=_COUNT_FULL)
+    _write_session(root, "withbase-bg", session_id="withbase-bg-id", count=_COUNT_FULL)
+    with_base = load_session(root / "withbase")
+    run_ripple(
+        RippleRequest(
+            session=with_base,
+            adapter=AdapterSpec(),
+            band_low_hz=99.0,
+            band_high_hz=101.0,
+            settling=SettlingDeclaration.PRECONNECTED,
+            baseline_path=root / "withbase-bg",
+            baseline_attachment=BaselineAttachment.SAME_ADAPTER_TIP_SHORTED,
+        )
+    )
     with TestClient(create_app(root=root)) as client:
-        yield RippleRoutesFixture(root=root, client=client, meas_dir=meas_dir)
+        yield RippleRoutesFixture(
+            root=root,
+            client=client,
+            meas_dir=meas_dir,
+            baseline_dir=root / "withbase-bg",
+        )
 
 
 def test_ripple_serves_stored_artifact_bytes(ripple_routes: RippleRoutesFixture) -> None:
@@ -235,6 +277,14 @@ def test_ripple_nonfinite_number_maps_409(ripple_routes: RippleRoutesFixture) ->
     assert response.json()["reason"] == "corrupt"
 
 
+def test_ripple_nested_corruption_maps_409(ripple_routes: RippleRoutesFixture) -> None:
+    # Верхний уровень v1 валиден, но вложенное число испорчено: это не 200.
+    response = ripple_routes.client.get("/api/sessions/nestedbad/ripple")
+
+    assert response.status_code == 409
+    assert response.json()["reason"] == "schema_incompatible"
+
+
 def test_ripple_incompatible_schema_maps_409(ripple_routes: RippleRoutesFixture) -> None:
     response = ripple_routes.client.get("/api/sessions/badschema/ripple")
 
@@ -248,6 +298,21 @@ def test_ripple_stale_input_maps_409(ripple_routes: RippleRoutesFixture) -> None
     manifest_path.write_bytes(manifest_path.read_bytes() + b" ")
 
     response = ripple_routes.client.get("/api/sessions/stale/ripple")
+
+    assert response.status_code == 409
+    assert response.json()["reason"] == "stale_input"
+
+
+def test_ripple_baseline_input_change_maps_409(ripple_routes: RippleRoutesFixture) -> None:
+    # Сначала сохранённый сайдкар свеж по обоим входам.
+    fresh = ripple_routes.client.get("/api/sessions/withbase/ripple")
+    assert fresh.status_code == 200
+    assert fresh.json()["baseline"]["comparison_status"] == "available"
+
+    # Байты фона изменились после публикации — сайдкар больше не «текущий».
+    ch1_path = ripple_routes.baseline_dir / "ch1.npy"
+    ch1_path.write_bytes(ch1_path.read_bytes() + b"x")
+    response = ripple_routes.client.get("/api/sessions/withbase/ripple")
 
     assert response.status_code == 409
     assert response.json()["reason"] == "stale_input"

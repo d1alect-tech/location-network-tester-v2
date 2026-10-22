@@ -37,6 +37,10 @@ from lnt.types import (
     AcquisitionTelemetry,
     ChannelMeta,
     ChannelRole,
+    ComponentValuesBasis,
+    FloatingDifferentialRcShunt,
+    ReferenceAssumption,
+    ScopeInputTerminated,
     SessionManifest,
     SessionSource,
     SessionType,
@@ -48,6 +52,16 @@ _COUNT = 29_000  # 2.9 s: span 1.9 s, nperseg 10k, 2 сегмента, хвос�
 _AMPLITUDE_V = 0.05
 _TONE_HZ = 100.0
 _DC_V = 0.5
+
+
+def _floating_geometry(*, resistance_ohm: float = 100.0) -> FloatingDifferentialRcShunt:
+    return FloatingDifferentialRcShunt(
+        resistance_ohm=resistance_ohm,
+        c1_f=10e-9,
+        c2_f=10e-9,
+        component_values_basis=ComponentValuesBasis.NOMINAL,
+        reference_assumption=ReferenceAssumption.FLOATING_HOST_UNVERIFIED,
+    )
 
 
 def _obj(payload: dict[str, object], key: str) -> dict[str, object]:
@@ -104,14 +118,16 @@ def _manifest(
     telemetry: AcquisitionTelemetry | None = None,
     range_code: int = 10,
     probe_multiplier: float = 1.0,
+    ch1_setup: FloatingDifferentialRcShunt | ScopeInputTerminated | None = None,
+    session_type: SessionType = SessionType.MEASUREMENT,
 ) -> SessionManifest:
     return SessionManifest(
-        schema_version=1,
+        schema_version=2 if ch1_setup is not None else 1,
         session_id=session_id,
         created_utc="2026-10-20T00:00:00Z",
         completed_utc="2026-10-20T00:00:03Z",
         source=source,
-        session_type=SessionType.MEASUREMENT,
+        session_type=session_type,
         sample_rate_hz=fs,
         duration_s=count / fs,
         sample_count=count,
@@ -130,6 +146,7 @@ def _manifest(
         ch2=None,
         acquisition_telemetry=telemetry,
         synthetic_truth=None,
+        ch1_setup=ch1_setup,
     )
 
 
@@ -497,6 +514,133 @@ def test_baseline_range_and_probe_mismatch_stays_comparison_unavailable(
     assert baseline_block["comparison_status"] == "unavailable"
     assert "baseline_range_code_mismatch" in _codes(baseline_block)
     assert "baseline_probe_multiplier_mismatch" in _codes(baseline_block)
+    assert _obj(payload, "time_domain")["availability"] == "available"
+
+
+def test_baseline_without_recorded_geometry_is_unavailable(tmp_path: Path) -> None:
+    # Given: обе записи устройства без записанной модели входа (schema v1).
+    measurement = _write(
+        tmp_path / "meas",
+        ch1=_sine_record(),
+        manifest=_manifest(
+            session_id="ripple-geom-absent",
+            source=SessionSource.DEVICE,
+            range_code=1,
+            telemetry=_telemetry(),
+        ),
+    )
+    baseline = _write(
+        tmp_path / "base",
+        ch1=_sine_record(),
+        manifest=_manifest(
+            session_id="ripple-geom-absent-base",
+            source=SessionSource.DEVICE,
+            range_code=1,
+            telemetry=_telemetry(),
+        ),
+    )
+
+    # When
+    sidecar = run_ripple(
+        _request(
+            measurement,
+            baseline_path=baseline.session_dir,
+            baseline_attachment=BaselineAttachment.SAME_ADAPTER_TIP_SHORTED,
+        )
+    )
+    payload = json.loads(sidecar.sidecar_path.read_text(encoding="utf-8"))
+
+    # Then: отсутствующая геометрия — недоступное сравнение, не догадка.
+    baseline_block = _obj(payload, "baseline")
+    assert baseline_block["comparison_status"] == "unavailable"
+    assert "baseline_geometry_missing" in _codes(baseline_block)
+    assert _obj(payload, "time_domain")["availability"] == "available"
+
+
+def test_baseline_mismatched_geometry_is_unavailable(tmp_path: Path) -> None:
+    # Given: две модели входа с разным сопротивлением — геометрия не совпадает.
+    measurement = _write(
+        tmp_path / "meas",
+        ch1=_sine_record(),
+        manifest=_manifest(
+            session_id="ripple-geom-diff",
+            source=SessionSource.DEVICE,
+            range_code=1,
+            telemetry=_telemetry(),
+            ch1_setup=_floating_geometry(resistance_ohm=100.0),
+        ),
+    )
+    baseline = _write(
+        tmp_path / "base",
+        ch1=_sine_record(),
+        manifest=_manifest(
+            session_id="ripple-geom-diff-base",
+            source=SessionSource.DEVICE,
+            range_code=1,
+            telemetry=_telemetry(),
+            ch1_setup=_floating_geometry(resistance_ohm=50.0),
+        ),
+    )
+
+    # When
+    sidecar = run_ripple(
+        _request(
+            measurement,
+            baseline_path=baseline.session_dir,
+            baseline_attachment=BaselineAttachment.SAME_ADAPTER_TIP_SHORTED,
+        )
+    )
+    payload = json.loads(sidecar.sidecar_path.read_text(encoding="utf-8"))
+
+    # Then
+    baseline_block = _obj(payload, "baseline")
+    assert baseline_block["comparison_status"] == "unavailable"
+    assert "baseline_geometry_mismatch" in _codes(baseline_block)
+
+
+def test_terminated_instrument_baseline_is_not_a_matched_background(tmp_path: Path) -> None:
+    # Given: legacy self-noise с 50-ом терминацией — прибор без адаптера/сборки.
+    measurement = _write(
+        tmp_path / "meas",
+        ch1=_sine_record(),
+        manifest=_manifest(
+            session_id="ripple-term-meas",
+            source=SessionSource.DEVICE,
+            range_code=1,
+            telemetry=_telemetry(),
+            ch1_setup=_floating_geometry(),
+        ),
+    )
+    baseline = _write(
+        tmp_path / "base",
+        ch1=_sine_record(),
+        manifest=_manifest(
+            session_id="ripple-term-base",
+            source=SessionSource.DEVICE,
+            range_code=1,
+            telemetry=_telemetry(),
+            session_type=SessionType.SELF_NOISE,
+            ch1_setup=ScopeInputTerminated(termination_resistance_ohm=50.0),
+        ),
+    )
+
+    # When
+    sidecar = run_ripple(
+        _request(
+            measurement,
+            baseline_path=baseline.session_dir,
+            baseline_attachment=BaselineAttachment.SAME_ADAPTER_TIP_SHORTED,
+        )
+    )
+    payload = json.loads(sidecar.sidecar_path.read_text(encoding="utf-8"))
+
+    # Then: только прибор — не согласованный фон rail-измерения.
+    baseline_block = _obj(payload, "baseline")
+    assert baseline_block["comparison_status"] == "unavailable"
+    assert "baseline_instrument_only" in _codes(baseline_block)
+    qualification = _obj(baseline_block, "session")
+    setup = cast("dict[str, object]", qualification["ch1_setup"])
+    assert setup["kind"] == "scope_input_terminated_v1"
     assert _obj(payload, "time_domain")["availability"] == "available"
 
 
@@ -1191,6 +1335,7 @@ def test_unavailable_measurement_makes_comparison_unavailable(tmp_path: Path) ->
             source=SessionSource.DEVICE,
             range_code=1,
             telemetry=_telemetry(clip_low=1),
+            ch1_setup=_floating_geometry(),
         ),
     )
     baseline = _write(
@@ -1201,6 +1346,7 @@ def test_unavailable_measurement_makes_comparison_unavailable(tmp_path: Path) ->
             source=SessionSource.DEVICE,
             range_code=1,
             telemetry=_telemetry(),
+            ch1_setup=_floating_geometry(),
         ),
     )
 
@@ -1263,6 +1409,7 @@ def test_calibrated_baseline_identity_is_not_assumed(tmp_path: Path) -> None:
             source=SessionSource.DEVICE,
             range_code=1,
             telemetry=_telemetry(calibration_used=True),
+            ch1_setup=_floating_geometry(),
         ),
     )
     baseline = _write(
@@ -1273,6 +1420,7 @@ def test_calibrated_baseline_identity_is_not_assumed(tmp_path: Path) -> None:
             source=SessionSource.DEVICE,
             range_code=1,
             telemetry=_telemetry(calibration_used=True),
+            ch1_setup=_floating_geometry(),
         ),
     )
 

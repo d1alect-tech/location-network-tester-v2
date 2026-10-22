@@ -20,6 +20,7 @@ from lnt.manifest import manifest_from_json
 from lnt.safe_paths import ensure_safe_filename, is_linked_path
 from lnt.ui.dependencies import AppServices, get_services, resolve_session_or_404
 from lnt.ui.models_ripple import RippleArtifact, RippleSchemaError, parse_ripple_artifact
+from lnt.ui.sessions import resolve_session_dir
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -59,6 +60,7 @@ def get_ripple_artifact(session_name: str, request: Request, services: Services)
     except OSError as error:
         raise _conflict("corrupt", f"ripple.json не читается: {error}") from error
     _verify_current_inputs(session_dir, artifact)
+    _verify_baseline_inputs(services.root, artifact)
     return Response(
         content=data,
         media_type=_MEDIA_TYPE_JSON,
@@ -78,6 +80,28 @@ def _verify_current_inputs(session_dir: Path, artifact: RippleArtifact) -> None:
         ) from error
     ch1_name = ensure_safe_filename(manifest.ch1.filename, label="ch1: имя файла")
     _match_digest(session_dir / ch1_name, artifact.ch1_sha256)
+
+
+def _verify_baseline_inputs(root: Path, artifact: RippleArtifact) -> None:
+    """Свежесть фона: сохранённые хэши обязаны совпасть с текущими файлами."""
+    baseline = artifact.baseline
+    if baseline is None:
+        return
+    key = baseline.session_dir if baseline.session_dir is not None else baseline.session_id
+    try:
+        baseline_dir = resolve_session_dir(root, key)
+        manifest = manifest_from_json(
+            (baseline_dir / _MANIFEST_FILENAME).read_text(encoding="utf-8")
+        )
+    except InputError as error:
+        raise _conflict(_STALE_INPUT, f"фон не разрешается для сверки входов: {error}") from error
+    except (OSError, UnicodeDecodeError) as error:
+        raise _conflict(_STALE_INPUT, f"фон не читается для сверки входов: {error}") from error
+    if manifest.session_id != baseline.session_id:
+        raise _conflict(_STALE_INPUT, "фон: session_id не совпадает с сохранённым")
+    _match_digest(baseline_dir / _MANIFEST_FILENAME, baseline.manifest_sha256)
+    ch1_name = ensure_safe_filename(manifest.ch1.filename, label="фоновый ch1: имя файла")
+    _match_digest(baseline_dir / ch1_name, baseline.ch1_sha256)
 
 
 def _match_digest(path: Path, expected: str) -> None:

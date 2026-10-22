@@ -18,6 +18,10 @@ const REASONS: Readonly<Record<string, string>> = {
   baseline_incompatible: "фон несовместим",
   baseline_missing: "фон не приложен",
   baseline_calibration_identity_unknown: "калибровка фона неизвестна",
+  baseline_geometry_missing: "геометрия фона не записана",
+  baseline_geometry_mismatch: "геометрия фона не совпадает",
+  baseline_instrument_only: "фон только прибора, без сборки",
+  baseline_hookup_mismatch: "подключение канала фона не совпадает",
   stale_input: "входные файлы изменились",
 };
 

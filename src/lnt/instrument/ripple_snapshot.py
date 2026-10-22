@@ -64,11 +64,13 @@ def build_snapshot(state: RippleState) -> RippleSnapshot:
     oldest_abs = state.capture_samples - ring_count
     settle = config.settle_samples
     startup = config.startup_discard_samples
-    settled = settle is not None and state.capture_samples >= settle
+    excluded_prefix = None if settle is None else max(settle, startup)
+    settled = excluded_prefix is not None and state.capture_samples >= excluded_prefix
     span_floor = max(state.span_start_abs, settle, startup) if settled and settle is not None else 0
     start_abs = max(span_floor, oldest_abs) if settled else None
-    excluded_prefix = None if settle is None else max(settle, startup)
-    settling_remaining = None if settle is None else max(settle - state.capture_samples, 0)
+    settling_remaining = (
+        None if excluded_prefix is None else max(excluded_prefix - state.capture_samples, 0)
+    )
     span_count = 0 if start_abs is None else max(state.capture_samples - start_abs, 0)
     offset = 0 if start_abs is None else start_abs - oldest_abs
     span = state.samples[offset : offset + span_count]
