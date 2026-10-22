@@ -126,6 +126,8 @@ export function createRipplePanelView(): RipplePanelView {
     qc.title = "";
     qc.dataset.qcCodes = "";
     qc.dataset.qcOmitted = "";
+    qc.dataset.qcHidden = "";
+    qc.dataset.qcHiddenCodes = "";
     spectrumMeta.textContent = "";
     spectrumMeta.title = "";
     baselineStatus.textContent = "";
@@ -194,6 +196,8 @@ export function createRipplePanelView(): RipplePanelView {
       qc.title = view.qcTitle;
       qc.dataset.qcCodes = view.qcCodes.join(" ");
       qc.dataset.qcOmitted = view.qcOmitted.join(" ");
+      qc.dataset.qcHidden = String(view.qcHidden.length);
+      qc.dataset.qcHiddenCodes = view.qcHidden.join(" ");
       spectrumMeta.textContent = view.spectrumMeta;
       spectrumMeta.title = view.spectrumMeta;
       paintBaseline(view);

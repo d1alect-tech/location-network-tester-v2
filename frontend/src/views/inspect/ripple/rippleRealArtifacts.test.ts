@@ -8,6 +8,7 @@
  * целиком остаётся доступной в title. */
 
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { RippleApi } from "../../../api/client-ripple";
 import { isRippleArtifact } from "../../../api/guards-ripple";
@@ -18,7 +19,9 @@ import { reasonText } from "./rippleFormat";
 import { buildRippleView } from "./rippleModel";
 import { type RipplePanelHandle, createRipplePanel } from "./ripplePanel";
 
-const FIXTURES = `${process.cwd()}/src/views/inspect/ripple/fixtures/`;
+/** Путь к фикстурам от модуля, а не от cwd: тест одинаково работает из
+ * корня репозитория и из frontend/. */
+const FIXTURES = join(import.meta.dirname, "fixtures");
 const CONSTANT = "ripple-constant-zero-spectrum";
 const CLIP_MISMATCH = "ripple-clip-mismatch-qc";
 
@@ -28,7 +31,7 @@ const CLIP_MISMATCH = "ripple-clip-mismatch-qc";
 const QC_TWO_LINE_CAPACITY = 150;
 
 function realArtifact(name: string): RippleArtifactPayload {
-  const parsed: unknown = JSON.parse(readFileSync(`${FIXTURES}${name}.json`, "utf8"));
+  const parsed: unknown = JSON.parse(readFileSync(join(FIXTURES, `${name}.json`), "utf8"));
   if (!isRippleArtifact(parsed)) throw new Error(`фикстура ${name} не прошла гвард ripple`);
   return parsed;
 }

@@ -76,6 +76,8 @@ export type RippleViewModel = {
   readonly qcTitle: string;
   readonly qcCodes: readonly string[];
   readonly qcOmitted: readonly string[];
+  /** Коды, чей текст не поместился в видимую строку: она называет их число. */
+  readonly qcHidden: readonly string[];
   readonly baseline: RippleBaselineView;
   readonly spectrumAvailable: boolean;
   readonly spectrumAvailability: RippleAvailability;
@@ -215,6 +217,7 @@ export function buildRippleView(
     qcTitle: qc.title,
     qcCodes: qc.codes,
     qcOmitted: qc.omitted,
+    qcHidden: qc.hidden,
     baseline: baselineView(artifact.baseline),
     spectrumAvailable: spectrum.availability === "available",
     spectrumAvailability: spectrum.availability,
