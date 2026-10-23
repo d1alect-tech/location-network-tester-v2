@@ -24,6 +24,7 @@ const KNOWN_MODES: readonly string[] = [
   "self_noise",
   "line_quality",
   "single_channel",
+  "ripple_measurement",
 ];
 
 function isCaptureModeId(value: string): value is CaptureModeId {
