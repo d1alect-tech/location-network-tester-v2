@@ -3,7 +3,9 @@
 Истина аналитическая: синус 100 Гц A=0.05 В + DC 0.5 В на fs=10 кГц; время
 установления объявлено ``--preconnected``. Ожидания exit-кодов, одна строка
 stderr и отсутствие traceback — контракт AGENTS.md. Ни одно ожидание не
-выводится из CLI.
+выводится из CLI. Декларация адаптера в контексте сессии — приоритетный
+источник входов адаптера: незаданные флаги берут её значения, заданные
+становятся утверждениями против неё (N6).
 """
 
 from __future__ import annotations
@@ -24,11 +26,16 @@ from lnt.cli import (
     main,
 )
 from lnt.cli_spec import CLI_SUBCOMMANDS
+from lnt.context.model import ContextSnapshot
+from lnt.context.schema import context_to_json
+from lnt.context.store import ContextStore, ContextUpdate
+from lnt.ripple.adapter_declaration import AdapterDeclaration, declaration_fields
 from lnt.session_store import write_session
 from lnt.types import (
     AcquisitionTelemetry,
     ChannelMeta,
     ChannelRole,
+    ComponentValuesBasis,
     SessionManifest,
     SessionSource,
     SessionType,
@@ -44,6 +51,8 @@ _TONE_HZ = 100.0
 _DC_V = 0.5
 
 _BANDED = ["--band-low", "99.0", "--band-high", "101.0", "--preconnected"]
+
+_DECLARED_AT = "2026-10-23T08:00:00.000Z"
 
 
 def _sine_record() -> np.ndarray:
@@ -116,6 +125,42 @@ def _sidecar_payload(session_dir: Path) -> dict[str, object]:
 
 def _file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _declare_adapter(
+    session: Path,
+    session_id: str,
+    *,
+    cap_nf: float = 100.0,
+    series_r_ohm: float = 470.0,
+    preconnected: bool = True,
+) -> None:
+    """Пишет декларацию адаптера в контекст сессии актёром lnt.capture."""
+    declaration = AdapterDeclaration(
+        cap_nf=cap_nf,
+        series_r_ohm=series_r_ohm,
+        preconnected=preconnected,
+        component_values_basis=ComponentValuesBasis.NOMINAL,
+    )
+    fields = declaration_fields(declaration, _DECLARED_AT)
+    ContextStore(session, session_id).update(
+        ContextUpdate(
+            expected_revision=0,
+            snapshot=ContextSnapshot(
+                schema_version=1,
+                session_id=session_id,
+                revision=1,
+                fields=fields,
+                tags=(),
+                notes=None,
+                profile_snapshots=(),
+            ),
+            actor="lnt.capture",
+            changed_keys=tuple(sorted(fields)),
+            occurred_at=_DECLARED_AT,
+            event_id=f"initial-{session_id}",
+        ),
+    )
 
 
 def _parser_subcommands() -> set[str]:
@@ -405,3 +450,229 @@ def test_invalid_flag_combinations_exit_2(
     assert code == EXIT_INPUT
     assert len(err.splitlines()) == 1
     assert "Traceback" not in err
+
+
+def test_happy_declaration_feeds_adapter_and_settling_without_flags(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: сессия с декларацией адаптера в контексте (актёр lnt.capture).
+    session = _write_session(tmp_path / "meas", "ripple-cli-decl")
+    _declare_adapter(session, "ripple-cli-decl")
+
+    # When: запуск без флагов адаптера и без --preconnected.
+    code, _, err = _run(
+        capsys, ["ripple", str(session), "--band-low", "99.0", "--band-high", "101.0"]
+    )
+
+    # Then: сайдкар берёт адаптер и установление из декларации контекста.
+    assert code == EXIT_OK
+    assert err == ""
+    payload = _sidecar_payload(session)
+    adapter = cast("dict[str, object]", payload["adapter"])
+    assert adapter["cap_nf"] == 100.0
+    assert adapter["series_r_ohm"] == 470.0
+    assert adapter["probe_multiplier"] == 1
+    assert adapter["component_values_basis"] == "nominal"
+    provenance = cast("dict[str, object]", payload["provenance"])
+    assert provenance["operator_attachment"] == "preconnected_no_reconnection"
+
+
+def test_happy_legacy_session_explicit_flags_and_legacy_defaults(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: легаси-сессия без контекста сессии.
+    session = _write_session(tmp_path / "meas", "ripple-cli-legacy")
+
+    # When: явные флаги адаптера без декларации.
+    code, _, err = _run(
+        capsys,
+        [
+            "ripple",
+            str(session),
+            *_BANDED,
+            "--cap-nf",
+            "220",
+            "--series-r-ohm",
+            "330",
+            "--probe",
+            "1x",
+        ],
+    )
+
+    # Then: значения из флагов; поведение легаси без изменений.
+    assert code == EXIT_OK
+    assert err == ""
+    adapter = cast("dict[str, object]", _sidecar_payload(session)["adapter"])
+    assert adapter["cap_nf"] == 220.0
+    assert adapter["series_r_ohm"] == 330.0
+    assert adapter["probe_multiplier"] == 1
+    assert adapter["component_values_basis"] == "nominal"
+
+    # And: без флагов и без декларации — сегодняшние дефолты (H6).
+    bare = _write_session(tmp_path / "bare", "ripple-cli-legacy-defaults")
+    code_bare, _, err_bare = _run(
+        capsys, ["ripple", str(bare), "--band-low", "99.0", "--band-high", "101.0"]
+    )
+    assert code_bare == EXIT_OK
+    assert err_bare == ""
+    payload_bare = _sidecar_payload(bare)
+    adapter_bare = cast("dict[str, object]", payload_bare["adapter"])
+    assert adapter_bare["cap_nf"] == 100.0
+    assert adapter_bare["series_r_ohm"] == 0.0
+    assert adapter_bare["probe_multiplier"] == 1
+    provenance_bare = cast("dict[str, object]", payload_bare["provenance"])
+    assert provenance_bare["operator_attachment"] == "settling_unknown"
+
+
+def test_happy_declaration_with_matching_flags_is_not_a_conflict(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: сессия с декларацией; флаги оператора согласуются с ней.
+    session = _write_session(tmp_path / "meas", "ripple-cli-decl-match")
+    _declare_adapter(session, "ripple-cli-decl-match")
+
+    # When: согласующиеся значения не являются конфликтом.
+    code, _, err = _run(
+        capsys,
+        [
+            "ripple",
+            str(session),
+            *_BANDED,
+            "--cap-nf",
+            "100",
+            "--series-r-ohm",
+            "470",
+            "--probe",
+            "1x",
+        ],
+    )
+
+    # Then: exit 0; сайдкар несёт значения декларации.
+    assert code == EXIT_OK
+    assert err == ""
+    adapter = cast("dict[str, object]", _sidecar_payload(session)["adapter"])
+    assert adapter["cap_nf"] == 100.0
+    assert adapter["series_r_ohm"] == 470.0
+    provenance = cast("dict[str, object]", _sidecar_payload(session)["provenance"])
+    assert provenance["operator_attachment"] == "preconnected_no_reconnection"
+
+
+@pytest.mark.parametrize(
+    ("preconnected", "extra_args", "message"),
+    [
+        (
+            True,
+            ["--cap-nf", "220"],
+            (
+                "ripple: adapter_declaration_mismatch: --cap-nf=220 "
+                "противоречит декларации захвата (100)"
+            ),
+        ),
+        (
+            True,
+            ["--series-r-ohm", "1000"],
+            (
+                "ripple: adapter_declaration_mismatch: --series-r-ohm=1000 "
+                "противоречит декларации захвата (470)"
+            ),
+        ),
+        (
+            True,
+            ["--probe", "10x"],
+            (
+                "ripple: adapter_declaration_mismatch: --probe=10x "
+                "противоречит декларации захвата (1x)"
+            ),
+        ),
+        (
+            False,
+            [],
+            (
+                "ripple: adapter_declaration_mismatch: --preconnected "
+                "противоречит декларации захвата (settling_unknown)"
+            ),
+        ),
+    ],
+)
+def test_declaration_conflict_exits_2_exact_one_line_stderr(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    preconnected: bool,
+    extra_args: list[str],
+    message: str,
+) -> None:
+    # Given: декларация в контексте; _BANDED несёт --preconnected.
+    session = _write_session(tmp_path / "meas", "ripple-cli-decl-conflict")
+    _declare_adapter(session, "ripple-cli-decl-conflict", preconnected=preconnected)
+
+    # When: заданный флаг противоречит декларации захвата.
+    code, _, err = _run(capsys, ["ripple", str(session), *_BANDED, *extra_args])
+
+    # Then: exit 2, ровно одна строка stderr с машинным кодом причины.
+    assert code == EXIT_INPUT
+    assert err == f"Ошибка: {message}\n"
+    assert "Traceback" not in err
+
+
+def test_partial_adapter_keys_in_context_cache_fail_closed(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: context.json с частичным набором adapter-ключей, без журнала событий.
+    session = _write_session(tmp_path / "meas", "ripple-cli-partial")
+    declaration = AdapterDeclaration(
+        cap_nf=100.0,
+        series_r_ohm=470.0,
+        preconnected=True,
+        component_values_basis=ComponentValuesBasis.NOMINAL,
+    )
+    fields = declaration_fields(declaration, _DECLARED_AT)
+    del fields["adapter.series_r_ohm"]
+    snapshot = ContextSnapshot(
+        schema_version=1,
+        session_id="ripple-cli-partial",
+        revision=1,
+        fields=fields,
+        tags=(),
+        notes=None,
+        profile_snapshots=(),
+    )
+    (session / "context.json").write_text(context_to_json(snapshot), encoding="utf-8")
+
+    # When
+    code, _, err = _run(capsys, ["ripple", str(session), *_BANDED])
+
+    # Then: частичная декларация — fail closed, exit 2 одной строкой.
+    assert code == EXIT_INPUT
+    assert len(err.splitlines()) == 1
+    assert "неполный набор ключей" in err
+    assert "Traceback" not in err
+
+
+def test_happy_rerun_republishes_identical_payload_context_untouched(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Given: сессия с декларацией; первый запуск опубликовал сайдкар.
+    session = _write_session(tmp_path / "meas", "ripple-cli-rerun")
+    _declare_adapter(session, "ripple-cli-rerun")
+    argv = ["ripple", str(session), "--band-low", "99.0", "--band-high", "101.0"]
+    code_first, _, err_first = _run(capsys, argv)
+    assert code_first == EXIT_OK
+    assert err_first == ""
+    first = (session / "ripple.json").read_bytes()
+    context_before = (session / "context.json").read_bytes()
+    events_before = (session / "context.events.jsonl").read_bytes()
+
+    # When: повторный запуск без изменений входов.
+    code_second, _, err_second = _run(capsys, argv)
+
+    # Then: перепубликация ровно тем же payload; декларация не мутируется (D10).
+    assert code_second == EXIT_OK
+    assert err_second == ""
+    assert (session / "ripple.json").read_bytes() == first
+    assert (session / "context.json").read_bytes() == context_before
+    assert (session / "context.events.jsonl").read_bytes() == events_before
