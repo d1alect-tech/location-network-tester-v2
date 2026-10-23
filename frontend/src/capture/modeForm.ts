@@ -6,6 +6,8 @@
  * разметка, классы и name=-атрибуты не менялись (пины capture.spec.ts). */
 
 import { el } from "../components/primitives/dom";
+import { createAdapterDeclarationSection } from "./adapterDeclarationForm";
+import type { AdapterDeclarationSection } from "./adapterDeclarationForm";
 import { createDisclosure } from "./disclosure";
 import { createModeFormFields, radioCard } from "./modeFormFields";
 import { syncModeVisibility } from "./modeFormVisibility";
@@ -25,6 +27,8 @@ export interface ModeFormSections {
   readonly source: HTMLElement;
   readonly paramsTitle: HTMLElement;
   readonly settings: HTMLElement;
+  /** Декларация адаптера (N7): видна только ripple+device. */
+  readonly adapter: HTMLElement;
   readonly series: HTMLElement;
 }
 
@@ -97,6 +101,9 @@ export function createModeForm(): ModeFormHandle {
   // --- Поля записи, базовая сессия и серия ---
   const fields = createModeFormFields();
 
+  // --- Декларация адаптера (N7): значения/ошибки интегрируются ниже ---
+  const adapter: AdapterDeclarationSection = createAdapterDeclarationSection();
+
   // --- Необязательные разделы за раскрытием ---
   const seriesDisclosure = createDisclosure("Серия и протокол");
   seriesDisclosure.body.append(
@@ -115,18 +122,45 @@ export function createModeForm(): ModeFormHandle {
       className: "capture-form",
       attrs: { novalidate: "" },
     },
-    [modeFieldset, sourceFieldset, paramsTitle, fields.settingsFields, seriesDisclosure.root],
+    [
+      modeFieldset,
+      sourceFieldset,
+      paramsTitle,
+      fields.settingsFields,
+      adapter.root,
+      seriesDisclosure.root,
+    ],
   ) as HTMLFormElement;
 
+  const readValues = (): CaptureFormValues => ({
+    ...fields.values(),
+    ...adapter.values(),
+  });
+
   const syncVisibility = (): void => {
-    syncModeVisibility(handle.getMode(), handle.getSource(), fields);
+    syncModeVisibility(handle.getMode(), handle.getSource(), {
+      channelsText: fields.channelsText,
+      baselineWrap: fields.baselineWrap,
+      profileFieldRoot: fields.profileFieldRoot,
+      adapterSection: adapter.root,
+    });
+  };
+
+  // Подсказка и пол длительности пересчитываются на каждое изменение
+  // полей (C/Rs/fs/длительность живут в разных секциях одной формы).
+  const syncAdapter = (): void => {
+    adapter.sync(readValues());
   };
 
   root.addEventListener("change", () => {
     syncVisibility();
+    syncAdapter();
     notify();
   });
-  root.addEventListener("input", notify);
+  root.addEventListener("input", () => {
+    syncAdapter();
+    notify();
+  });
 
   const handle: ModeFormHandle = {
     root,
@@ -135,6 +169,7 @@ export function createModeForm(): ModeFormHandle {
       source: sourceFieldset,
       paramsTitle,
       settings: fields.settingsFields,
+      adapter: adapter.root,
       series: seriesDisclosure.root,
     },
     getMode: () => {
@@ -142,9 +177,15 @@ export function createModeForm(): ModeFormHandle {
       return CAPTURE_MODES[(checked?.value ?? "rc_measurement") as CaptureModeId];
     },
     getSource: () => (deviceRadio.checked ? "device" : "simulator"),
-    values: fields.values,
-    setErrors: fields.setErrors,
-    clearErrors: fields.clearErrors,
+    values: readValues,
+    setErrors: (errors) => {
+      fields.setErrors(errors);
+      adapter.setErrors(errors);
+    },
+    clearErrors: () => {
+      fields.clearErrors();
+      adapter.clearErrors();
+    },
     onChange: (listener) => {
       listeners.add(listener);
     },
@@ -155,5 +196,6 @@ export function createModeForm(): ModeFormHandle {
   };
 
   syncVisibility();
+  syncAdapter();
   return handle;
 }

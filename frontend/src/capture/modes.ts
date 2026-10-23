@@ -1,9 +1,16 @@
 /** Режимы захвата: ровно пять режимов из плана. Выбор режима определяет,
  * какие настройки существуют — невозможные комбинации не показываются.
- * Контракты зеркалируют CaptureRequest (src/lnt/ui/models.py). */
+ * Контракты зеркалируют CaptureRequest (src/lnt/ui/models.py). Валидация
+ * вынесена в modesValidation.ts (N7-сплит под потолок 250 чистых LOC) и
+ * реэкспортирована здесь — публичная поверхность не менялась. */
 
 import type { CaptureJobRequest, SimulateJobRequest } from "../api/types-jobs";
 import { ADAPTER_PRESET } from "./adapterPreset";
+import { validateCaptureForm } from "./modesValidation";
+import type { ValidatedCaptureForm } from "./modesValidation";
+
+export { validateCaptureForm };
+export type { ValidatedCaptureForm };
 
 export const CAPTURE_MODE_IDS = [
   "rc_measurement",
@@ -90,7 +97,8 @@ export const CAPTURE_MODES: Record<CaptureModeId, CaptureModeDef> = {
   },
 };
 
-/** Значения формы как строки полей ввода (пустая строка = не задано). */
+/** Значения формы как строки полей ввода (пустая строка = не задано);
+ *  декларация адаптера — булево и литерал базиса, не строки. */
 export interface CaptureFormValues {
   durationS: string;
   sampleRateHz: string;
@@ -100,6 +108,10 @@ export interface CaptureFormValues {
   repeat: string;
   intervalS: string;
   profile: string;
+  adapterCapNf: string;
+  adapterSeriesROhm: string;
+  adapterPreconnected: boolean;
+  adapterBasis: "nominal" | "operator_measured";
 }
 
 export const DEFAULT_FORM_VALUES: CaptureFormValues = {
@@ -111,99 +123,22 @@ export const DEFAULT_FORM_VALUES: CaptureFormValues = {
   repeat: "1",
   intervalS: "0",
   profile: "quiet",
+  // Пресет адаптера — импорт из N4, не хардкод чисел.
+  adapterCapNf: String(ADAPTER_PRESET.capNfNominal),
+  adapterSeriesROhm: String(ADAPTER_PRESET.seriesROhmNominal),
+  // D4: утвердительная галка по умолчанию НЕ стоит.
+  adapterPreconnected: false,
+  adapterBasis: "nominal",
 };
 
 export type CaptureFieldErrors = Partial<Record<keyof CaptureFormValues, string>>;
 
-export interface ValidatedCaptureForm {
-  durationS: number;
-  sampleRateHz: number;
-  rangeV: number;
-  label: string | null;
-  baselineSession: string | null;
-  repeat: number;
-  intervalS: number;
-  profile: string;
-}
-
-const RANGE_VALUES = new Set([5, 1, 0.5]);
-// Зеркало _validated_child_name: [A-Za-z0-9][A-Za-z0-9._-]{0,127}
-const CHILD_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
-
-function parsePositive(raw: string): number | null {
-  if (raw.trim() === "") return null;
-  const value = Number(raw.replace(",", "."));
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return value;
-}
-
-function parseNonNegative(raw: string): number | null {
-  if (raw.trim() === "") return null;
-  const value = Number(raw.replace(",", "."));
-  if (!Number.isFinite(value) || value < 0) return null;
-  return value;
-}
-
-/** Валидация до отправки: русские ошибки по полям; пустой объект — форма валидна. */
-export function validateCaptureForm(values: CaptureFormValues): {
-  valid: ValidatedCaptureForm | null;
-  errors: CaptureFieldErrors;
-} {
-  const errors: CaptureFieldErrors = {};
-
-  const durationS = parsePositive(values.durationS);
-  if (durationS === null)
-    errors.durationS = "Длительность должна быть положительным числом секунд.";
-
-  const sampleRateHz = parsePositive(values.sampleRateHz);
-  if (sampleRateHz === null) {
-    errors.sampleRateHz = "Частота дискретизации должна быть положительным числом герц.";
-  }
-
-  const rangeV = parsePositive(values.rangeV);
-  if (rangeV === null || !RANGE_VALUES.has(rangeV)) {
-    errors.rangeV = "Диапазон должен быть одним из: 5, 1 или 0,5 В.";
-  }
-
-  const repeat = Number(values.repeat);
-  if (!Number.isInteger(repeat) || repeat < 1) {
-    errors.repeat = "Повторов должно быть целое число не меньше 1.";
-  }
-
-  const intervalS = parseNonNegative(values.intervalS);
-  if (intervalS === null) {
-    errors.intervalS = "Интервал стартов должен быть неотрицательным числом секунд.";
-  }
-
-  let baselineSession: string | null = null;
-  const baselineRaw = values.baselineSession.trim();
-  if (baselineRaw !== "" && !CHILD_NAME_PATTERN.test(baselineRaw)) {
-    errors.baselineSession =
-      "Имя базовой сессии: латиница, цифры и знаки . _ - , не длиннее 128 символов.";
-  } else if (baselineRaw !== "") {
-    baselineSession = baselineRaw;
-  }
-
-  const label = values.label.trim();
-  if (label.length > 128) {
-    errors.label = "Метка не длиннее 128 символов.";
-  }
-
-  if (Object.keys(errors).length > 0) return { valid: null, errors };
-  return {
-    valid: {
-      durationS: durationS as number,
-      sampleRateHz: sampleRateHz as number,
-      rangeV: rangeV as number,
-      label: label === "" ? null : label,
-      baselineSession,
-      repeat: repeat as number,
-      intervalS: intervalS as number,
-      profile: values.profile,
-    },
-    errors,
-  };
-}
+/** Значения полей настроек/серии без декларации адаптера (владелец —
+ *  modeFormFields; декларацию читает adapterDeclarationForm). */
+export type CoreFormValues = Omit<
+  CaptureFormValues,
+  "adapterCapNf" | "adapterSeriesROhm" | "adapterPreconnected" | "adapterBasis"
+>;
 
 export type CaptureSource = "simulator" | "device";
 
@@ -229,6 +164,19 @@ export function buildJobRequest(
       ...series,
     };
   }
+  // Декларация адаптера — только ripple-режим с осциллографом (D7);
+  // прочие режимы и симулятор ключа не получают вовсе.
+  const adapter =
+    mode.id === "ripple_measurement"
+      ? {
+          adapter_declaration: {
+            preconnected: form.adapterPreconnected,
+            cap_nf: form.adapterCapNf,
+            series_r_ohm: form.adapterSeriesROhm,
+            component_values_basis: form.adapterBasis,
+          },
+        }
+      : {};
   return {
     kind: "capture",
     duration_s: form.durationS,
@@ -239,5 +187,6 @@ export function buildJobRequest(
     channels: mode.channels,
     input: mode.input,
     ...series,
+    ...adapter,
   };
 }
