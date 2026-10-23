@@ -1,6 +1,9 @@
 /** Todo 9 RED: живой чип риппла — состояния, честность чисел и свежесть.
  * Контракт события — models_ripple_live.py (строгая модель, числа только у
- * ready). Чип чит-only: ни одной кнопки, никакой математики на клиенте. */
+ * ready). Чип чит-only: ни одной кнопки, никакой математики на клиенте.
+ * GAP-6 (task 8): маркер базиса компонент адаптера («номинал»/«измерено
+ * оператором», неизвестный — прочерк) и постоянная подсказка номинальной
+ * модели; декларация в живую — будущая работа (D8/OQ5), здесь её нет. */
 
 import { describe, expect, it } from "vitest";
 import type { LiveRipplePayload, LiveStatePayload } from "../../api/types-live";
@@ -162,6 +165,43 @@ describe("scopeRippleChip (todo 9)", () => {
     expect(textOf(chip.root, "data-ripple-window")).toBe("500 мс");
     expect(textOf(chip.root, "data-ripple-adapter")).toBe("100 нФ · 0 Ом · ×1");
     expect(textOf(chip.root, "data-ripple-label")).toContain("полные отсчёты");
+  });
+
+  it("маркер базиса компонент: до события прочерк, номинал и измерено оператором", () => {
+    const chip = mountScopeRippleChip();
+    expect(textOf(chip.root, "data-ripple-basis")).toBe("—");
+    chip.apply(READY);
+    expect(textOf(chip.root, "data-ripple-basis")).toBe("номинал");
+    chip.apply(
+      ripple({ ...READY, adapter: { ...ADAPTER, component_values_basis: "operator_measured" } }),
+    );
+    expect(textOf(chip.root, "data-ripple-basis")).toBe("измерено оператором");
+  });
+
+  it("неизвестный базис — прочерк, выдуманный ярлык запрещён; снимок жив", () => {
+    const chip = mountScopeRippleChip();
+    chip.apply(ripple({ ...READY, adapter: { ...ADAPTER, component_values_basis: "guessed" } }));
+    expect(textOf(chip.root, "data-ripple-basis")).toBe("—");
+    expect(textOf(chip.root, "data-ripple-rms")).toBe("35.4 мВ");
+  });
+
+  it("базис — провенанс: переживает устаревание вместе с адаптером", () => {
+    const { chip, timers } = chipWithTimers();
+    chip.apply(READY);
+    timers.armed[0]?.();
+    expect(textOf(chip.root, "data-ripple-basis")).toBe("номинал");
+    expect(textOf(chip.root, "data-ripple-adapter")).toBe("100 нФ · 0 Ом · ×1");
+  });
+
+  it("постоянная подсказка номинальной модели адаптера всегда на месте", () => {
+    const chip = mountScopeRippleChip();
+    expect(textOf(chip.root, "data-ripple-model-hint")).toBe(
+      "живые числа используют номинальную модель адаптера",
+    );
+    chip.apply(SETTLING);
+    expect(textOf(chip.root, "data-ripple-model-hint")).toBe(
+      "живые числа используют номинальную модель адаптера",
+    );
   });
 
   it("unavailable честно без чисел", () => {

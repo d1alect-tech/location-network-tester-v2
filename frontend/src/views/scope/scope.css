@@ -872,7 +872,8 @@
 
 /* Ширины — под самый широкий текст каждого слота: статус
    «установление», прогресс «осталось ~999 мс», значения «999.9 мВ»,
-   окно «999 мс», адаптер «100 нФ · 0 Ом · ×1». */
+   окно «999 мс», адаптер «100 нФ · 0 Ом · ×1», базис
+   «измерено оператором» (GAP-6: смена базиса не двигает соседей). */
 .lnt-scope-workspace .lnt-scope-ripple-state {
   min-width: 13ch;
 }
@@ -892,6 +893,10 @@
 
 .lnt-scope-workspace .lnt-scope-ripple-adapter {
   min-width: 17ch;
+}
+
+.lnt-scope-workspace .lnt-scope-ripple-basis {
+  min-width: 20ch;
 }
 
 .lnt-scope-workspace .lnt-scope-ripple-label {

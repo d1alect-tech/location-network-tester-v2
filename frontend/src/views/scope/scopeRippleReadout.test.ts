@@ -1,6 +1,8 @@
 /** D1: ошибка SSE-транспорта гасит числа живого чипа риппла до следующего
  * ripple-события текущей эпохи. Сам реконнект и heartbeat числа не
- * возвращают. */
+ * возвращают.
+ * GAP-6 (task 8): композиция доносит маркер базиса компонент адаптера и
+ * постоянную подсказку номинальной модели до чипа без изменений провода. */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LntApiClient } from "../../api/client";
@@ -108,6 +110,24 @@ function textOf(root: HTMLElement, attr: string): string {
 afterEach(() => {
   vi.unstubAllGlobals();
   FakeEventSource.instances = [];
+});
+
+describe("живой чип риппла: маркер базиса компонент (GAP-6)", () => {
+  it("readout доносит базис и подсказку модели до чипа", () => {
+    const readout = mountScopeRippleReadout();
+    readout.applyLiveState(RUNNING);
+    readout.applyRipple(READY);
+    expect(textOf(readout.rippleRow, "data-ripple-basis")).toBe("номинал");
+    readout.applyRipple({
+      ...READY,
+      adapter: { ...ADAPTER, component_values_basis: "operator_measured" },
+    });
+    expect(textOf(readout.rippleRow, "data-ripple-basis")).toBe("измерено оператором");
+    expect(textOf(readout.rippleRow, "data-ripple-model-hint")).toBe(
+      "живые числа используют номинальную модель адаптера",
+    );
+    readout.dispose();
+  });
 });
 
 describe("живой чип риппла при ошибке транспорта", () => {

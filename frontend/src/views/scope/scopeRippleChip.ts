@@ -8,7 +8,11 @@
  * реконнект (onopen), кадры и heartbeat возраст риппла не обновляют и числа
  * не возвращают — это делает только следующее событие ripple. Геометрия
  * стабильна: каждое меняющееся значение сидит в слоте с фиксированной
- * минимальной шириной (scope.css), смена текста не двигает соседей. */
+ * минимальной шириной (scope.css), смена текста не двигает соседей.
+ * GAP-6 (task 8): маркер базиса компонент адаптера («номинал»/«измерено
+ * оператором», неизвестный литерал — прочерк) рядом с adapter-фактами и
+ * постоянная подсказка «живые числа используют номинальную модель
+ * адаптера» (D8). Декларация в живую — будущая работа (OQ5), здесь её нет. */
 
 import type { LiveRipplePayload, LiveStatePayload } from "../../api/types-live";
 import { el } from "../../components/primitives/dom";
@@ -52,7 +56,9 @@ interface SlotView {
   readonly vpp: HTMLElement;
   readonly window: HTMLElement;
   readonly adapter: HTMLElement;
+  readonly basis: HTMLElement;
   readonly label: HTMLElement;
+  readonly modelHint: HTMLElement;
 }
 
 export function mountScopeRippleChip(options: ScopeRippleChipOptions = {}): ScopeRippleChipHandle {
@@ -73,10 +79,16 @@ export function mountScopeRippleChip(options: ScopeRippleChipOptions = {}): Scop
     vpp: valueSlot("data-ripple-vpp", "lnt-scope-ripple-vpp"),
     window: valueSlot("data-ripple-window", "lnt-scope-ripple-window"),
     adapter: valueSlot("data-ripple-adapter", "lnt-scope-ripple-adapter"),
+    basis: valueSlot("data-ripple-basis", "lnt-scope-ripple-basis"),
     label: el("span", {
       className: "lnt-scope-ripple-label",
       attrs: { "data-ripple-label": "", "data-readonly": "" },
       text: "полные отсчёты, некалиброванные вольты",
+    }),
+    modelHint: el("span", {
+      className: "lnt-scope-ripple-label",
+      attrs: { "data-ripple-model-hint": "", "data-readonly": "" },
+      text: "живые числа используют номинальную модель адаптера",
     }),
   };
   const metric = (label: string, slot: HTMLElement): HTMLElement =>
@@ -98,7 +110,9 @@ export function mountScopeRippleChip(options: ScopeRippleChipOptions = {}): Scop
       metric("Vpp", slots.vpp),
       metric("окно", slots.window),
       metric("адаптер", slots.adapter),
+      metric("базис", slots.basis),
       slots.label,
+      slots.modelHint,
     ],
   );
 
@@ -169,6 +183,7 @@ export function mountScopeRippleChip(options: ScopeRippleChipOptions = {}): Scop
       slots.vpp.textContent = "—";
       slots.window.textContent = "—";
       slots.adapter.textContent = "—";
+      slots.basis.textContent = "—";
       return;
     }
     const showValues = data.status === "ready" && !stale;
@@ -182,6 +197,8 @@ export function mountScopeRippleChip(options: ScopeRippleChipOptions = {}): Scop
     slots.window.textContent =
       showValues && data.span_duration_s !== null ? formatSeconds(data.span_duration_s) : "—";
     slots.adapter.textContent = formatAdapter(data.adapter);
+    // Базис — провенанс, как адаптер: не зависит от свежести чисел.
+    slots.basis.textContent = formatBasis(data.adapter.component_values_basis);
   }
 
   function apply(payload: LiveRipplePayload | null): void {
@@ -241,4 +258,12 @@ function formatAdapter(adapter: LiveRipplePayload["adapter"]): string {
     ? String(adapter.series_r_ohm)
     : adapter.series_r_ohm.toFixed(1);
   return `${cap} нФ · ${series} Ом · ×${adapter.probe_multiplier}`;
+}
+
+/** Маркер базиса компонент: объявленный номинал или значения, измеренные
+ * оператором. Неизвестный литерал — прочерк, выдуманный ярлык запрещён. */
+function formatBasis(basis: string): string {
+  if (basis === "nominal") return "номинал";
+  if (basis === "operator_measured") return "измерено оператором";
+  return "—";
 }
