@@ -5,7 +5,7 @@
  * сценарный снимок в очередь SSE; без этого поток отдаёт пустой кадр
  * с retry — детерминированно и без гонок. */
 
-import type { JobSnapshot } from "../api/types-jobs";
+import type { JobRequest, JobSnapshot } from "../api/types-jobs";
 import {
   type MockHttpReply,
   type MockHttpRequest,
@@ -124,8 +124,8 @@ export function buildJobScript(
 
 export class JobStore {
   readonly plans = new Map<string, JobPlan>();
-  /** Тела запросов POST /api/jobs по порядку поступления. */
-  readonly startedRequests: Record<string, unknown>[] = [];
+  /** Тела запросов POST /api/jobs по порядку поступления (тип из types-jobs). */
+  readonly startedRequests: JobRequest[] = [];
   readonly cancelRequests: string[] = [];
   sessionCounter = 0;
   /** Задача, уже существующая на сервере при монтировании (восстановление). */
@@ -151,11 +151,11 @@ export class JobStore {
   }
 }
 
-function startJob(store: JobStore, body: Record<string, unknown>): MockHttpReply {
+function startJob(store: JobStore, body: JobRequest): MockHttpReply {
   store.startedRequests.push(body);
   const jobId = `job-${store.plans.size + 1}`;
   store.sessionCounter += 1;
-  const script = buildJobScript(body, jobId, store.sessionCounter);
+  const script = buildJobScript({ ...body }, jobId, store.sessionCounter);
   // Первый запуск всегда отдаёт queued + первый рабочий снимок автоматически.
   store.plans.set(jobId, {
     scripted: script.scripted,
@@ -220,7 +220,7 @@ export function handleJobs(store: JobStore, request: MockHttpRequest): MockHttpR
     if (!request.nonceOk) {
       return failure(403, { code: "mutation_nonce_invalid", detail: "nonce недействителен" });
     }
-    return startJob(store, request.bodyJson<Record<string, unknown>>());
+    return startJob(store, request.bodyJson<JobRequest>());
   }
   const jobMatch = /^\/api\/jobs\/([^/]+)(\/.*)?$/.exec(path);
   if (jobMatch) {

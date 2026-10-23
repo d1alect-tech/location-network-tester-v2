@@ -12,7 +12,7 @@
 import type { Page, Route } from "@playwright/test";
 import type { CatalogSession } from "../api/types";
 import type { DeviceStateValue } from "../api/types-device";
-import type { JobSnapshot } from "../api/types-jobs";
+import type { JobRequest, JobSnapshot } from "../api/types-jobs";
 import type { LiveMode } from "../api/types-live";
 import {
   CORPUS_V2_ARTIFACT_KEY,
@@ -115,7 +115,7 @@ export class MockLntBackend {
   }
 
   // ---- хуки спек (имена сохранены от трёх старых моков) ----
-  get startedRequests(): Record<string, unknown>[] {
+  get startedRequests(): JobRequest[] {
     return this.jobs.startedRequests;
   }
   get cancelRequests(): string[] {

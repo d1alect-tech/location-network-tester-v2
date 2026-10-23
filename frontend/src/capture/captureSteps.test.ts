@@ -12,6 +12,7 @@ function harness(validate = true) {
     source: el("div", { attrs: { "data-marker": "source" } }),
     paramsTitle: el("h3", { text: "Параметры записи" }),
     settings: el("div", { attrs: { "data-marker": "settings" } }),
+    adapter: el("div", { attrs: { "data-marker": "adapter" } }),
     series: el("div", { attrs: { "data-marker": "series" } }),
   };
   const form = el("form", {}, [
@@ -19,6 +20,7 @@ function harness(validate = true) {
     sections.source,
     sections.paramsTitle,
     sections.settings,
+    sections.adapter,
     sections.series,
   ]) as HTMLFormElement;
   const launchNode = el("div", { attrs: { "data-marker": "launch" } });
@@ -63,11 +65,22 @@ describe("createCaptureSteps: раскладка секций по панеля�
     expect(panel(1).contains(sections.modes)).toBe(true);
     expect(panel(1).contains(sections.source)).toBe(true);
     expect(panel(2).contains(sections.settings)).toBe(true);
+    expect(panel(2).contains(sections.adapter)).toBe(true);
     expect(panel(2).contains(sections.series)).toBe(true);
     expect(form.querySelector("h3.capture-section-title")).toBeNull();
     expect(panel(2).querySelector(".capture-step-title")?.textContent).toBe(
       "Шаг 2 · Параметры записи",
     );
+  });
+
+  it("секция декларации адаптера стоит между настройками и серией шага 2", () => {
+    // Given / When
+    const { panel, sections } = harness();
+
+    // Then: OQ1 — обязательная видимая секция ВНУТРИ шага 2, после настроек.
+    const index = (node: HTMLElement): number => [...panel(2).children].indexOf(node);
+    expect(index(sections.adapter) - index(sections.settings)).toBe(1);
+    expect(index(sections.series) - index(sections.adapter)).toBe(1);
   });
 
   it("узел запуска владельца попадает в панель шага 3", () => {

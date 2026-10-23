@@ -49,12 +49,15 @@ const STEP_COPY: readonly [StepCopy, StepCopy, StepCopy] = [
 
 // Секции формы, которые раскладываются по панелям шагов. paramsTitle —
 // h3 «Параметры записи» прежней одностраничной формы: заменяется заголовком
-// шага 2 и удаляется из DOM.
+// шага 2 и удаляется из DOM. adapter — секция декларации адаптера (N7):
+// обязательная видимая секция ВНУТРИ шага 2 между настройками и серией
+// (OQ1 — рельс трёх шагов не тронут).
 export interface CaptureStepSections {
   readonly modes: HTMLElement;
   readonly source: HTMLElement;
   readonly paramsTitle: HTMLElement;
   readonly settings: HTMLElement;
+  readonly adapter: HTMLElement;
   readonly series: HTMLElement;
 }
 
@@ -204,7 +207,7 @@ export function createCaptureSteps(options: CaptureStepsOptions): CaptureStepsHa
 
   // Секции формы раскладываются по панелям; прежний h3 заменяет заголовок шага.
   const panel1 = panel(0, [sections.modes, sections.source]);
-  const panel2 = panel(1, [echo, sections.settings, sections.series]);
+  const panel2 = panel(1, [echo, sections.settings, sections.adapter, sections.series]);
   const panel3 = panel(2, options.launch);
   sections.paramsTitle.remove();
   form.append(panel1, panel2);
