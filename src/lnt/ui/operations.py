@@ -17,12 +17,13 @@ from lnt.archive.backup import backup_all_sessions, backup_output_name
 from lnt.cm_dm.analysis import analyze_cm_dm_session, write_cm_dm_analysis
 from lnt.cm_dm.dispatch import is_cm_dm_session
 from lnt.compare import ComparisonResult, compare_analyses, ensure_comparable
+from lnt.ripple.adapter_declaration import AdapterDeclaration
 from lnt.scope_io import NEVER_CANCELLED, CancellationToken, CancelledResult
 from lnt.selftest import SelftestResult, run_selftest
 from lnt.simulate import simulate_session
 from lnt.spectrum_hold import write_hold_spectrum
 from lnt.support import BundleOptions, SupportBundleResult, build_support_bundle
-from lnt.types import ChannelMode, SeriesPosition, SessionType
+from lnt.types import ChannelMode, ComponentValuesBasis, SeriesPosition, SessionType
 from lnt.ui.analysis_v2_wire import AnalyzeWriteResult, run_v2_after_v1
 from lnt.ui.device import DeviceStatus, diagnose_device
 from lnt.ui.models import CaptureRequest, SimulateRequest
@@ -90,6 +91,19 @@ def _channel_mode(channels: int) -> ChannelMode:
     return ChannelMode.CH1_ONLY if channels == 1 else ChannelMode.DUAL
 
 
+def _adapter_declaration(request: CaptureRequest) -> AdapterDeclaration | None:
+    """Приводит DTO декларации панели к доменному типу ripple."""
+    declaration = request.adapter_declaration
+    if declaration is None:
+        return None
+    return AdapterDeclaration(
+        cap_nf=declaration.cap_nf,
+        series_r_ohm=declaration.series_r_ohm,
+        preconnected=declaration.preconnected,
+        component_values_basis=ComponentValuesBasis(declaration.component_values_basis),
+    )
+
+
 def _session_type(request: CaptureRequest) -> SessionType:
     if request.input == "transformer":
         return SessionType.LINE_QUALITY
@@ -144,6 +158,7 @@ class LntBackend:
             baseline_session=baseline,
             channel_mode=_channel_mode(request.channels),
             cancellation_token=cancellation_token,
+            adapter_declaration=_adapter_declaration(request),
         )
 
     def analyze_and_write(

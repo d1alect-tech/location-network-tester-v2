@@ -25,11 +25,13 @@ from lnt.context.model import (
 from lnt.context.store import ContextStore, ContextUpdate
 from lnt.errors import InputError
 from lnt.manifest import manifest_from_json
+from lnt.ripple.adapter_declaration import declaration_fields
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from lnt.metadata_collector import MetadataField, MetadataSnapshot
+    from lnt.ripple.adapter_declaration import AdapterDeclaration
 
 RECONCILE_MARKER: Final = ".reconcile-needed"
 LEGACY_ARTIFACT_KEY: Final = "legacy-default"
@@ -58,12 +60,13 @@ class ProjectionFailure:
     reason: str
 
 
-def write_initial_context(
+def write_initial_context(  # noqa: PLR0913 - write-once шов собирает входы захвата
     session_dir: Path,
     session_id: str,
     metadata: MetadataSnapshot,
     *,
     label: str | None,
+    adapter_declaration: AdapterDeclaration | None = None,
     tags: tuple[str, ...] = (),
 ) -> None:
     """Write the initial context event inside an unpublished session directory."""
@@ -81,6 +84,8 @@ def write_initial_context(
             collection_reason=None,
             captured_at=metadata.captured_at,
         )
+    if adapter_declaration is not None:
+        fields.update(declaration_fields(adapter_declaration, metadata.captured_at))
     snapshot = ContextSnapshot(
         schema_version=1,
         session_id=session_id,

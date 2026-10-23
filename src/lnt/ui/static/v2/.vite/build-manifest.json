@@ -43,7 +43,7 @@
     "src/api/sessionMetrics.ts": "e971aee078ddd9394ea90b2be6e45d783fc4f113fba08a6209308e9caf21beb4",
     "src/api/types-analysis.ts": "07200e6dd1273c713ff19a6de3e8e10023e37844f7e8ac19eb34c303df8f9b2c",
     "src/api/types-device.ts": "622ddb56a9caed082023a83fe22a8e84fc5bb29facba5f6b73beeda689e8a74b",
-    "src/api/types-jobs.ts": "bc1a0531ceca3f466c4728519a1d8ae1ff056d58c19c66b06d41d7f73d556ee9",
+    "src/api/types-jobs.ts": "e0b677f4b88c25eb61b68ab09e9d305a31ef42936077c4373fa03510f7c54879",
     "src/api/types-live.ts": "25af04907aac214b81f697458be2585ae41dbabd57cc6f2a21ab75f85d85c93b",
     "src/api/types-plots.ts": "82dbe672b00efa1c4725a269c96b009d29477722ace6be57ecea2df87ca798ec",
     "src/api/types-research.ts": "f38d8e72957929b4169c205fc55e1163f914095ae6728097a1c4d94cf2b78c75",
