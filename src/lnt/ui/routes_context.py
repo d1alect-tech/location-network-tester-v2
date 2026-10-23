@@ -1,6 +1,7 @@
 """HTTP API оптимистично версионированного session context."""
 
 import uuid
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Annotated
@@ -11,6 +12,7 @@ from lnt.context.events import read_event_history
 from lnt.context.model import ContextField, ContextSnapshot
 from lnt.context.store import ContextConflictError, ContextStore, ContextUpdate
 from lnt.errors import InputError
+from lnt.ripple.adapter_declaration import ADAPTER_CONTEXT_KEYS
 from lnt.ui.api_support import session_directory
 from lnt.ui.dependencies import AppServices, get_services
 from lnt.ui.models_context import (
@@ -51,6 +53,37 @@ def show_context(
     return _response(session_id, ContextStore(directory, session_id))
 
 
+def _guard_adapter_declaration(
+    current: ContextSnapshot, request_fields: Mapping[str, ContextFieldModel]
+) -> None:
+    """Отклоняет PUT, который меняет или создаёт write-once декларацию адаптера."""
+    for key in ADAPTER_CONTEXT_KEYS:
+        existing = current.fields.get(key)
+        new = request_fields.get(key)
+        if existing is None:
+            if new is not None:
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    detail={
+                        "detail": (
+                            "декларация адаптера не создаётся через API — только в момент захвата"
+                        ),
+                        "reason": "adapter_declaration_capture_only",
+                    },
+                )
+            continue
+        if new is None or ContextField(**new.model_dump()) != existing:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail={
+                    "detail": (
+                        f"декларация адаптера неизменяема: ключ {key} нельзя изменить или удалить"
+                    ),
+                    "reason": "adapter_declaration_immutable",
+                },
+            )
+
+
 @router.put("/{session_id}")
 def update_context(
     session_id: str,
@@ -61,6 +94,8 @@ def update_context(
     directory = session_directory(session_id, services.catalog_db, services.root)
     store = ContextStore(directory, session_id)
     current = store.load().snapshot or ContextSnapshot.empty(session_id)
+    if request.fields is not None:
+        _guard_adapter_declaration(current, request.fields)
     now = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     fields = (
         current.fields
