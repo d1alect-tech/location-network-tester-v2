@@ -52,12 +52,12 @@ function interruptedJobFixture(): JobSnapshot {
 }
 
 test.describe("capture workflow", () => {
-  test("mode setup screen shows exactly four modes and preview updates", async ({ page }) => {
+  test("mode setup screen shows exactly five modes and preview updates", async ({ page }) => {
     installMockBackend(page);
     await page.goto(`${BASE}#/capture`);
 
     const modeCards = page.locator('.capture-mode-group input[name="capture-mode"]');
-    await expect(modeCards).toHaveCount(4);
+    await expect(modeCards).toHaveCount(5);
 
     // Превью по умолчанию: боковая колонка визарда видима на каждом шаге.
     await expect(page.locator(".capture-preview-list")).toContainText("RC-развязка");

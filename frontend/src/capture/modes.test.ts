@@ -4,9 +4,15 @@ import { CAPTURE_MODES, DEFAULT_FORM_VALUES, buildJobRequest, validateCaptureFor
 const valid = { ...DEFAULT_FORM_VALUES };
 
 describe("capture mode definitions", () => {
-  it("exposes exactly the four planned modes", () => {
+  it("exposes exactly the five planned modes", () => {
     expect(Object.keys(CAPTURE_MODES).sort()).toEqual(
-      ["line_quality", "rc_measurement", "self_noise", "single_channel"].sort(),
+      [
+        "line_quality",
+        "rc_measurement",
+        "self_noise",
+        "single_channel",
+        "ripple_measurement",
+      ].sort(),
     );
   });
 
@@ -19,6 +25,8 @@ describe("capture mode definitions", () => {
     expect(CAPTURE_MODES.rc_measurement.channels).toBe(2);
     expect(CAPTURE_MODES.single_channel.channels).toBe(1);
     expect(CAPTURE_MODES.single_channel.usesBaseline).toBe(true);
+    expect(CAPTURE_MODES.ripple_measurement.channels).toBe(1);
+    expect(CAPTURE_MODES.ripple_measurement.usesBaseline).toBe(false);
   });
 });
 

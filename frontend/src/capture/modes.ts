@@ -1,14 +1,16 @@
-/** Режимы захвата: ровно четыре режима из плана. Выбор режима определяет,
+/** Режимы захвата: ровно пять режимов из плана. Выбор режима определяет,
  * какие настройки существуют — невозможные комбинации не показываются.
  * Контракты зеркалируют CaptureRequest (src/lnt/ui/models.py). */
 
 import type { CaptureJobRequest, SimulateJobRequest } from "../api/types-jobs";
+import { ADAPTER_PRESET } from "./adapterPreset";
 
 export const CAPTURE_MODE_IDS = [
   "rc_measurement",
   "self_noise",
   "line_quality",
   "single_channel",
+  "ripple_measurement",
 ] as const;
 export type CaptureModeId = (typeof CAPTURE_MODE_IDS)[number];
 
@@ -72,6 +74,17 @@ export const CAPTURE_MODES: Record<CaptureModeId, CaptureModeDef> = {
     input: "rc",
     selfNoise: false,
     usesBaseline: true,
+    sessionTypeRu: "Измерение (measurement)",
+    ch1SetupRu: "RC-развязка (floating differential RC shunt)",
+  },
+  ripple_measurement: {
+    id: "ripple_measurement",
+    titleRu: "Риппл-измерение (адаптер)",
+    descriptionRu: `Тот же одноканальный CH1-поток, что и в одноканальном захвате, с зафиксированным пресетом адаптера (номинал ${ADAPTER_PRESET.capNfNominal} нФ / 1 МОм / x1). Декларация адаптера записывается в контекст сессии в момент захвата.`,
+    channels: 1,
+    input: "rc",
+    selfNoise: false,
+    usesBaseline: false,
     sessionTypeRu: "Измерение (measurement)",
     ch1SetupRu: "RC-развязка (floating differential RC shunt)",
   },

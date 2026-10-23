@@ -20,13 +20,13 @@ function stubClient(): LntApiClient {
 }
 
 describe("захват V6: radio-card D1=A (пин, уже зелёный)", () => {
-  it("input[name=capture-mode] остаются как есть: 4 режима, RC по умолчанию", () => {
+  it("input[name=capture-mode] остаются как есть: 5 режимов, RC по умолчанию", () => {
     // Given / When
     const form = createModeForm();
 
     // Then: контракт D1=A radio-card — селекторы пинятся, портирование их хранит
     const radios = form.root.querySelectorAll('input[name="capture-mode"]');
-    expect(radios).toHaveLength(4);
+    expect(radios).toHaveLength(5);
     const checked = form.root.querySelector<HTMLInputElement>('input[name="capture-mode"]:checked');
     expect(checked?.value).toBe("rc_measurement");
   });
