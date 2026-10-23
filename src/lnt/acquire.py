@@ -6,12 +6,12 @@ I/O с устройством — в ``scope_io``; масштаб raw -> В и �
 Без таблицы ``calibration_used=False``.
 """
 
+from __future__ import annotations
+
 import math
 import uuid
-from collections.abc import Callable
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import overload
+from typing import TYPE_CHECKING, overload
 
 from lnt.acquire_setup import (
     FRONT_END_CH2,
@@ -49,6 +49,12 @@ from lnt.types import (
     SessionType,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from lnt.ripple.adapter_declaration import AdapterDeclaration
+
 __all__ = ["DEFAULT_RANGE_V", "DEFAULT_SAMPLE_RATE_HZ", "RANGE_CODES", "capture_session"]
 
 DEFAULT_SAMPLE_RATE_HZ = 8_000_000.0
@@ -71,6 +77,7 @@ def capture_session(
     baseline_session: str | None = None,
     channel_mode: ChannelMode = ChannelMode.DUAL,
     adc_calibration: AdcCalibration | None = None,
+    adapter_declaration: AdapterDeclaration | None = None,
 ) -> Path: ...
 
 
@@ -90,6 +97,7 @@ def capture_session(
     baseline_session: str | None = None,
     channel_mode: ChannelMode = ChannelMode.DUAL,
     adc_calibration: AdcCalibration | None = None,
+    adapter_declaration: AdapterDeclaration | None = None,
 ) -> Path | CancelledResult: ...
 
 
@@ -108,6 +116,7 @@ def capture_session(  # noqa: C901, PLR0913 -- capture assembly boundary
     channel_mode: ChannelMode = ChannelMode.DUAL,
     cancellation_token: CancellationToken = NEVER_CANCELLED,
     adc_calibration: AdcCalibration | None = None,
+    adapter_declaration: AdapterDeclaration | None = None,
 ) -> Path | CancelledResult:
     """Захватывает сессию и атомарно пишет её в ``out_dir``.
 
@@ -116,6 +125,8 @@ def capture_session(  # noqa: C901, PLR0913 -- capture assembly boundary
     ``channel_mode=CH1_ONLY`` — один пробник: CH2 не сохраняется, анализ
     по номинальным окнам без фазовой привязки.
     ``adc_calibration=None`` — без поправки, ``calibration_used=False``.
+    ``adapter_declaration`` — операторская декларация RC-адаптера ripple;
+    пишется write-once в начальный контекст сессии.
     """
     rate_code = _rate_code(sample_rate_hz)
     ch1_range_code = _range_code(ch1_range_v)
@@ -198,7 +209,13 @@ def capture_session(  # noqa: C901, PLR0913 -- capture assembly boundary
     )
 
     def prepare_publish(partial: Path) -> None:
-        write_initial_context(partial, manifest.session_id, metadata, label=normalized_label)
+        write_initial_context(
+            partial,
+            manifest.session_id,
+            metadata,
+            label=normalized_label,
+            adapter_declaration=adapter_declaration,
+        )
         # Last cancellation boundary: never interrupt the following atomic rename.
         if cancellation_token.is_cancelled():
             raise _CaptureCancelledError

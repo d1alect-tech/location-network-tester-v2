@@ -71,6 +71,14 @@ export type SimulateJobRequest = SeriesFields & {
   channels?: 1 | 2;
 };
 
+/** Зеркало AdapterDeclarationModel (src/lnt/ui/models.py) — change-both-or-neither (H4). */
+export interface AdapterDeclarationFields {
+  preconnected: boolean;
+  cap_nf: number;
+  series_r_ohm: number;
+  component_values_basis: "nominal" | "operator_measured";
+}
+
 export type CaptureJobRequest = SeriesFields & {
   kind: "capture";
   duration_s?: number;
@@ -80,6 +88,7 @@ export type CaptureJobRequest = SeriesFields & {
   baseline_session?: string | null;
   channels?: 1 | 2;
   input?: "rc" | "transformer";
+  adapter_declaration?: AdapterDeclarationFields;
 };
 
 export interface AnalyzeJobRequest {
