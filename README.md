@@ -7,7 +7,7 @@
 *Capture and spectral analysis of mains power for testing hypotheses about
 electrical input lag. Russian-language tool, Windows only.*
 
-![Инспекция: сравнение двух сессий, спектр мощности и таблица маркеров](docs/img/ui-inspect.png)
+![Инспекция: сравнение двух симулированных сессий (розетка-А против розетки-Б) — спектр мощности с max-hold и дельты Δср/Δmax](docs/img/ui-inspect.png)
 
 ## О чём это
 
