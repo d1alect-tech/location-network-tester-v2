@@ -24,6 +24,7 @@ const KNOWN_MODES: readonly string[] = [
   "self_noise",
   "line_quality",
   "single_channel",
+  "ripple_measurement",
 ];
 
 function isCaptureModeId(value: string): value is CaptureModeId {
@@ -40,6 +41,10 @@ const FIELD_NAMES: Readonly<Record<keyof CaptureFormValues, string>> = {
   repeat: "repeat",
   intervalS: "interval_s",
   profile: "profile",
+  adapterCapNf: "adapter_cap_nf",
+  adapterSeriesROhm: "adapter_series_r_ohm",
+  adapterPreconnected: "adapter_preconnected",
+  adapterBasis: "adapter_component_values_basis",
 };
 
 function controlValue(form: HTMLFormElement, name: string): string {
@@ -50,21 +55,49 @@ function controlValue(form: HTMLFormElement, name: string): string {
   return "";
 }
 
+/** Декларация адаптера: галка читается как boolean, базис — с radio-пары
+ * (RadioNodeList отдаёт значение отмеченной кнопки). */
+function adapterOverrides(form: HTMLFormElement): Partial<CaptureFormValues> {
+  const overrides: Partial<CaptureFormValues> = {};
+  const checkbox = form.elements.namedItem(FIELD_NAMES.adapterPreconnected);
+  if (checkbox instanceof HTMLInputElement && checkbox.type === "checkbox") {
+    overrides.adapterPreconnected = checkbox.checked;
+  }
+  const basis = form.elements.namedItem(FIELD_NAMES.adapterBasis);
+  if (basis instanceof RadioNodeList) {
+    overrides.adapterBasis = basis.value === "operator_measured" ? "operator_measured" : "nominal";
+  }
+  return overrides;
+}
+
 function readMode(form: HTMLFormElement | null): CaptureModeDef {
   const checked = form?.querySelector<HTMLInputElement>('input[name="capture-mode"]:checked');
   const id = checked?.value ?? "";
   return isCaptureModeId(id) ? CAPTURE_MODES[id] : CAPTURE_MODES.rc_measurement;
 }
 
+/** Строковые поля формы — читаются value-чтением; галка и базис — ниже. */
+const STRING_KEYS = [
+  "durationS",
+  "sampleRateHz",
+  "rangeV",
+  "label",
+  "baselineSession",
+  "repeat",
+  "intervalS",
+  "profile",
+  "adapterCapNf",
+  "adapterSeriesROhm",
+] as const satisfies readonly (keyof CaptureFormValues)[];
+
 function readRawValues(form: HTMLFormElement | null): CaptureFormValues {
-  const keys = Object.keys(FIELD_NAMES) as (keyof CaptureFormValues)[];
   const values = { ...DEFAULT_FORM_VALUES };
   if (form === null) return values;
-  for (const key of keys) {
+  for (const key of STRING_KEYS) {
     const raw = controlValue(form, FIELD_NAMES[key]);
     values[key] = raw.trim() === "" ? DEFAULT_FORM_VALUES[key] : raw;
   }
-  return values;
+  return { ...values, ...adapterOverrides(form) };
 }
 
 function validatedOrDefault(values: CaptureFormValues): ValidatedCaptureForm {

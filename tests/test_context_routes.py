@@ -6,13 +6,21 @@ from fastapi.testclient import TestClient
 
 from lnt.catalog.connection import writer_transaction
 from lnt.catalog.migrations import apply_migrations
+from lnt.context.model import ContextField, ContextSnapshot
+from lnt.context.store import ContextStore, ContextUpdate
+from lnt.ripple.adapter_declaration import AdapterDeclaration, declaration_fields
 from lnt.simulate import simulate_session
+from lnt.types import ComponentValuesBasis
 from lnt.ui.app import create_app
+from lnt.ui.models_context import ContextFieldModel
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     import pytest
+
+_CAPTURED_AT = "2026-10-23T08:00:00.000Z"
 
 
 def _client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
@@ -190,3 +198,222 @@ def test_stale_catalog_path_cannot_authorize_replacement_inside_root(tmp_path: P
     assert write.status_code == 404
     assert not (replacement / "context.json").exists()
     assert not (replacement / "context.events.jsonl").exists()
+
+
+def _seed_adapter_declaration(tmp_path: Path, session_id: str = "known") -> ContextSnapshot:
+    """Кладёт write-once декларацию так же, как lnt.capture при захвате."""
+    declaration = AdapterDeclaration(
+        cap_nf=100.0,
+        series_r_ohm=470.0,
+        preconnected=True,
+        component_values_basis=ComponentValuesBasis.OPERATOR_MEASURED,
+    )
+    fields = declaration_fields(declaration, _CAPTURED_AT)
+    snapshot = ContextSnapshot(
+        schema_version=1,
+        session_id=session_id,
+        revision=1,
+        fields=fields,
+        tags=(),
+        notes=None,
+        profile_snapshots=(),
+    )
+    ContextStore(tmp_path / "sessions" / session_id, session_id).update(
+        ContextUpdate(
+            expected_revision=0,
+            snapshot=snapshot,
+            actor="lnt.capture",
+            changed_keys=tuple(sorted(fields)),
+            occurred_at=_CAPTURED_AT,
+            event_id=f"initial-{session_id}",
+        ),
+    )
+    return snapshot
+
+
+def _field_payloads(fields: Mapping[str, ContextField]) -> dict[str, dict[str, object]]:
+    """Поля контекста в JSON-форме тела PUT: byte-faithful round-trip."""
+    return {
+        key: ContextFieldModel.model_validate(field, from_attributes=True).model_dump(mode="json")
+        for key, field in fields.items()
+    }
+
+
+def test_put_keeps_unchanged_adapter_keys_and_edits_notes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(tmp_path, monkeypatch) as client:
+        seeded = _seed_adapter_declaration(tmp_path)
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        response = client.put(
+            "/api/context/known",
+            json={
+                "expected_revision": seeded.revision,
+                "fields": _field_payloads(seeded.fields),
+                "notes": "проверено",
+            },
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["revision"] == 2
+    assert body["notes"] == "проверено"
+    assert set(body["fields"]) == set(seeded.fields)
+    assert body["fields"]["adapter.cap_nf"]["value"] == 100.0
+
+
+def test_put_changing_adapter_field_is_409_immutable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(tmp_path, monkeypatch) as client:
+        seeded = _seed_adapter_declaration(tmp_path)
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        payloads = _field_payloads(seeded.fields)
+        payloads["adapter.cap_nf"]["value"] = 200.0
+        response = client.put(
+            "/api/context/known",
+            json={"expected_revision": seeded.revision, "fields": payloads},
+            headers=headers,
+        )
+        current = client.get("/api/context/known")
+
+    assert response.status_code == 409
+    assert response.json()["reason"] == "adapter_declaration_immutable"
+    assert "декларация адаптера" in response.json()["detail"]
+    assert current.json()["revision"] == seeded.revision
+    assert current.json()["fields"]["adapter.cap_nf"]["value"] == 100.0
+
+
+def test_put_removing_adapter_key_is_409_immutable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(tmp_path, monkeypatch) as client:
+        seeded = _seed_adapter_declaration(tmp_path)
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        payloads = _field_payloads(seeded.fields)
+        del payloads["adapter.preconnected"]
+        response = client.put(
+            "/api/context/known",
+            json={"expected_revision": seeded.revision, "fields": payloads},
+            headers=headers,
+        )
+
+    assert response.status_code == 409
+    assert response.json()["reason"] == "adapter_declaration_immutable"
+    assert "декларация адаптера" in response.json()["detail"]
+
+
+def test_put_adding_adapter_keys_without_declaration_is_409_capture_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(tmp_path, monkeypatch) as client:
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        declaration = AdapterDeclaration(
+            cap_nf=100.0,
+            series_r_ohm=470.0,
+            preconnected=True,
+            component_values_basis=ComponentValuesBasis.NOMINAL,
+        )
+        response = client.put(
+            "/api/context/known",
+            json={
+                "expected_revision": 0,
+                "fields": _field_payloads(declaration_fields(declaration, _CAPTURED_AT)),
+            },
+            headers=headers,
+        )
+
+    assert response.status_code == 409
+    assert response.json()["reason"] == "adapter_declaration_capture_only"
+    assert "только в момент захвата" in response.json()["detail"]
+
+
+def test_legacy_session_without_declaration_accepts_other_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(tmp_path, monkeypatch) as client:
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        response = client.put(
+            "/api/context/known",
+            json={
+                "expected_revision": 0,
+                "fields": {
+                    "session.label": {
+                        "kind": "string",
+                        "value": "лаборатория",
+                        "unit": None,
+                        "uncertainty": None,
+                        "source": "user",
+                        "collection_status": "collected",
+                        "collection_reason": None,
+                        "captured_at": _CAPTURED_AT,
+                    }
+                },
+            },
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["revision"] == 1
+    assert body["fields"]["session.label"]["value"] == "лаборатория"
+
+
+def test_put_adds_label_alongside_unchanged_declaration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(tmp_path, monkeypatch) as client:
+        seeded = _seed_adapter_declaration(tmp_path)
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        payloads = _field_payloads(seeded.fields)
+        payloads["session.label"] = {
+            "kind": "string",
+            "value": "стенд 3",
+            "unit": None,
+            "uncertainty": None,
+            "source": "user",
+            "collection_status": "collected",
+            "collection_reason": None,
+            "captured_at": _CAPTURED_AT,
+        }
+        response = client.put(
+            "/api/context/known",
+            json={"expected_revision": seeded.revision, "fields": payloads, "tags": ["ripple"]},
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["revision"] == 2
+    assert body["tags"] == ["ripple"]
+    assert body["fields"]["session.label"]["value"] == "стенд 3"
+    assert body["fields"]["adapter.cap_nf"]["value"] == 100.0
+
+
+def test_put_stale_revision_with_declaration_is_still_409_conflict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _client(tmp_path, monkeypatch) as client:
+        seeded = _seed_adapter_declaration(tmp_path)
+        headers = {"X-LNT-Mutation-Nonce": client.get("/api/config").json()["mutation_nonce"]}
+        stale = client.put(
+            "/api/context/known",
+            json={
+                "expected_revision": 0,
+                "fields": _field_payloads(seeded.fields),
+                "notes": "устарело",
+            },
+            headers=headers,
+        )
+
+    assert stale.status_code == 409
+    assert stale.json()["current_revision"] == seeded.revision
+    assert "конфликт" in stale.json()["detail"]

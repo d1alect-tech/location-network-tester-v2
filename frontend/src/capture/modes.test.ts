@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
+import type { CaptureFormValues } from "./modes";
 import { CAPTURE_MODES, DEFAULT_FORM_VALUES, buildJobRequest, validateCaptureForm } from "./modes";
 
 const valid = { ...DEFAULT_FORM_VALUES };
 
 describe("capture mode definitions", () => {
-  it("exposes exactly the four planned modes", () => {
+  it("exposes exactly the five planned modes", () => {
     expect(Object.keys(CAPTURE_MODES).sort()).toEqual(
-      ["line_quality", "rc_measurement", "self_noise", "single_channel"].sort(),
+      [
+        "line_quality",
+        "rc_measurement",
+        "self_noise",
+        "single_channel",
+        "ripple_measurement",
+      ].sort(),
     );
   });
 
@@ -19,6 +26,8 @@ describe("capture mode definitions", () => {
     expect(CAPTURE_MODES.rc_measurement.channels).toBe(2);
     expect(CAPTURE_MODES.single_channel.channels).toBe(1);
     expect(CAPTURE_MODES.single_channel.usesBaseline).toBe(true);
+    expect(CAPTURE_MODES.ripple_measurement.channels).toBe(1);
+    expect(CAPTURE_MODES.ripple_measurement.usesBaseline).toBe(false);
   });
 });
 
@@ -58,6 +67,78 @@ describe("validateCaptureForm", () => {
   it("rejects overlong labels", () => {
     const { errors } = validateCaptureForm({ ...valid, label: "x".repeat(129) });
     expect(errors.label).toContain("128 символов");
+  });
+});
+
+describe("validateCaptureForm: поля декларации адаптера", () => {
+  it("принимает дефолтные значения декларации без ошибок", () => {
+    const { valid: parsedDefault, errors } = validateCaptureForm(valid);
+    expect(errors.adapterCapNf).toBeUndefined();
+    expect(errors.adapterSeriesROhm).toBeUndefined();
+    expect(errors.adapterBasis).toBeUndefined();
+    expect(parsedDefault?.adapterCapNf).toBe(100);
+    expect(parsedDefault?.adapterSeriesROhm).toBe(0);
+    expect(valid?.adapterPreconnected).toBe(false);
+    expect(valid?.adapterBasis).toBe("nominal");
+  });
+
+  it("режет неположительную ёмкость и отрицательный R по-русски", () => {
+    const { errors } = validateCaptureForm({
+      ...valid,
+      adapterCapNf: "0",
+      adapterSeriesROhm: "-1",
+    });
+    expect(errors.adapterCapNf).toContain("положительным числом нанофарад");
+    expect(errors.adapterSeriesROhm).toContain("неотрицательным числом ом");
+  });
+
+  it("базис значений — только литерал nominal/operator_measured", () => {
+    const bogus = JSON.parse(
+      JSON.stringify({ ...valid, adapterBasis: "value_diff" }),
+    ) as CaptureFormValues;
+    const { errors } = validateCaptureForm(bogus);
+    expect(errors.adapterBasis).toContain("номинал");
+  });
+});
+
+describe("buildJobRequest: ветка adapter_declaration", () => {
+  const parsed = validateCaptureForm({ ...valid }).valid;
+  if (!parsed) throw new Error("fixture must validate");
+
+  it("ripple_measurement + device вкладывает adapter_declaration в capture-запрос", () => {
+    const ripple = validateCaptureForm({
+      ...valid,
+      adapterCapNf: "220",
+      adapterSeriesROhm: "4.7",
+      adapterPreconnected: true,
+      adapterBasis: "operator_measured",
+    }).valid;
+    if (!ripple) throw new Error("fixture must validate");
+    const request = buildJobRequest(CAPTURE_MODES.ripple_measurement, ripple, "device");
+    expect(request).toMatchObject({
+      kind: "capture",
+      channels: 1,
+      input: "rc",
+      adapter_declaration: {
+        preconnected: true,
+        cap_nf: 220,
+        series_r_ohm: 4.7,
+        component_values_basis: "operator_measured",
+      },
+    });
+  });
+
+  it("симулятор никогда не несёт декларацию (D7)", () => {
+    const request = buildJobRequest(CAPTURE_MODES.ripple_measurement, parsed, "simulator");
+    expect(request.kind).toBe("simulate");
+    expect("adapter_declaration" in request).toBe(false);
+  });
+
+  it("прочие режимы с устройством не несут декларацию", () => {
+    for (const id of ["rc_measurement", "self_noise", "line_quality", "single_channel"] as const) {
+      const request = buildJobRequest(CAPTURE_MODES[id], parsed, "device");
+      expect("adapter_declaration" in request).toBe(false);
+    }
   });
 });
 

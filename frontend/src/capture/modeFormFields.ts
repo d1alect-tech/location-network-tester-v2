@@ -6,7 +6,7 @@
 import { el } from "../components/primitives/dom";
 import { type FieldHandle, createField } from "../components/primitives/forms";
 import { DEFAULT_FORM_VALUES } from "./modes";
-import type { CaptureFieldErrors, CaptureFormValues } from "./modes";
+import type { CaptureFieldErrors, CoreFormValues } from "./modes";
 
 function numberInput(name: string, step = "any", min?: string): HTMLInputElement {
   const input = el("input", {
@@ -51,7 +51,7 @@ export interface ModeFormFields {
   readonly profileField: FieldHandle;
   /** Сетка всегда видимых настроек; порядок узлов тот же, что до сплита. */
   readonly settingsFields: HTMLElement;
-  values(): CaptureFormValues;
+  values(): CoreFormValues;
   setErrors(errors: CaptureFieldErrors): void;
   clearErrors(): void;
 }
@@ -158,7 +158,7 @@ export function createModeFormFields(): ModeFormFields {
     intervalField,
     profileField,
     settingsFields,
-    values: (): CaptureFormValues => ({
+    values: (): CoreFormValues => ({
       durationS: durationInput.value,
       sampleRateHz: rateInput.value,
       rangeV: rangeSelect.value,

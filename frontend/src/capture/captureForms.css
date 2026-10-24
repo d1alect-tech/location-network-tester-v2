@@ -279,6 +279,158 @@
   overflow-wrap: anywhere;
 }
 
+/* ── Декларация адаптера (N7): группа шага 2 визарда ─────────────────── */
+
+.capture-view .capture-adapter-group {
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-panel);
+  padding: 12px;
+  margin: 0 0 16px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.capture-view .capture-adapter-group legend {
+  font: 700 11px / 14px var(--lnt-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lnt-text-sec);
+  padding: 0 4px;
+}
+
+/* Утверждение подключения: цель 44px (a11y-пол), карточная подсветка галки. */
+.capture-view .capture-adapter-confirm {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  align-items: center;
+  min-height: var(--lnt-touch-target-min);
+  padding: 8px 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  cursor: pointer;
+  min-width: 0;
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease), background var(--lnt-t-fast)
+    var(--lnt-ease);
+}
+
+.capture-view .capture-adapter-confirm:hover {
+  background: var(--lnt-elev);
+  border-color: var(--lnt-line-hot);
+}
+
+.capture-view .capture-adapter-confirm:has(input:checked) {
+  border-color: var(--lnt-accent);
+  background: var(--lnt-elev);
+}
+
+.capture-view .capture-adapter-confirm:has(input:focus-visible) {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: 2px;
+}
+
+.capture-view .capture-adapter-confirm input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--lnt-accent);
+  flex: none;
+}
+
+.capture-view .capture-adapter-confirm-text {
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text);
+  min-width: 0;
+}
+
+.capture-view .capture-adapter-confirm-hint {
+  margin: -4px 0 0;
+}
+
+/* Радио-пара базиса: те же карточки-цели 44px. */
+.capture-view .capture-basis-toggle {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.capture-view .capture-basis-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+  align-items: center;
+  min-height: var(--lnt-touch-target-min);
+  padding: 6px 10px;
+  border: 1px solid var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-chrome);
+  cursor: pointer;
+  min-width: 0;
+  transition: border-color var(--lnt-t-fast) var(--lnt-ease), background var(--lnt-t-fast)
+    var(--lnt-ease);
+}
+
+.capture-view .capture-basis-option:hover {
+  background: var(--lnt-elev);
+  border-color: var(--lnt-line-hot);
+}
+
+.capture-view .capture-basis-option:has(input:checked) {
+  border-color: var(--lnt-accent);
+  background: var(--lnt-elev);
+}
+
+.capture-view .capture-basis-option:has(input:focus-visible) {
+  outline: 2px solid var(--lnt-accent);
+  outline-offset: 2px;
+}
+
+.capture-view .capture-basis-option span {
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text);
+  min-width: 0;
+}
+
+/* Статическая строка тракта записи — идиома строки каналов. */
+.capture-view .capture-adapter-fixed {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px dashed var(--lnt-line-struct);
+  border-radius: var(--lnt-r-ctl);
+  font-size: 13px;
+  color: var(--lnt-text-sec);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* H12: слоты динамики держат резерв высоты — появление/исчезновение
+ * подсказки и пола длительности не сдвигает раскладку. Пол резервируется
+ * под две строки: на 1280-колонке предупреждение переносится. */
+.capture-view .capture-adapter-notices {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.capture-view .capture-adapter-slot {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  min-width: 0;
+}
+
+.capture-view .capture-adapter-slot-floor {
+  min-height: 50px;
+}
+
+.capture-view .capture-adapter-hint {
+  margin: 0;
+}
+
 /* ── Визард (G4): рельс шагов, эхо-чипы, 44px-навигация ────────────────── */
 
 /* Пункт рельса: крупная цель 44px (a11y-пол), состояние data-state,

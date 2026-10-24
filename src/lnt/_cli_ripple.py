@@ -3,6 +3,9 @@
 Поверхность без математики: разрешение сессии (путь, имя каталога или
 ``session_id`` по семантике ``ui/sessions.resolve_session_dir``), типизированный
 разбор флагов, вызов публичного ``run_ripple`` и однострочный свод в stdout.
+Входы адаптера (``--cap-nf/--series-r-ohm/--probe/--preconnected``) при
+отсутствии флага читаются из декларации контекста сессии; заданный флаг —
+утверждение против декларации (несовпадение — exit 2).
 CLI никогда не правит отсчёты, не пересчитывает вольты и не вычитает фон —
 ``--probe`` это проверка равенства против манифеста, фон публикуется рядом.
 Внутренний отказ движка — exit 1 одной строкой stderr, без traceback.
@@ -14,14 +17,13 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, cast
 
+from lnt._cli_ripple_declaration import resolve_adapter, session_declaration
 from lnt.analysis_v2.engine_ripple import run_ripple
 from lnt.analysis_v2.ripple_options import (
     BaselineAttachment,
     RippleRequest,
-    SettlingDeclaration,
 )
 from lnt.errors import AnalysisError, InputError
-from lnt.ripple.adapter import AdapterSpec
 from lnt.session_store import load_session
 from lnt.ui.sessions import resolve_session_dir
 
@@ -35,13 +37,10 @@ EXIT_OK: Final = 0
 EXIT_INTERNAL_ERROR: Final = 1
 
 DEFAULT_ROOT: Final = Path.home() / "lnt-sessions"
-DEFAULT_CAP_NF: Final = 100.0
-DEFAULT_SERIES_R_OHM: Final = 0.0
 DEFAULT_WINDOW_S: Final = 1.0
 
 #: ``--probe`` — объявление пробника адаптера (1x/10x), не масштаб записи.
 _PROBE_CHOICES: Final = ("1x", "10x")
-_PROBE_MULTIPLIERS: Final[Mapping[str, int]] = {"1x": 1, "10x": 10}
 
 _UNAVAILABLE: Final = "недоступно"
 
@@ -77,22 +76,31 @@ def configure_ripple_parser(
     command.add_argument(
         "--cap-nf",
         type=finite_float,
-        default=DEFAULT_CAP_NF,
+        default=None,
         metavar="NF",
-        help="ёмкость последовательного конденсатора адаптера, нФ",
+        help=(
+            "ёмкость последовательного конденсатора адаптера, нФ; "
+            "по умолчанию: из декларации контекста сессии, иначе 100 нФ"
+        ),
     )
     command.add_argument(
         "--series-r-ohm",
         type=finite_float,
-        default=DEFAULT_SERIES_R_OHM,
+        default=None,
         metavar="OHM",
-        help="номинал последовательного резистора адаптера, Ом",
+        help=(
+            "номинал последовательного резистора адаптера, Ом; "
+            "по умолчанию: из декларации контекста сессии, иначе 0 Ом"
+        ),
     )
     command.add_argument(
         "--probe",
         choices=_PROBE_CHOICES,
-        default="1x",
-        help="объявленный пробник адаптера: проверка равенства против манифеста, не пересчёт",
+        default=None,
+        help=(
+            "объявленный пробник адаптера: проверка равенства против манифеста, не пересчёт; "
+            "по умолчанию: из декларации контекста сессии, иначе 1x"
+        ),
     )
     command.add_argument(
         "--window-s",
@@ -104,7 +112,11 @@ def configure_ripple_parser(
     command.add_argument(
         "--preconnected",
         action="store_true",
-        help="операторское объявление: подключение до старта записи, без переподключений в эпохе",
+        default=None,
+        help=(
+            "операторское объявление: подключение до старта записи, без переподключений в эпохе; "
+            "по умолчанию: из декларации контекста сессии, иначе settling_unknown"
+        ),
     )
     command.add_argument(
         "--baseline",
@@ -138,24 +150,17 @@ def _request_from_args(args: argparse.Namespace) -> RippleRequest:
     """Строит запрос движка из разобранных аргументов; нечисловые отказы — типизированные."""
     session_dir = _resolve_session_dir(cast("str", args.session), cast("Path", args.root))
     session = _load_session_guarded(session_dir)
+    adapter, settling = resolve_adapter(args, session_declaration(session))
     baseline_key = cast("str | None", args.baseline)
     baseline_shorted = bool(args.baseline_shorted_tip)
     if baseline_shorted and baseline_key is None:
         raise InputError("ripple: --baseline-shorted-tip требует --baseline")
     return RippleRequest(
         session=session,
-        adapter=AdapterSpec(
-            cap_nf=cast("float", args.cap_nf),
-            series_r_ohm=cast("float", args.series_r_ohm),
-            probe_multiplier=_PROBE_MULTIPLIERS[cast("str", args.probe)],
-        ),
+        adapter=adapter,
         band_low_hz=cast("float", args.band_low),
         band_high_hz=cast("float", args.band_high),
-        settling=(
-            SettlingDeclaration.PRECONNECTED
-            if bool(args.preconnected)
-            else SettlingDeclaration.UNKNOWN
-        ),
+        settling=settling,
         window_s=cast("float", args.window_s),
         baseline_path=Path(baseline_key) if baseline_key is not None else None,
         baseline_attachment=(

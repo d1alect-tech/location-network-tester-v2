@@ -38,6 +38,14 @@ describe("captureParamsToPrefill (C1: билет из URL → предзапол
     expect(prefill).toEqual({ durationS: "1.5" });
   });
 
+  it("ripple_measurement проходит существующий механизм префилла режима", () => {
+    // Given / When: новый пятый режим принимается тем же списком CAPTURE_MODE_IDS.
+    const prefill = captureParamsToPrefill({ mode: "ripple_measurement", source: "device" });
+
+    // Then
+    expect(prefill).toEqual({ modeId: "ripple_measurement", source: "device" });
+  });
+
   it("пустой query даёт пустой префилл (форма показывает свои дефолты)", () => {
     // Given / When
     const prefill = captureParamsToPrefill({ a: "x", b: "y" });
@@ -76,6 +84,17 @@ describe("applyCapturePrefill (C1: префилл ложится в живую �
       label: "точка-7",
     });
     expect(notified).toBeGreaterThan(0);
+  });
+
+  it("ripple_measurement ложится пятой радио-карточкой в живую форму", () => {
+    // Given
+    const form = createModeForm();
+
+    // When
+    applyCapturePrefill(form.root, { modeId: "ripple_measurement" });
+
+    // Then
+    expect(form.getMode().id).toBe("ripple_measurement");
   });
 
   it("пустой префилл ничего не трогает (дефолты RC/симулятор на месте)", () => {

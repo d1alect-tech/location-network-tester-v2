@@ -73,6 +73,21 @@
   margin: 12px 0 0;
 }
 
+/* Пол длительности (N7): консультативная полоса warn-тона — НЕ блокирует
+ * «Далее», истина о достаточности остаётся за движком (коды причин). */
+.capture-view .capture-adapter-floor {
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid rgb(230 134 25 / 0.35);
+  border-left: 3px solid var(--lnt-warn);
+  border-radius: var(--lnt-r-ctl);
+  background: var(--lnt-warn-bg);
+  font: 400 13px / 18px var(--lnt-ui);
+  color: var(--lnt-text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* ── Устройство и preflight: пилюли-glyph + карточки замечаний ─────────── */
 
 .capture-view .capture-device-line {

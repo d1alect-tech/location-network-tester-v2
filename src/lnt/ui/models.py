@@ -128,6 +128,17 @@ class SimulateRequest(_SeriesRequest):
         return value
 
 
+class AdapterDeclarationModel(BaseModel):
+    """Декларация RC-адаптера ripple в запросе захвата (write-once контекст)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
+
+    preconnected: bool
+    cap_nf: Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
+    series_r_ohm: Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
+    component_values_basis: Literal["nominal", "operator_measured"]
+
+
 class CaptureRequest(_SeriesRequest):
     """Запрос на захват сессии с осциллографа."""
 
@@ -141,6 +152,7 @@ class CaptureRequest(_SeriesRequest):
     baseline_session: str | None = None
     channels: Literal[1, 2] = 2
     input: Literal["rc", "transformer"] = "rc"
+    adapter_declaration: AdapterDeclarationModel | None = None
 
     @field_validator("baseline_session")
     @classmethod
@@ -192,6 +204,18 @@ class CaptureRequest(_SeriesRequest):
                 "диапазон должен быть одним из: 5.0, 1.0, 0.5 В",
             )
         return value
+
+    @model_validator(mode="after")
+    def validate_adapter_declaration_pairing(self) -> "CaptureRequest":
+        """Ripple-декларация совместима только с одноканальным RC-захватом."""
+        if self.adapter_declaration is None:
+            return self
+        if self.channels != 1 or self.input != "rc" or self.self_noise:
+            raise PydanticCustomError(
+                "adapter_declaration_requires_single_channel_rc",
+                "ripple-декларация совместима только с одноканальным RC-захватом",
+            )
+        return self
 
 
 class AnalyzeRequest(BaseModel):
